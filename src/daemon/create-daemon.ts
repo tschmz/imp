@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { ConversationState } from "../domain/conversation.js";
@@ -6,7 +7,7 @@ import { createAgentRunner } from "../runtime/agent-runner.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
 import type { TransportHandler } from "../transports/types.js";
-import type { Daemon, DaemonConfig } from "./types.js";
+import type { Daemon, DaemonConfig, RuntimePaths } from "./types.js";
 
 export function createDaemon(config: DaemonConfig): Daemon {
   const agentRegistry = createAgentRegistry(loadBuiltInAgents());
@@ -18,6 +19,8 @@ export function createDaemon(config: DaemonConfig): Daemon {
       if (!defaultAgent) {
         throw new Error(`Unknown default agent: ${config.defaultAgentId}`);
       }
+
+      await ensureRuntimePaths(config.paths);
 
       console.log(`starting daemon with default agent "${defaultAgent.id}"`);
       console.log(`data root: ${config.paths.dataRoot}`);
@@ -76,4 +79,12 @@ async function getOrCreateConversationState(
 
   await conversationStore.put(created);
   return created;
+}
+
+async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
+  await mkdir(paths.dataRoot, { recursive: true });
+  await mkdir(paths.botRoot, { recursive: true });
+  await mkdir(paths.conversationsDir, { recursive: true });
+  await mkdir(paths.logsDir, { recursive: true });
+  await mkdir(paths.runtimeDir, { recursive: true });
 }
