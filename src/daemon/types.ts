@@ -5,7 +5,8 @@ export interface TelegramBotRuntimeConfig {
 }
 
 export interface DaemonConfig {
-  dataDir: string;
+  dataRoot: string;
+  botDataDir: string;
   defaultAgentId: string;
   activeBot: TelegramBotRuntimeConfig;
 }

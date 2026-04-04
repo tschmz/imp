@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { DaemonConfig } from "../daemon/types.js";
 import type { AppConfig } from "./types.js";
 
@@ -21,7 +22,8 @@ export function resolveRuntimeConfig(appConfig: AppConfig): DaemonConfig {
   }
 
   return {
-    dataDir: appConfig.paths.dataRoot,
+    dataRoot: appConfig.paths.dataRoot,
+    botDataDir: join(appConfig.paths.dataRoot, "bots", bot.id),
     defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,
     activeBot: {
       id: bot.id,

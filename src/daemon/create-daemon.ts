@@ -10,7 +10,7 @@ import type { Daemon, DaemonConfig } from "./types.js";
 
 export function createDaemon(config: DaemonConfig): Daemon {
   const agentRegistry = createAgentRegistry(loadBuiltInAgents());
-  const conversationStore = createFsConversationStore(config.dataDir);
+  const conversationStore = createFsConversationStore(config.botDataDir);
 
   return {
     async start() {
@@ -20,7 +20,8 @@ export function createDaemon(config: DaemonConfig): Daemon {
       }
 
       console.log(`starting daemon with default agent "${defaultAgent.id}"`);
-      console.log(`data dir: ${config.dataDir}`);
+      console.log(`data root: ${config.dataRoot}`);
+      console.log(`bot data dir: ${config.botDataDir}`);
 
       console.log(`active bot: ${config.activeBot.id}`);
 
