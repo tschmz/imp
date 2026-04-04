@@ -1,8 +1,2 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-
-export default function (_pi: ExtensionAPI) {
-  void _pi;
-
-  // pi-claw extension entrypoint
-  // Implementation will start with workflow state + /status + tool gating.
-}
+export { createDaemon } from "./daemon/create-daemon.js";
+export type { Daemon, DaemonConfig } from "./daemon/types.js";

@@ -2,25 +2,18 @@
   "name": "pi-claw",
   "version": "0.1.0",
   "private": true,
-  "description": "A lightweight, opinionated OpenClaw-like layer built on top of pi",
+  "description": "A lightweight local daemon for pi-based agents",
   "type": "module",
-  "keywords": [
-    "pi-package"
-  ],
   "engines": {
     "node": ">=20.6.0"
-  },
-  "pi": {
-    "extensions": [
-      "./src"
-    ]
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "check": "npm run typecheck && npm run lint"
+    "check": "npm run typecheck && npm run lint",
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.65.0"
