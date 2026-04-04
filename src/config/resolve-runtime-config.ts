@@ -23,8 +23,10 @@ export function resolveRuntimeConfig(appConfig: AppConfig): DaemonConfig {
   return {
     dataDir: appConfig.paths.dataRoot,
     defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,
-    telegram: {
-      botToken: bot.token,
+    activeBot: {
+      id: bot.id,
+      type: bot.type,
+      token: bot.token,
     },
   };
 }

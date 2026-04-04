@@ -22,32 +22,30 @@ export function createDaemon(config: DaemonConfig): Daemon {
       console.log(`starting daemon with default agent "${defaultAgent.id}"`);
       console.log(`data dir: ${config.dataDir}`);
 
-      if (config.telegram) {
-        const transport = createTelegramTransport(config.telegram);
-        const handler: TransportHandler = {
-          handle: async (message: IncomingMessage): Promise<OutgoingMessage> => {
-            const conversation = await getOrCreateConversationState(
-              message,
-              defaultAgent.id,
-              conversationStore,
-            );
-            const agent = agentRegistry.get(conversation.agentId) ?? defaultAgent;
-            const runner = createAgentRunner(agent);
-            const response = await runner.run(message);
+      console.log(`active bot: ${config.activeBot.id}`);
 
-            await conversationStore.put({
-              ...conversation,
-              updatedAt: message.receivedAt,
-            });
+      const transport = createTelegramTransport(config.activeBot);
+      const handler: TransportHandler = {
+        handle: async (message: IncomingMessage): Promise<OutgoingMessage> => {
+          const conversation = await getOrCreateConversationState(
+            message,
+            defaultAgent.id,
+            conversationStore,
+          );
+          const agent = agentRegistry.get(conversation.agentId) ?? defaultAgent;
+          const runner = createAgentRunner(agent);
+          const response = await runner.run(message);
 
-            return response;
-          },
-        };
+          await conversationStore.put({
+            ...conversation,
+            updatedAt: message.receivedAt,
+          });
 
-        await transport.start(handler);
-      } else {
-        console.log("telegram transport is not configured");
-      }
+          return response;
+        },
+      };
+
+      await transport.start(handler);
     },
   };
 }

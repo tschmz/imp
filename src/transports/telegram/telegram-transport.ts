@@ -1,12 +1,9 @@
 import { Bot } from "grammy";
+import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
 import type { Transport, TransportHandler } from "../types.js";
 
-export interface TelegramTransportConfig {
-  botToken: string;
-}
-
-export function createTelegramTransport(config: TelegramTransportConfig): Transport {
-  const bot = new Bot(config.botToken);
+export function createTelegramTransport(config: TelegramBotRuntimeConfig): Transport {
+  const bot = new Bot(config.token);
 
   return {
     async start(handler: TransportHandler): Promise<void> {
