@@ -1,8 +1,8 @@
 {
-  "name": "pi-claw",
+  "name": "imp",
   "version": "0.1.0",
   "private": true,
-  "description": "A lightweight local daemon for pi-based agents",
+  "description": "A lightweight local daemon for modular agent bots",
   "type": "module",
   "engines": {
     "node": ">=20.6.0"
