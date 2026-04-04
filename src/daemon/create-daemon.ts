@@ -4,6 +4,7 @@ import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { ConversationState } from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
+import { createFileLogger } from "../logging/file-logger.js";
 import { createAgentRunner } from "../runtime/agent-runner.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
@@ -30,6 +31,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
 
       await ensureRuntimePaths(config.paths);
       await ensureLogFile(config.paths.logFilePath);
+      const logger = createFileLogger(config.paths.logFilePath);
       const runtimeStatePath = join(config.paths.runtimeDir, "daemon.json");
       await assertNoRunningInstance(runtimeStatePath);
       await writeRuntimeState(runtimeStatePath, {
@@ -41,16 +43,16 @@ export function createDaemon(config: DaemonConfig): Daemon {
       const cleanup = registerRuntimeCleanup(runtimeStatePath);
 
       try {
-        console.log(`starting daemon with default agent "${defaultAgent.id}"`);
-        console.log(`data root: ${config.paths.dataRoot}`);
-        console.log(`bot root: ${config.paths.botRoot}`);
-        console.log(`conversations dir: ${config.paths.conversationsDir}`);
-        console.log(`logs dir: ${config.paths.logsDir}`);
-        console.log(`log file: ${config.paths.logFilePath}`);
-        console.log(`runtime dir: ${config.paths.runtimeDir}`);
-        console.log(`runtime file: ${runtimeStatePath}`);
+        await logger.info(`starting daemon with default agent "${defaultAgent.id}"`);
+        await logger.info(`data root: ${config.paths.dataRoot}`);
+        await logger.info(`bot root: ${config.paths.botRoot}`);
+        await logger.info(`conversations dir: ${config.paths.conversationsDir}`);
+        await logger.info(`logs dir: ${config.paths.logsDir}`);
+        await logger.info(`log file: ${config.paths.logFilePath}`);
+        await logger.info(`runtime dir: ${config.paths.runtimeDir}`);
+        await logger.info(`runtime file: ${runtimeStatePath}`);
 
-        console.log(`active bot: ${config.activeBot.id}`);
+        await logger.info(`active bot: ${config.activeBot.id}`);
 
         const transport = createTelegramTransport(config.activeBot);
         const handler: TransportHandler = {
@@ -73,7 +75,12 @@ export function createDaemon(config: DaemonConfig): Daemon {
           },
         };
 
-        await transport.start(handler);
+        try {
+          await transport.start(handler);
+        } catch (error) {
+          await logger.error("daemon stopped with transport error", error);
+          throw error;
+        }
       } finally {
         cleanup.dispose();
         await cleanup.run();
