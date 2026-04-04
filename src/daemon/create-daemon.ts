@@ -75,12 +75,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
           },
         };
 
-        try {
-          await transport.start(handler);
-        } catch (error) {
-          await logger.error("daemon stopped with transport error", error);
-          throw error;
-        }
+        await transport.start(handler);
       } finally {
         cleanup.dispose();
         await cleanup.run();
