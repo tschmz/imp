@@ -29,6 +29,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
       }
 
       await ensureRuntimePaths(config.paths);
+      await ensureLogFile(config.paths.logFilePath);
       const runtimeStatePath = join(config.paths.runtimeDir, "daemon.json");
       await assertNoRunningInstance(runtimeStatePath);
       await writeRuntimeState(runtimeStatePath, {
@@ -45,6 +46,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
         console.log(`bot root: ${config.paths.botRoot}`);
         console.log(`conversations dir: ${config.paths.conversationsDir}`);
         console.log(`logs dir: ${config.paths.logsDir}`);
+        console.log(`log file: ${config.paths.logFilePath}`);
         console.log(`runtime dir: ${config.paths.runtimeDir}`);
         console.log(`runtime file: ${runtimeStatePath}`);
 
@@ -110,6 +112,10 @@ async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
   await mkdir(paths.conversationsDir, { recursive: true });
   await mkdir(paths.logsDir, { recursive: true });
   await mkdir(paths.runtimeDir, { recursive: true });
+}
+
+async function ensureLogFile(path: string): Promise<void> {
+  await writeFile(path, "", { encoding: "utf8", flag: "a" });
 }
 
 async function writeRuntimeState(path: string, state: RuntimeState): Promise<void> {

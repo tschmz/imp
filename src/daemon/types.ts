@@ -9,6 +9,7 @@ export interface RuntimePaths {
   botRoot: string;
   conversationsDir: string;
   logsDir: string;
+  logFilePath: string;
   runtimeDir: string;
 }
 

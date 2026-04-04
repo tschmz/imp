@@ -29,6 +29,7 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
       botRoot,
       conversationsDir: join(botRoot, "conversations"),
       logsDir: join(botRoot, "logs"),
+      logFilePath: join(botRoot, "logs", "daemon.log"),
       runtimeDir: join(botRoot, "runtime"),
     },
     configPath,
