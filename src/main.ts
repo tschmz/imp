@@ -1,8 +1,12 @@
+import { parseCliArgs } from "./cli/parse-cli-args.js";
+import { loadAppConfig } from "./config/load-app-config.js";
+import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
 import { createDaemon } from "./daemon/create-daemon.js";
-import { loadConfigFromEnv } from "./config/load-config.js";
 
 async function main(): Promise<void> {
-  const daemon = createDaemon(loadConfigFromEnv());
+  const args = parseCliArgs();
+  const appConfig = await loadAppConfig(args.configPath);
+  const daemon = createDaemon(resolveRuntimeConfig(appConfig));
   await daemon.start();
 }
 
