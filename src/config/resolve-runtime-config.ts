@@ -21,9 +21,16 @@ export function resolveRuntimeConfig(appConfig: AppConfig): DaemonConfig {
     throw new Error(`Unsupported bot type: ${bot.type}`);
   }
 
+  const botRoot = join(appConfig.paths.dataRoot, "bots", bot.id);
+
   return {
-    dataRoot: appConfig.paths.dataRoot,
-    botDataDir: join(appConfig.paths.dataRoot, "bots", bot.id),
+    paths: {
+      dataRoot: appConfig.paths.dataRoot,
+      botRoot,
+      conversationsDir: join(botRoot, "conversations"),
+      logsDir: join(botRoot, "logs"),
+      runtimeDir: join(botRoot, "runtime"),
+    },
     defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,
     activeBot: {
       id: bot.id,

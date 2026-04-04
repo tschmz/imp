@@ -4,9 +4,16 @@ export interface TelegramBotRuntimeConfig {
   token: string;
 }
 
-export interface DaemonConfig {
+export interface RuntimePaths {
   dataRoot: string;
-  botDataDir: string;
+  botRoot: string;
+  conversationsDir: string;
+  logsDir: string;
+  runtimeDir: string;
+}
+
+export interface DaemonConfig {
+  paths: RuntimePaths;
   defaultAgentId: string;
   activeBot: TelegramBotRuntimeConfig;
 }
