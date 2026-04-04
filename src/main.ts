@@ -1,13 +1,25 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { parseCliArgs } from "./cli/parse-cli-args.js";
 import { loadAppConfig } from "./config/load-app-config.js";
 import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
 import { createDaemon } from "./daemon/create-daemon.js";
+import { createFileLogger } from "./logging/file-logger.js";
 
 async function main(): Promise<void> {
   const args = parseCliArgs();
   const appConfig = await loadAppConfig(args.configPath);
-  const daemon = createDaemon(resolveRuntimeConfig(appConfig, args.configPath));
-  await daemon.start();
+  const runtimeConfig = resolveRuntimeConfig(appConfig, args.configPath);
+  const daemon = createDaemon(runtimeConfig);
+
+  try {
+    await daemon.start();
+  } catch (error) {
+    await ensureStartupLogFile(runtimeConfig.paths.logFilePath);
+    const logger = createFileLogger(runtimeConfig.paths.logFilePath);
+    await logger.error("daemon failed to start", error);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error: unknown) => {
@@ -15,3 +27,8 @@ main().catch((error: unknown) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+async function ensureStartupLogFile(path: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, "", { encoding: "utf8", flag: "a" });
+}
