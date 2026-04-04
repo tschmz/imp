@@ -4,7 +4,13 @@ import type { ConversationRef, ConversationState } from "../domain/conversation.
 import type { ConversationStore } from "./types.js";
 
 function getConversationPath(dataDir: string, ref: ConversationRef): string {
-  return join(dataDir, "conversations", `${ref.transport}-${ref.externalId}.json`);
+  return join(
+    dataDir,
+    "conversations",
+    sanitizePathSegment(ref.transport),
+    sanitizePathSegment(ref.externalId),
+    "meta.json",
+  );
 }
 
 export function createFsConversationStore(dataDir: string): ConversationStore {
@@ -36,4 +42,8 @@ function isMissingFile(error: unknown): boolean {
     "code" in error &&
     error.code === "ENOENT"
   );
+}
+
+function sanitizePathSegment(value: string): string {
+  return value.replaceAll("/", "_");
 }
