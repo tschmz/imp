@@ -39,6 +39,7 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
       id: bot.id,
       type: bot.type,
       token: bot.token,
+      allowedUserIds: bot.access.allowedUserIds,
     },
   };
 }

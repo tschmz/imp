@@ -4,6 +4,7 @@ import type { Transport, TransportHandler } from "../types.js";
 
 export function createTelegramTransport(config: TelegramBotRuntimeConfig): Transport {
   const bot = new Bot(config.token);
+  const allowedUserIds = new Set(config.allowedUserIds);
 
   return {
     async start(handler: TransportHandler): Promise<void> {
@@ -15,6 +16,10 @@ export function createTelegramTransport(config: TelegramBotRuntimeConfig): Trans
         }
 
         if (ctx.chat.type !== "private") {
+          return;
+        }
+
+        if (!allowedUserIds.has(String(ctx.from.id))) {
           return;
         }
 

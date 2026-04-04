@@ -2,6 +2,7 @@ export interface TelegramBotRuntimeConfig {
   id: string;
   type: "telegram";
   token: string;
+  allowedUserIds: string[];
 }
 
 export interface RuntimePaths {
