@@ -51,6 +51,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
         await logger.info(`logs dir: ${config.paths.logsDir}`);
         await logger.info(`log file: ${config.paths.logFilePath}`);
         await logger.info(`runtime dir: ${config.paths.runtimeDir}`);
+        await logger.info(`lock file: ${config.paths.lockFilePath}`);
         await logger.info(`runtime file: ${runtimeStatePath}`);
 
         await logger.info(`active bot: ${config.activeBot.id}`);
