@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { parseCliArgs } from "./cli/parse-cli-args.js";
