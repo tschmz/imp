@@ -16,6 +16,7 @@ interface RuntimeState {
   botId: string;
   startedAt: string;
   configPath: string;
+  logFilePath: string;
 }
 
 export function createDaemon(config: DaemonConfig): Daemon {
@@ -39,6 +40,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
         botId: config.activeBot.id,
         startedAt: new Date().toISOString(),
         configPath: config.configPath,
+        logFilePath: config.paths.logFilePath,
       });
       const cleanup = registerRuntimeCleanup(runtimeStatePath);
 
@@ -227,7 +229,9 @@ function parseRuntimeState(content: string): RuntimeState | null {
     typeof value.startedAt !== "string" ||
     value.startedAt.length === 0 ||
     typeof value.configPath !== "string" ||
-    value.configPath.length === 0
+    value.configPath.length === 0 ||
+    typeof value.logFilePath !== "string" ||
+    value.logFilePath.length === 0
   ) {
     return null;
   }
@@ -237,6 +241,7 @@ function parseRuntimeState(content: string): RuntimeState | null {
     botId: value.botId,
     startedAt: value.startedAt,
     configPath: value.configPath,
+    logFilePath: value.logFilePath,
   };
 }
 
