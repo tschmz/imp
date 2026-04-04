@@ -45,7 +45,7 @@ function getConfigPathCandidates(options: {
     candidates.push(resolve(xdgConfigHome, "imp", "config.json"));
   }
 
-  candidates.push(resolve(homedir(), ".config", "imp", "config.json"));
+  candidates.push(getDefaultUserConfigPath(env));
   candidates.push("/etc/imp/config.json");
 
   return Array.from(new Set(candidates));
@@ -62,7 +62,7 @@ async function pathExists(path: string): Promise<boolean> {
 
 function buildMissingConfigMessage(checkedPaths: string[]): string {
   const checked = checkedPaths.map((path) => `- ${path}`).join("\n");
-  const recommendedPath = resolve(homedir(), ".config", "imp", "config.json");
+  const recommendedPath = getDefaultUserConfigPath();
 
   return [
     "No config file found.",
@@ -75,4 +75,22 @@ function buildMissingConfigMessage(checkedPaths: string[]): string {
     "Or start with:",
     "- imp --config /path/to/config.json",
   ].join("\n");
+}
+
+export function getDefaultUserConfigPath(env: NodeJS.ProcessEnv = process.env): string {
+  const xdgConfigHome = env.XDG_CONFIG_HOME;
+  if (xdgConfigHome) {
+    return resolve(xdgConfigHome, "imp", "config.json");
+  }
+
+  return resolve(homedir(), ".config", "imp", "config.json");
+}
+
+export function getDefaultUserDataRoot(env: NodeJS.ProcessEnv = process.env): string {
+  const xdgStateHome = env.XDG_STATE_HOME;
+  if (xdgStateHome) {
+    return resolve(xdgStateHome, "imp");
+  }
+
+  return resolve(homedir(), ".local", "state", "imp");
 }
