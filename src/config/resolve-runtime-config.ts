@@ -2,7 +2,7 @@ import { join } from "node:path";
 import type { DaemonConfig } from "../daemon/types.js";
 import type { AppConfig } from "./types.js";
 
-export function resolveRuntimeConfig(appConfig: AppConfig): DaemonConfig {
+export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): DaemonConfig {
   const enabledBots = appConfig.bots.filter((bot) => bot.enabled);
 
   if (enabledBots.length === 0) {
@@ -31,6 +31,7 @@ export function resolveRuntimeConfig(appConfig: AppConfig): DaemonConfig {
       logsDir: join(botRoot, "logs"),
       runtimeDir: join(botRoot, "runtime"),
     },
+    configPath,
     defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,
     activeBot: {
       id: bot.id,

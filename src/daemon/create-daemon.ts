@@ -10,6 +10,13 @@ import { createTelegramTransport } from "../transports/telegram/telegram-transpo
 import type { TransportHandler } from "../transports/types.js";
 import type { Daemon, DaemonConfig, RuntimePaths } from "./types.js";
 
+interface RuntimeState {
+  pid: number;
+  botId: string;
+  startedAt: string;
+  configPath: string;
+}
+
 export function createDaemon(config: DaemonConfig): Daemon {
   const agentRegistry = createAgentRegistry(loadBuiltInAgents());
   const conversationStore = createFsConversationStore(config.paths);
@@ -22,10 +29,15 @@ export function createDaemon(config: DaemonConfig): Daemon {
       }
 
       await ensureRuntimePaths(config.paths);
-      const pidFilePath = join(config.paths.runtimeDir, "daemon.pid");
-      await assertNoRunningInstance(pidFilePath);
-      await writePidFile(pidFilePath);
-      const cleanup = registerRuntimeCleanup(pidFilePath);
+      const runtimeStatePath = join(config.paths.runtimeDir, "daemon.json");
+      await assertNoRunningInstance(runtimeStatePath);
+      await writeRuntimeState(runtimeStatePath, {
+        pid: process.pid,
+        botId: config.activeBot.id,
+        startedAt: new Date().toISOString(),
+        configPath: config.configPath,
+      });
+      const cleanup = registerRuntimeCleanup(runtimeStatePath);
 
       try {
         console.log(`starting daemon with default agent "${defaultAgent.id}"`);
@@ -34,7 +46,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
         console.log(`conversations dir: ${config.paths.conversationsDir}`);
         console.log(`logs dir: ${config.paths.logsDir}`);
         console.log(`runtime dir: ${config.paths.runtimeDir}`);
-        console.log(`pid file: ${pidFilePath}`);
+        console.log(`runtime file: ${runtimeStatePath}`);
 
         console.log(`active bot: ${config.activeBot.id}`);
 
@@ -100,28 +112,35 @@ async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
   await mkdir(paths.runtimeDir, { recursive: true });
 }
 
-async function writePidFile(path: string): Promise<void> {
-  await writeFile(path, `${process.pid}\n`, "utf8");
+async function writeRuntimeState(path: string, state: RuntimeState): Promise<void> {
+  await writeFile(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
 async function assertNoRunningInstance(path: string): Promise<void> {
-  const existingPid = await readPidFile(path);
-  if (existingPid === undefined) {
+  const existingState = await readRuntimeState(path);
+  if (existingState === undefined) {
     return;
   }
 
-  if (existingPid === process.pid) {
+  if (existingState === null) {
+    await removePidFile(path);
     return;
   }
 
-  if (isProcessRunning(existingPid)) {
-    throw new Error(`Another daemon instance is already running with pid ${existingPid}.`);
+  if (existingState.pid === process.pid) {
+    return;
+  }
+
+  if (isProcessRunning(existingState.pid)) {
+    throw new Error(
+      `Another daemon instance is already running with pid ${existingState.pid}.`,
+    );
   }
 
   await removePidFile(path);
 }
 
-function registerRuntimeCleanup(pidFilePath: string): {
+function registerRuntimeCleanup(runtimeStatePath: string): {
   dispose(): void;
   run(): Promise<void>;
 } {
@@ -133,7 +152,7 @@ function registerRuntimeCleanup(pidFilePath: string): {
     }
 
     cleanedUp = true;
-    await removePidFile(pidFilePath);
+    await removePidFile(runtimeStatePath);
   };
 
   const handleSigint = () => {
@@ -170,16 +189,9 @@ async function removePidFile(path: string): Promise<void> {
   }
 }
 
-async function readPidFile(path: string): Promise<number | undefined> {
+async function readRuntimeState(path: string): Promise<RuntimeState | null | undefined> {
   try {
-    const content = await readFile(path, "utf8");
-    const pid = Number.parseInt(content.trim(), 10);
-
-    if (!Number.isInteger(pid) || pid <= 0) {
-      return undefined;
-    }
-
-    return pid;
+    return parseRuntimeState(await readFile(path, "utf8"));
   } catch (error) {
     if (isMissingFileError(error)) {
       return undefined;
@@ -187,6 +199,37 @@ async function readPidFile(path: string): Promise<number | undefined> {
 
     throw error;
   }
+}
+
+function parseRuntimeState(content: string): RuntimeState | null {
+  let value: Partial<RuntimeState>;
+
+  try {
+    value = JSON.parse(content) as Partial<RuntimeState>;
+  } catch {
+    return null;
+  }
+
+  if (
+    !Number.isInteger(value.pid) ||
+    value.pid === undefined ||
+    value.pid <= 0 ||
+    typeof value.botId !== "string" ||
+    value.botId.length === 0 ||
+    typeof value.startedAt !== "string" ||
+    value.startedAt.length === 0 ||
+    typeof value.configPath !== "string" ||
+    value.configPath.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    pid: value.pid,
+    botId: value.botId,
+    startedAt: value.startedAt,
+    configPath: value.configPath,
+  };
 }
 
 function isProcessRunning(pid: number): boolean {

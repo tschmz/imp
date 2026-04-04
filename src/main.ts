@@ -6,7 +6,7 @@ import { createDaemon } from "./daemon/create-daemon.js";
 async function main(): Promise<void> {
   const args = parseCliArgs();
   const appConfig = await loadAppConfig(args.configPath);
-  const daemon = createDaemon(resolveRuntimeConfig(appConfig));
+  const daemon = createDaemon(resolveRuntimeConfig(appConfig, args.configPath));
   await daemon.start();
 }
 

@@ -14,6 +14,7 @@ export interface RuntimePaths {
 
 export interface DaemonConfig {
   paths: RuntimePaths;
+  configPath: string;
   defaultAgentId: string;
   activeBot: TelegramBotRuntimeConfig;
 }
