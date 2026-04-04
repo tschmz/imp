@@ -22,7 +22,7 @@ export async function discoverConfigPath(options: {
     }
   }
 
-  throw new Error(buildMissingConfigMessage(candidates));
+  throw new Error(buildMissingConfigMessage(candidates, options.env));
 }
 
 function getConfigPathCandidates(options: {
@@ -60,9 +60,12 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function buildMissingConfigMessage(checkedPaths: string[]): string {
+function buildMissingConfigMessage(
+  checkedPaths: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): string {
   const checked = checkedPaths.map((path) => `- ${path}`).join("\n");
-  const recommendedPath = getDefaultUserConfigPath();
+  const recommendedPath = getDefaultUserConfigPath(env);
 
   return [
     "No config file found.",

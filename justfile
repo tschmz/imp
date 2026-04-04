@@ -8,9 +8,10 @@ default:
 clean:
   npm run clean
 
-# Run typecheck and lint.
+# Run typecheck, lint, and tests.
 check:
   npm run check
+  npm test
 
 # Compile the project into dist/.
 build:
