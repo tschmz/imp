@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, GrammyError } from "grammy";
 import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
 import type { Transport, TransportHandler } from "../types.js";
 
@@ -7,6 +7,8 @@ export function createTelegramTransport(config: TelegramBotRuntimeConfig): Trans
 
   return {
     async start(handler: TransportHandler): Promise<void> {
+      await validateBotToken(bot, config);
+
       bot.on("message:text", async (ctx) => {
         if (!ctx.chat || !ctx.message || !ctx.from) {
           return;
@@ -37,4 +39,21 @@ export function createTelegramTransport(config: TelegramBotRuntimeConfig): Trans
       await bot.start();
     },
   };
+}
+
+async function validateBotToken(
+  bot: Bot,
+  config: TelegramBotRuntimeConfig,
+): Promise<void> {
+  try {
+    await bot.api.getMe();
+  } catch (error) {
+    if (error instanceof GrammyError) {
+      throw new Error(
+        `Invalid Telegram bot token for bot "${config.id}" (${error.error_code}: ${error.description})`,
+      );
+    }
+
+    throw error;
+  }
 }
