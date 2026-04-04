@@ -31,7 +31,6 @@ export function createDaemon(config: DaemonConfig): Daemon {
 
       await ensureRuntimePaths(config.paths);
       await ensureLogFile(config.paths.logFilePath);
-      await ensureLockFile(config.paths.lockFilePath);
       const logger = createFileLogger(config.paths.logFilePath);
       const runtimeStatePath = config.paths.runtimeStatePath;
       await assertNoRunningInstance(runtimeStatePath);
@@ -42,10 +41,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
         configPath: config.configPath,
         logFilePath: config.paths.logFilePath,
       });
-      const cleanup = registerRuntimeCleanup({
-        runtimeStatePath,
-        lockFilePath: config.paths.lockFilePath,
-      });
+      const cleanup = registerRuntimeCleanup({ runtimeStatePath });
 
       try {
         await logger.info(`starting daemon with default agent "${defaultAgent.id}"`);
@@ -55,7 +51,6 @@ export function createDaemon(config: DaemonConfig): Daemon {
         await logger.info(`logs dir: ${config.paths.logsDir}`);
         await logger.info(`log file: ${config.paths.logFilePath}`);
         await logger.info(`runtime dir: ${config.paths.runtimeDir}`);
-        await logger.info(`lock file: ${config.paths.lockFilePath}`);
         await logger.info(`runtime file: ${runtimeStatePath}`);
 
         await logger.info(`active bot: ${config.activeBot.id}`);
@@ -126,10 +121,6 @@ async function ensureLogFile(path: string): Promise<void> {
   await writeFile(path, "", { encoding: "utf8", flag: "a" });
 }
 
-async function ensureLockFile(path: string): Promise<void> {
-  await writeFile(path, `${process.pid}\n`, "utf8");
-}
-
 async function writeRuntimeState(path: string, state: RuntimeState): Promise<void> {
   await writeFile(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
@@ -158,10 +149,7 @@ async function assertNoRunningInstance(path: string): Promise<void> {
   await removeRuntimeStateFile(path);
 }
 
-function registerRuntimeCleanup(paths: {
-  runtimeStatePath: string;
-  lockFilePath: string;
-}): {
+function registerRuntimeCleanup(paths: { runtimeStatePath: string }): {
   dispose(): void;
   run(): Promise<void>;
 } {
@@ -174,7 +162,6 @@ function registerRuntimeCleanup(paths: {
 
     cleanedUp = true;
     await removeRuntimeStateFile(paths.runtimeStatePath);
-    await removeLockFile(paths.lockFilePath);
   };
 
   const handleSigint = () => {
@@ -202,16 +189,6 @@ function registerRuntimeCleanup(paths: {
 }
 
 async function removeRuntimeStateFile(path: string): Promise<void> {
-  try {
-    await unlink(path);
-  } catch (error) {
-    if (!isMissingFileError(error)) {
-      throw error;
-    }
-  }
-}
-
-async function removeLockFile(path: string): Promise<void> {
   try {
     await unlink(path);
   } catch (error) {

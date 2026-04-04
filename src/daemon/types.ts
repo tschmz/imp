@@ -11,7 +11,6 @@ export interface RuntimePaths {
   logsDir: string;
   logFilePath: string;
   runtimeDir: string;
-  lockFilePath: string;
   runtimeStatePath: string;
 }
 
