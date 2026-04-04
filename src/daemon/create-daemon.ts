@@ -1,4 +1,4 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
@@ -23,6 +23,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
 
       await ensureRuntimePaths(config.paths);
       const pidFilePath = join(config.paths.runtimeDir, "daemon.pid");
+      await assertNoRunningInstance(pidFilePath);
       await writePidFile(pidFilePath);
       const cleanup = registerRuntimeCleanup(pidFilePath);
 
@@ -103,6 +104,23 @@ async function writePidFile(path: string): Promise<void> {
   await writeFile(path, `${process.pid}\n`, "utf8");
 }
 
+async function assertNoRunningInstance(path: string): Promise<void> {
+  const existingPid = await readPidFile(path);
+  if (existingPid === undefined) {
+    return;
+  }
+
+  if (existingPid === process.pid) {
+    return;
+  }
+
+  if (isProcessRunning(existingPid)) {
+    throw new Error(`Another daemon instance is already running with pid ${existingPid}.`);
+  }
+
+  await removePidFile(path);
+}
+
 function registerRuntimeCleanup(pidFilePath: string): {
   dispose(): void;
   run(): Promise<void>;
@@ -152,6 +170,42 @@ async function removePidFile(path: string): Promise<void> {
   }
 }
 
+async function readPidFile(path: string): Promise<number | undefined> {
+  try {
+    const content = await readFile(path, "utf8");
+    const pid = Number.parseInt(content.trim(), 10);
+
+    if (!Number.isInteger(pid) || pid <= 0) {
+      return undefined;
+    }
+
+    return pid;
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (isMissingProcessError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function isMissingProcessError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "ESRCH";
 }
