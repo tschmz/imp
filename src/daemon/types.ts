@@ -11,6 +11,7 @@ export interface RuntimePaths {
   logsDir: string;
   logFilePath: string;
   runtimeDir: string;
+  runtimeStatePath: string;
 }
 
 export interface DaemonConfig {

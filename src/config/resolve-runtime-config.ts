@@ -31,6 +31,7 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
       logsDir: join(botRoot, "logs"),
       logFilePath: join(botRoot, "logs", "daemon.log"),
       runtimeDir: join(botRoot, "runtime"),
+      runtimeStatePath: join(botRoot, "runtime", "daemon.json"),
     },
     configPath,
     defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,

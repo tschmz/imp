@@ -1,5 +1,4 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { ConversationState } from "../domain/conversation.js";
@@ -33,7 +32,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
       await ensureRuntimePaths(config.paths);
       await ensureLogFile(config.paths.logFilePath);
       const logger = createFileLogger(config.paths.logFilePath);
-      const runtimeStatePath = join(config.paths.runtimeDir, "daemon.json");
+      const runtimeStatePath = config.paths.runtimeStatePath;
       await assertNoRunningInstance(runtimeStatePath);
       await writeRuntimeState(runtimeStatePath, {
         pid: process.pid,
