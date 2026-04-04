@@ -49,7 +49,7 @@ function buildDefaultConfig(env: NodeJS.ProcessEnv): string {
           enabled: true,
           token: "replace-me",
           access: {
-            allowedUserIds: ["123456789"],
+            allowedUserIds: [],
           },
         },
       ],

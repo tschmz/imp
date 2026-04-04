@@ -18,7 +18,7 @@
       "enabled": true,
       "token": "replace-me",
       "access": {
-        "allowedUserIds": ["123456789"]
+        "allowedUserIds": []
       }
     }
   ]
