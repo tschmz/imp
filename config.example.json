@@ -1,0 +1,25 @@
+{
+  "instance": {
+    "name": "home"
+  },
+  "paths": {
+    "dataRoot": "/var/lib/pi-daemon"
+  },
+  "logging": {
+    "level": "info"
+  },
+  "defaults": {
+    "agentId": "default"
+  },
+  "bots": [
+    {
+      "id": "private-telegram",
+      "type": "telegram",
+      "enabled": true,
+      "token": "replace-me",
+      "access": {
+        "allowedUserIds": ["123456789"]
+      }
+    }
+  ]
+}
