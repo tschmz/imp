@@ -2,6 +2,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { parseCliArgs } from "./cli/parse-cli-args.js";
+import { discoverConfigPath } from "./config/discover-config-path.js";
 import { loadAppConfig } from "./config/load-app-config.js";
 import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
 import { createDaemon } from "./daemon/create-daemon.js";
@@ -9,8 +10,9 @@ import { createFileLogger } from "./logging/file-logger.js";
 
 async function main(): Promise<void> {
   const args = parseCliArgs();
-  const appConfig = await loadAppConfig(args.configPath);
-  const runtimeConfig = resolveRuntimeConfig(appConfig, args.configPath);
+  const { configPath } = await discoverConfigPath({ cliConfigPath: args.configPath });
+  const appConfig = await loadAppConfig(configPath);
+  const runtimeConfig = resolveRuntimeConfig(appConfig, configPath);
   const daemon = createDaemon(runtimeConfig);
 
   try {

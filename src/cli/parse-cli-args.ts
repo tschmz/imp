@@ -1,5 +1,5 @@
 export interface CliArgs {
-  configPath: string;
+  configPath?: string;
 }
 
 export function parseCliArgs(argv: string[] = process.argv.slice(2)): CliArgs {
@@ -19,10 +19,6 @@ export function parseCliArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     }
 
     throw new Error(`Unknown argument: ${arg}`);
-  }
-
-  if (!configPath) {
-    throw new Error("Missing required argument: --config <path>");
   }
 
   return { configPath };
