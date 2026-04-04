@@ -131,7 +131,7 @@ async function assertNoRunningInstance(path: string): Promise<void> {
   }
 
   if (existingState === null) {
-    await removePidFile(path);
+    await removeRuntimeStateFile(path);
     return;
   }
 
@@ -145,7 +145,7 @@ async function assertNoRunningInstance(path: string): Promise<void> {
     );
   }
 
-  await removePidFile(path);
+  await removeRuntimeStateFile(path);
 }
 
 function registerRuntimeCleanup(runtimeStatePath: string): {
@@ -160,7 +160,7 @@ function registerRuntimeCleanup(runtimeStatePath: string): {
     }
 
     cleanedUp = true;
-    await removePidFile(runtimeStatePath);
+    await removeRuntimeStateFile(runtimeStatePath);
   };
 
   const handleSigint = () => {
@@ -187,7 +187,7 @@ function registerRuntimeCleanup(runtimeStatePath: string): {
   };
 }
 
-async function removePidFile(path: string): Promise<void> {
+async function removeRuntimeStateFile(path: string): Promise<void> {
   try {
     await unlink(path);
   } catch (error) {
