@@ -162,7 +162,7 @@ describe("createFsConversationStore", () => {
     ).rejects.toThrow("version mismatch");
   });
 
-  it("detects conflicts when updatedAt does not increase", async () => {
+  it("accepts writes when updatedAt does not increase as long as version matches", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
     const ref = { transport: "telegram", externalId: "42" };
@@ -181,15 +181,114 @@ describe("createFsConversationStore", () => {
     const latest = await store.get(ref);
     expect(latest).toBeDefined();
 
-    await expect(
-      store.put({
-        state: {
-          ...latest!.state,
-          updatedAt: "2026-04-05T00:00:00.000Z",
+    await store.put({
+      state: {
+        ...latest!.state,
+        updatedAt: "2026-04-05T00:00:00.000Z",
+      },
+      messages: [
+        {
+          id: "msg-2",
+          role: "assistant",
+          text: "still accepted",
+          createdAt: "2026-04-05T00:00:00.000Z",
         },
-        messages: [],
-      }),
-    ).rejects.toThrow("updatedAt must increase");
+      ],
+    });
+
+    await expect(store.get(ref)).resolves.toEqual({
+      state: {
+        ...latest!.state,
+        updatedAt: "2026-04-05T00:00:00.000Z",
+        version: 2,
+      },
+      messages: [
+        {
+          id: "msg-2",
+          role: "assistant",
+          text: "still accepted",
+          createdAt: "2026-04-05T00:00:00.000Z",
+        },
+      ],
+    });
+  });
+
+  it("serializes concurrent put calls for the same conversation without dropping messages", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const ref = { transport: "telegram", externalId: "42" };
+
+    await store.put({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:00:00.000Z",
+        version: 0,
+      },
+      messages: [],
+    });
+
+    const latest = await store.get(ref);
+    expect(latest).toBeDefined();
+
+    const firstWrite = store.put({
+      state: {
+        ...latest!.state,
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+      messages: [
+        ...latest!.messages,
+        {
+          id: "msg-1",
+          role: "user",
+          text: "hello",
+          createdAt: "2026-04-05T00:01:00.000Z",
+        },
+      ],
+    });
+
+    const secondWrite = store.put({
+      state: {
+        ...latest!.state,
+        updatedAt: "2026-04-05T00:02:00.000Z",
+      },
+      messages: [
+        ...latest!.messages,
+        {
+          id: "msg-2",
+          role: "assistant",
+          text: "world",
+          createdAt: "2026-04-05T00:02:00.000Z",
+        },
+      ],
+    });
+
+    await Promise.all([firstWrite, secondWrite]);
+
+    await expect(store.get(ref)).resolves.toEqual({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:02:00.000Z",
+        version: 3,
+      },
+      messages: [
+        {
+          id: "msg-1",
+          role: "user",
+          text: "hello",
+          createdAt: "2026-04-05T00:01:00.000Z",
+        },
+        {
+          id: "msg-2",
+          role: "assistant",
+          text: "world",
+          createdAt: "2026-04-05T00:02:00.000Z",
+        },
+      ],
+    });
   });
 
   it("ignores orphan temp files from interrupted writes", async () => {
