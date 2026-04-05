@@ -71,6 +71,7 @@ async function getOrCreateConversationContext(
     agentId: defaultAgentId,
     createdAt: message.receivedAt,
     updatedAt: message.receivedAt,
+    version: 0,
   };
 
   const createdContext: ConversationContext = {
@@ -79,7 +80,13 @@ async function getOrCreateConversationContext(
   };
 
   await conversationStore.put(createdContext);
-  return createdContext;
+  return {
+    ...createdContext,
+    state: {
+      ...createdState,
+      version: 1,
+    },
+  };
 }
 
 function toUserConversationMessage(message: IncomingMessage) {

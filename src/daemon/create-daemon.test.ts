@@ -73,14 +73,14 @@ describe("createDaemon", () => {
       },
     ]);
 
-    const persistedMessages = JSON.parse(
+    const persistedConversation = JSON.parse(
       await readFile(
-        join(paths.conversationsDir, "telegram", "42", "messages.json"),
+        join(paths.conversationsDir, "telegram", "42", "conversation.json"),
         "utf8",
       ),
-    ) as unknown[];
+    ) as { messages: unknown[] };
 
-    expect(persistedMessages).toHaveLength(4);
+    expect(persistedConversation.messages).toHaveLength(4);
   });
 
   it("builds the default agent from configured agents", async () => {
