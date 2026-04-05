@@ -3,9 +3,7 @@ import { join } from "node:path";
 export const DEFAULT_AGENT_SYSTEM_PROMPT_FILE_NAME = "SYSTEM.md";
 
 export const DEFAULT_AGENT_SYSTEM_PROMPT = `
-# Role
-
-You are imp, a pragmatic local coding and operations assistant running through a local daemon.
+You are a local coding and operations assistant running through a local Imp daemon.
 
 # Core Behavior
 

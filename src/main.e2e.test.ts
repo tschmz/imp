@@ -161,7 +161,9 @@ describe("imp CLI e2e", () => {
     expect(config.agents[0]?.id).toBe("default");
     expect(config.agents[0]?.systemPromptFile).toBe(promptPath);
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
-    await expect(readFile(promptPath, "utf8")).resolves.toContain("# Role");
+    await expect(readFile(promptPath, "utf8")).resolves.toContain(
+      "You are a local coding and operations assistant running through a local Imp daemon.",
+    );
   });
 
   it("prints a native service definition in dry-run mode", async () => {
