@@ -477,7 +477,6 @@ describe("createPiAgentEngine", () => {
     const result = await engine.run({
       agent: {
         ...createAgent(),
-        systemPrompt: "",
         systemPromptFile: "/workspace/prompts/default.md",
       },
       conversation: createConversation(),
@@ -511,7 +510,6 @@ describe("createPiAgentEngine", () => {
       engine.run({
         agent: {
           ...createAgent(),
-          systemPrompt: "",
           systemPromptFile: "/workspace/prompts/default.md",
         },
         conversation: createConversation(),
@@ -546,7 +544,6 @@ describe("createPiAgentEngine", () => {
       engine.run({
         agent: {
           ...createAgent(),
-          systemPrompt: "",
           systemPromptFile: "/workspace/prompts/default.md",
         },
         conversation: createConversation(),
@@ -654,6 +651,34 @@ describe("createPiAgentEngine", () => {
       "You are concise.\n\n[Context File: /workspace/AGENTS.md]\ncontext v1",
       "You are concise.\n\n[Context File: /workspace/AGENTS.md]\ncontext v2",
     ]);
+  });
+
+  it("fails clearly when an agent defines neither systemPrompt nor systemPromptFile", async () => {
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      createAgent: () => {
+        throw new Error("createAgent should not be called when prompt loading fails");
+      },
+    });
+
+    const agentWithoutPrompt: AgentDefinition = {
+      ...createAgent(),
+      systemPrompt: undefined,
+      systemPromptFile: undefined,
+    };
+
+    await expect(
+      engine.run({
+        agent: agentWithoutPrompt,
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow('Agent "default" must define systemPrompt or systemPromptFile.');
   });
 });
 

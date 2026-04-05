@@ -169,8 +169,7 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
     return {
       id: configuredAgent.id,
       name: configuredAgent.name ?? builtIn?.name ?? configuredAgent.id,
-      systemPrompt: configuredAgent.systemPrompt ?? builtIn?.systemPrompt ?? "",
-      systemPromptFile: configuredAgent.systemPromptFile,
+      ...resolveAgentPrompt(configuredAgent, builtIn),
       model: configuredAgent.model ?? builtIn?.model ?? { provider: "", modelId: "" },
       authFile: configuredAgent.authFile ?? builtIn?.authFile,
       inference: configuredAgent.inference ?? builtIn?.inference,
@@ -179,6 +178,33 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
       extensions: builtIn?.extensions ?? [],
     };
   });
+}
+
+function resolveAgentPrompt(
+  configuredAgent: DaemonConfig["agents"][number],
+  builtIn: AgentDefinition | undefined,
+): Pick<AgentDefinition, "systemPrompt" | "systemPromptFile"> {
+  if (configuredAgent.systemPromptFile) {
+    return {
+      systemPromptFile: configuredAgent.systemPromptFile,
+    };
+  }
+
+  if (configuredAgent.systemPrompt) {
+    return {
+      systemPrompt: configuredAgent.systemPrompt,
+    };
+  }
+
+  if (builtIn?.systemPromptFile) {
+    return {
+      systemPromptFile: builtIn.systemPromptFile,
+    };
+  }
+
+  return {
+    ...(builtIn?.systemPrompt ? { systemPrompt: builtIn.systemPrompt } : {}),
+  };
 }
 async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
   await mkdir(paths.dataRoot, { recursive: true });

@@ -17,7 +17,7 @@ export interface ModelRef {
 export interface AgentDefinition {
   id: string;
   name: string;
-  systemPrompt: string;
+  systemPrompt?: string;
   systemPromptFile?: string;
   model: ModelRef;
   authFile?: string;

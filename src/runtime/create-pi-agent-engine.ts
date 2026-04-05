@@ -302,8 +302,10 @@ async function buildSystemPrompt(
     }
 
     sections.push(trimmedContent);
-  } else {
+  } else if (agent.systemPrompt) {
     sections.push(agent.systemPrompt);
+  } else {
+    throw new Error(`Agent "${agent.id}" must define systemPrompt or systemPromptFile.`);
   }
 
   const contextFiles = agent.context?.files ?? [];

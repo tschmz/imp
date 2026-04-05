@@ -187,7 +187,6 @@ describe("createDaemon", () => {
     expect(runInputs).toHaveLength(1);
     expect(runInputs[0]?.agent).toMatchObject({
       id: "default",
-      systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
       systemPromptFile: "/workspace/prompts/default.md",
       model: {
         provider: "openai",
@@ -195,6 +194,7 @@ describe("createDaemon", () => {
       },
       tools: ["read"],
     });
+    expect(runInputs[0]?.agent.systemPrompt).toBeUndefined();
   });
 
   it("fails startup when an agent references an unknown tool", async () => {

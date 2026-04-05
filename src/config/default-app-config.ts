@@ -1,12 +1,11 @@
 import { join } from "node:path";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
+import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
 import { getDefaultUserDataRoot } from "./discover-config-path.js";
 import type { AppConfig } from "./types.js";
 
 const defaultAgentId = "default";
 const defaultBotId = "private-telegram";
-const defaultSystemPrompt =
-  "You are a concise and pragmatic assistant running through a local daemon.";
 const defaultTools = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 
 export interface InitialConfigAnswers {
@@ -72,7 +71,7 @@ export function buildInitialAppConfig(
         },
         ...(answers.systemPromptFile
           ? { systemPromptFile: answers.systemPromptFile }
-          : { systemPrompt: defaultSystemPrompt }),
+          : { systemPrompt: DEFAULT_AGENT_SYSTEM_PROMPT }),
       },
     ],
     bots: [
