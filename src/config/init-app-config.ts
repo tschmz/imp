@@ -1,6 +1,9 @@
 import { mkdir, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { getDefaultUserConfigPath, getDefaultUserDataRoot } from "./discover-config-path.js";
+import { createDefaultAppConfig } from "./default-app-config.js";
+import { getDefaultUserConfigPath } from "./discover-config-path.js";
+import { appConfigSchema } from "./schema.js";
+import type { AppConfig } from "./types.js";
 
 const ownerReadWriteMode = 0o600;
 
@@ -9,9 +12,11 @@ export async function initAppConfig(options: {
   force?: boolean;
   env?: NodeJS.ProcessEnv;
   now?: Date;
+  config?: AppConfig;
 } = {}): Promise<string> {
   const env = options.env ?? process.env;
   const configPath = resolve(options.configPath ?? getDefaultUserConfigPath(env));
+  const config = appConfigSchema.parse(options.config ?? createDefaultAppConfig(env));
 
   await mkdir(dirname(configPath), { recursive: true });
   try {
@@ -21,7 +26,7 @@ export async function initAppConfig(options: {
 
     const file = await open(configPath, options.force ? "w" : "wx", ownerReadWriteMode);
     try {
-      await file.writeFile(`${buildDefaultConfig(env)}\n`, { encoding: "utf8" });
+      await file.writeFile(`${JSON.stringify(config, null, 2)}\n`, { encoding: "utf8" });
       await file.chmod(ownerReadWriteMode);
     } finally {
       await file.close();
@@ -65,58 +70,6 @@ async function backupExistingConfig(configPath: string, now: Date): Promise<void
 
 function formatBackupTimestamp(date: Date): string {
   return date.toISOString().replaceAll(":", "-");
-}
-
-function buildDefaultConfig(env: NodeJS.ProcessEnv): string {
-  return JSON.stringify(
-    {
-      instance: {
-        name: "default",
-      },
-      paths: {
-        dataRoot: getDefaultUserDataRoot(env),
-      },
-      logging: {
-        level: "info",
-      },
-      defaults: {
-        agentId: "default",
-      },
-      agents: [
-        {
-          id: "default",
-          model: {
-            provider: "openai",
-            modelId: "gpt-5.4",
-          },
-          tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
-          inference: {
-            metadata: {
-              app: "imp",
-            },
-            request: {
-              store: true,
-            },
-          },
-          systemPrompt:
-            "You are a concise and pragmatic assistant running through a local daemon.",
-        },
-      ],
-      bots: [
-        {
-          id: "private-telegram",
-          type: "telegram",
-          enabled: true,
-          token: "replace-me",
-          access: {
-            allowedUserIds: [],
-          },
-        },
-      ],
-    },
-    null,
-    2,
-  );
 }
 
 function isAlreadyExistsError(error: unknown): error is NodeJS.ErrnoException {

@@ -3,7 +3,11 @@ import { Command } from "commander";
 
 export interface CliDependencies {
   startDaemon: (options: { configPath?: string }) => Promise<void>;
-  initConfig: (options: { configPath?: string; force: boolean }) => Promise<void>;
+  initConfig: (options: {
+    configPath?: string;
+    force: boolean;
+    defaults: boolean;
+  }) => Promise<void>;
 }
 
 export function createCli(dependencies: CliDependencies): Command {
@@ -28,11 +32,13 @@ export function createCli(dependencies: CliDependencies): Command {
     .command("init")
     .description("Create an initial config file")
     .option("-f, --force", "Overwrite an existing config file")
-    .action(async function action(this: Command, options: { force?: boolean }) {
+    .option("--defaults", "Skip prompts and write the default config template")
+    .action(async function action(this: Command, options: { force?: boolean; defaults?: boolean }) {
       const globalOptions = this.optsWithGlobals<{ config?: string }>();
       await dependencies.initConfig({
         configPath: globalOptions.config,
         force: options.force ?? false,
+        defaults: options.defaults ?? false,
       });
     });
 

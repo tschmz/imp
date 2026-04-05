@@ -60,11 +60,11 @@ describe("imp CLI e2e", () => {
     expect(stdout.trim()).toBe("0.1.0");
   });
 
-  it("creates a default config through `imp init`", async () => {
+  it("creates a default config through `imp init --defaults`", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
 
-    const { stdout } = await runCli(["init"], env);
+    const { stdout } = await runCli(["init", "--defaults"], env);
     const configPath = join(root, "config-home", "imp", "config.json");
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
@@ -85,7 +85,7 @@ describe("imp CLI e2e", () => {
     const configPath = join(root, "config-home", "imp", "config.json");
     const dataRoot = join(root, "state-home", "imp");
 
-    await runCli(["init"], env);
+    await runCli(["init", "--defaults"], env);
     await overwriteConfig(configPath, {
       instance: {
         name: "default",
@@ -158,7 +158,7 @@ describe("imp CLI e2e", () => {
       "daemon.json",
     );
 
-    await runCli(["init"], env);
+    await runCli(["init", "--defaults"], env);
     await overwriteConfig(configPath, {
       instance: {
         name: "default",
@@ -207,6 +207,17 @@ describe("imp CLI e2e", () => {
     await expect(runCli(["start"], env)).rejects.toMatchObject({
       stderr: expect.stringContaining(
         `Another daemon instance is already running with pid ${process.pid}.`,
+      ),
+    });
+  });
+
+  it("rejects non-interactive init without --defaults", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    await expect(runCli(["init"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        "`imp init` requires an interactive terminal. Re-run with --defaults to skip prompts.",
       ),
     });
   });

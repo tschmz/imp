@@ -33,7 +33,13 @@ npm install -g @tschmz/imp
 imp init
 ```
 
-This creates a starter config you can adapt for your local setup. You can also inspect
+`imp init` runs an interactive setup wizard. For a non-interactive starter config, use:
+
+```bash
+imp init --defaults
+```
+
+You can also inspect
 [`config.example.json`](./config.example.json) for a more complete example.
 
 ### Start the daemon

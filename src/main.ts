@@ -5,6 +5,7 @@ import { createCli } from "./cli/create-cli.js";
 import { discoverConfigPath } from "./config/discover-config-path.js";
 import { initAppConfig } from "./config/init-app-config.js";
 import { loadAppConfig } from "./config/load-app-config.js";
+import { promptForInitialAppConfig } from "./config/prompt-init-config.js";
 import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
 import { createDaemon } from "./daemon/create-daemon.js";
 import { createFileLogger } from "./logging/file-logger.js";
@@ -12,8 +13,9 @@ import { createFileLogger } from "./logging/file-logger.js";
 async function main(): Promise<void> {
   const cli = createCli({
     startDaemon: runDaemon,
-    initConfig: async ({ configPath, force }) => {
-      const createdConfigPath = await initAppConfig({ configPath, force });
+    initConfig: async ({ configPath, force, defaults }) => {
+      const config = defaults ? undefined : await resolveInitConfig();
+      const createdConfigPath = await initAppConfig({ configPath, force, config });
       console.log(`Created config at ${createdConfigPath}`);
     },
   });
@@ -27,8 +29,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error("daemon failed to start");
-  console.error(error);
+  console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
 
@@ -55,4 +56,24 @@ async function runDaemon(options: { configPath?: string }): Promise<void> {
     );
     process.exitCode = 1;
   }
+}
+
+async function resolveInitConfig() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new Error("`imp init` requires an interactive terminal. Re-run with --defaults to skip prompts.");
+  }
+
+  try {
+    return await promptForInitialAppConfig();
+  } catch (error) {
+    if (isPromptExitError(error)) {
+      throw new Error("Config initialization cancelled.");
+    }
+
+    throw error;
+  }
+}
+
+function isPromptExitError(error: unknown): boolean {
+  return error instanceof Error && error.name === "ExitPromptError";
 }

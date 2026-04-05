@@ -2,6 +2,7 @@ import { chmod, mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { buildInitialAppConfig } from "./default-app-config.js";
 import { initAppConfig } from "./init-app-config.js";
 
 const tempDirs: string[] = [];
@@ -126,6 +127,31 @@ describe("initAppConfig", () => {
     await expect(readFile(backupPath, "utf8")).resolves.toBe(originalContent);
     const backupMode = (await stat(backupPath)).mode & 0o777;
     expect(backupMode).toBe(0o600);
+  });
+
+  it("writes a provided config template", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    const env = {
+      XDG_CONFIG_HOME: join(root, "config-home"),
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
+    const config = buildInitialAppConfig(env, {
+      instanceName: "home",
+      dataRoot: join(root, "custom-state"),
+      provider: "openai-codex",
+      modelId: "gpt-5.4",
+      telegramToken: "123:abc",
+      allowedUserIds: ["1", "2"],
+      workingDirectory: join(root, "workspace"),
+      contextFiles: [join(root, "workspace", "AGENTS.md")],
+      systemPromptFile: join(root, "SYSTEM.md"),
+    });
+
+    await initAppConfig({ configPath, config });
+
+    await expect(readFile(configPath, "utf8")).resolves.toContain('"authFile"');
+    await expect(readFile(configPath, "utf8")).resolves.toContain('"systemPromptFile"');
   });
 });
 
