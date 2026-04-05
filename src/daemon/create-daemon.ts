@@ -1,14 +1,16 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
+import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationState } from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createFileLogger } from "../logging/file-logger.js";
 import { createAgentRunner } from "../runtime/agent-runner.js";
+import type { AgentRunner } from "../runtime/types.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import type { ConversationStore } from "../storage/types.js";
 import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
-import type { TransportHandler } from "../transports/types.js";
+import type { Transport, TransportHandler } from "../transports/types.js";
 import type { Daemon, DaemonConfig, RuntimePaths } from "./types.js";
 
 interface RuntimeState {
@@ -19,9 +21,21 @@ interface RuntimeState {
   logFilePath: string;
 }
 
-export function createDaemon(config: DaemonConfig): Daemon {
-  const agentRegistry = createAgentRegistry(loadBuiltInAgents());
-  const conversationStore = createFsConversationStore(config.paths);
+interface DaemonDependencies {
+  agentRegistry?: ReturnType<typeof createAgentRegistry>;
+  conversationStore?: ConversationStore;
+  createRunner?: (agent: AgentDefinition) => AgentRunner;
+  createTransport?: (config: DaemonConfig["activeBot"]) => Transport;
+}
+
+export function createDaemon(
+  config: DaemonConfig,
+  dependencies: DaemonDependencies = {},
+): Daemon {
+  const agentRegistry = dependencies.agentRegistry ?? createAgentRegistry(loadBuiltInAgents());
+  const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
+  const createRunner = dependencies.createRunner ?? createAgentRunner;
+  const createTransport = dependencies.createTransport ?? createTelegramTransport;
 
   return {
     async start() {
@@ -56,7 +70,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
 
         await logger.info(`active bot: ${config.activeBot.id}`);
 
-        const transport = createTelegramTransport(config.activeBot);
+        const transport = createTransport(config.activeBot);
         const handler: TransportHandler = {
           handle: async (message: IncomingMessage): Promise<OutgoingMessage> => {
             const conversation = await getOrCreateConversationContext(
@@ -65,7 +79,7 @@ export function createDaemon(config: DaemonConfig): Daemon {
               conversationStore,
             );
             const agent = agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
-            const runner = createAgentRunner(agent);
+            const runner = createRunner(agent);
             const response = await runner.run({
               agent,
               conversation,
