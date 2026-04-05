@@ -1,7 +1,14 @@
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 
+export interface TransportInboundEvent {
+  message: IncomingMessage;
+  runWithProcessing<T>(operation: () => Promise<T>): Promise<T>;
+  deliver(message: OutgoingMessage): Promise<void>;
+  deliverError?(error: unknown): Promise<void>;
+}
+
 export interface TransportHandler {
-  handle(message: IncomingMessage): Promise<OutgoingMessage>;
+  handle(event: TransportInboundEvent): Promise<void>;
 }
 
 export interface Transport {

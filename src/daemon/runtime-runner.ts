@@ -1,4 +1,5 @@
 import { createHandleIncomingMessage } from "../application/handle-incoming-message.js";
+import { createMessageProcessor } from "../application/message-processor.js";
 import { createAgentRegistry } from "../agents/registry.js";
 import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
 import type { Transport } from "../transports/types.js";
@@ -31,6 +32,10 @@ export function createRuntimeEntries(
       defaultAgentId: runtime.botConfig.defaultAgentId,
       logger: runtime.logger,
     });
+    const messageProcessor = createMessageProcessor({
+      handler: handleIncomingMessage,
+      logger: runtime.logger,
+    });
     let transport: Transport | undefined;
     let stopped = false;
 
@@ -61,7 +66,7 @@ export function createRuntimeEntries(
           await transport.stop?.();
           return;
         }
-        await transport.start(handleIncomingMessage);
+        await transport.start(messageProcessor);
       },
       async stop(): Promise<void> {
         if (stopped) {

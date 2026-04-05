@@ -50,8 +50,8 @@ describe("createDaemon", () => {
       engine,
       createTransport: () => ({
         async start(handler: TransportHandler) {
-          await handler.handle(createIncomingMessage("1", "hello"));
-          await handler.handle(createIncomingMessage("2", "again"));
+          await handler.handle(createTransportEvent(createIncomingMessage("1", "hello")));
+          await handler.handle(createTransportEvent(createIncomingMessage("2", "again")));
         },
       }),
     });
@@ -122,7 +122,7 @@ describe("createDaemon", () => {
         engine,
         createTransport: () => ({
           async start(handler: TransportHandler) {
-            await handler.handle(createIncomingMessage("1", "hello"));
+            await handler.handle(createTransportEvent(createIncomingMessage("1", "hello")));
           },
         }),
       },
@@ -177,7 +177,7 @@ describe("createDaemon", () => {
         engine,
         createTransport: () => ({
           async start(handler: TransportHandler) {
-            await handler.handle(createIncomingMessage("1", "hello"));
+            await handler.handle(createTransportEvent(createIncomingMessage("1", "hello")));
           },
         }),
       },
@@ -284,10 +284,10 @@ describe("createDaemon", () => {
         createTransport: (config) => ({
           async start(handler: TransportHandler) {
             startedBotIds.push(config.id);
-            await handler.handle({
+            await handler.handle(createTransportEvent({
               ...createIncomingMessage("1", "hello"),
               botId: config.id,
-            });
+            }));
           },
         }),
       },
@@ -521,6 +521,14 @@ function createIncomingMessage(messageId: string, text: string): IncomingMessage
     userId: "7",
     text,
     receivedAt: "2026-04-05T00:00:00.000Z",
+  };
+}
+
+function createTransportEvent(message: IncomingMessage) {
+  return {
+    message,
+    deliver: vi.fn(async () => {}),
+    runWithProcessing: async <T>(operation: () => Promise<T>): Promise<T> => operation(),
   };
 }
 

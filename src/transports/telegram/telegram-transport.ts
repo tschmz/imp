@@ -3,7 +3,7 @@ import { Bot, GrammyError } from "grammy";
 import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
 import type { Logger } from "../../logging/types.js";
 import { renderTelegramMessages } from "./render-telegram-message.js";
-import type { Transport, TransportHandler } from "../types.js";
+import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
 
 interface TelegramBotAdapter {
   api: {
@@ -92,6 +92,19 @@ export function createTelegramTransport(
 
         const startedAt = Date.now();
         const correlationId = randomUUID();
+        const safeContext = {
+          chat: ctx.chat,
+          message: ctx.message,
+          from: ctx.from,
+          reply: ctx.reply.bind(ctx),
+        };
+        const event = createTelegramInboundEvent(
+          config.id,
+          correlationId,
+          safeContext,
+          bot,
+          logger,
+        );
         await logger?.debug("received telegram message", {
           botId: config.id,
           transport: "telegram",
@@ -99,59 +112,69 @@ export function createTelegramTransport(
           messageId: String(ctx.message.message_id),
           correlationId,
         });
-
-        try {
-          const stopTyping = startTypingStatus(bot, ctx.chat.id);
-          try {
-            const response = await handler.handle({
-              botId: config.id,
-              conversation: {
-                transport: "telegram",
-                externalId: String(ctx.chat.id),
-              },
-              messageId: String(ctx.message.message_id),
-              correlationId,
-              userId: String(ctx.from.id),
-              text: ctx.message.text,
-              receivedAt: new Date().toISOString(),
-            });
-            for (const chunk of renderTelegramMessages(response.text)) {
-              await ctx.reply(chunk, {
-                parse_mode: "HTML",
-              });
-            }
-          } finally {
-            stopTyping();
-          }
-          await logger?.debug("replied to telegram message", {
-            botId: config.id,
-            transport: "telegram",
-            conversationId: String(ctx.chat.id),
-            messageId: String(ctx.message.message_id),
-            correlationId,
-            durationMs: Date.now() - startedAt,
-          });
-        } catch (error) {
-          await logger?.error(
-            "failed to handle telegram message",
-            {
-              botId: config.id,
-              transport: "telegram",
-              conversationId: String(ctx.chat.id),
-              messageId: String(ctx.message.message_id),
-              durationMs: Date.now() - startedAt,
-              errorType: error instanceof Error ? error.name : typeof error,
-            },
-            error,
-          );
-          await ctx.reply("Sorry, something went wrong while processing your message.");
-        }
+        await handler.handle(event);
+        await logger?.debug("processed telegram message", {
+          botId: config.id,
+          transport: "telegram",
+          conversationId: String(ctx.chat.id),
+          messageId: String(ctx.message.message_id),
+          correlationId,
+          durationMs: Date.now() - startedAt,
+        });
       });
 
       await bot.start();
     },
     async stop(): Promise<void> {
       bot.stop();
+    },
+  };
+}
+
+function createTelegramInboundEvent(
+  botId: string,
+  correlationId: string,
+  ctx: Required<Pick<TelegramMessageContext, "chat" | "message" | "from" | "reply">>,
+  bot: TelegramBotAdapter,
+  logger?: Logger,
+): TransportInboundEvent {
+  return {
+    message: {
+      botId,
+      conversation: {
+        transport: "telegram",
+        externalId: String(ctx.chat.id),
+      },
+      messageId: String(ctx.message.message_id),
+      correlationId,
+      userId: String(ctx.from.id),
+      text: ctx.message.text,
+      receivedAt: new Date().toISOString(),
+    },
+    async runWithProcessing<T>(operation: () => Promise<T>): Promise<T> {
+      const stopTyping = startTypingStatus(bot, ctx.chat.id);
+      try {
+        return await operation();
+      } finally {
+        stopTyping();
+      }
+    },
+    async deliver(message): Promise<void> {
+      for (const chunk of renderTelegramMessages(message.text)) {
+        await ctx.reply(chunk, {
+          parse_mode: "HTML",
+        });
+      }
+    },
+    async deliverError(): Promise<void> {
+      await logger?.debug("sending telegram processing error response", {
+        botId,
+        transport: "telegram",
+        conversationId: String(ctx.chat.id),
+        messageId: String(ctx.message.message_id),
+        correlationId,
+      });
+      await ctx.reply("Sorry, something went wrong while processing your message.");
     },
   };
 }

@@ -4,16 +4,29 @@ import type { Logger } from "../../logging/types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
 
 describe("createTelegramTransport", () => {
-  it("forwards a private text message from an allowed user", async () => {
+  it("forwards a validated inbound event from an allowed private text message", async () => {
     const bot = createFakeBot();
     const logger = createMockLogger();
-    const handler = vi.fn<(message: IncomingMessage) => Promise<OutgoingMessage>>().mockResolvedValue({
-      conversation: {
-        transport: "telegram",
-        externalId: "42",
-      },
-      text: "pong",
-    });
+    let capturedEvent:
+      | Parameters<{
+          handle(event: {
+            message: IncomingMessage;
+            deliver(message: OutgoingMessage): Promise<void>;
+            runWithProcessing<T>(operation: () => Promise<T>): Promise<T>;
+          }): Promise<void>;
+        }["handle"]>[0]
+      | undefined;
+    const handler = {
+      handle: vi.fn(async (event) => {
+        capturedEvent = event;
+        await event.runWithProcessing(async () => {
+          await event.deliver({
+            conversation: event.message.conversation,
+            text: "pong",
+          });
+        });
+      }),
+    };
 
     const transport = createTelegramTransport(
       {
@@ -26,14 +39,14 @@ describe("createTelegramTransport", () => {
       logger,
     );
 
-    await transport.start({ handle: handler });
+    await transport.start(handler);
     await bot.emitTextMessage({
       chat: { id: 42, type: "private" },
       from: { id: 7 },
       message: { message_id: 99, text: "ping" },
     });
 
-    expect(handler).toHaveBeenCalledWith({
+    expect(capturedEvent?.message).toEqual({
       conversation: {
         transport: "telegram",
         externalId: "42",
@@ -45,6 +58,7 @@ describe("createTelegramTransport", () => {
       text: "ping",
       receivedAt: expect.any(String),
     });
+    expect(handler.handle).toHaveBeenCalledTimes(1);
     expect(bot.reply).toHaveBeenCalledWith("pong", {
       parse_mode: "HTML",
     });
@@ -55,7 +69,9 @@ describe("createTelegramTransport", () => {
   it("ignores a private text message from a disallowed user", async () => {
     const bot = createFakeBot();
     const logger = createMockLogger();
-    const handler = vi.fn<(message: IncomingMessage) => Promise<OutgoingMessage>>();
+    const handler = {
+      handle: vi.fn(async () => {}),
+    };
 
     const transport = createTelegramTransport(
       {
@@ -68,28 +84,34 @@ describe("createTelegramTransport", () => {
       logger,
     );
 
-    await transport.start({ handle: handler });
+    await transport.start(handler);
     await bot.emitTextMessage({
       chat: { id: 42, type: "private" },
       from: { id: 8 },
       message: { message_id: 99, text: "ping" },
     });
 
-    expect(handler).not.toHaveBeenCalled();
+    expect(handler.handle).not.toHaveBeenCalled();
     expect(bot.reply).not.toHaveBeenCalled();
     expect(logger.error).not.toHaveBeenCalled();
   });
 
-  it("splits long telegram replies into multiple messages", async () => {
+  it("renders long telegram replies through the delivery hook", async () => {
     const bot = createFakeBot();
     const logger = createMockLogger();
-    const handler = vi.fn<(message: IncomingMessage) => Promise<OutgoingMessage>>().mockResolvedValue({
-      conversation: {
-        transport: "telegram",
-        externalId: "42",
-      },
-      text: "x".repeat(5000),
-    });
+    const handler = {
+      handle: vi.fn(async (event) => {
+        await event.runWithProcessing(async () => {
+          await event.deliver({
+            conversation: {
+              transport: "telegram",
+              externalId: "42",
+            },
+            text: "x".repeat(5000),
+          });
+        });
+      }),
+    };
 
     const transport = createTelegramTransport(
       {
@@ -102,7 +124,7 @@ describe("createTelegramTransport", () => {
       logger,
     );
 
-    await transport.start({ handle: handler });
+    await transport.start(handler);
     await bot.emitTextMessage({
       chat: { id: 42, type: "private" },
       from: { id: 7 },
@@ -122,12 +144,14 @@ describe("createTelegramTransport", () => {
     );
   });
 
-  it("replies with a stable error message when handling fails", async () => {
+  it("replies with a stable error message through the error delivery hook", async () => {
     const bot = createFakeBot();
     const logger = createMockLogger();
-    const handler = vi
-      .fn<(message: IncomingMessage) => Promise<OutgoingMessage>>()
-      .mockRejectedValue(new Error("boom"));
+    const handler = {
+      handle: vi.fn(async (event) => {
+        await event.deliverError?.(new Error("boom"));
+      }),
+    };
 
     const transport = createTelegramTransport(
       {
@@ -140,27 +164,21 @@ describe("createTelegramTransport", () => {
       logger,
     );
 
-    await transport.start({ handle: handler });
+    await transport.start(handler);
     await bot.emitTextMessage({
       chat: { id: 42, type: "private" },
       from: { id: 7 },
       message: { message_id: 99, text: "ping" },
     });
-
-    expect(bot.reply).toHaveBeenCalledWith(
-      "Sorry, something went wrong while processing your message.",
-    );
-    expect(logger.error).toHaveBeenCalledWith(
-      "failed to handle telegram message",
+    expect(bot.reply).toHaveBeenCalledWith("Sorry, something went wrong while processing your message.");
+    expect(logger.debug).toHaveBeenCalledWith(
+      "sending telegram processing error response",
       expect.objectContaining({
         botId: "private-telegram",
         transport: "telegram",
         conversationId: "42",
         messageId: "99",
-        durationMs: expect.any(Number),
-        errorType: "Error",
       }),
-      expect.any(Error),
     );
   });
 
@@ -169,13 +187,17 @@ describe("createTelegramTransport", () => {
     try {
       const bot = createFakeBot();
       const logger = createMockLogger();
-      let resolveHandler: ((value: OutgoingMessage) => void) | undefined;
-      const handler = vi.fn<(message: IncomingMessage) => Promise<OutgoingMessage>>(
-        () =>
-          new Promise<OutgoingMessage>((resolve) => {
-            resolveHandler = resolve;
-          }),
-      );
+      let resolveOperation: (() => void) | undefined;
+      const handler = {
+        handle: vi.fn(async (event) => {
+          await event.runWithProcessing(
+            () =>
+              new Promise<void>((resolve) => {
+                resolveOperation = resolve;
+              }),
+          );
+        }),
+      };
 
       const transport = createTelegramTransport(
         {
@@ -188,7 +210,7 @@ describe("createTelegramTransport", () => {
         logger,
       );
 
-      await transport.start({ handle: handler });
+    await transport.start(handler);
       const pendingMessage = bot.emitTextMessage({
         chat: { id: 42, type: "private" },
         from: { id: 7 },
@@ -203,13 +225,7 @@ describe("createTelegramTransport", () => {
       expect(bot.api.sendChatAction).toHaveBeenCalledTimes(2);
       expect(bot.api.sendChatAction).toHaveBeenLastCalledWith(42, "typing");
 
-      resolveHandler?.({
-        conversation: {
-          transport: "telegram",
-          externalId: "42",
-        },
-        text: "done",
-      });
+      resolveOperation?.();
 
       await pendingMessage;
       await vi.advanceTimersByTimeAsync(4000);
