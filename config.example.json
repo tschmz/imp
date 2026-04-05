@@ -34,7 +34,7 @@
           "/path/to/workspace/AGENTS.md"
         ]
       },
-      "systemPromptFile": "./prompts/default-system-prompt.md"
+      "systemPromptFile": "/var/lib/imp/SYSTEM.md"
     },
     {
       "id": "ops",
