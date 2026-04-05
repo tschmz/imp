@@ -233,6 +233,30 @@ describe("imp CLI e2e", () => {
     });
   });
 
+  it("reinstalls the service during `imp init --force` when the definition already exists", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const definitionPath =
+      process.platform === "darwin"
+        ? join(root, "Library", "LaunchAgents", "dev.imp.plist")
+        : join(root, ".config", "systemd", "user", "imp.service");
+
+    await runCli(["init", "--defaults"], env);
+
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(definitionPath, "existing\n", "utf8");
+
+    const { stdout } = await runCli(["init", "--defaults", "--force"], env);
+
+    expect(stdout).toContain("Created config at");
+    expect(stdout).toContain(`Installed`);
+    await expect(readFile(definitionPath, "utf8")).resolves.not.toBe("existing\n");
+  });
+
   it("fails when service uninstall cannot find a definition", async () => {
     if (process.platform === "win32") {
       return;

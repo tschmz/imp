@@ -45,7 +45,7 @@ async function main(): Promise<void> {
       console.log(`Created config at ${createdConfigPath}`);
 
       if (initSetup.installService) {
-        const result = await installService({ configPath: createdConfigPath });
+        const result = await installService({ configPath: createdConfigPath, force });
         console.log(`Installed ${result.platform} service at ${result.definitionPath}`);
       }
     },
