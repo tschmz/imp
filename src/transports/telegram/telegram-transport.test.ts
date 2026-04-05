@@ -79,6 +79,48 @@ describe("createTelegramTransport", () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it("splits long telegram replies into multiple messages", async () => {
+    const bot = createFakeBot();
+    const logger = createMockLogger();
+    const handler = vi.fn<(message: IncomingMessage) => Promise<OutgoingMessage>>().mockResolvedValue({
+      conversation: {
+        transport: "telegram",
+        externalId: "42",
+      },
+      text: "x".repeat(5000),
+    });
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      logger,
+    );
+
+    await transport.start({ handle: handler });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "ping" },
+    });
+
+    expect(bot.reply).toHaveBeenCalledTimes(2);
+    expect(bot.reply).toHaveBeenNthCalledWith(
+      1,
+      "x".repeat(4096),
+      { parse_mode: "HTML" },
+    );
+    expect(bot.reply).toHaveBeenNthCalledWith(
+      2,
+      "x".repeat(904),
+      { parse_mode: "HTML" },
+    );
+  });
+
   it("replies with a stable error message when handling fails", async () => {
     const bot = createFakeBot();
     const logger = createMockLogger();

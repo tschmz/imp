@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTelegramMessage } from "./render-telegram-message.js";
+import { renderTelegramMessage, renderTelegramMessages } from "./render-telegram-message.js";
 
 describe("renderTelegramMessage", () => {
   it("escapes Telegram HTML control characters", () => {
@@ -42,5 +42,28 @@ describe("renderTelegramMessage", () => {
 
   it("leaves unmatched backticks as plain text", () => {
     expect(renderTelegramMessage("Use `npm test here.")).toBe("Use `npm test here.");
+  });
+
+  it("chunks long plain text messages", () => {
+    expect(renderTelegramMessages("hello world there", 11)).toEqual(["hello ", "world there"]);
+  });
+
+  it("keeps inline code balanced across chunks", () => {
+    expect(renderTelegramMessages("Use `abcdefghij` now", 18)).toEqual([
+      "Use ",
+      "<code>abcde</code>",
+      "<code>fghij</code>",
+      " now",
+    ]);
+  });
+
+  it("splits oversized code blocks into multiple balanced code blocks", () => {
+    expect(renderTelegramMessages("```abcdefghij```", 40)).toEqual([
+      "<pre><code>abcdefghij</code></pre>",
+    ]);
+    expect(renderTelegramMessages("```abcdefghijk```", 34)).toEqual([
+      "<pre><code>abcdefghij</code></pre>",
+      "<pre><code>k</code></pre>",
+    ]);
   });
 });
