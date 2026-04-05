@@ -32,7 +32,15 @@ describe("initAppConfig", () => {
       };
       agents: Array<{
         id: string;
-        model: { provider: string; modelId: string };
+        model: {
+          provider: string;
+          modelId: string;
+        };
+        inference?: {
+          maxOutputTokens?: number;
+          metadata?: Record<string, unknown>;
+          request?: Record<string, unknown>;
+        };
         systemPrompt: string;
       }>;
       bots: Array<{ access: { allowedUserIds: string[] } }>;
@@ -44,6 +52,14 @@ describe("initAppConfig", () => {
     expect(config.agents[0]?.model).toEqual({
       provider: "openai",
       modelId: "gpt-5.4",
+    });
+    expect(config.agents[0]?.inference).toEqual({
+      metadata: {
+        app: "imp",
+      },
+      request: {
+        store: true,
+      },
     });
     expect(config.agents[0]?.systemPrompt).toBe(
       "You are a concise and pragmatic assistant running through a local daemon.",

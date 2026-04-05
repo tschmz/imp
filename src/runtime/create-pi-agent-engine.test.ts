@@ -129,6 +129,77 @@ describe("createPiAgentEngine", () => {
       }),
     ).rejects.toThrow('Agent "default" failed: No API key for provider: faux');
   });
+
+  it("applies inference options and request overrides from agent config", async () => {
+    let capturedOnPayload:
+      | ((payload: unknown, model: { api: string }) => unknown | Promise<unknown> | undefined)
+      | undefined;
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      createAgent: (options) => {
+        capturedOnPayload = options.onPayload as typeof capturedOnPayload;
+        return {
+          state: {
+            messages: [fauxAssistantMessage("stored response")],
+          },
+          prompt: async () => {},
+        };
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        inference: {
+          maxOutputTokens: 2000,
+          metadata: {
+            app: "imp",
+            env: "test",
+          },
+          request: {
+            store: true,
+            service_tier: "priority",
+          },
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(capturedOnPayload).toBeTypeOf("function");
+    expect(
+      await capturedOnPayload?.(
+        {
+          model: "gpt-5.4",
+          store: false,
+          max_output_tokens: 4000,
+          metadata: {
+            existing: true,
+          },
+        },
+        { api: "openai-responses" },
+      ),
+    ).toEqual({
+      model: "gpt-5.4",
+      store: true,
+      max_output_tokens: 2000,
+      metadata: {
+        app: "imp",
+        env: "test",
+      },
+      service_tier: "priority",
+    });
+  });
 });
 
 function createAgent(): AgentDefinition {

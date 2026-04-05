@@ -15,6 +15,14 @@ describe("resolveRuntimeConfig", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
+          inference: {
+            metadata: {
+              app: "imp",
+            },
+            request: {
+              store: true,
+            },
+          },
           systemPrompt: "You are the configured default agent.",
         },
       ],
@@ -44,6 +52,14 @@ describe("resolveRuntimeConfig", () => {
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
+        },
+        inference: {
+          metadata: {
+            app: "imp",
+          },
+          request: {
+            store: true,
+          },
         },
         systemPrompt: "You are the configured default agent.",
       },
@@ -159,6 +175,14 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
+        },
+        inference: {
+          metadata: {
+            app: "imp",
+          },
+          request: {
+            store: true,
+          },
         },
         systemPrompt: "You are concise.",
       },

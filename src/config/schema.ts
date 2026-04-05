@@ -6,11 +6,18 @@ const modelConfigSchema = z.object({
   modelId: z.string().min(1),
 });
 
+const inferenceSettingsSchema = z.object({
+  maxOutputTokens: z.number().int().positive().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  request: z.record(z.string(), z.unknown()).optional(),
+});
+
 const agentConfigSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).optional(),
   systemPrompt: z.string().min(1).optional(),
   model: modelConfigSchema.optional(),
+  inference: inferenceSettingsSchema.optional(),
 });
 
 const telegramBotSchema = z.object({
