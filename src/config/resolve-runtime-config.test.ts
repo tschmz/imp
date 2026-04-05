@@ -3,7 +3,7 @@ import { resolveRuntimeConfig } from "./resolve-runtime-config.js";
 import type { AppConfig } from "./types.js";
 
 describe("resolveRuntimeConfig", () => {
-  it("maps a single enabled telegram bot into daemon runtime config", () => {
+  it("maps enabled telegram bots into daemon runtime config", () => {
     const appConfig = createAppConfig({
       defaults: {
         agentId: "default-agent",
@@ -46,7 +46,6 @@ describe("resolveRuntimeConfig", () => {
     const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.configPath).toBe("/etc/imp/config.json");
-    expect(result.defaultAgentId).toBe("ops-agent");
     expect(result.agents).toEqual([
       {
         id: "default-agent",
@@ -66,21 +65,24 @@ describe("resolveRuntimeConfig", () => {
         systemPrompt: "You are the configured default agent.",
       },
     ]);
-    expect(result.activeBot).toEqual({
-      id: "private-telegram",
-      type: "telegram",
-      token: "telegram-token",
-      allowedUserIds: ["42"],
-    });
-    expect(result.paths).toEqual({
-      dataRoot: "/var/lib/imp",
-      botRoot: "/var/lib/imp/bots/private-telegram",
-      conversationsDir: "/var/lib/imp/bots/private-telegram/conversations",
-      logsDir: "/var/lib/imp/bots/private-telegram/logs",
-      logFilePath: "/var/lib/imp/bots/private-telegram/logs/daemon.log",
-      runtimeDir: "/var/lib/imp/bots/private-telegram/runtime",
-      runtimeStatePath: "/var/lib/imp/bots/private-telegram/runtime/daemon.json",
-    });
+    expect(result.activeBots).toEqual([
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["42"],
+        defaultAgentId: "ops-agent",
+        paths: {
+          dataRoot: "/var/lib/imp",
+          botRoot: "/var/lib/imp/bots/private-telegram",
+          conversationsDir: "/var/lib/imp/bots/private-telegram/conversations",
+          logsDir: "/var/lib/imp/bots/private-telegram/logs",
+          logFilePath: "/var/lib/imp/bots/private-telegram/logs/daemon.log",
+          runtimeDir: "/var/lib/imp/bots/private-telegram/runtime",
+          runtimeStatePath: "/var/lib/imp/bots/private-telegram/runtime/daemon.json",
+        },
+      },
+    ]);
   });
 
   it("uses the global default agent id when the bot has no routing override", () => {
@@ -103,7 +105,7 @@ describe("resolveRuntimeConfig", () => {
 
     const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
-    expect(result.defaultAgentId).toBe("default-agent");
+    expect(result.activeBots[0]?.defaultAgentId).toBe("default-agent");
   });
 
   it("resolves relative context file paths against the config directory", () => {
@@ -165,7 +167,7 @@ describe("resolveRuntimeConfig", () => {
     );
   });
 
-  it("fails when more than one bot is enabled", () => {
+  it("keeps more than one enabled bot", () => {
     const appConfig = createAppConfig({
       bots: [
         {
@@ -189,9 +191,12 @@ describe("resolveRuntimeConfig", () => {
       ],
     });
 
-    expect(() => resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).toThrowError(
-      "Current runtime supports only one enabled bot.",
-    );
+    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.activeBots.map((bot) => bot.id)).toEqual([
+      "private-telegram",
+      "ops-telegram",
+    ]);
   });
 });
 

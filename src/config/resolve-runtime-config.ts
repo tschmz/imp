@@ -9,44 +9,38 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
   if (enabledBots.length === 0) {
     throw new Error("Config must enable at least one bot.");
   }
-
-  if (enabledBots.length > 1) {
-    throw new Error(
-      "Current runtime supports only one enabled bot. " +
-        "Keep the config in multi-bot format, but enable exactly one bot for now.",
-    );
-  }
-
-  const bot = enabledBots[0];
-  if (bot.type !== "telegram") {
-    throw new Error(`Unsupported bot type: ${bot.type}`);
-  }
-
-  const botRoot = join(appConfig.paths.dataRoot, "bots", bot.id);
   const configDir = dirname(configPath);
 
   return {
-    paths: {
-      dataRoot: appConfig.paths.dataRoot,
-      botRoot,
-      conversationsDir: join(botRoot, "conversations"),
-      logsDir: join(botRoot, "logs"),
-      logFilePath: join(botRoot, "logs", "daemon.log"),
-      runtimeDir: join(botRoot, "runtime"),
-      runtimeStatePath: join(botRoot, "runtime", "daemon.json"),
-    },
     configPath,
-    defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,
     agents: appConfig.agents.map((agent) => ({
       ...agent,
       ...(agent.context ? { context: resolveAgentContext(agent.context, configDir) } : {}),
     })),
-    activeBot: {
-      id: bot.id,
-      type: bot.type,
-      token: bot.token,
-      allowedUserIds: bot.access.allowedUserIds,
-    },
+    activeBots: enabledBots.map((bot) => {
+      if (bot.type !== "telegram") {
+        throw new Error(`Unsupported bot type: ${bot.type}`);
+      }
+
+      const botRoot = join(appConfig.paths.dataRoot, "bots", bot.id);
+
+      return {
+        id: bot.id,
+        type: bot.type,
+        token: bot.token,
+        allowedUserIds: bot.access.allowedUserIds,
+        defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,
+        paths: {
+          dataRoot: appConfig.paths.dataRoot,
+          botRoot,
+          conversationsDir: join(botRoot, "conversations"),
+          logsDir: join(botRoot, "logs"),
+          logFilePath: join(botRoot, "logs", "daemon.log"),
+          runtimeDir: join(botRoot, "runtime"),
+          runtimeStatePath: join(botRoot, "runtime", "daemon.json"),
+        },
+      };
+    }),
   };
 }
 

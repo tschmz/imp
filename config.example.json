@@ -48,6 +48,46 @@
         }
       },
       "systemPrompt": "You are a concise and pragmatic assistant running through a local daemon."
+    },
+    {
+      "id": "ops",
+      "name": "Operations",
+      "model": {
+        "provider": "openai",
+        "modelId": "gpt-5.4"
+      },
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "context": {
+        "workingDirectory": "/path/to/ops-workspace",
+        "files": [
+          "/path/to/ops-workspace/AGENTS.md",
+          "/path/to/ops-workspace/RUNBOOK.md"
+        ]
+      },
+      "inference": {
+        "metadata": {
+          "app": "imp",
+          "role": "ops"
+        },
+        "request": {
+          "store": true,
+          "reasoning": {
+            "effort": "medium"
+          },
+          "text": {
+            "verbosity": "low"
+          }
+        }
+      },
+      "systemPrompt": "You are a concise operations assistant focused on diagnostics, runbooks, and safe remediation steps."
     }
   ],
   "bots": [
@@ -58,6 +98,18 @@
       "token": "replace-me",
       "access": {
         "allowedUserIds": []
+      }
+    },
+    {
+      "id": "ops-telegram",
+      "type": "telegram",
+      "enabled": false,
+      "token": "replace-me-too",
+      "access": {
+        "allowedUserIds": []
+      },
+      "routing": {
+        "defaultAgentId": "ops"
       }
     }
   ]

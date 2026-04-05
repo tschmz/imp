@@ -26,9 +26,9 @@ afterEach(async () => {
 describe("createDaemon", () => {
   it("loads persisted transcript into the next agent run", async () => {
     const root = await createTempDir();
-    const paths = createRuntimePaths(root);
-    const config = createConfig(paths);
-    const conversationStore = createFsConversationStore(paths);
+    const botConfig = createBotConfig(root);
+    const config = createConfig(botConfig);
+    const conversationStore = createFsConversationStore(botConfig.paths);
     const runInputs: AgentRunInput[] = [];
     const engine: AgentEngine = {
       run: vi.fn(async (input) => {
@@ -44,7 +44,7 @@ describe("createDaemon", () => {
 
     const daemon = createDaemon(config, {
       agentRegistry: createAgentRegistry([createDefaultAgent()]),
-      conversationStore,
+      createConversationStore: () => conversationStore,
       engine,
       createTransport: () => ({
         async start(handler: TransportHandler) {
@@ -77,7 +77,7 @@ describe("createDaemon", () => {
 
     const persistedConversation = JSON.parse(
       await readFile(
-        join(paths.conversationsDir, "telegram", "42", "conversation.json"),
+        join(botConfig.paths.conversationsDir, "telegram", "42", "conversation.json"),
         "utf8",
       ),
     ) as { messages: unknown[] };
@@ -87,7 +87,7 @@ describe("createDaemon", () => {
 
   it("builds the default agent from configured agents", async () => {
     const root = await createTempDir();
-    const paths = createRuntimePaths(root);
+    const botConfig = createBotConfig(root);
     const runInputs: AgentRunInput[] = [];
     const engine: AgentEngine = {
       run: vi.fn(async (input) => {
@@ -103,7 +103,7 @@ describe("createDaemon", () => {
 
     const daemon = createDaemon(
       {
-        ...createConfig(paths),
+        ...createConfig(botConfig),
         agents: [
           {
             id: "default",
@@ -142,12 +142,12 @@ describe("createDaemon", () => {
 
   it("fails startup when an agent references an unknown tool", async () => {
     const root = await createTempDir();
-    const paths = createRuntimePaths(root);
+    const botConfig = createBotConfig(root);
     const startTransport = vi.fn();
 
     const daemon = createDaemon(
       {
-        ...createConfig(paths),
+        ...createConfig(botConfig),
         agents: [
           {
             id: "default",
@@ -178,6 +178,70 @@ describe("createDaemon", () => {
     await expect(daemon.start()).rejects.toThrow('Unknown tools for agent "default": bashh');
     expect(startTransport).not.toHaveBeenCalled();
   });
+
+  it("starts all enabled bots with isolated runtime state", async () => {
+    const root = await createTempDir();
+    const privateBot = createBotConfig(root);
+    const opsBot = createBotConfig(root, {
+      id: "ops-telegram",
+      defaultAgentId: "ops",
+    });
+    const startedBotIds: string[] = [];
+
+    const daemon = createDaemon(
+      {
+        configPath: join(root, "config.json"),
+        agents: [
+          {
+            id: "default",
+            systemPrompt: "You are concise.",
+            model: {
+              provider: "test",
+              modelId: "stub",
+            },
+          },
+          {
+            id: "ops",
+            systemPrompt: "You are ops.",
+            model: {
+              provider: "test",
+              modelId: "stub",
+            },
+          },
+        ],
+        activeBots: [privateBot, opsBot],
+      },
+      {
+        engine: {
+          run: vi.fn(async (input) => ({
+            message: {
+              conversation: input.message.conversation,
+              text: input.agent.id,
+            },
+          })),
+        },
+        createTransport: (config) => ({
+          async start(handler: TransportHandler) {
+            startedBotIds.push(config.id);
+            await handler.handle({
+              ...createIncomingMessage("1", "hello"),
+              botId: config.id,
+            });
+          },
+        }),
+      },
+    );
+
+    await daemon.start();
+
+    expect(startedBotIds.sort()).toEqual(["ops-telegram", "private-telegram"]);
+    await expect(readFile(privateBot.paths.logFilePath, "utf8")).resolves.toContain(
+      '"message":"starting daemon with default agent \\"default\\""',
+    );
+    await expect(readFile(opsBot.paths.logFilePath, "utf8")).resolves.toContain(
+      '"message":"starting daemon with default agent \\"ops\\""',
+    );
+  });
 });
 
 async function createTempDir(): Promise<string> {
@@ -186,23 +250,40 @@ async function createTempDir(): Promise<string> {
   return path;
 }
 
-function createRuntimePaths(root: string): RuntimePaths {
+function createRuntimePaths(root: string, botId = "private-telegram"): RuntimePaths {
   return {
     dataRoot: root,
-    botRoot: join(root, "bot"),
-    conversationsDir: join(root, "conversations"),
-    logsDir: join(root, "logs"),
-    logFilePath: join(root, "logs", "daemon.log"),
-    runtimeDir: join(root, "runtime"),
-    runtimeStatePath: join(root, "runtime", "daemon.json"),
+    botRoot: join(root, "bots", botId),
+    conversationsDir: join(root, "bots", botId, "conversations"),
+    logsDir: join(root, "bots", botId, "logs"),
+    logFilePath: join(root, "bots", botId, "logs", "daemon.log"),
+    runtimeDir: join(root, "bots", botId, "runtime"),
+    runtimeStatePath: join(root, "bots", botId, "runtime", "daemon.json"),
   };
 }
 
-function createConfig(paths: RuntimePaths): DaemonConfig {
+function createBotConfig(
+  root: string,
+  overrides: Partial<DaemonConfig["activeBots"][number]> = {},
+): DaemonConfig["activeBots"][number] {
+  const id = overrides.id ?? "private-telegram";
+  const paths = overrides.paths ?? createRuntimePaths(root, id);
+
   return {
-    paths,
-    configPath: join(paths.dataRoot, "config.json"),
+    id,
+    type: "telegram",
+    token: "telegram-token",
+    allowedUserIds: ["7"],
     defaultAgentId: "default",
+    paths,
+    ...overrides,
+  };
+}
+
+function createConfig(botConfig: DaemonConfig["activeBots"][number]): DaemonConfig {
+  return {
+    configPath: join(botConfig.paths.dataRoot, "config.json"),
+    activeBots: [botConfig],
     agents: [
       {
         id: "default",
@@ -213,12 +294,6 @@ function createConfig(paths: RuntimePaths): DaemonConfig {
         },
       },
     ],
-    activeBot: {
-      id: "private-telegram",
-      type: "telegram",
-      token: "telegram-token",
-      allowedUserIds: ["7"],
-    },
   };
 }
 

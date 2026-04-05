@@ -22,16 +22,16 @@ import {
   cleanupRuntimeState,
   writeRuntimeState,
 } from "./runtime-state.js";
-import type { Daemon, DaemonConfig, RuntimePaths } from "./types.js";
+import type { ActiveBotRuntimeConfig, Daemon, DaemonConfig, RuntimePaths } from "./types.js";
 
 interface DaemonDependencies {
-  logger?: Logger;
   agentRegistry?: ReturnType<typeof createAgentRegistry>;
-  conversationStore?: ConversationStore;
   engine?: AgentEngine;
   toolRegistry?: ToolRegistry;
   createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
-  createTransport?: (config: DaemonConfig["activeBot"], logger: Logger) => Transport;
+  createLogger?: (path: string) => Logger;
+  createConversationStore?: (paths: RuntimePaths) => ConversationStore;
+  createTransport?: (config: ActiveBotRuntimeConfig, logger: Logger) => Transport;
 }
 
 export function createDaemon(
@@ -40,17 +40,11 @@ export function createDaemon(
 ): Daemon {
   const agentRegistry =
     dependencies.agentRegistry ?? createAgentRegistry(buildAgents(config.agents));
-  const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
   const createBuiltInRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
-  const logger = dependencies.logger ?? createFileLogger(config.paths.logFilePath);
-  const engine =
-    dependencies.engine ??
-    createPiAgentEngine({
-      logger,
-      ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
-      createBuiltInToolRegistry: createBuiltInRegistry,
-    });
+  const createLogger = dependencies.createLogger ?? createFileLogger;
+  const createConversationStore =
+    dependencies.createConversationStore ?? createFsConversationStore;
   const createTransport =
     dependencies.createTransport ??
     ((botConfig, runtimeLogger) => createTelegramTransport(botConfig, undefined, runtimeLogger));
@@ -58,45 +52,87 @@ export function createDaemon(
   return {
     async start() {
       validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createBuiltInRegistry);
-      const handleIncomingMessage = createHandleIncomingMessage({
-        agentRegistry,
-        conversationStore,
-        engine,
-        defaultAgentId: config.defaultAgentId,
-      });
+      const runtimeEntries = await Promise.all(
+        config.activeBots.map(async (botConfig) => {
+          const logger = createLogger(botConfig.paths.logFilePath);
+          const conversationStore = createConversationStore(botConfig.paths);
 
-      await ensureRuntimePaths(config.paths);
-      await ensureLogFile(config.paths.logFilePath);
-      const runtimeStatePath = config.paths.runtimeStatePath;
-      await assertNoRunningInstance(runtimeStatePath);
-      await writeRuntimeState(runtimeStatePath, {
-        pid: process.pid,
-        botId: config.activeBot.id,
-        startedAt: new Date().toISOString(),
-        configPath: config.configPath,
-        logFilePath: config.paths.logFilePath,
-      });
-      const cleanup = registerRuntimeCleanup({ runtimeStatePath });
+          await ensureRuntimePaths(botConfig.paths);
+          await ensureLogFile(botConfig.paths.logFilePath);
+          await assertNoRunningInstance(botConfig.paths.runtimeStatePath);
+          await writeRuntimeState(botConfig.paths.runtimeStatePath, {
+            pid: process.pid,
+            botId: botConfig.id,
+            startedAt: new Date().toISOString(),
+            configPath: config.configPath,
+            logFilePath: botConfig.paths.logFilePath,
+          });
+
+          return {
+            botConfig,
+            logger,
+            conversationStore,
+          };
+        }),
+      );
+      const logger = createBroadcastLogger(runtimeEntries.map((entry) => entry.logger));
+      const engine =
+        dependencies.engine ??
+        createPiAgentEngine({
+          logger,
+          ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
+          createBuiltInToolRegistry: createBuiltInRegistry,
+        });
+      const activeRuntimeEntries = runtimeEntries.map((entry) => ({
+        ...entry,
+        handleIncomingMessage: createHandleIncomingMessage({
+          agentRegistry,
+          conversationStore: entry.conversationStore,
+          engine,
+          defaultAgentId: entry.botConfig.defaultAgentId,
+        }),
+      }));
+      const cleanup = registerRuntimeCleanup(
+        activeRuntimeEntries.map(({ botConfig }) => ({
+          runtimeStatePath: botConfig.paths.runtimeStatePath,
+        })),
+      );
 
       try {
-        const defaultAgent = agentRegistry.get(config.defaultAgentId);
-        await logger.info(`starting daemon with default agent "${defaultAgent?.id ?? "unknown"}"`);
-        await logger.info(`data root: ${config.paths.dataRoot}`);
-        await logger.info(`bot root: ${config.paths.botRoot}`);
-        await logger.info(`conversations dir: ${config.paths.conversationsDir}`);
-        await logger.info(`logs dir: ${config.paths.logsDir}`);
-        await logger.info(`log file: ${config.paths.logFilePath}`);
-        await logger.info(`runtime dir: ${config.paths.runtimeDir}`);
-        await logger.info(`runtime file: ${runtimeStatePath}`);
+        await Promise.all(
+          activeRuntimeEntries.map(async ({ botConfig, logger, handleIncomingMessage }) => {
+            const defaultAgent = agentRegistry.get(botConfig.defaultAgentId);
+            await logger.info(
+              `starting daemon with default agent "${defaultAgent?.id ?? "unknown"}"`,
+            );
+            await logger.info(`data root: ${botConfig.paths.dataRoot}`);
+            await logger.info(`bot root: ${botConfig.paths.botRoot}`);
+            await logger.info(`conversations dir: ${botConfig.paths.conversationsDir}`);
+            await logger.info(`logs dir: ${botConfig.paths.logsDir}`);
+            await logger.info(`log file: ${botConfig.paths.logFilePath}`);
+            await logger.info(`runtime dir: ${botConfig.paths.runtimeDir}`);
+            await logger.info(`runtime file: ${botConfig.paths.runtimeStatePath}`);
+            await logger.info(`active bot: ${botConfig.id}`);
 
-        await logger.info(`active bot: ${config.activeBot.id}`);
-
-        const transport = createTransport(config.activeBot, logger);
-        await transport.start(handleIncomingMessage);
+            const transport = createTransport(botConfig, logger);
+            await transport.start(handleIncomingMessage);
+          }),
+        );
       } finally {
         cleanup.dispose();
         await cleanup.run();
       }
+    },
+  };
+}
+
+function createBroadcastLogger(loggers: Logger[]): Logger {
+  return {
+    async info(message, fields) {
+      await Promise.all(loggers.map(async (logger) => logger.info(message, fields)));
+    },
+    async error(message, fields, error) {
+      await Promise.all(loggers.map(async (logger) => logger.error(message, fields, error)));
     },
   };
 }
@@ -155,7 +191,7 @@ async function ensureLogFile(path: string): Promise<void> {
   await writeFile(path, "", { encoding: "utf8", flag: "a" });
 }
 
-function registerRuntimeCleanup(paths: { runtimeStatePath: string }): {
+function registerRuntimeCleanup(paths: Array<{ runtimeStatePath: string }>): {
   dispose(): void;
   run(): Promise<void>;
 } {
@@ -167,7 +203,7 @@ function registerRuntimeCleanup(paths: { runtimeStatePath: string }): {
     }
 
     cleanedUp = true;
-    await cleanupRuntimeState(paths.runtimeStatePath);
+    await Promise.all(paths.map(async (path) => cleanupRuntimeState(path.runtimeStatePath)));
   };
 
   const handleSigint = () => {

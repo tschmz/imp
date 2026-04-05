@@ -28,9 +28,13 @@ async function main(): Promise<void> {
   try {
     await daemon.start();
   } catch (error) {
-    await ensureStartupLogFile(runtimeConfig.paths.logFilePath);
-    const logger = createFileLogger(runtimeConfig.paths.logFilePath);
-    await logger.error("daemon failed to start", undefined, error);
+    await Promise.all(
+      runtimeConfig.activeBots.map(async (bot) => {
+        await ensureStartupLogFile(bot.paths.logFilePath);
+        const logger = createFileLogger(bot.paths.logFilePath);
+        await logger.error("daemon failed to start", { botId: bot.id }, error);
+      }),
+    );
     process.exitCode = 1;
   }
 }

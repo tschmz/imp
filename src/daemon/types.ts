@@ -17,12 +17,15 @@ export interface RuntimePaths {
   runtimeStatePath: string;
 }
 
-export interface DaemonConfig {
-  paths: RuntimePaths;
-  configPath: string;
+export interface ActiveBotRuntimeConfig extends TelegramBotRuntimeConfig {
   defaultAgentId: string;
+  paths: RuntimePaths;
+}
+
+export interface DaemonConfig {
+  configPath: string;
   agents: ConfiguredAgent[];
-  activeBot: TelegramBotRuntimeConfig;
+  activeBots: ActiveBotRuntimeConfig[];
 }
 
 export interface Daemon {
