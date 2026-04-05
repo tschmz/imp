@@ -281,7 +281,31 @@ async function buildSystemPrompt(
   agent: AgentDefinition,
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
-  const sections = [agent.systemPrompt];
+  const sections: string[] = [];
+
+  if (agent.systemPromptFile) {
+    let content: string;
+    try {
+      content = await readTextFile(agent.systemPromptFile);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to read system prompt file for agent "${agent.id}": ${agent.systemPromptFile} (${detail})`,
+      );
+    }
+
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      throw new Error(
+        `System prompt file for agent "${agent.id}" is empty: ${agent.systemPromptFile}`,
+      );
+    }
+
+    sections.push(trimmedContent);
+  } else {
+    sections.push(agent.systemPrompt);
+  }
+
   const contextFiles = agent.context?.files ?? [];
 
   for (const path of contextFiles) {
@@ -347,9 +371,11 @@ async function buildSystemPromptCacheKey(
   getContextFileFingerprint: (path: string) => Promise<string>,
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
-  const contextFiles = agent.context?.files ?? [];
+  const promptFiles = [agent.systemPromptFile, ...(agent.context?.files ?? [])].filter(
+    (path): path is string => path !== undefined,
+  );
   const fileFingerprints = await Promise.all(
-    contextFiles.map(async (path) => {
+    promptFiles.map(async (path) => {
       try {
         const fingerprint = await getContextFileFingerprint(path);
         return `${path}:${fingerprint}`;
@@ -368,6 +394,7 @@ async function buildSystemPromptCacheKey(
   return JSON.stringify({
     agentId: agent.id,
     systemPrompt: agent.systemPrompt,
+    systemPromptFile: agent.systemPromptFile,
     files: fileFingerprints,
   });
 }

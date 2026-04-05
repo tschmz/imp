@@ -18,6 +18,7 @@ export interface AgentDefinition {
   id: string;
   name: string;
   systemPrompt: string;
+  systemPromptFile?: string;
   model: ModelRef;
   authFile?: string;
   inference?: InferenceSettings;

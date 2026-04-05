@@ -18,6 +18,9 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
     },
     agents: appConfig.agents.map((agent) => ({
       ...agent,
+      ...(agent.systemPromptFile
+        ? { systemPromptFile: resolveConfigPath(agent.systemPromptFile, configDir) }
+        : {}),
       ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, configDir) } : {}),
       ...(agent.context ? { context: resolveAgentContext(agent.context, configDir) } : {}),
     })),

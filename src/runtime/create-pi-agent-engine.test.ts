@@ -442,6 +442,121 @@ describe("createPiAgentEngine", () => {
     );
   });
 
+  it("loads the system prompt from systemPromptFile when configured", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        expect(context.systemPrompt).toBe(
+          "You are defined in a file.\n\n" +
+            "[Context File: /workspace/AGENTS.md]\n" +
+            "Follow the workspace instructions.",
+        );
+        return fauxAssistantMessage("ok");
+      },
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async (path) => {
+        if (path === "/workspace/prompts/default.md") {
+          return "You are defined in a file.";
+        }
+
+        if (path === "/workspace/AGENTS.md") {
+          return "Follow the workspace instructions.";
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      },
+    });
+
+    const result = await engine.run({
+      agent: {
+        ...createAgent(),
+        systemPrompt: "",
+        systemPromptFile: "/workspace/prompts/default.md",
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(result.message.text).toBe("ok");
+  });
+
+  it("fails clearly when the configured system prompt file cannot be read", async () => {
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      createAgent: () => {
+        throw new Error("createAgent should not be called when prompt loading fails");
+      },
+      readTextFile: async (path) => {
+        if (path === "/workspace/prompts/default.md") {
+          throw new Error("ENOENT");
+        }
+
+        return "unused";
+      },
+    });
+
+    await expect(
+      engine.run({
+        agent: {
+          ...createAgent(),
+          systemPrompt: "",
+          systemPromptFile: "/workspace/prompts/default.md",
+        },
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow(
+      'Failed to read system prompt file for agent "default": /workspace/prompts/default.md (ENOENT)',
+    );
+  });
+
+  it("fails clearly when the configured system prompt file is empty", async () => {
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      createAgent: () => {
+        throw new Error("createAgent should not be called when prompt loading fails");
+      },
+      readTextFile: async (path) => {
+        if (path === "/workspace/prompts/default.md") {
+          return "   \n\n  ";
+        }
+
+        return "unused";
+      },
+    });
+
+    await expect(
+      engine.run({
+        agent: {
+          ...createAgent(),
+          systemPrompt: "",
+          systemPromptFile: "/workspace/prompts/default.md",
+        },
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow(
+      'System prompt file for agent "default" is empty: /workspace/prompts/default.md',
+    );
+  });
+
   it("reuses the cached system prompt when context file fingerprints are unchanged", async () => {
     const readCalls: string[] = [];
     const fingerprintCalls: string[] = [];

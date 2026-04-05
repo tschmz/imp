@@ -17,16 +17,22 @@ const agentContextConfigSchema = z.object({
   workingDirectory: z.string().min(1).optional(),
 });
 
-const agentConfigSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1).optional(),
-  systemPrompt: z.string().min(1).optional(),
-  model: modelConfigSchema.optional(),
-  authFile: z.string().min(1).optional(),
-  inference: inferenceSettingsSchema.optional(),
-  context: agentContextConfigSchema.optional(),
-  tools: z.string().min(1).array().optional(),
-});
+const agentConfigSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1).optional(),
+    systemPrompt: z.string().min(1).optional(),
+    systemPromptFile: z.string().min(1).optional(),
+    model: modelConfigSchema.optional(),
+    authFile: z.string().min(1).optional(),
+    inference: inferenceSettingsSchema.optional(),
+    context: agentContextConfigSchema.optional(),
+    tools: z.string().min(1).array().optional(),
+  })
+  .refine((agent) => !(agent.systemPrompt && agent.systemPromptFile), {
+    message: "Specify either systemPrompt or systemPromptFile, not both.",
+    path: ["systemPromptFile"],
+  });
 
 const telegramBotSchema = z.object({
   id: z.string().min(1),

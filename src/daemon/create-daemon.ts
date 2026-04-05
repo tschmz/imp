@@ -155,9 +155,9 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
     const builtIn = builtInsById.get(configuredAgent.id);
 
     if (!builtIn) {
-      if (!configuredAgent.systemPrompt) {
+      if (!configuredAgent.systemPrompt && !configuredAgent.systemPromptFile) {
         throw new Error(
-          `Configured agent "${configuredAgent.id}" must define systemPrompt.`,
+          `Configured agent "${configuredAgent.id}" must define systemPrompt or systemPromptFile.`,
         );
       }
 
@@ -170,6 +170,7 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
       id: configuredAgent.id,
       name: configuredAgent.name ?? builtIn?.name ?? configuredAgent.id,
       systemPrompt: configuredAgent.systemPrompt ?? builtIn?.systemPrompt ?? "",
+      systemPromptFile: configuredAgent.systemPromptFile,
       model: configuredAgent.model ?? builtIn?.model ?? { provider: "", modelId: "" },
       authFile: configuredAgent.authFile ?? builtIn?.authFile,
       inference: configuredAgent.inference ?? builtIn?.inference,

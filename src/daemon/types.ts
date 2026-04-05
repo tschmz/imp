@@ -40,6 +40,7 @@ export interface ConfiguredAgent {
   id: string;
   name?: string;
   systemPrompt?: string;
+  systemPromptFile?: string;
   model?: ModelRef;
   authFile?: string;
   inference?: InferenceSettings;

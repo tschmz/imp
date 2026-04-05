@@ -140,6 +140,62 @@ describe("createDaemon", () => {
     });
   });
 
+  it("accepts configured agents that define systemPromptFile instead of systemPrompt", async () => {
+    const root = await createTempDir();
+    const botConfig = createBotConfig(root);
+    const runInputs: AgentRunInput[] = [];
+    const engine: AgentEngine = {
+      run: vi.fn(async (input) => {
+        runInputs.push(input);
+        return {
+          message: {
+            conversation: input.message.conversation,
+            text: "configured",
+          },
+        };
+      }),
+    };
+
+    const daemon = createDaemon(
+      {
+        ...createConfig(botConfig),
+        agents: [
+          {
+            id: "default",
+            systemPromptFile: "/workspace/prompts/default.md",
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+            tools: ["read"],
+          },
+        ],
+      },
+      {
+        engine,
+        createTransport: () => ({
+          async start(handler: TransportHandler) {
+            await handler.handle(createIncomingMessage("1", "hello"));
+          },
+        }),
+      },
+    );
+
+    await daemon.start();
+
+    expect(runInputs).toHaveLength(1);
+    expect(runInputs[0]?.agent).toMatchObject({
+      id: "default",
+      systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
+      systemPromptFile: "/workspace/prompts/default.md",
+      model: {
+        provider: "openai",
+        modelId: "gpt-5.4",
+      },
+      tools: ["read"],
+    });
+  });
+
   it("fails startup when an agent references an unknown tool", async () => {
     const root = await createTempDir();
     const botConfig = createBotConfig(root);

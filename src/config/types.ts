@@ -23,6 +23,7 @@ export interface AgentConfig {
   id: string;
   name?: string;
   systemPrompt?: string;
+  systemPromptFile?: string;
   model?: ModelConfig;
   authFile?: string;
   inference?: InferenceSettings;

@@ -34,7 +34,7 @@
           "/path/to/workspace/AGENTS.md"
         ]
       },
-      "systemPrompt": "You are a concise and pragmatic assistant running through a local daemon."
+      "systemPromptFile": "./prompts/default-system-prompt.md"
     },
     {
       "id": "ops",
