@@ -57,6 +57,25 @@ Or with an explicit config path:
 imp start --config /path/to/config.json
 ```
 
+### Install as a user service
+
+```bash
+imp service install
+```
+
+On Linux, `imp service install` and `imp init` now install a user systemd unit together with a
+managed environment file. The unit reads `PATH` from that generated environment file so the daemon
+and child processes get a stable, predictable command lookup environment by default.
+
+When your shell environment changes, refresh the installed service with:
+
+```bash
+imp service install --force
+```
+
+That regenerates both the unit and the managed environment file without requiring manual edits to
+`~/.config/systemd/user/imp.service`.
+
 ## How It Works
 
 `imp` runs as a local daemon. It loads a JSON configuration, resolves agent and bot definitions,

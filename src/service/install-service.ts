@@ -7,6 +7,7 @@ import {
   type ServicePlatform,
   renderServiceDefinition,
 } from "./install-plan.js";
+import { renderLinuxServiceEnvironment } from "./linux-service-environment.js";
 
 export interface ServiceInstaller {
   run(command: string, args: string[]): Promise<void>;
@@ -16,6 +17,7 @@ export interface ServiceInstaller {
 export interface ServiceInstallResult {
   platform: ServicePlatform;
   definitionPath: string;
+  environmentPath?: string;
   plan: ServiceInstallPlan;
 }
 
@@ -43,6 +45,23 @@ export async function installService(options: {
     serviceLabel: plan.serviceLabel,
   });
   const definition = renderServiceDefinition(plan);
+  let environmentPath: string | undefined;
+
+  if (plan.platform === "linux-systemd-user") {
+    environmentPath = plan.environmentPath;
+    if (!environmentPath) {
+      throw new Error("Linux service installation requires an environment file path.");
+    }
+
+    await writeManagedFile({
+      path: environmentPath,
+      resourceLabel: "Service environment file",
+      content: renderLinuxServiceEnvironment(),
+      force: options.force,
+      now: options.now,
+    });
+  }
+
   await writeManagedFile({
     path: definitionPath,
     resourceLabel: "Service definition",
@@ -62,6 +81,7 @@ export async function installService(options: {
   return {
     platform: plan.platform,
     definitionPath,
+    environmentPath,
     plan,
   };
 }

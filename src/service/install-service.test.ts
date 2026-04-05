@@ -45,11 +45,12 @@ describe("installService", () => {
   it("writes and activates a linux user service", async () => {
     const root = await createTempDir();
     const calls: Array<{ command: string; args: string[] }> = [];
+    const configPath = join(root, ".config", "imp", "config.json");
 
     const result = await installService({
       platform: "linux",
       homeDir: root,
-      configPath: join(root, ".config", "imp", "config.json"),
+      configPath,
       execPath: "/usr/bin/node",
       argv: ["/usr/bin/node", "/app/dist/main.js"],
       installer: {
@@ -60,7 +61,12 @@ describe("installService", () => {
     });
 
     expect(result.definitionPath).toBe(join(root, ".config", "systemd", "user", "imp.service"));
+    expect(result.environmentPath).toBe(`${configPath}.service.env`);
     await expect(readFile(result.definitionPath, "utf8")).resolves.toContain("ExecStart=");
+    await expect(readFile(result.definitionPath, "utf8")).resolves.toContain(
+      `EnvironmentFile="${configPath}.service.env"`,
+    );
+    await expect(readFile(`${configPath}.service.env`, "utf8")).resolves.toContain("PATH=");
     expect(calls).toEqual([
       { command: "systemctl", args: ["--user", "daemon-reload"] },
       { command: "systemctl", args: ["--user", "enable", "--now", "imp.service"] },
@@ -156,27 +162,31 @@ describe("installService", () => {
     );
   });
 
-  it("creates a backup before overwriting an existing service definition with force", async () => {
+  it("creates backups before overwriting existing linux service files with force", async () => {
     const root = await createTempDir();
+    const configPath = join(root, ".config", "imp", "config.json");
     const definitionPath = join(root, ".config", "systemd", "user", "imp.service");
-    const backupPath = `${definitionPath}.2026-04-05T19-30-00.000Z.bak`;
+    const environmentPath = `${configPath}.service.env`;
+    const definitionBackupPath = `${definitionPath}.2026-04-05T19-30-00.000Z.bak`;
+    const environmentBackupPath = `${environmentPath}.2026-04-05T19-30-00.000Z.bak`;
 
     await installService({
       platform: "linux",
       homeDir: root,
-      configPath: join(root, ".config", "imp", "config.json"),
+      configPath,
       execPath: "/usr/bin/node",
       argv: ["/usr/bin/node", "/app/dist/main.js"],
       installer: {
         async run() {},
       },
     });
-    const originalContent = await readFile(definitionPath, "utf8");
+    const originalDefinitionContent = await readFile(definitionPath, "utf8");
+    const originalEnvironmentContent = await readFile(environmentPath, "utf8");
 
     await installService({
       platform: "linux",
       homeDir: root,
-      configPath: join(root, ".config", "imp", "config.json"),
+      configPath,
       execPath: "/usr/bin/node",
       argv: ["/usr/bin/node", "/app/dist/main.js"],
       installer: {
@@ -186,7 +196,8 @@ describe("installService", () => {
       now: new Date("2026-04-05T19:30:00.000Z"),
     });
 
-    await expect(readFile(backupPath, "utf8")).resolves.toBe(originalContent);
+    await expect(readFile(definitionBackupPath, "utf8")).resolves.toBe(originalDefinitionContent);
+    await expect(readFile(environmentBackupPath, "utf8")).resolves.toBe(originalEnvironmentContent);
   });
 });
 

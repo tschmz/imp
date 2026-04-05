@@ -10,6 +10,7 @@ export interface ServiceInstallPlan {
   workingDirectory: string;
   command: string;
   args: string[];
+  environmentPath?: string;
 }
 
 export function createServiceInstallPlan(options: {
@@ -17,6 +18,7 @@ export function createServiceInstallPlan(options: {
   argv?: string[];
   execPath?: string;
   platform?: NodeJS.Platform;
+  environmentPath?: string;
 }): ServiceInstallPlan {
   const configPath = resolve(options.configPath);
   const platform = detectServicePlatform(options.platform);
@@ -34,6 +36,8 @@ export function createServiceInstallPlan(options: {
     workingDirectory: dirname(configPath),
     command: commandLine.command,
     args: commandLine.args,
+    environmentPath:
+      platform === "linux-systemd-user" ? resolve(options.environmentPath ?? `${configPath}.service.env`) : undefined,
   };
 }
 
@@ -105,6 +109,7 @@ function renderSystemdUserUnit(plan: ServiceInstallPlan): string {
     "[Service]",
     "Type=simple",
     `WorkingDirectory=${plan.workingDirectory}`,
+    ...(plan.environmentPath ? [`EnvironmentFile=${quoteSystemdValue(plan.environmentPath)}`] : []),
     `ExecStart=${[plan.command, ...plan.args].map(quoteSystemdValue).join(" ")}`,
     "Restart=on-failure",
     "RestartSec=3",
