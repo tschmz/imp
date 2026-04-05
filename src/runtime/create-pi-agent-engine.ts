@@ -64,10 +64,15 @@ export function createPiAgentEngine(
         throw new Error(`Agent "${input.agent.id}" did not produce an assistant message.`);
       }
 
+      const responseText = getAssistantText(assistantMessage);
+      if (!responseText.trim()) {
+        throw new Error(`Agent "${input.agent.id}" produced an assistant message without text content.`);
+      }
+
       return {
         message: {
           conversation: input.message.conversation,
-          text: getAssistantText(assistantMessage),
+          text: responseText,
         },
       };
     },

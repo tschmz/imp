@@ -66,6 +66,43 @@ describe("createPiAgentEngine", () => {
       },
     });
   });
+
+  it("fails clearly when the configured model cannot be resolved", async () => {
+    const engine = createPiAgentEngine({
+      resolveModel: () => undefined,
+    });
+
+    await expect(
+      engine.run({
+        agent: createAgent(),
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow('Unknown model for agent "default": faux/faux-1');
+  });
+
+  it("fails clearly when the assistant response contains no text", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([fauxAssistantMessage([])]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+    });
+
+    await expect(
+      engine.run({
+        agent: createAgent(),
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow(
+      'Agent "default" produced an assistant message without text content.',
+    );
+  });
 });
 
 function createAgent(): AgentDefinition {
