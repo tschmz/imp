@@ -16,10 +16,13 @@ export function createCli(dependencies: CliDependencies): Command {
     .showHelpAfterError()
     .version(getCliVersion());
 
-  program.action(async function action(this: Command) {
-    const options = this.opts<{ config?: string }>();
-    await dependencies.startDaemon({ configPath: options.config });
-  });
+  program
+    .command("start")
+    .description("Start the imp daemon")
+    .action(async function action(this: Command) {
+      const options = this.optsWithGlobals<{ config?: string }>();
+      await dependencies.startDaemon({ configPath: options.config });
+    });
 
   program
     .command("init")

@@ -39,13 +39,13 @@ This creates a starter config you can adapt for your local setup. You can also i
 ### Start the daemon
 
 ```bash
-imp
+imp start
 ```
 
 Or with an explicit config path:
 
 ```bash
-imp --config /path/to/config.json
+imp --config /path/to/config.json start
 ```
 
 ## How It Works

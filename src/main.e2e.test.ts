@@ -27,6 +27,17 @@ beforeAll(async () => {
 });
 
 describe("imp CLI e2e", () => {
+  it("shows help output when no command is given", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli([], env);
+
+    expect(stdout).toContain("Usage: imp");
+    expect(stdout).toContain("start");
+    expect(stdout).toContain("init");
+  });
+
   it("shows help output", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
@@ -34,6 +45,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["--help"], env);
 
     expect(stdout).toContain("Usage: imp");
+    expect(stdout).toContain("start");
     expect(stdout).toContain("init");
     expect(stdout).toContain("--config <path>");
     expect(stdout).toContain("--version");
@@ -111,7 +123,7 @@ describe("imp CLI e2e", () => {
       ],
     });
 
-    await expect(runCli([], env)).rejects.toSatisfy((error: { stderr?: string }) => {
+    await expect(runCli(["start"], env)).rejects.toSatisfy((error: { stderr?: string }) => {
       const stderr = error.stderr ?? "";
       return (
         stderr.includes('Invalid Telegram bot token for bot "private-telegram"') ||
@@ -192,7 +204,7 @@ describe("imp CLI e2e", () => {
       logFilePath: join(dataRoot, "bots", "private-telegram", "logs", "daemon.log"),
     });
 
-    await expect(runCli([], env)).rejects.toMatchObject({
+    await expect(runCli(["start"], env)).rejects.toMatchObject({
       stderr: expect.stringContaining(
         `Another daemon instance is already running with pid ${process.pid}.`,
       ),

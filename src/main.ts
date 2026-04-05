@@ -18,6 +18,11 @@ async function main(): Promise<void> {
     },
   });
 
+  if (process.argv.length <= 2) {
+    cli.outputHelp();
+    return;
+  }
+
   await cli.parseAsync(process.argv);
 }
 
