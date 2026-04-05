@@ -2,14 +2,17 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { createCli } from "./cli/create-cli.js";
-import { discoverConfigPath } from "./config/discover-config-path.js";
+import { discoverConfigPath, getDefaultUserConfigPath } from "./config/discover-config-path.js";
 import { assertInitConfigCanBeCreated, initAppConfig } from "./config/init-app-config.js";
 import { loadAppConfig } from "./config/load-app-config.js";
 import { promptForInitialAppConfig } from "./config/prompt-init-config.js";
 import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
 import { createDaemon } from "./daemon/create-daemon.js";
 import { createFileLogger } from "./logging/file-logger.js";
+import { assertServiceInstallCanProceed, installService, resolveServiceDefinitionPath } from "./service/install-service.js";
+import { restartService, startService, stopService } from "./service/manage-service.js";
 import { createServiceInstallPlan, renderServiceDefinition } from "./service/install-plan.js";
+import { uninstallService } from "./service/uninstall-service.js";
 
 async function main(): Promise<void> {
   const cli = createCli({
@@ -24,7 +27,7 @@ async function main(): Promise<void> {
       });
       console.log(`Created config at ${createdConfigPath}`);
     },
-    installService: async ({ configPath, dryRun }) => {
+    installService: async ({ configPath, dryRun, force }) => {
       const { configPath: resolvedConfigPath } = await discoverConfigPath({
         cliConfigPath: configPath,
       });
@@ -35,9 +38,50 @@ async function main(): Promise<void> {
         return;
       }
 
-      throw new Error(
-        "Service installation is not implemented yet. Re-run with --dry-run to inspect the generated definition.",
-      );
+      const definitionPath = resolveServiceDefinitionPath({
+        platform: plan.platform,
+        serviceName: plan.serviceName,
+        serviceLabel: plan.serviceLabel,
+      });
+
+      await assertServiceInstallCanProceed({
+        definitionPath,
+        force,
+      });
+
+      const result = await installService({ configPath: resolvedConfigPath, force: true });
+      console.log(`Installed ${result.platform} service at ${result.definitionPath}`);
+    },
+    uninstallService: async ({ configPath }) => {
+      const resolvedConfigPath = resolveServiceConfigPath(configPath);
+      const plan = createServiceInstallPlan({ configPath: resolvedConfigPath });
+      const definitionPath = resolveServiceDefinitionPath({
+        platform: plan.platform,
+        serviceName: plan.serviceName,
+        serviceLabel: plan.serviceLabel,
+      });
+      const result = await uninstallService({
+        platform: plan.platform,
+        definitionPath,
+        serviceName: plan.serviceName,
+        serviceLabel: plan.serviceLabel,
+      });
+      console.log(`Removed ${result.platform} service at ${result.definitionPath}`);
+    },
+    startService: async ({ configPath }) => {
+      const serviceTarget = resolveServiceTarget(configPath);
+      await startService(serviceTarget);
+      console.log(`Started ${serviceTarget.platform} service ${serviceTarget.serviceName}`);
+    },
+    stopService: async ({ configPath }) => {
+      const serviceTarget = resolveServiceTarget(configPath);
+      await stopService(serviceTarget);
+      console.log(`Stopped ${serviceTarget.platform} service ${serviceTarget.serviceName}`);
+    },
+    restartService: async ({ configPath }) => {
+      const serviceTarget = resolveServiceTarget(configPath);
+      await restartService(serviceTarget);
+      console.log(`Restarted ${serviceTarget.platform} service ${serviceTarget.serviceName}`);
     },
   });
 
@@ -97,4 +141,27 @@ async function resolveInitConfig() {
 
 function isPromptExitError(error: unknown): boolean {
   return error instanceof Error && error.name === "ExitPromptError";
+}
+
+function resolveServiceConfigPath(cliConfigPath?: string): string {
+  if (cliConfigPath) {
+    return cliConfigPath;
+  }
+
+  return process.env.IMP_CONFIG_PATH ?? getDefaultUserConfigPath(process.env);
+}
+
+function resolveServiceTarget(cliConfigPath?: string) {
+  const configPath = resolveServiceConfigPath(cliConfigPath);
+  const plan = createServiceInstallPlan({ configPath });
+  return {
+    platform: plan.platform,
+    definitionPath: resolveServiceDefinitionPath({
+      platform: plan.platform,
+      serviceName: plan.serviceName,
+      serviceLabel: plan.serviceLabel,
+    }),
+    serviceName: plan.serviceName,
+    serviceLabel: plan.serviceLabel,
+  };
 }

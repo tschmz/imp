@@ -35,6 +35,7 @@ describe("service install plan", () => {
     );
 
     expect(definition).toContain("[Unit]");
+    expect(definition).toContain("WorkingDirectory=/tmp/imp");
     expect(definition).toContain("ExecStart=");
     expect(definition).toContain("WantedBy=default.target");
   });

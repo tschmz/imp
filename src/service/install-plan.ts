@@ -104,7 +104,7 @@ function renderSystemdUserUnit(plan: ServiceInstallPlan): string {
     "",
     "[Service]",
     "Type=simple",
-    `WorkingDirectory=${quoteSystemdValue(plan.workingDirectory)}`,
+    `WorkingDirectory=${plan.workingDirectory}`,
     `ExecStart=${[plan.command, ...plan.args].map(quoteSystemdValue).join(" ")}`,
     "Restart=on-failure",
     "RestartSec=3",

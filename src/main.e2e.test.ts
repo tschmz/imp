@@ -60,7 +60,31 @@ describe("imp CLI e2e", () => {
 
     expect(stdout).toContain("Usage: imp service install");
     expect(stdout).toContain("--config <path>");
+    expect(stdout).toContain("--force");
     expect(stdout).toContain("--dry-run");
+  });
+
+  it("shows help output for service uninstall", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["service", "uninstall", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp service uninstall");
+    expect(stdout).toContain("--config <path>");
+  });
+
+  it("shows help output for service lifecycle commands", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const startHelp = await runCli(["service", "start", "--help"], env);
+    const stopHelp = await runCli(["service", "stop", "--help"], env);
+    const restartHelp = await runCli(["service", "restart", "--help"], env);
+
+    expect(startHelp.stdout).toContain("Usage: imp service start");
+    expect(stopHelp.stdout).toContain("Usage: imp service stop");
+    expect(restartHelp.stdout).toContain("Usage: imp service restart");
   });
 
   it("shows command-specific config help for start", async () => {
@@ -135,6 +159,90 @@ describe("imp CLI e2e", () => {
       default:
         throw new Error(`Unsupported test platform: ${process.platform}`);
     }
+  });
+
+  it("fails with a clear message for non-dry-run service install on unsupported platforms", async () => {
+    if (process.platform !== "win32") {
+      return;
+    }
+
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    await runCli(["init", "--defaults"], env);
+
+    await expect(runCli(["service", "install"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining("Automatic Windows service installation is not implemented yet."),
+    });
+  });
+
+  it("fails before installing when the service definition already exists", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    await runCli(["init", "--defaults"], env);
+    await runCli(["service", "install", "--dry-run"], env);
+
+    const definitionPath =
+      process.platform === "darwin"
+        ? join(root, "Library", "LaunchAgents", "dev.imp.plist")
+        : process.platform === "linux"
+          ? join(root, ".config", "systemd", "user", "imp.service")
+          : null;
+
+    if (!definitionPath) {
+      return;
+    }
+
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(dirname(definitionPath), { recursive: true });
+    await writeFile(definitionPath, "existing\n", "utf8");
+
+    await expect(runCli(["service", "install"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        `Service definition already exists: ${definitionPath}\nRe-run with --force to overwrite.`,
+      ),
+    });
+  });
+
+  it("fails when service uninstall cannot find a definition", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const definitionPath =
+      process.platform === "darwin"
+        ? join(root, "Library", "LaunchAgents", "dev.imp.plist")
+        : join(root, ".config", "systemd", "user", "imp.service");
+
+    await expect(runCli(["service", "uninstall"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(`Service definition not found: ${definitionPath}`),
+    });
+  });
+
+  it("fails when service lifecycle commands cannot find a definition", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const definitionPath =
+      process.platform === "darwin"
+        ? join(root, "Library", "LaunchAgents", "dev.imp.plist")
+        : join(root, ".config", "systemd", "user", "imp.service");
+
+    await expect(runCli(["service", "start"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(`Service definition not found: ${definitionPath}`),
+    });
+    await expect(runCli(["service", "stop"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(`Service definition not found: ${definitionPath}`),
+    });
+    await expect(runCli(["service", "restart"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(`Service definition not found: ${definitionPath}`),
+    });
   });
 
   it("creates runtime directories and logs a startup failure for an invalid telegram token", async () => {
@@ -304,6 +412,7 @@ async function createTempDir(): Promise<string> {
 function createTestEnv(root: string): NodeJS.ProcessEnv {
   return {
     ...process.env,
+    HOME: root,
     XDG_CONFIG_HOME: join(root, "config-home"),
     XDG_STATE_HOME: join(root, "state-home"),
   };

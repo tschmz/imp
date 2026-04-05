@@ -8,7 +8,11 @@ export interface CliDependencies {
     force: boolean;
     defaults: boolean;
   }) => Promise<void>;
-  installService: (options: { configPath?: string; dryRun: boolean }) => Promise<void>;
+  installService: (options: { configPath?: string; dryRun: boolean; force: boolean }) => Promise<void>;
+  uninstallService: (options: { configPath?: string }) => Promise<void>;
+  startService: (options: { configPath?: string }) => Promise<void>;
+  stopService: (options: { configPath?: string }) => Promise<void>;
+  restartService: (options: { configPath?: string }) => Promise<void>;
 }
 
 export function createCli(dependencies: CliDependencies): Command {
@@ -51,15 +55,51 @@ export function createCli(dependencies: CliDependencies): Command {
     .command("install")
     .description("Generate or install a background service definition")
     .option("-c, --config <path>", "Path to the config file")
+    .option("-f, --force", "Overwrite an existing service definition")
     .option("--dry-run", "Print the generated service definition instead of installing it")
     .action(async function action(
       this: Command,
-      options: { config?: string; dryRun?: boolean },
+      options: { config?: string; dryRun?: boolean; force?: boolean },
     ) {
       await dependencies.installService({
         configPath: options.config,
         dryRun: options.dryRun ?? false,
+        force: options.force ?? false,
       });
+    });
+
+  serviceCommand
+    .command("uninstall")
+    .description("Remove an installed background service definition")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, options: { config?: string }) {
+      await dependencies.uninstallService({
+        configPath: options.config,
+      });
+    });
+
+  serviceCommand
+    .command("start")
+    .description("Start an installed background service")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, options: { config?: string }) {
+      await dependencies.startService({ configPath: options.config });
+    });
+
+  serviceCommand
+    .command("stop")
+    .description("Stop a running background service")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, options: { config?: string }) {
+      await dependencies.stopService({ configPath: options.config });
+    });
+
+  serviceCommand
+    .command("restart")
+    .description("Restart an installed background service")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, options: { config?: string }) {
+      await dependencies.restartService({ configPath: options.config });
     });
 
   return program;
