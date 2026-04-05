@@ -8,6 +8,7 @@ import type { Transport, TransportHandler } from "../types.js";
 interface TelegramBotAdapter {
   api: {
     getMe(): Promise<unknown>;
+    sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
   };
   on(filter: "message:text", handler: (ctx: TelegramMessageContext) => Promise<void>): void;
   start(): Promise<void>;
@@ -99,22 +100,27 @@ export function createTelegramTransport(
         });
 
         try {
-          const response = await handler.handle({
-            botId: config.id,
-            conversation: {
-              transport: "telegram",
-              externalId: String(ctx.chat.id),
-            },
-            messageId: String(ctx.message.message_id),
-            correlationId,
-            userId: String(ctx.from.id),
-            text: ctx.message.text,
-            receivedAt: new Date().toISOString(),
-          });
-          for (const chunk of renderTelegramMessages(response.text)) {
-            await ctx.reply(chunk, {
-              parse_mode: "HTML",
+          const stopTyping = startTypingStatus(bot, ctx.chat.id);
+          try {
+            const response = await handler.handle({
+              botId: config.id,
+              conversation: {
+                transport: "telegram",
+                externalId: String(ctx.chat.id),
+              },
+              messageId: String(ctx.message.message_id),
+              correlationId,
+              userId: String(ctx.from.id),
+              text: ctx.message.text,
+              receivedAt: new Date().toISOString(),
             });
+            for (const chunk of renderTelegramMessages(response.text)) {
+              await ctx.reply(chunk, {
+                parse_mode: "HTML",
+              });
+            }
+          } finally {
+            stopTyping();
           }
           await logger?.debug("replied to telegram message", {
             botId: config.id,
@@ -161,4 +167,45 @@ async function validateBotToken(
 
     throw error;
   }
+}
+
+function startTypingStatus(
+  bot: TelegramBotAdapter,
+  chatId: number,
+): () => void {
+  let active = true;
+  let timeout: NodeJS.Timeout | undefined;
+
+  const scheduleNext = () => {
+    if (!active) {
+      return;
+    }
+
+    timeout = setTimeout(() => {
+      void sendTyping();
+    }, 4000);
+  };
+
+  const sendTyping = async () => {
+    if (!active) {
+      return;
+    }
+
+    try {
+      await bot.api.sendChatAction(chatId, "typing");
+    } catch {
+      scheduleNext();
+      return;
+    }
+    scheduleNext();
+  };
+
+  void sendTyping();
+
+  return () => {
+    active = false;
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  };
 }

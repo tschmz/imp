@@ -48,6 +48,7 @@ describe("createTelegramTransport", () => {
     expect(bot.reply).toHaveBeenCalledWith("pong", {
       parse_mode: "HTML",
     });
+    expect(bot.api.sendChatAction).toHaveBeenCalledWith(42, "typing");
     expect(logger.error).not.toHaveBeenCalled();
   });
 
@@ -162,6 +163,61 @@ describe("createTelegramTransport", () => {
       expect.any(Error),
     );
   });
+
+  it("keeps sending typing status while a reply is still being generated", async () => {
+    vi.useFakeTimers();
+    try {
+      const bot = createFakeBot();
+      const logger = createMockLogger();
+      let resolveHandler: ((value: OutgoingMessage) => void) | undefined;
+      const handler = vi.fn<(message: IncomingMessage) => Promise<OutgoingMessage>>(
+        () =>
+          new Promise<OutgoingMessage>((resolve) => {
+            resolveHandler = resolve;
+          }),
+      );
+
+      const transport = createTelegramTransport(
+        {
+          id: "private-telegram",
+          type: "telegram",
+          token: "telegram-token",
+          allowedUserIds: ["7"],
+        },
+        bot,
+        logger,
+      );
+
+      await transport.start({ handle: handler });
+      const pendingMessage = bot.emitTextMessage({
+        chat: { id: 42, type: "private" },
+        from: { id: 7 },
+        message: { message_id: 99, text: "ping" },
+      });
+
+      await Promise.resolve();
+      expect(bot.api.sendChatAction).toHaveBeenCalledTimes(1);
+      expect(bot.api.sendChatAction).toHaveBeenLastCalledWith(42, "typing");
+
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(bot.api.sendChatAction).toHaveBeenCalledTimes(2);
+      expect(bot.api.sendChatAction).toHaveBeenLastCalledWith(42, "typing");
+
+      resolveHandler?.({
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+        },
+        text: "done",
+      });
+
+      await pendingMessage;
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(bot.api.sendChatAction).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 function createMockLogger(): Logger {
@@ -173,7 +229,10 @@ function createMockLogger(): Logger {
 }
 
 function createFakeBot(): {
-  api: { getMe(): Promise<unknown> };
+  api: {
+    getMe(): Promise<unknown>;
+    sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
+  };
   on(
     filter: "message:text",
     handler: (ctx: {
@@ -219,6 +278,7 @@ function createFakeBot(): {
   return {
     api: {
       getMe: vi.fn(async () => ({ username: "test_bot" })),
+      sendChatAction: vi.fn(async () => ({})),
     },
     on(_filter, handler) {
       onTextMessage = handler;
