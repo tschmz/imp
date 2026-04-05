@@ -27,6 +27,27 @@ beforeAll(async () => {
 });
 
 describe("imp CLI e2e", () => {
+  it("shows help output", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["--help"], env);
+
+    expect(stdout).toContain("Usage: imp");
+    expect(stdout).toContain("init");
+    expect(stdout).toContain("--config <path>");
+    expect(stdout).toContain("--version");
+  });
+
+  it("shows version output", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["--version"], env);
+
+    expect(stdout.trim()).toBe("0.1.0");
+  });
+
   it("creates a default config through `imp init`", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
