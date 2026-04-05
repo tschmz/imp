@@ -23,6 +23,7 @@ describe("resolveRuntimeConfig", () => {
               store: true,
             },
           },
+          tools: ["read"],
           systemPrompt: "You are the configured default agent.",
         },
       ],
@@ -61,6 +62,7 @@ describe("resolveRuntimeConfig", () => {
             store: true,
           },
         },
+        tools: ["read"],
         systemPrompt: "You are the configured default agent.",
       },
     ]);
@@ -114,8 +116,10 @@ describe("resolveRuntimeConfig", () => {
             modelId: "gpt-5.4",
           },
           context: {
+            workingDirectory: "./workspace",
             files: ["./AGENTS.md", "/opt/shared/README.md"],
           },
+          tools: ["read", "bash"],
           systemPrompt: "You are concise.",
         },
       ],
@@ -135,8 +139,10 @@ describe("resolveRuntimeConfig", () => {
     const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.agents[0]?.context).toEqual({
+      workingDirectory: "/etc/imp/workspace",
       files: ["/etc/imp/AGENTS.md", "/opt/shared/README.md"],
     });
+    expect(result.agents[0]?.tools).toEqual(["read", "bash"]);
   });
 
   it("fails when no bot is enabled", () => {
@@ -219,6 +225,7 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
             store: true,
           },
         },
+        tools: [],
         systemPrompt: "You are concise.",
       },
     ],

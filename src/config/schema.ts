@@ -14,6 +14,7 @@ const inferenceSettingsSchema = z.object({
 
 const agentContextConfigSchema = z.object({
   files: z.string().min(1).array().optional(),
+  workingDirectory: z.string().min(1).optional(),
 });
 
 const agentConfigSchema = z.object({
@@ -23,6 +24,7 @@ const agentConfigSchema = z.object({
   model: modelConfigSchema.optional(),
   inference: inferenceSettingsSchema.optional(),
   context: agentContextConfigSchema.optional(),
+  tools: z.string().min(1).array().optional(),
 });
 
 const telegramBotSchema = z.object({

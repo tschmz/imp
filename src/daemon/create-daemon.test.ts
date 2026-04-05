@@ -110,6 +110,7 @@ describe("createDaemon", () => {
               provider: "openai",
               modelId: "gpt-5.4",
             },
+            tools: ["read"],
           },
         ],
       },
@@ -133,7 +134,47 @@ describe("createDaemon", () => {
         provider: "openai",
         modelId: "gpt-5.4",
       },
+      tools: ["read"],
     });
+  });
+
+  it("fails startup when an agent references an unknown tool", async () => {
+    const root = await createTempDir();
+    const paths = createRuntimePaths(root);
+    const startTransport = vi.fn();
+
+    const daemon = createDaemon(
+      {
+        ...createConfig(paths),
+        agents: [
+          {
+            id: "default",
+            systemPrompt: "You are configured from json.",
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+            tools: ["bashh"],
+          },
+        ],
+      },
+      {
+        engine: {
+          run: vi.fn(),
+        },
+        createBuiltInToolRegistry: () => ({
+          list: () => [],
+          get: () => undefined,
+          pick: () => [],
+        }),
+        createTransport: () => ({
+          start: startTransport,
+        }),
+      },
+    );
+
+    await expect(daemon.start()).rejects.toThrow('Unknown tools for agent "default": bashh');
+    expect(startTransport).not.toHaveBeenCalled();
   });
 });
 

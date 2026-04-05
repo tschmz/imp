@@ -25,6 +25,7 @@ export interface AgentConfig {
   model?: ModelConfig;
   inference?: InferenceSettings;
   context?: AgentContextConfig;
+  tools?: string[];
 }
 
 export type BotConfig = TelegramBotConfig;

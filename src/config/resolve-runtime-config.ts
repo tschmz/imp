@@ -53,6 +53,13 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
 function resolveAgentContext(context: AgentContextConfig, configDir: string): AgentContextConfig {
   return {
     ...context,
+    ...(context.workingDirectory
+      ? {
+          workingDirectory: isAbsolute(context.workingDirectory)
+            ? context.workingDirectory
+            : resolve(configDir, context.workingDirectory),
+        }
+      : {}),
     ...(context.files
       ? {
           files: context.files.map((path) =>

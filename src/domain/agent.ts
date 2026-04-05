@@ -6,6 +6,7 @@ export interface InferenceSettings {
 
 export interface AgentContextConfig {
   files?: string[];
+  workingDirectory?: string;
 }
 
 export interface ModelRef {

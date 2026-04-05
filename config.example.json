@@ -18,7 +18,9 @@
         "provider": "openai",
         "modelId": "gpt-5.4"
       },
+      "tools": [],
       "context": {
+        "workingDirectory": "/path/to/workspace",
         "files": [
           "/path/to/workspace/AGENTS.md"
         ]

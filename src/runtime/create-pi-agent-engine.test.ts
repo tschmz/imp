@@ -1,4 +1,5 @@
 import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration } from "@mariozechner/pi-ai";
+import { Type } from "@sinclair/typebox";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
@@ -210,6 +211,145 @@ describe("createPiAgentEngine", () => {
       },
       service_tier: "priority",
     });
+  });
+
+  it("passes resolved configured tools into the agent runtime", async () => {
+    let capturedTools: unknown[] | undefined;
+    const tool = {
+      name: "read_file",
+      label: "Read File",
+      description: "Read a file from disk.",
+      parameters: Type.Object({ path: Type.String() }),
+      async execute() {
+        return {
+          content: [{ type: "text" as const, text: "ok" }],
+          details: {},
+        };
+      },
+    };
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      toolRegistry: {
+        list: () => [tool],
+        get: (name) => (name === "read_file" ? tool : undefined),
+        pick: (names) => names.flatMap((name) => (name === "read_file" ? [tool] : [])),
+      },
+      createAgent: (options) => {
+        capturedTools = options.initialState?.tools as unknown[];
+        return {
+          state: {
+            messages: [fauxAssistantMessage("tool-ready")],
+          },
+          prompt: async () => {},
+        };
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        tools: ["read_file"],
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(capturedTools).toEqual([tool]);
+  });
+
+  it("registers built-in tools in the default runtime path", async () => {
+    let capturedTools: Array<{ name: string }> | undefined;
+    let capturedWorkingDirectory: string | undefined;
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createBuiltInToolRegistry: (workingDirectory) => {
+        capturedWorkingDirectory = workingDirectory;
+        return {
+          list: () => [],
+          get: () => undefined,
+          pick: (names) =>
+            names.map((name) => ({
+              name,
+              label: name,
+              description: `${name} tool`,
+              parameters: Type.Object({}),
+              async execute() {
+                return {
+                  content: [],
+                  details: {},
+                };
+              },
+            })),
+        };
+      },
+      createAgent: (options) => {
+        capturedTools = options.initialState?.tools as Array<{ name: string }>;
+        return {
+          state: {
+            messages: [fauxAssistantMessage("tool-ready")],
+          },
+          prompt: async () => {},
+        };
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        context: {
+          ...createAgent().context,
+          workingDirectory: "/workspace/project",
+        },
+        tools: ["read", "bash"],
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(capturedWorkingDirectory).toBe("/workspace/project");
+    expect(capturedTools?.map((tool) => tool.name)).toEqual(["read", "bash"]);
+  });
+
+  it("fails clearly when a configured tool cannot be resolved", async () => {
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      toolRegistry: {
+        list: () => [],
+        get: () => undefined,
+        pick: () => [],
+      },
+    });
+
+    await expect(
+      engine.run({
+        agent: {
+          ...createAgent(),
+          tools: ["read"],
+        },
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow('Unknown tools for agent "default": read');
   });
 
   it("fails clearly when a configured context file cannot be read", async () => {

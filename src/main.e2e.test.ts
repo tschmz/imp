@@ -2,7 +2,7 @@ import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -17,6 +17,13 @@ afterEach(async () => {
       await rm(path, { recursive: true, force: true });
     }),
   );
+});
+
+beforeAll(async () => {
+  await execFileAsync("npm", ["run", "build"], {
+    cwd: projectRoot,
+    env: process.env,
+  });
 });
 
 describe("imp CLI e2e", () => {
@@ -197,11 +204,6 @@ async function runCli(
   args: string[],
   env: NodeJS.ProcessEnv,
 ): Promise<{ stdout: string; stderr: string }> {
-  await execFileAsync("npm", ["run", "build"], {
-    cwd: projectRoot,
-    env: process.env,
-  });
-
   return execFileAsync("node", ["dist/main.js", ...args], {
     cwd: projectRoot,
     env,

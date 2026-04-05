@@ -36,4 +36,5 @@ export interface ConfiguredAgent {
   model?: ModelRef;
   inference?: InferenceSettings;
   context?: AgentContextConfig;
+  tools?: string[];
 }

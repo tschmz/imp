@@ -5,10 +5,16 @@ import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationState } from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createFileLogger } from "../logging/file-logger.js";
-import { createPiAgentEngine } from "../runtime/create-pi-agent-engine.js";
+import {
+  createBuiltInToolRegistry,
+  createPiAgentEngine,
+  resolveAgentTools,
+  resolveWorkingDirectory,
+} from "../runtime/create-pi-agent-engine.js";
 import type { AgentEngine } from "../runtime/types.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import type { ConversationStore } from "../storage/types.js";
+import type { ToolRegistry } from "../tools/registry.js";
 import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
 import type { Transport, TransportHandler } from "../transports/types.js";
 import type { Daemon, DaemonConfig, RuntimePaths } from "./types.js";
@@ -25,6 +31,8 @@ interface DaemonDependencies {
   agentRegistry?: ReturnType<typeof createAgentRegistry>;
   conversationStore?: ConversationStore;
   engine?: AgentEngine;
+  toolRegistry?: ToolRegistry;
+  createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
   createTransport?: (config: DaemonConfig["activeBot"]) => Transport;
 }
 
@@ -35,7 +43,14 @@ export function createDaemon(
   const agentRegistry =
     dependencies.agentRegistry ?? createAgentRegistry(buildAgents(config.agents));
   const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
-  const engine = dependencies.engine ?? createPiAgentEngine();
+  const createBuiltInRegistry =
+    dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
+  const engine =
+    dependencies.engine ??
+    createPiAgentEngine({
+      ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
+      createBuiltInToolRegistry: createBuiltInRegistry,
+    });
   const createTransport = dependencies.createTransport ?? createTelegramTransport;
   const defaultAgent = agentRegistry.get(config.defaultAgentId);
 
@@ -44,6 +59,7 @@ export function createDaemon(
       if (!defaultAgent) {
         throw new Error(`Unknown default agent: ${config.defaultAgentId}`);
       }
+      validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createBuiltInRegistry);
 
       await ensureRuntimePaths(config.paths);
       await ensureLogFile(config.paths.logFilePath);
@@ -112,6 +128,17 @@ export function createDaemon(
   };
 }
 
+function validateAgentRegistry(
+  agentRegistry: ReturnType<typeof createAgentRegistry>,
+  toolRegistry: ToolRegistry | undefined,
+  createBuiltInRegistry: (workingDirectory: string) => ToolRegistry,
+): void {
+  for (const agent of agentRegistry.list()) {
+    const registry = toolRegistry ?? createBuiltInRegistry(resolveWorkingDirectory(agent));
+    resolveAgentTools(agent, registry);
+  }
+}
+
 function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[] {
   const builtIns = loadBuiltInAgents();
   const builtInsById = new Map(builtIns.map((agent) => [agent.id, agent]));
@@ -138,7 +165,7 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
       model: configuredAgent.model ?? builtIn?.model ?? { provider: "", modelId: "" },
       inference: configuredAgent.inference ?? builtIn?.inference,
       context: configuredAgent.context ?? builtIn?.context,
-      tools: builtIn?.tools ?? [],
+      tools: configuredAgent.tools ?? builtIn?.tools ?? [],
       extensions: builtIn?.extensions ?? [],
     };
   });

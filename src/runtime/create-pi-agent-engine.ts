@@ -1,10 +1,15 @@
 import { readFile } from "node:fs/promises";
-import { Agent, type AgentOptions } from "@mariozechner/pi-agent-core";
+import { Agent, type AgentMessage, type AgentOptions } from "@mariozechner/pi-agent-core";
+import {
+  createCodingTools,
+  createFindTool,
+  createGrepTool,
+  createLsTool,
+} from "@mariozechner/pi-coding-agent";
 import {
   getModel,
   type Api as AiApi,
   type AssistantMessage,
-  type Message,
   type Model,
   type StreamOptions,
   type Usage,
@@ -12,6 +17,8 @@ import {
 } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationMessage } from "../domain/conversation.js";
+import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
+import type { ToolDefinition } from "../tools/types.js";
 import type { AgentEngine } from "./types.js";
 
 const EMPTY_USAGE: Usage = {
@@ -33,12 +40,14 @@ interface PiAgentEngineDependencies {
   resolveModel?: (provider: string, modelId: string) => Model<AiApi> | undefined;
   createAgent?: (options: AgentOptions) => AgentHandle;
   readTextFile?: (path: string) => Promise<string>;
+  toolRegistry?: ToolRegistry;
+  createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
 }
 
 interface AgentHandle {
   prompt(text: string): Promise<void>;
   state: {
-    messages: Message[];
+    messages: AgentMessage[];
   };
 }
 
@@ -48,6 +57,8 @@ export function createPiAgentEngine(
   const resolveModel = dependencies.resolveModel ?? defaultResolveModel;
   const createAgent = dependencies.createAgent ?? defaultCreateAgent;
   const readTextFile = dependencies.readTextFile ?? defaultReadTextFile;
+  const buildToolRegistry =
+    dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
 
   return {
     async run(input) {
@@ -60,13 +71,17 @@ export function createPiAgentEngine(
       }
 
       const systemPrompt = await buildSystemPrompt(input.agent, readTextFile);
+      const toolRegistry =
+        dependencies.toolRegistry ??
+        buildToolRegistry(resolveWorkingDirectory(input.agent));
+      const tools = resolveAgentTools(input.agent, toolRegistry);
       const onPayload = createOnPayloadOverride(input.agent);
       const agent = createAgent({
         initialState: {
           systemPrompt,
           model,
           thinkingLevel: "off",
-          tools: [],
+          tools,
           messages: toAgentMessages(input.conversation.messages, model),
         },
         ...(onPayload ? { onPayload } : {}),
@@ -114,6 +129,39 @@ function defaultCreateAgent(options: AgentOptions): AgentHandle {
 
 async function defaultReadTextFile(path: string): Promise<string> {
   return readFile(path, "utf8");
+}
+
+export function resolveWorkingDirectory(agent: AgentDefinition): string {
+  return agent.context?.workingDirectory ?? process.cwd();
+}
+
+export function createBuiltInToolRegistry(workingDirectory: string): ToolRegistry {
+  return createToolRegistry([
+    ...createCodingTools(workingDirectory),
+    createGrepTool(workingDirectory),
+    createFindTool(workingDirectory),
+    createLsTool(workingDirectory),
+  ]);
+}
+
+export function resolveAgentTools(
+  agent: AgentDefinition,
+  toolRegistry: ToolRegistry,
+): ToolDefinition[] {
+  if (agent.tools.length === 0) {
+    return [];
+  }
+
+  const resolvedTools = toolRegistry.pick(agent.tools);
+  const resolvedNames = new Set(resolvedTools.map((tool) => tool.name));
+  const missingTools = agent.tools.filter((name) => !resolvedNames.has(name));
+  if (missingTools.length > 0) {
+    throw new Error(
+      `Unknown tools for agent "${agent.id}": ${missingTools.join(", ")}`,
+    );
+  }
+
+  return resolvedTools;
 }
 
 function createOnPayloadOverride(
