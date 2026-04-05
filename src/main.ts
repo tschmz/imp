@@ -9,6 +9,7 @@ import { promptForInitialAppConfig } from "./config/prompt-init-config.js";
 import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
 import { createDaemon } from "./daemon/create-daemon.js";
 import { createFileLogger } from "./logging/file-logger.js";
+import { createServiceInstallPlan, renderServiceDefinition } from "./service/install-plan.js";
 
 async function main(): Promise<void> {
   const cli = createCli({
@@ -22,6 +23,21 @@ async function main(): Promise<void> {
         config,
       });
       console.log(`Created config at ${createdConfigPath}`);
+    },
+    installService: async ({ configPath, dryRun }) => {
+      const { configPath: resolvedConfigPath } = await discoverConfigPath({
+        cliConfigPath: configPath,
+      });
+      const plan = createServiceInstallPlan({ configPath: resolvedConfigPath });
+
+      if (dryRun) {
+        console.log(renderServiceDefinition(plan));
+        return;
+      }
+
+      throw new Error(
+        "Service installation is not implemented yet. Re-run with --dry-run to inspect the generated definition.",
+      );
     },
   });
 

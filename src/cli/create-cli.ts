@@ -8,6 +8,7 @@ export interface CliDependencies {
     force: boolean;
     defaults: boolean;
   }) => Promise<void>;
+  installService: (options: { configPath?: string; dryRun: boolean }) => Promise<void>;
 }
 
 export function createCli(dependencies: CliDependencies): Command {
@@ -41,6 +42,23 @@ export function createCli(dependencies: CliDependencies): Command {
         configPath: options.config,
         force: options.force ?? false,
         defaults: options.defaults ?? false,
+      });
+    });
+
+  const serviceCommand = program.command("service").description("Manage imp background services");
+
+  serviceCommand
+    .command("install")
+    .description("Generate or install a background service definition")
+    .option("-c, --config <path>", "Path to the config file")
+    .option("--dry-run", "Print the generated service definition instead of installing it")
+    .action(async function action(
+      this: Command,
+      options: { config?: string; dryRun?: boolean },
+    ) {
+      await dependencies.installService({
+        configPath: options.config,
+        dryRun: options.dryRun ?? false,
       });
     });
 

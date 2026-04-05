@@ -36,6 +36,7 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("Usage: imp");
     expect(stdout).toContain("start");
     expect(stdout).toContain("init");
+    expect(stdout).toContain("service");
   });
 
   it("shows help output", async () => {
@@ -47,7 +48,19 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("Usage: imp");
     expect(stdout).toContain("start");
     expect(stdout).toContain("init");
+    expect(stdout).toContain("service");
     expect(stdout).toContain("--version");
+  });
+
+  it("shows help output for service install", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["service", "install", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp service install");
+    expect(stdout).toContain("--config <path>");
+    expect(stdout).toContain("--dry-run");
   });
 
   it("shows command-specific config help for start", async () => {
@@ -96,6 +109,32 @@ describe("imp CLI e2e", () => {
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
+  });
+
+  it("prints a native service definition in dry-run mode", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    await runCli(["init", "--defaults"], env);
+
+    const { stdout } = await runCli(["service", "install", "--dry-run"], env);
+
+    switch (process.platform) {
+      case "linux":
+        expect(stdout).toContain("[Unit]");
+        expect(stdout).toContain("ExecStart=");
+        break;
+      case "darwin":
+        expect(stdout).toContain("<plist version=\"1.0\">");
+        expect(stdout).toContain("<key>ProgramArguments</key>");
+        break;
+      case "win32":
+        expect(stdout).toContain("<service>");
+        expect(stdout).toContain("<executable>");
+        break;
+      default:
+        throw new Error(`Unsupported test platform: ${process.platform}`);
+    }
   });
 
   it("creates runtime directories and logs a startup failure for an invalid telegram token", async () => {
