@@ -17,6 +17,7 @@ export interface ConversationState {
   agentId: string;
   createdAt: string;
   updatedAt: string;
+  version?: number;
 }
 
 export interface ConversationContext {

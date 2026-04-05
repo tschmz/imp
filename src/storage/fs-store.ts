@@ -1,9 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
   ConversationMessage,
+  ConversationContext,
   ConversationRef,
-  ConversationState,
 } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
 import type { ConversationStore } from "./types.js";
@@ -16,52 +16,74 @@ function getConversationDir(conversationsDir: string, ref: ConversationRef): str
   );
 }
 
-function getConversationStatePath(conversationsDir: string, ref: ConversationRef): string {
-  return join(getConversationDir(conversationsDir, ref), "meta.json");
-}
-
-function getConversationMessagesPath(conversationsDir: string, ref: ConversationRef): string {
-  return join(getConversationDir(conversationsDir, ref), "messages.json");
+function getConversationSnapshotPath(conversationsDir: string, ref: ConversationRef): string {
+  return join(getConversationDir(conversationsDir, ref), "conversation.json");
 }
 
 export function createFsConversationStore(paths: RuntimePaths): ConversationStore {
   return {
     async get(ref) {
-      const statePath = getConversationStatePath(paths.conversationsDir, ref);
+      const snapshotPath = getConversationSnapshotPath(paths.conversationsDir, ref);
       try {
-        const raw = await readFile(statePath, "utf8");
-        const state = JSON.parse(raw) as ConversationState;
-        const messages = await readConversationMessages(paths.conversationsDir, ref);
-
-        return {
-          state,
-          messages,
-        };
+        const raw = await readFile(snapshotPath, "utf8");
+        return normalizeSnapshot(JSON.parse(raw) as ConversationContext);
       } catch (error: unknown) {
         if (isMissingFile(error)) {
-          return undefined;
+          return readLegacyConversation(paths.conversationsDir, ref);
         }
         throw error;
       }
     },
     async put(context) {
-      const statePath = getConversationStatePath(paths.conversationsDir, context.state.conversation);
-      const messagesPath = getConversationMessagesPath(
-        paths.conversationsDir,
-        context.state.conversation,
-      );
-      await mkdir(dirname(statePath), { recursive: true });
-      await writeFile(statePath, JSON.stringify(context.state, null, 2));
-      await writeFile(messagesPath, JSON.stringify(context.messages, null, 2));
+      const snapshotPath = getConversationSnapshotPath(paths.conversationsDir, context.state.conversation);
+      const current = await this.get(context.state.conversation);
+      const normalizedContext = normalizeSnapshot(context);
+      assertNoWriteConflict(normalizedContext, current);
+
+      const nextSnapshot: ConversationContext = {
+        ...normalizedContext,
+        state: {
+          ...normalizedContext.state,
+          version: (current?.state.version ?? 0) + 1,
+        },
+      };
+
+      const tempPath = `${snapshotPath}.tmp`;
+      await mkdir(dirname(snapshotPath), { recursive: true });
+      await writeFile(tempPath, JSON.stringify(nextSnapshot, null, 2));
+      await rename(tempPath, snapshotPath);
     },
   };
 }
 
-async function readConversationMessages(
+async function readLegacyConversation(
+  conversationsDir: string,
+  ref: ConversationRef,
+): Promise<ConversationContext | undefined> {
+  const statePath = join(getConversationDir(conversationsDir, ref), "meta.json");
+
+  try {
+    const raw = await readFile(statePath, "utf8");
+    const state = JSON.parse(raw) as ConversationContext["state"];
+    const messages = await readLegacyMessages(conversationsDir, ref);
+    return normalizeSnapshot({
+      state,
+      messages,
+    });
+  } catch (error: unknown) {
+    if (isMissingFile(error)) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
+async function readLegacyMessages(
   conversationsDir: string,
   ref: ConversationRef,
 ): Promise<ConversationMessage[]> {
-  const path = getConversationMessagesPath(conversationsDir, ref);
+  const path = join(getConversationDir(conversationsDir, ref), "messages.json");
 
   try {
     const raw = await readFile(path, "utf8");
@@ -72,6 +94,33 @@ async function readConversationMessages(
     }
 
     throw error;
+  }
+}
+
+function normalizeSnapshot(snapshot: ConversationContext): ConversationContext {
+  return {
+    ...snapshot,
+    state: {
+      ...snapshot.state,
+      version: snapshot.state.version ?? 0,
+    },
+  };
+}
+
+function assertNoWriteConflict(
+  incoming: ConversationContext,
+  current: ConversationContext | undefined,
+): void {
+  if (!current) {
+    return;
+  }
+
+  if (incoming.state.version !== current.state.version) {
+    throw new Error("Conversation write conflict: version mismatch");
+  }
+
+  if (incoming.state.updatedAt <= current.state.updatedAt) {
+    throw new Error("Conversation write conflict: updatedAt must increase");
   }
 }
 

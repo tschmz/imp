@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -42,6 +42,7 @@ describe("createFsConversationStore", () => {
         agentId: "default",
         createdAt: "2026-04-05T00:00:00.000Z",
         updatedAt: "2026-04-05T00:00:00.000Z",
+        version: 0,
       },
       messages: [
         {
@@ -55,7 +56,13 @@ describe("createFsConversationStore", () => {
 
     await store.put(context);
 
-    await expect(store.get(context.state.conversation)).resolves.toEqual(context);
+    await expect(store.get(context.state.conversation)).resolves.toEqual({
+      ...context,
+      state: {
+        ...context.state,
+        version: 1,
+      },
+    });
   });
 
   it("sanitizes path segments before writing to disk", async () => {
@@ -70,6 +77,7 @@ describe("createFsConversationStore", () => {
         agentId: "default",
         createdAt: "2026-04-05T00:00:00.000Z",
         updatedAt: "2026-04-05T00:00:00.000Z",
+        version: 0,
       },
       messages: [],
     };
@@ -77,18 +85,24 @@ describe("createFsConversationStore", () => {
     await store.put(context);
 
     const written = await readFile(
-      join(root, "conversations", "telegram_web", "user_123", "meta.json"),
+      join(root, "conversations", "telegram_web", "user_123", "conversation.json"),
       "utf8",
     );
 
-    expect(JSON.parse(written)).toEqual(context.state);
+    expect(JSON.parse(written)).toEqual({
+      ...context,
+      state: {
+        ...context.state,
+        version: 1,
+      },
+    });
   });
 
-  it("returns an empty transcript when only conversation state exists", async () => {
+  it("loads legacy state file and returns an empty transcript when messages are missing", async () => {
     const root = await createTempDir();
     const statePath = join(root, "conversations", "telegram", "42", "meta.json");
     await (await import("node:fs/promises")).mkdir(dirname(statePath), { recursive: true });
-    await (await import("node:fs/promises")).writeFile(
+    await writeFile(
       statePath,
       JSON.stringify({
         conversation: {
@@ -112,8 +126,166 @@ describe("createFsConversationStore", () => {
         agentId: "default",
         createdAt: "2026-04-05T00:00:00.000Z",
         updatedAt: "2026-04-05T00:00:00.000Z",
+        version: 0,
       },
       messages: [],
+    });
+  });
+
+  it("detects conflicts when version does not match the latest snapshot", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const ref = { transport: "telegram", externalId: "42" };
+
+    await store.put({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:00:00.000Z",
+        version: 0,
+      },
+      messages: [],
+    });
+
+    await expect(
+      store.put({
+        state: {
+          conversation: ref,
+          agentId: "default",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:01:00.000Z",
+          version: 0,
+        },
+        messages: [],
+      }),
+    ).rejects.toThrow("version mismatch");
+  });
+
+  it("detects conflicts when updatedAt does not increase", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const ref = { transport: "telegram", externalId: "42" };
+
+    await store.put({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:00:00.000Z",
+        version: 0,
+      },
+      messages: [],
+    });
+
+    const latest = await store.get(ref);
+    expect(latest).toBeDefined();
+
+    await expect(
+      store.put({
+        state: {
+          ...latest!.state,
+          updatedAt: "2026-04-05T00:00:00.000Z",
+        },
+        messages: [],
+      }),
+    ).rejects.toThrow("updatedAt must increase");
+  });
+
+  it("ignores orphan temp files from interrupted writes", async () => {
+    const root = await createTempDir();
+    const ref = { transport: "telegram", externalId: "42" };
+    const snapshotPath = join(root, "conversations", "telegram", "42", "conversation.json");
+    await (await import("node:fs/promises")).mkdir(dirname(snapshotPath), { recursive: true });
+    await writeFile(
+      `${snapshotPath}.tmp`,
+      JSON.stringify({
+        state: {
+          conversation: ref,
+          agentId: "default",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:00:00.000Z",
+          version: 1,
+        },
+        messages: [
+          {
+            id: "stale",
+            role: "user",
+            text: "stale",
+            createdAt: "2026-04-05T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    const store = createFsConversationStore(createRuntimePaths(root));
+    await expect(store.get(ref)).resolves.toBeUndefined();
+  });
+
+  it("only exposes committed snapshots when a temp file coexists with a committed file", async () => {
+    const root = await createTempDir();
+    const ref = { transport: "telegram", externalId: "42" };
+    const snapshotPath = join(root, "conversations", "telegram", "42", "conversation.json");
+    await (await import("node:fs/promises")).mkdir(dirname(snapshotPath), { recursive: true });
+
+    await writeFile(
+      snapshotPath,
+      JSON.stringify({
+        state: {
+          conversation: ref,
+          agentId: "default",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:01:00.000Z",
+          version: 2,
+        },
+        messages: [
+          {
+            id: "committed",
+            role: "assistant",
+            text: "committed",
+            createdAt: "2026-04-05T00:01:00.000Z",
+          },
+        ],
+      }),
+    );
+    await writeFile(
+      `${snapshotPath}.tmp`,
+      JSON.stringify({
+        state: {
+          conversation: ref,
+          agentId: "default",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:02:00.000Z",
+          version: 3,
+        },
+        messages: [
+          {
+            id: "uncommitted",
+            role: "assistant",
+            text: "uncommitted",
+            createdAt: "2026-04-05T00:02:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    const store = createFsConversationStore(createRuntimePaths(root));
+    await expect(store.get(ref)).resolves.toEqual({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+        version: 2,
+      },
+      messages: [
+        {
+          id: "committed",
+          role: "assistant",
+          text: "committed",
+          createdAt: "2026-04-05T00:01:00.000Z",
+        },
+      ],
     });
   });
 });
