@@ -81,6 +81,14 @@ export function createPiAgentEngine(
               `${input.agent.model.provider}/${input.agent.model.modelId}`,
           );
         }
+        await logger?.debug("resolved agent model", {
+          botId: input.message.botId,
+          transport: input.message.conversation.transport,
+          conversationId: input.message.conversation.externalId,
+          messageId: input.message.messageId,
+          correlationId: input.message.correlationId,
+          agentId: input.agent.id,
+        });
 
         const systemPrompt = await resolveSystemPrompt({
           agent: input.agent,
@@ -88,11 +96,20 @@ export function createPiAgentEngine(
           getContextFileFingerprint,
           cache: systemPromptCache,
           latestCacheKeyByAgentId: latestSystemPromptCacheKeyByAgentId,
+          logger,
         });
         const toolRegistry =
           dependencies.toolRegistry ??
           buildToolRegistry(resolveWorkingDirectory(input.agent));
         const tools = resolveAgentTools(input.agent, toolRegistry);
+        await logger?.debug("prepared agent runtime", {
+          botId: input.message.botId,
+          transport: input.message.conversation.transport,
+          conversationId: input.message.conversation.externalId,
+          messageId: input.message.messageId,
+          correlationId: input.message.correlationId,
+          agentId: input.agent.id,
+        });
         const onPayload = createOnPayloadOverride(input.agent);
         const agent = createAgent({
           initialState: {
@@ -126,6 +143,16 @@ export function createPiAgentEngine(
         if (!responseText.trim()) {
           throw new Error(`Agent "${input.agent.id}" produced an assistant message without text content.`);
         }
+
+        await logger?.debug("agent engine run completed", {
+          botId: input.message.botId,
+          transport: input.message.conversation.transport,
+          conversationId: input.message.conversation.externalId,
+          messageId: input.message.messageId,
+          correlationId: input.message.correlationId,
+          agentId: input.agent.id,
+          durationMs: Date.now() - startedAt,
+        });
 
         return {
           message: {
@@ -275,6 +302,7 @@ async function resolveSystemPrompt(options: {
   getContextFileFingerprint: (path: string) => Promise<string>;
   cache: Map<string, string>;
   latestCacheKeyByAgentId: Map<string, string>;
+  logger?: Logger;
 }): Promise<string> {
   const cacheKey = await buildSystemPromptCacheKey(
     options.agent,
@@ -283,11 +311,17 @@ async function resolveSystemPrompt(options: {
   );
   const cachedPrompt = options.cache.get(cacheKey);
   if (cachedPrompt !== undefined) {
+    await options.logger?.debug("reused cached system prompt", {
+      agentId: options.agent.id,
+    });
     return cachedPrompt;
   }
 
   const systemPrompt = await buildSystemPrompt(options.agent, options.readTextFile);
   options.cache.set(cacheKey, systemPrompt);
+  await options.logger?.debug("rebuilt system prompt", {
+    agentId: options.agent.id,
+  });
 
   const previousCacheKey = options.latestCacheKeyByAgentId.get(options.agent.id);
   if (previousCacheKey !== undefined && previousCacheKey !== cacheKey) {

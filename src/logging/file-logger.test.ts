@@ -17,6 +17,30 @@ afterEach(async () => {
 });
 
 describe("createFileLogger", () => {
+  it("writes debug logs when level is set to debug", async () => {
+    const logFilePath = await createLogFilePath();
+    const consoleDebug = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const logger = createFileLogger(logFilePath, "debug");
+
+    await logger.debug("visible-debug");
+
+    await expect(readFile(logFilePath, "utf8")).resolves.toContain('"level":"DEBUG"');
+    expect(consoleDebug).toHaveBeenCalledWith("visible-debug");
+  });
+
+  it("suppresses debug logs when level is set to info", async () => {
+    const logFilePath = await createLogFilePath();
+    const consoleDebug = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const logger = createFileLogger(logFilePath, "info");
+
+    await logger.debug("hidden-debug");
+
+    await expect(readFile(logFilePath, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(consoleDebug).not.toHaveBeenCalled();
+  });
+
   it("suppresses info logs when level is set to warn", async () => {
     const logFilePath = await createLogFilePath();
     const consoleInfo = vi.spyOn(console, "log").mockImplementation(() => {});

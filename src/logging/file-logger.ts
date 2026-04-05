@@ -10,6 +10,14 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
 
 export function createFileLogger(path: string, level: LogLevel = "info"): Logger {
   return {
+    async debug(message: string, fields?: LogFields): Promise<void> {
+      if (!shouldLog("debug", level)) {
+        return;
+      }
+
+      await writeLogLine(path, "DEBUG", message, fields);
+      console.debug(formatConsoleLog(message, fields));
+    },
     async info(message: string, fields?: LogFields): Promise<void> {
       if (!shouldLog("info", level)) {
         return;

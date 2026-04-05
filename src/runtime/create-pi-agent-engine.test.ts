@@ -558,6 +558,7 @@ function createIncomingMessage(): IncomingMessage {
 
 function createMockLogger(): Logger {
   return {
+    debug: vi.fn(async () => {}),
     info: vi.fn(async () => {}),
     error: vi.fn(async () => {}),
   };

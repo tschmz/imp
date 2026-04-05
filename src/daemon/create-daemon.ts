@@ -67,29 +67,33 @@ export function createDaemon(
             configPath: config.configPath,
             logFilePath: botConfig.paths.logFilePath,
           });
+          await logger.debug("initialized bot runtime state", {
+            botId: botConfig.id,
+          });
+          const engine =
+            dependencies.engine ??
+            createPiAgentEngine({
+              logger,
+              ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
+              createBuiltInToolRegistry: createBuiltInRegistry,
+            });
 
           return {
             botConfig,
             logger,
             conversationStore,
+            engine,
           };
         }),
       );
-      const logger = createBroadcastLogger(runtimeEntries.map((entry) => entry.logger));
-      const engine =
-        dependencies.engine ??
-        createPiAgentEngine({
-          logger,
-          ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
-          createBuiltInToolRegistry: createBuiltInRegistry,
-        });
       const activeRuntimeEntries = runtimeEntries.map((entry) => ({
         ...entry,
         handleIncomingMessage: createHandleIncomingMessage({
           agentRegistry,
           conversationStore: entry.conversationStore,
-          engine,
+          engine: entry.engine,
           defaultAgentId: entry.botConfig.defaultAgentId,
+          logger: entry.logger,
         }),
       }));
       const cleanup = registerRuntimeCleanup(
@@ -113,6 +117,9 @@ export function createDaemon(
             await logger.info(`runtime dir: ${botConfig.paths.runtimeDir}`);
             await logger.info(`runtime file: ${botConfig.paths.runtimeStatePath}`);
             await logger.info(`active bot: ${botConfig.id}`);
+            await logger.debug("starting transport for bot", {
+              botId: botConfig.id,
+            });
 
             const transport = createTransport(botConfig, logger);
             await transport.start(handleIncomingMessage);
@@ -122,17 +129,6 @@ export function createDaemon(
         cleanup.dispose();
         await cleanup.run();
       }
-    },
-  };
-}
-
-function createBroadcastLogger(loggers: Logger[]): Logger {
-  return {
-    async info(message, fields) {
-      await Promise.all(loggers.map(async (logger) => logger.info(message, fields)));
-    },
-    async error(message, fields, error) {
-      await Promise.all(loggers.map(async (logger) => logger.error(message, fields, error)));
     },
   };
 }

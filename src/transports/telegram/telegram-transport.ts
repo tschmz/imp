@@ -37,27 +37,60 @@ export function createTelegramTransport(
   return {
     async start(handler: TransportHandler): Promise<void> {
       await validateBotToken(bot, config);
+      await logger?.debug("validated telegram bot token", {
+        botId: config.id,
+        transport: "telegram",
+      });
 
       bot.on("message:text", async (ctx) => {
         if (!ctx.chat || !ctx.message || !ctx.from) {
+          await logger?.debug("ignored telegram update without chat, message, or sender", {
+            botId: config.id,
+            transport: "telegram",
+          });
           return;
         }
 
         if (ctx.chat.type !== "private") {
+          await logger?.debug("ignored non-private telegram chat", {
+            botId: config.id,
+            transport: "telegram",
+            conversationId: String(ctx.chat.id),
+            messageId: String(ctx.message.message_id),
+          });
           return;
         }
 
         if (!allowedUserIds.has(String(ctx.from.id))) {
+          await logger?.debug("ignored telegram message from disallowed user", {
+            botId: config.id,
+            transport: "telegram",
+            conversationId: String(ctx.chat.id),
+            messageId: String(ctx.message.message_id),
+          });
           return;
         }
 
         const text = ctx.message.text.trim();
         if (!text) {
+          await logger?.debug("ignored empty telegram message", {
+            botId: config.id,
+            transport: "telegram",
+            conversationId: String(ctx.chat.id),
+            messageId: String(ctx.message.message_id),
+          });
           return;
         }
 
         const startedAt = Date.now();
         const correlationId = randomUUID();
+        await logger?.debug("received telegram message", {
+          botId: config.id,
+          transport: "telegram",
+          conversationId: String(ctx.chat.id),
+          messageId: String(ctx.message.message_id),
+          correlationId,
+        });
 
         try {
           const response = await handler.handle({
@@ -73,6 +106,14 @@ export function createTelegramTransport(
             receivedAt: new Date().toISOString(),
           });
           await ctx.reply(response.text);
+          await logger?.debug("replied to telegram message", {
+            botId: config.id,
+            transport: "telegram",
+            conversationId: String(ctx.chat.id),
+            messageId: String(ctx.message.message_id),
+            correlationId,
+            durationMs: Date.now() - startedAt,
+          });
         } catch (error) {
           await logger?.error(
             "failed to handle telegram message",

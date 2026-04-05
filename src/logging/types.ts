@@ -12,6 +12,7 @@ export interface LogFields {
 }
 
 export interface Logger {
+  debug(message: string, fields?: LogFields): Promise<void>;
   info(message: string, fields?: LogFields): Promise<void>;
   error(message: string, fields?: LogFields, error?: unknown): Promise<void>;
 }

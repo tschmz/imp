@@ -1,6 +1,7 @@
 import type { AgentRegistry } from "../agents/registry.js";
 import type { ConversationContext, ConversationState } from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
+import type { Logger } from "../logging/types.js";
 import type { AgentEngine } from "../runtime/types.js";
 import type { ConversationStore } from "../storage/types.js";
 
@@ -9,6 +10,7 @@ interface HandleIncomingMessageDependencies {
   conversationStore: ConversationStore;
   engine: AgentEngine;
   defaultAgentId: string;
+  logger?: Logger;
 }
 
 export interface HandleIncomingMessage {
@@ -30,8 +32,17 @@ export function createHandleIncomingMessage(
         message,
         defaultAgent.id,
         dependencies.conversationStore,
+        dependencies.logger,
       );
       const agent = dependencies.agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
+      await dependencies.logger?.debug("resolved conversation context", {
+        botId: message.botId,
+        transport: message.conversation.transport,
+        conversationId: message.conversation.externalId,
+        messageId: message.messageId,
+        correlationId: message.correlationId,
+        agentId: agent.id,
+      });
       const response = await dependencies.engine.run({
         agent,
         conversation,
@@ -65,9 +76,18 @@ async function getOrCreateConversationContext(
   message: IncomingMessage,
   defaultAgentId: string,
   conversationStore: ConversationStore,
+  logger?: Logger,
 ): Promise<ConversationContext> {
   const existing = await conversationStore.get(message.conversation);
   if (existing) {
+    await logger?.debug("loaded existing conversation", {
+      botId: message.botId,
+      transport: message.conversation.transport,
+      conversationId: message.conversation.externalId,
+      messageId: message.messageId,
+      correlationId: message.correlationId,
+      agentId: existing.state.agentId,
+    });
     return existing;
   }
 
@@ -85,6 +105,14 @@ async function getOrCreateConversationContext(
   };
 
   await conversationStore.put(createdContext);
+  await logger?.debug("created new conversation", {
+    botId: message.botId,
+    transport: message.conversation.transport,
+    conversationId: message.conversation.externalId,
+    messageId: message.messageId,
+    correlationId: message.correlationId,
+    agentId: defaultAgentId,
+  });
   return {
     ...createdContext,
     state: {
