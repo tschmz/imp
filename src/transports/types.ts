@@ -6,4 +6,5 @@ export interface TransportHandler {
 
 export interface Transport {
   start(handler: TransportHandler): Promise<void>;
+  stop?(): Promise<void> | void;
 }

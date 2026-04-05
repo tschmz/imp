@@ -1,37 +1,33 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { createHandleIncomingMessage } from "../application/handle-incoming-message.js";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
-import { createFileLogger } from "../logging/file-logger.js";
 import type { Logger } from "../logging/types.js";
 import {
   createBuiltInToolRegistry,
-  createPiAgentEngine,
   resolveAgentTools,
   resolveWorkingDirectory,
 } from "../runtime/create-pi-agent-engine.js";
-import { createOAuthApiKeyResolver } from "../runtime/create-oauth-api-key-resolver.js";
-import type { AgentEngine } from "../runtime/types.js";
-import { createFsConversationStore } from "../storage/fs-store.js";
-import type { ConversationStore } from "../storage/types.js";
 import type { ToolRegistry } from "../tools/registry.js";
-import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
 import type { Transport } from "../transports/types.js";
 import {
-  assertNoRunningInstance,
-  cleanupRuntimeState,
-  writeRuntimeState,
-} from "./runtime-state.js";
-import type { ActiveBotRuntimeConfig, Daemon, DaemonConfig, RuntimePaths } from "./types.js";
+  bootstrapRuntime,
+  type BootstrappedRuntime,
+  type RuntimeBootstrapDependencies,
+} from "./runtime-bootstrap.js";
+import {
+  createRuntimeEntries,
+  runRuntimeEntries,
+} from "./runtime-runner.js";
+import {
+  createRuntimeShutdown,
+  type RuntimeLifecycleProcess,
+} from "./runtime-shutdown.js";
+import { cleanupRuntimeState } from "./runtime-state.js";
+import type { ActiveBotRuntimeConfig, Daemon, DaemonConfig } from "./types.js";
 
-interface DaemonDependencies {
+interface DaemonDependencies extends RuntimeBootstrapDependencies {
   agentRegistry?: ReturnType<typeof createAgentRegistry>;
-  engine?: AgentEngine;
-  toolRegistry?: ToolRegistry;
-  createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
-  createLogger?: (path: string, level: DaemonConfig["logging"]["level"]) => Logger;
-  createConversationStore?: (paths: RuntimePaths) => ConversationStore;
   createTransport?: (config: ActiveBotRuntimeConfig, logger: Logger) => Transport;
+  runtimeProcess?: RuntimeLifecycleProcess;
 }
 
 export function createDaemon(
@@ -42,94 +38,38 @@ export function createDaemon(
     dependencies.agentRegistry ?? createAgentRegistry(buildAgents(config.agents));
   const createBuiltInRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
-  const createLogger = dependencies.createLogger ?? createFileLogger;
-  const createConversationStore =
-    dependencies.createConversationStore ?? createFsConversationStore;
-  const createTransport =
-    dependencies.createTransport ??
-    ((botConfig, runtimeLogger) => createTelegramTransport(botConfig, undefined, runtimeLogger));
 
   return {
     async start() {
       validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createBuiltInRegistry);
-      const runtimeEntries = await Promise.all(
-        config.activeBots.map(async (botConfig) => {
-          const logger = createLogger(botConfig.paths.logFilePath, config.logging.level);
-          const conversationStore = createConversationStore(botConfig.paths);
-
-          await ensureRuntimePaths(botConfig.paths);
-          await ensureLogFile(botConfig.paths.logFilePath);
-          await assertNoRunningInstance(botConfig.paths.runtimeStatePath);
-          await writeRuntimeState(botConfig.paths.runtimeStatePath, {
-            pid: process.pid,
-            botId: botConfig.id,
-            startedAt: new Date().toISOString(),
-            configPath: config.configPath,
-            logFilePath: botConfig.paths.logFilePath,
-          });
-          await logger.debug("initialized bot runtime state", {
-            botId: botConfig.id,
-          });
-          const engine =
-            dependencies.engine ??
-            createPiAgentEngine({
-              logger,
-              getApiKey: (provider, agent) =>
-                createOAuthApiKeyResolver(agent.authFile, logger)(provider),
-              ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
-              createBuiltInToolRegistry: createBuiltInRegistry,
-            });
-
-          return {
-            botConfig,
-            logger,
-            conversationStore,
-            engine,
-          };
-        }),
-      );
-      const activeRuntimeEntries = runtimeEntries.map((entry) => ({
-        ...entry,
-        handleIncomingMessage: createHandleIncomingMessage({
-          agentRegistry,
-          conversationStore: entry.conversationStore,
-          engine: entry.engine,
-          defaultAgentId: entry.botConfig.defaultAgentId,
-          logger: entry.logger,
-        }),
-      }));
-      const cleanup = registerRuntimeCleanup(
-        activeRuntimeEntries.map(({ botConfig }) => ({
-          runtimeStatePath: botConfig.paths.runtimeStatePath,
-        })),
-      );
+      const runtimes: BootstrappedRuntime[] = [];
 
       try {
+        for (const botConfig of config.activeBots) {
+          runtimes.push(await bootstrapRuntime(config, botConfig, dependencies));
+        }
+      } catch (error) {
         await Promise.all(
-          activeRuntimeEntries.map(async ({ botConfig, logger, handleIncomingMessage }) => {
-            const defaultAgent = agentRegistry.get(botConfig.defaultAgentId);
-            await logger.info(
-              `starting daemon with default agent "${defaultAgent?.id ?? "unknown"}"`,
-            );
-            await logger.info(`data root: ${botConfig.paths.dataRoot}`);
-            await logger.info(`bot root: ${botConfig.paths.botRoot}`);
-            await logger.info(`conversations dir: ${botConfig.paths.conversationsDir}`);
-            await logger.info(`logs dir: ${botConfig.paths.logsDir}`);
-            await logger.info(`log file: ${botConfig.paths.logFilePath}`);
-            await logger.info(`runtime dir: ${botConfig.paths.runtimeDir}`);
-            await logger.info(`runtime file: ${botConfig.paths.runtimeStatePath}`);
-            await logger.info(`active bot: ${botConfig.id}`);
-            await logger.debug("starting transport for bot", {
-              botId: botConfig.id,
-            });
-
-            const transport = createTransport(botConfig, logger);
-            await transport.start(handleIncomingMessage);
-          }),
+          runtimes.map(async (runtime) => cleanupRuntimeState(runtime.botConfig.paths.runtimeStatePath)),
         );
+        throw error;
+      }
+      const runtimeEntries = createRuntimeEntries(runtimes, {
+        agentRegistry,
+        createTransport: dependencies.createTransport,
+      });
+      const shutdown = createRuntimeShutdown(
+        runtimeEntries,
+        runtimes.map((runtime) => runtime.botConfig.paths.runtimeStatePath),
+        dependencies.runtimeProcess,
+      );
+      const registeredSignals = shutdown.registerSignalHandlers();
+
+      try {
+        await runRuntimeEntries(runtimeEntries);
       } finally {
-        cleanup.dispose();
-        await cleanup.run();
+        registeredSignals.dispose();
+        await shutdown.shutdown();
       }
     },
   };
@@ -173,54 +113,4 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
       extensions: [],
     };
   });
-}
-async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
-  await mkdir(paths.dataRoot, { recursive: true });
-  await mkdir(paths.botRoot, { recursive: true });
-  await mkdir(paths.conversationsDir, { recursive: true });
-  await mkdir(paths.logsDir, { recursive: true });
-  await mkdir(paths.runtimeDir, { recursive: true });
-}
-
-async function ensureLogFile(path: string): Promise<void> {
-  await writeFile(path, "", { encoding: "utf8", flag: "a" });
-}
-
-function registerRuntimeCleanup(paths: Array<{ runtimeStatePath: string }>): {
-  dispose(): void;
-  run(): Promise<void>;
-} {
-  let cleanedUp = false;
-
-  const run = async (): Promise<void> => {
-    if (cleanedUp) {
-      return;
-    }
-
-    cleanedUp = true;
-    await Promise.all(paths.map(async (path) => cleanupRuntimeState(path.runtimeStatePath)));
-  };
-
-  const handleSigint = () => {
-    void run().finally(() => {
-      process.exit(130);
-    });
-  };
-
-  const handleSigterm = () => {
-    void run().finally(() => {
-      process.exit(0);
-    });
-  };
-
-  process.once("SIGINT", handleSigint);
-  process.once("SIGTERM", handleSigterm);
-
-  return {
-    dispose() {
-      process.off("SIGINT", handleSigint);
-      process.off("SIGTERM", handleSigterm);
-    },
-    run,
-  };
 }

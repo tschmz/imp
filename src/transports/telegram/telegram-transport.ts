@@ -12,6 +12,7 @@ interface TelegramBotAdapter {
   };
   on(filter: "message:text", handler: (ctx: TelegramMessageContext) => Promise<void>): void;
   start(): Promise<void>;
+  stop(): void;
 }
 
 interface TelegramMessageContext {
@@ -148,6 +149,9 @@ export function createTelegramTransport(
       });
 
       await bot.start();
+    },
+    async stop(): Promise<void> {
+      bot.stop();
     },
   };
 }

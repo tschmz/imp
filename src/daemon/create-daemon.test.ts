@@ -1,6 +1,7 @@
 import { access, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
@@ -8,7 +9,7 @@ import type { IncomingMessage } from "../domain/message.js";
 import type { AgentRunInput } from "../runtime/context.js";
 import type { AgentEngine } from "../runtime/types.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
-import type { TransportHandler } from "../transports/types.js";
+import type { Transport, TransportHandler } from "../transports/types.js";
 import { createDaemon } from "./create-daemon.js";
 import type { DaemonConfig, RuntimePaths } from "./types.js";
 
@@ -307,37 +308,134 @@ describe("createDaemon", () => {
     const root = await createTempDir();
     const botConfig = createBotConfig(root);
     const config = createConfig(botConfig);
-    let releaseTransportStart: (() => void) | undefined;
-
-    const transportStopped = new Promise<void>((resolve) => {
-      releaseTransportStart = resolve;
-    });
-
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(((code?: number) => {
-        expect(code).toBe(0);
-        releaseTransportStart?.();
-        return undefined as never;
-      }) as typeof process.exit);
+    const runtimeProcess = createFakeProcess();
+    const transport = createBlockingTransport();
 
     const daemon = createDaemon(config, {
       agentRegistry: createAgentRegistry([createDefaultAgent()]),
       engine: {
         run: vi.fn(),
       },
-      createTransport: () => ({
-        async start() {
-          process.emit("SIGTERM");
-          await transportStopped;
-        },
-      }),
+      createTransport: () => transport,
+      runtimeProcess,
     });
 
-    await daemon.start();
+    const started = daemon.start();
+    await transport.waitUntilStarted();
+    runtimeProcess.emitSignal("SIGTERM");
+    await started;
 
-    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(runtimeProcess.exit).toHaveBeenCalledWith(0);
+    expect(transport.stop).toHaveBeenCalledTimes(1);
     await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
+  });
+
+  it("exits cleanly on SIGINT", async () => {
+    const root = await createTempDir();
+    const botConfig = createBotConfig(root);
+    const runtimeProcess = createFakeProcess();
+    const transport = createBlockingTransport();
+
+    const daemon = createDaemon(createConfig(botConfig), {
+      agentRegistry: createAgentRegistry([createDefaultAgent()]),
+      engine: {
+        run: vi.fn(),
+      },
+      createTransport: () => transport,
+      runtimeProcess,
+    });
+
+    const started = daemon.start();
+    await transport.waitUntilStarted();
+    runtimeProcess.emitSignal("SIGINT");
+    await started;
+
+    expect(runtimeProcess.exit).toHaveBeenCalledWith(130);
+    expect(transport.stop).toHaveBeenCalledTimes(1);
+    await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
+  });
+
+  it("cleans up runtime state and stops transports when start fails", async () => {
+    const root = await createTempDir();
+    const botConfig = createBotConfig(root);
+    const transport = createFailingTransport(new Error("boom"));
+
+    const daemon = createDaemon(createConfig(botConfig), {
+      agentRegistry: createAgentRegistry([createDefaultAgent()]),
+      engine: {
+        run: vi.fn(),
+      },
+      createTransport: () => transport,
+    });
+
+    await expect(daemon.start()).rejects.toThrow("boom");
+
+    expect(transport.stop).toHaveBeenCalledTimes(1);
+    await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
+  });
+
+  it("stops all runtimes and removes all runtime state after a partial multi-bot start failure", async () => {
+    const root = await createTempDir();
+    const privateBot = createBotConfig(root);
+    const opsBot = createBotConfig(root, {
+      id: "ops-telegram",
+      defaultAgentId: "ops",
+    });
+    const startedBotIds: string[] = [];
+    const stoppingBotIds: string[] = [];
+
+    const transports = new Map<string, Transport>([
+      ["private-telegram", createBlockingTransport(startedBotIds, stoppingBotIds, "private-telegram")],
+      ["ops-telegram", createFailingTransport(new Error("ops boom"), startedBotIds, stoppingBotIds, "ops-telegram")],
+    ]);
+
+    const daemon = createDaemon(
+      {
+        configPath: join(root, "config.json"),
+        logging: {
+          level: "info",
+        },
+        agents: [
+          {
+            id: "default",
+            systemPrompt: "You are concise.",
+            model: {
+              provider: "test",
+              modelId: "stub",
+            },
+          },
+          {
+            id: "ops",
+            systemPrompt: "You are ops.",
+            model: {
+              provider: "test",
+              modelId: "stub",
+            },
+          },
+        ],
+        activeBots: [privateBot, opsBot],
+      },
+      {
+        engine: {
+          run: vi.fn(),
+        },
+        createTransport: (botConfig) => {
+          const transport = transports.get(botConfig.id);
+          if (!transport) {
+            throw new Error(`missing transport for ${botConfig.id}`);
+          }
+
+          return transport;
+        },
+      },
+    );
+
+    await expect(daemon.start()).rejects.toThrow("ops boom");
+
+    expect(startedBotIds.sort()).toEqual(["ops-telegram", "private-telegram"]);
+    expect(stoppingBotIds.sort()).toEqual(["ops-telegram", "private-telegram"]);
+    await expect(access(privateBot.paths.runtimeStatePath)).rejects.toThrow();
+    await expect(access(opsBot.paths.runtimeStatePath)).rejects.toThrow();
   });
 });
 
@@ -423,5 +521,73 @@ function createIncomingMessage(messageId: string, text: string): IncomingMessage
     userId: "7",
     text,
     receivedAt: "2026-04-05T00:00:00.000Z",
+  };
+}
+
+function createBlockingTransport(
+  startedBotIds?: string[],
+  stoppingBotIds?: string[],
+  botId = "private-telegram",
+): Transport & { waitUntilStarted(): Promise<void> } {
+  let releaseStart: (() => void) | undefined;
+  let resolveStarted: (() => void) | undefined;
+  const started = new Promise<void>((resolve) => {
+    resolveStarted = resolve;
+  });
+
+  return {
+    async start() {
+      startedBotIds?.push(botId);
+      resolveStarted?.();
+      await new Promise<void>((resolve) => {
+        releaseStart = resolve;
+      });
+    },
+    stop: vi.fn(async () => {
+      stoppingBotIds?.push(botId);
+      releaseStart?.();
+    }),
+    waitUntilStarted: () => started,
+  };
+}
+
+function createFailingTransport(
+  error: Error,
+  startedBotIds?: string[],
+  stoppingBotIds?: string[],
+  botId = "private-telegram",
+): Transport {
+  return {
+    async start() {
+      startedBotIds?.push(botId);
+      throw error;
+    },
+    stop: vi.fn(async () => {
+      stoppingBotIds?.push(botId);
+    }),
+  };
+}
+
+function createFakeProcess(): {
+  emitSignal(signal: "SIGINT" | "SIGTERM"): void;
+  exit: ReturnType<typeof vi.fn<(code?: number) => never>>;
+  off(event: "SIGINT" | "SIGTERM", listener: () => void): EventEmitter;
+  once(event: "SIGINT" | "SIGTERM", listener: () => void): EventEmitter;
+} {
+  const emitter = new EventEmitter();
+
+  return {
+    emitSignal(signal) {
+      emitter.emit(signal);
+    },
+    exit: vi.fn((() => undefined as never) as (code?: number) => never),
+    off(event, listener) {
+      emitter.off(event, listener);
+      return emitter;
+    },
+    once(event, listener) {
+      emitter.once(event, listener);
+      return emitter;
+    },
   };
 }

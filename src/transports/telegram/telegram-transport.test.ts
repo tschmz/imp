@@ -248,6 +248,7 @@ function createFakeBot(): {
     }) => Promise<void>,
   ): void;
   start(): Promise<void>;
+  stop(): void;
   emitTextMessage(input: {
     chat: { id: number; type: string };
     from: { id: number };
@@ -284,6 +285,7 @@ function createFakeBot(): {
       onTextMessage = handler;
     },
     async start() {},
+    stop() {},
     async emitTextMessage(input) {
       if (!onTextMessage) {
         throw new Error("message handler was not registered");
