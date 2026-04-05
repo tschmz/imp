@@ -1,4 +1,5 @@
 import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -124,6 +125,12 @@ describe("imp CLI e2e", () => {
 
     const { stdout } = await runCli(["init", "--defaults"], env);
     const configPath = join(root, "config-home", "imp", "config.json");
+    const servicePath =
+      process.platform === "darwin"
+        ? join(root, "Library", "LaunchAgents", "dev.imp.plist")
+        : process.platform === "linux"
+          ? join(root, ".config", "systemd", "user", "imp.service")
+          : null;
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
@@ -132,6 +139,10 @@ describe("imp CLI e2e", () => {
     };
 
     expect(stdout).toContain(`Created config at ${configPath}`);
+    if (servicePath) {
+      expect(stdout).toContain(`Installed`);
+      await expect(stat(servicePath)).resolves.toBeDefined();
+    }
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
@@ -183,7 +194,6 @@ describe("imp CLI e2e", () => {
     const env = createTestEnv(root);
 
     await runCli(["init", "--defaults"], env);
-    await runCli(["service", "install", "--dry-run"], env);
 
     const definitionPath =
       process.platform === "darwin"
@@ -415,11 +425,36 @@ async function createTempDir(): Promise<string> {
 }
 
 function createTestEnv(root: string): NodeJS.ProcessEnv {
+  const binDir = join(root, "bin");
+  mkdirSync(binDir, { recursive: true });
+
+  if (process.platform === "linux") {
+    const systemctlPath = join(binDir, "systemctl");
+    writeFileSync(
+      systemctlPath,
+      "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$IMP_TEST_SERVICE_LOG\"\nif [[ \"$2\" == \"status\" ]]; then\n  printf 'imp.service - imp daemon\\n'\nfi\n",
+      "utf8",
+    );
+    chmodSync(systemctlPath, 0o755);
+  }
+
+  if (process.platform === "darwin") {
+    const launchctlPath = join(binDir, "launchctl");
+    writeFileSync(
+      launchctlPath,
+      "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$IMP_TEST_SERVICE_LOG\"\nif [[ \"$1\" == \"print\" ]]; then\n  printf 'state = running\\n'\nfi\n",
+      "utf8",
+    );
+    chmodSync(launchctlPath, 0o755);
+  }
+
   return {
     ...process.env,
     HOME: root,
     XDG_CONFIG_HOME: join(root, "config-home"),
     XDG_STATE_HOME: join(root, "state-home"),
+    IMP_TEST_SERVICE_LOG: join(root, "service-manager.log"),
+    PATH: `${binDir}:${process.env.PATH ?? ""}`,
   };
 }
 

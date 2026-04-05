@@ -9,6 +9,17 @@ import {
 } from "./default-app-config.js";
 import type { AppConfig } from "./types.js";
 
+interface PromptDependencies {
+  confirm: typeof confirm;
+  input: typeof input;
+  select: typeof select;
+}
+
+export interface InitialAppSetup {
+  config: AppConfig;
+  installService: boolean;
+}
+
 const providerChoices = [
   { name: "OpenAI", value: "openai" },
   { name: "Anthropic", value: "anthropic" },
@@ -21,7 +32,8 @@ const providerChoices = [
 
 export async function promptForInitialAppConfig(
   env: NodeJS.ProcessEnv = process.env,
-): Promise<AppConfig> {
+  dependencies: PromptDependencies = { confirm, input, select },
+): Promise<InitialAppSetup> {
   const defaults = createDefaultAppConfig(env);
   const defaultAgent = defaults.agents[0];
   const defaultBot = defaults.bots[0];
@@ -30,19 +42,19 @@ export async function promptForInitialAppConfig(
     throw new Error("Default init config is incomplete.");
   }
 
-  const instanceName = await input({
+  const instanceName = await dependencies.input({
     message: "Instance name",
     default: defaults.instance.name,
     validate: requireNonEmpty("Instance name is required."),
   });
 
-  const dataRoot = await input({
+  const dataRoot = await dependencies.input({
     message: "Data root for logs and runtime state",
     default: defaults.paths.dataRoot,
     validate: requireNonEmpty("Data root is required."),
   });
 
-  const providerSelection = await select({
+  const providerSelection = await dependencies.select({
     message: "Default agent provider",
     choices: providerChoices,
     default: "openai",
@@ -50,75 +62,86 @@ export async function promptForInitialAppConfig(
 
   const provider =
     providerSelection === "other"
-      ? await input({
+      ? await dependencies.input({
           message: "Provider ID",
           validate: requireNonEmpty("Provider ID is required."),
         })
       : providerSelection;
 
-  const modelId = await input({
+  const modelId = await dependencies.input({
     message: "Model ID",
     default: getSuggestedModelId(provider),
     validate: requireNonEmpty("Model ID is required."),
   });
 
-  const telegramToken = await input({
+  const telegramToken = await dependencies.input({
     message: "Telegram bot token",
     default: defaultBot.token,
     validate: requireNonEmpty("Telegram bot token is required."),
   });
 
-  const allowedUserIdsRaw = await input({
+  const allowedUserIdsRaw = await dependencies.input({
     message: "Allowed Telegram user IDs (comma-separated, optional)",
     default: "",
     validate: validateTelegramUserIds,
   });
 
-  const workingDirectory = await input({
+  const workingDirectory = await dependencies.input({
     message: "Agent working directory (optional)",
     default: "",
   });
 
   const includeAgentsFile =
     workingDirectory.length > 0
-      ? await confirm({
+      ? await dependencies.confirm({
           message: "Add AGENTS.md from the working directory?",
           default: true,
         })
       : false;
 
-  const extraContextFilesRaw = await input({
+  const extraContextFilesRaw = await dependencies.input({
     message: "Additional context files (comma-separated, optional)",
     default: "",
   });
 
-  const useSystemPromptFile = await confirm({
+  const useSystemPromptFile = await dependencies.confirm({
     message: "Use a system prompt file?",
     default: false,
   });
 
   const systemPromptFile = useSystemPromptFile
-    ? await input({
+    ? await dependencies.input({
         message: "System prompt file path",
         default: join(dataRoot, "SYSTEM.md"),
         validate: requireNonEmpty("System prompt file path is required."),
       })
     : undefined;
 
-  return buildInitialAppConfig(env, {
-    instanceName,
-    dataRoot,
-    provider,
-    modelId,
-    telegramToken,
-    allowedUserIds: parseCommaSeparatedValues(allowedUserIdsRaw),
-    ...(workingDirectory.length > 0 ? { workingDirectory } : {}),
-    contextFiles: [
-      ...(includeAgentsFile ? [join(workingDirectory, "AGENTS.md")] : []),
-      ...parseCommaSeparatedValues(extraContextFilesRaw),
-    ],
-    ...(systemPromptFile ? { systemPromptFile } : {}),
-  });
+  const installService =
+    process.platform === "win32"
+      ? false
+      : await dependencies.confirm({
+          message: "Install and start imp as a background service now?",
+          default: true,
+        });
+
+  return {
+    config: buildInitialAppConfig(env, {
+      instanceName,
+      dataRoot,
+      provider,
+      modelId,
+      telegramToken,
+      allowedUserIds: parseCommaSeparatedValues(allowedUserIdsRaw),
+      ...(workingDirectory.length > 0 ? { workingDirectory } : {}),
+      contextFiles: [
+        ...(includeAgentsFile ? [join(workingDirectory, "AGENTS.md")] : []),
+        ...parseCommaSeparatedValues(extraContextFilesRaw),
+      ],
+      ...(systemPromptFile ? { systemPromptFile } : {}),
+    }),
+    installService,
+  };
 }
 
 function requireNonEmpty(message: string): (value: string) => true | string {

@@ -19,13 +19,20 @@ async function main(): Promise<void> {
     startDaemon: runDaemon,
     initConfig: async ({ configPath, force, defaults }) => {
       const resolvedConfigPath = await assertInitConfigCanBeCreated({ configPath, force });
-      const config = defaults ? undefined : await resolveInitConfig();
+      const initSetup = defaults
+        ? { config: undefined, installService: process.platform !== "win32" }
+        : await resolveInitConfig();
       const createdConfigPath = await initAppConfig({
         configPath: resolvedConfigPath,
         force,
-        config,
+        config: initSetup.config,
       });
       console.log(`Created config at ${createdConfigPath}`);
+
+      if (initSetup.installService) {
+        const result = await installService({ configPath: createdConfigPath });
+        console.log(`Installed ${result.platform} service at ${result.definitionPath}`);
+      }
     },
     installService: async ({ configPath, dryRun, force }) => {
       const { configPath: resolvedConfigPath } = await discoverConfigPath({
