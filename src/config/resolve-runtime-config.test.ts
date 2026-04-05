@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { appConfigSchema } from "./schema.js";
 import { resolveRuntimeConfig } from "./resolve-runtime-config.js";
 import type { AppConfig } from "./types.js";
 
@@ -254,6 +255,131 @@ describe("resolveRuntimeConfig", () => {
 
     expect(result.logging.level).toBe("info");
   });
+
+  it("rejects defaults.agentId when it does not reference a configured agent", () => {
+    const result = appConfigSchema.safeParse(
+      createAppConfig({
+        defaults: {
+          agentId: "missing-agent",
+        },
+        bots: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: {
+              allowedUserIds: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expectSchemaIssue(result, ["defaults", "agentId"], [
+      'Unknown default agent id "missing-agent".',
+      'Expected one of: "default".',
+    ]);
+  });
+
+  it("rejects bots.routing.defaultAgentId when it does not reference a configured agent", () => {
+    const result = appConfigSchema.safeParse(
+      createAppConfig({
+        bots: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: {
+              allowedUserIds: [],
+            },
+            routing: {
+              defaultAgentId: "missing-agent",
+            },
+          },
+        ],
+      }),
+    );
+
+    expectSchemaIssue(result, ["bots", 0, "routing", "defaultAgentId"], [
+      'Unknown default agent id "missing-agent" for bot "private-telegram".',
+      'Expected one of: "default".',
+    ]);
+  });
+
+  it("rejects duplicate agent ids", () => {
+    const result = appConfigSchema.safeParse(
+      createAppConfig({
+        agents: [
+          {
+            id: "default",
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+            systemPrompt: "You are concise.",
+          },
+          {
+            id: "default",
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+            systemPrompt: "You are also concise.",
+          },
+        ],
+        bots: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: {
+              allowedUserIds: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expectSchemaIssue(result, ["agents", 1, "id"], [
+      'Duplicate agent id "default".',
+      "Agent ids must be unique.",
+    ]);
+  });
+
+  it("rejects duplicate bot ids", () => {
+    const result = appConfigSchema.safeParse(
+      createAppConfig({
+        bots: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: {
+              allowedUserIds: [],
+            },
+          },
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "other-telegram-token",
+            access: {
+              allowedUserIds: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expectSchemaIssue(result, ["bots", 1, "id"], [
+      'Duplicate bot id "private-telegram".',
+      "Bot ids must be unique.",
+    ]);
+  });
 });
 
 function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
@@ -293,4 +419,26 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
     ],
     bots: overrides.bots ?? [],
   };
+}
+
+function expectSchemaIssue(
+  result: ReturnType<typeof appConfigSchema.safeParse>,
+  path: Array<string | number>,
+  messageParts: string[],
+): void {
+  expect(result.success).toBe(false);
+  if (result.success) {
+    throw new Error("Expected schema validation to fail.");
+  }
+
+  const issue = result.error.issues.find(
+    (candidate) =>
+      candidate.path.length === path.length &&
+      candidate.path.every((segment, index) => segment === path[index]),
+  );
+
+  expect(issue).toBeDefined();
+  for (const part of messageParts) {
+    expect(issue?.message).toContain(part);
+  }
 }

@@ -115,4 +115,60 @@ export const appConfigSchema = z.object({
   }),
   agents: agentConfigSchema.array().min(1),
   bots: telegramBotSchema.array().min(1),
+}).superRefine((config, ctx) => {
+  const agentIds = new Set<string>();
+  const knownAgentIds = new Set<string>();
+
+  for (const [index, agent] of config.agents.entries()) {
+    if (agentIds.has(agent.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["agents", index, "id"],
+        message: `Duplicate agent id "${agent.id}". Agent ids must be unique.`,
+      });
+      continue;
+    }
+
+    agentIds.add(agent.id);
+    knownAgentIds.add(agent.id);
+  }
+
+  const botIds = new Set<string>();
+  for (const [index, bot] of config.bots.entries()) {
+    if (botIds.has(bot.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["bots", index, "id"],
+        message: `Duplicate bot id "${bot.id}". Bot ids must be unique.`,
+      });
+      continue;
+    }
+
+    botIds.add(bot.id);
+  }
+
+  if (!knownAgentIds.has(config.defaults.agentId)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["defaults", "agentId"],
+      message: `Unknown default agent id "${config.defaults.agentId}". Expected one of: ${formatKnownIds(knownAgentIds)}.`,
+    });
+  }
+
+  for (const [index, bot] of config.bots.entries()) {
+    const defaultAgentId = bot.routing?.defaultAgentId;
+    if (!defaultAgentId || knownAgentIds.has(defaultAgentId)) {
+      continue;
+    }
+
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["bots", index, "routing", "defaultAgentId"],
+      message: `Unknown default agent id "${defaultAgentId}" for bot "${bot.id}". Expected one of: ${formatKnownIds(knownAgentIds)}.`,
+    });
+  }
 });
+
+function formatKnownIds(ids: Set<string>): string {
+  return [...ids].sort().map((id) => `"${id}"`).join(", ");
+}
