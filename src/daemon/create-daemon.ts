@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { createHandleIncomingMessage } from "../application/handle-incoming-message.js";
-import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import { createFileLogger } from "../logging/file-logger.js";
@@ -148,63 +147,32 @@ function validateAgentRegistry(
 }
 
 function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[] {
-  const builtIns = loadBuiltInAgents();
-  const builtInsById = new Map(builtIns.map((agent) => [agent.id, agent]));
-
   return configuredAgents.map((configuredAgent) => {
-    const builtIn = builtInsById.get(configuredAgent.id);
+    if (!configuredAgent.systemPrompt && !configuredAgent.systemPromptFile) {
+      throw new Error(
+        `Configured agent "${configuredAgent.id}" must define systemPrompt or systemPromptFile.`,
+      );
+    }
 
-    if (!builtIn) {
-      if (!configuredAgent.systemPrompt && !configuredAgent.systemPromptFile) {
-        throw new Error(
-          `Configured agent "${configuredAgent.id}" must define systemPrompt or systemPromptFile.`,
-        );
-      }
-
-      if (!configuredAgent.model) {
-        throw new Error(`Configured agent "${configuredAgent.id}" must define model.`);
-      }
+    if (!configuredAgent.model) {
+      throw new Error(`Configured agent "${configuredAgent.id}" must define model.`);
     }
 
     return {
       id: configuredAgent.id,
-      name: configuredAgent.name ?? builtIn?.name ?? configuredAgent.id,
-      ...resolveAgentPrompt(configuredAgent, builtIn),
-      model: configuredAgent.model ?? builtIn?.model ?? { provider: "", modelId: "" },
-      authFile: configuredAgent.authFile ?? builtIn?.authFile,
-      inference: configuredAgent.inference ?? builtIn?.inference,
-      context: configuredAgent.context ?? builtIn?.context,
-      tools: configuredAgent.tools ?? builtIn?.tools ?? [],
-      extensions: builtIn?.extensions ?? [],
+      name: configuredAgent.name ?? configuredAgent.id,
+      ...(configuredAgent.systemPrompt ? { systemPrompt: configuredAgent.systemPrompt } : {}),
+      ...(configuredAgent.systemPromptFile
+        ? { systemPromptFile: configuredAgent.systemPromptFile }
+        : {}),
+      model: configuredAgent.model,
+      ...(configuredAgent.authFile ? { authFile: configuredAgent.authFile } : {}),
+      ...(configuredAgent.inference ? { inference: configuredAgent.inference } : {}),
+      ...(configuredAgent.context ? { context: configuredAgent.context } : {}),
+      tools: configuredAgent.tools ?? [],
+      extensions: [],
     };
   });
-}
-
-function resolveAgentPrompt(
-  configuredAgent: DaemonConfig["agents"][number],
-  builtIn: AgentDefinition | undefined,
-): Pick<AgentDefinition, "systemPrompt" | "systemPromptFile"> {
-  if (configuredAgent.systemPromptFile) {
-    return {
-      systemPromptFile: configuredAgent.systemPromptFile,
-    };
-  }
-
-  if (configuredAgent.systemPrompt) {
-    return {
-      systemPrompt: configuredAgent.systemPrompt,
-    };
-  }
-
-  if (builtIn?.systemPromptFile) {
-    return {
-      systemPromptFile: builtIn.systemPromptFile,
-    };
-  }
-
-  return {
-    ...(builtIn?.systemPrompt ? { systemPrompt: builtIn.systemPrompt } : {}),
-  };
 }
 async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
   await mkdir(paths.dataRoot, { recursive: true });

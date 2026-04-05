@@ -65,6 +65,51 @@ describe("appConfigSchema", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("rejects agents without a prompt definition", () => {
+    const result = appConfigSchema.safeParse(
+      createConfig({
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["agents", 0, "systemPrompt"],
+        message: "Specify either systemPrompt or systemPromptFile.",
+      }),
+    );
+  });
+
+  it("rejects agents without a model", () => {
+    const result = appConfigSchema.safeParse(
+      createConfig({
+        id: "default",
+        systemPrompt: "You are concise.",
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["agents", 0, "model"],
+        message: "Agent model is required.",
+      }),
+    );
+  });
 });
 
 function createConfig(agent: Record<string, unknown>) {

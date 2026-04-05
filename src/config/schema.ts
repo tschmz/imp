@@ -39,6 +39,22 @@ const agentConfigSchema = z
       });
     }
 
+    if (!agent.systemPrompt && !agent.systemPromptFile) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["systemPrompt"],
+        message: "Specify either systemPrompt or systemPromptFile.",
+      });
+    }
+
+    if (!agent.model) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["model"],
+        message: "Agent model is required.",
+      });
+    }
+
     if (!agent.authFile) {
       return;
     }
