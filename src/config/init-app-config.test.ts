@@ -26,7 +26,7 @@ describe("initAppConfig", () => {
     const configPath = await initAppConfig({ env });
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
-      paths: { dataRoot: string; authFile?: string };
+      paths: { dataRoot: string };
       defaults: {
         agentId: string;
       };
@@ -36,7 +36,6 @@ describe("initAppConfig", () => {
           provider: string;
           modelId: string;
         };
-        authFile?: string;
         tools?: string[];
         context?: {
           files?: string[];
@@ -58,7 +57,6 @@ describe("initAppConfig", () => {
       provider: "openai",
       modelId: "gpt-5.4",
     });
-    expect(config.agents[0]?.authFile).toBe(join(root, "state-home", "imp", "auth.json"));
     expect(config.agents[0]?.tools).toEqual([
       "read",
       "bash",
