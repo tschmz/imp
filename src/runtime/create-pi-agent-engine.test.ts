@@ -378,6 +378,105 @@ describe("createPiAgentEngine", () => {
       'Failed to read context file for agent "default": /workspace/AGENTS.md (ENOENT)',
     );
   });
+
+  it("reuses the cached system prompt when context file fingerprints are unchanged", async () => {
+    const readCalls: string[] = [];
+    const fingerprintCalls: string[] = [];
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      getContextFileFingerprint: async (path) => {
+        fingerprintCalls.push(path);
+        return "mtime:1:size:100";
+      },
+      readTextFile: async (path) => {
+        readCalls.push(path);
+        return "cached context";
+      },
+      createAgent: () => ({
+        state: {
+          messages: [fauxAssistantMessage("cached response")],
+        },
+        prompt: async () => {},
+      }),
+    });
+
+    await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+    await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(fingerprintCalls).toEqual([
+      "/workspace/AGENTS.md",
+      "/workspace/AGENTS.md",
+    ]);
+    expect(readCalls).toEqual(["/workspace/AGENTS.md"]);
+  });
+
+  it("invalidates the cached system prompt when context fingerprints change", async () => {
+    const readCalls: string[] = [];
+    const contextByFingerprint = new Map([
+      ["mtime:1:size:100", "context v1"],
+      ["mtime:2:size:100", "context v2"],
+    ]);
+    const fingerprints = ["mtime:1:size:100", "mtime:2:size:100"];
+    const systemPrompts: string[] = [];
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      getContextFileFingerprint: async () => fingerprints.shift() ?? "mtime:2:size:100",
+      readTextFile: async (path) => {
+        const currentFingerprint = readCalls.length === 0 ? "mtime:1:size:100" : "mtime:2:size:100";
+        readCalls.push(path);
+        return contextByFingerprint.get(currentFingerprint) ?? "unknown context";
+      },
+      createAgent: (options) => {
+        systemPrompts.push(options.initialState?.systemPrompt ?? "");
+        return {
+          state: {
+            messages: [fauxAssistantMessage("response")],
+          },
+          prompt: async () => {},
+        };
+      },
+    });
+
+    await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+    await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(readCalls).toEqual([
+      "/workspace/AGENTS.md",
+      "/workspace/AGENTS.md",
+    ]);
+    expect(systemPrompts).toEqual([
+      "You are concise.\n\n[Context File: /workspace/AGENTS.md]\ncontext v1",
+      "You are concise.\n\n[Context File: /workspace/AGENTS.md]\ncontext v2",
+    ]);
+  });
 });
 
 function createAgent(): AgentDefinition {

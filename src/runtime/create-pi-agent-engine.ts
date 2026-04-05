@@ -1,4 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { Agent, type AgentMessage, type AgentOptions } from "@mariozechner/pi-agent-core";
 import {
   createCodingTools,
@@ -40,6 +42,7 @@ interface PiAgentEngineDependencies {
   resolveModel?: (provider: string, modelId: string) => Model<AiApi> | undefined;
   createAgent?: (options: AgentOptions) => AgentHandle;
   readTextFile?: (path: string) => Promise<string>;
+  getContextFileFingerprint?: (path: string) => Promise<string>;
   toolRegistry?: ToolRegistry;
   createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
 }
@@ -57,8 +60,12 @@ export function createPiAgentEngine(
   const resolveModel = dependencies.resolveModel ?? defaultResolveModel;
   const createAgent = dependencies.createAgent ?? defaultCreateAgent;
   const readTextFile = dependencies.readTextFile ?? defaultReadTextFile;
+  const getContextFileFingerprint =
+    dependencies.getContextFileFingerprint ?? defaultGetContextFileFingerprint;
   const buildToolRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
+  const systemPromptCache = new Map<string, string>();
+  const latestSystemPromptCacheKeyByAgentId = new Map<string, string>();
 
   return {
     async run(input) {
@@ -70,7 +77,13 @@ export function createPiAgentEngine(
         );
       }
 
-      const systemPrompt = await buildSystemPrompt(input.agent, readTextFile);
+      const systemPrompt = await resolveSystemPrompt({
+        agent: input.agent,
+        readTextFile,
+        getContextFileFingerprint,
+        cache: systemPromptCache,
+        latestCacheKeyByAgentId: latestSystemPromptCacheKeyByAgentId,
+      });
       const toolRegistry =
         dependencies.toolRegistry ??
         buildToolRegistry(resolveWorkingDirectory(input.agent));
@@ -129,6 +142,11 @@ function defaultCreateAgent(options: AgentOptions): AgentHandle {
 
 async function defaultReadTextFile(path: string): Promise<string> {
   return readFile(path, "utf8");
+}
+
+async function defaultGetContextFileFingerprint(path: string): Promise<string> {
+  const fileStats = await stat(path);
+  return `${fileStats.mtimeMs}:${fileStats.size}`;
 }
 
 export function resolveWorkingDirectory(agent: AgentDefinition): string {
@@ -227,6 +245,65 @@ async function buildSystemPrompt(
   }
 
   return sections.join("\n\n");
+}
+
+async function resolveSystemPrompt(options: {
+  agent: AgentDefinition;
+  readTextFile: (path: string) => Promise<string>;
+  getContextFileFingerprint: (path: string) => Promise<string>;
+  cache: Map<string, string>;
+  latestCacheKeyByAgentId: Map<string, string>;
+}): Promise<string> {
+  const cacheKey = await buildSystemPromptCacheKey(
+    options.agent,
+    options.getContextFileFingerprint,
+    options.readTextFile,
+  );
+  const cachedPrompt = options.cache.get(cacheKey);
+  if (cachedPrompt !== undefined) {
+    return cachedPrompt;
+  }
+
+  const systemPrompt = await buildSystemPrompt(options.agent, options.readTextFile);
+  options.cache.set(cacheKey, systemPrompt);
+
+  const previousCacheKey = options.latestCacheKeyByAgentId.get(options.agent.id);
+  if (previousCacheKey !== undefined && previousCacheKey !== cacheKey) {
+    options.cache.delete(previousCacheKey);
+  }
+  options.latestCacheKeyByAgentId.set(options.agent.id, cacheKey);
+
+  return systemPrompt;
+}
+
+async function buildSystemPromptCacheKey(
+  agent: AgentDefinition,
+  getContextFileFingerprint: (path: string) => Promise<string>,
+  readTextFile: (path: string) => Promise<string>,
+): Promise<string> {
+  const contextFiles = agent.context?.files ?? [];
+  const fileFingerprints = await Promise.all(
+    contextFiles.map(async (path) => {
+      try {
+        const fingerprint = await getContextFileFingerprint(path);
+        return `${path}:${fingerprint}`;
+      } catch {
+        try {
+          const content = await readTextFile(path);
+          const hash = createHash("sha256").update(content).digest("hex");
+          return `${path}:sha256:${hash}`;
+        } catch {
+          return `${path}:unreadable`;
+        }
+      }
+    }),
+  );
+
+  return JSON.stringify({
+    agentId: agent.id,
+    systemPrompt: agent.systemPrompt,
+    files: fileFingerprints,
+  });
 }
 
 function toAgentMessages(
