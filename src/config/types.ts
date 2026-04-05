@@ -1,4 +1,5 @@
 import type { AgentContextConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
+import type { LogLevel } from "../logging/types.js";
 
 export interface InstanceConfig {
   name: string;
@@ -9,7 +10,7 @@ export interface PathsConfig {
 }
 
 export interface LoggingConfig {
-  level: "debug" | "info" | "warn" | "error";
+  level: LogLevel;
 }
 
 export interface DefaultsConfig {

@@ -31,7 +31,7 @@ async function main(): Promise<void> {
     await Promise.all(
       runtimeConfig.activeBots.map(async (bot) => {
         await ensureStartupLogFile(bot.paths.logFilePath);
-        const logger = createFileLogger(bot.paths.logFilePath);
+        const logger = createFileLogger(bot.paths.logFilePath, runtimeConfig.logging.level);
         await logger.error("daemon failed to start", { botId: bot.id }, error);
       }),
     );

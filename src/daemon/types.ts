@@ -1,4 +1,5 @@
 import type { AgentContextConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
+import type { LogLevel } from "../logging/types.js";
 
 export interface TelegramBotRuntimeConfig {
   id: string;
@@ -24,6 +25,9 @@ export interface ActiveBotRuntimeConfig extends TelegramBotRuntimeConfig {
 
 export interface DaemonConfig {
   configPath: string;
+  logging: {
+    level: LogLevel;
+  };
   agents: ConfiguredAgent[];
   activeBots: ActiveBotRuntimeConfig[];
 }

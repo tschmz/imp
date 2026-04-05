@@ -29,7 +29,7 @@ interface DaemonDependencies {
   engine?: AgentEngine;
   toolRegistry?: ToolRegistry;
   createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
-  createLogger?: (path: string) => Logger;
+  createLogger?: (path: string, level: DaemonConfig["logging"]["level"]) => Logger;
   createConversationStore?: (paths: RuntimePaths) => ConversationStore;
   createTransport?: (config: ActiveBotRuntimeConfig, logger: Logger) => Transport;
 }
@@ -54,7 +54,7 @@ export function createDaemon(
       validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createBuiltInRegistry);
       const runtimeEntries = await Promise.all(
         config.activeBots.map(async (botConfig) => {
-          const logger = createLogger(botConfig.paths.logFilePath);
+          const logger = createLogger(botConfig.paths.logFilePath, config.logging.level);
           const conversationStore = createConversationStore(botConfig.paths);
 
           await ensureRuntimePaths(botConfig.paths);

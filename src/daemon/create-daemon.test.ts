@@ -191,6 +191,9 @@ describe("createDaemon", () => {
     const daemon = createDaemon(
       {
         configPath: join(root, "config.json"),
+        logging: {
+          level: "info",
+        },
         agents: [
           {
             id: "default",
@@ -283,6 +286,9 @@ function createBotConfig(
 function createConfig(botConfig: DaemonConfig["activeBots"][number]): DaemonConfig {
   return {
     configPath: join(botConfig.paths.dataRoot, "config.json"),
+    logging: {
+      level: "info",
+    },
     activeBots: [botConfig],
     agents: [
       {

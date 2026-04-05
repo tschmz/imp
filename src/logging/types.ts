@@ -1,3 +1,5 @@
+export type LogLevel = "debug" | "info" | "warn" | "error";
+
 export interface LogFields {
   botId?: string;
   transport?: string;

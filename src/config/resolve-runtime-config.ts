@@ -13,6 +13,9 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
 
   return {
     configPath,
+    logging: {
+      level: appConfig.logging?.level ?? "info",
+    },
     agents: appConfig.agents.map((agent) => ({
       ...agent,
       ...(agent.context ? { context: resolveAgentContext(agent.context, configDir) } : {}),

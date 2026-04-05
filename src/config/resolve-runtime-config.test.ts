@@ -46,6 +46,9 @@ describe("resolveRuntimeConfig", () => {
     const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.configPath).toBe("/etc/imp/config.json");
+    expect(result.logging).toEqual({
+      level: "info",
+    });
     expect(result.agents).toEqual([
       {
         id: "default-agent",
@@ -197,6 +200,27 @@ describe("resolveRuntimeConfig", () => {
       "private-telegram",
       "ops-telegram",
     ]);
+  });
+
+  it("defaults logging level to info when logging config is omitted", () => {
+    const appConfig = createAppConfig({
+      logging: undefined,
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.logging.level).toBe("info");
   });
 });
 

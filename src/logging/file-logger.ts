@@ -1,13 +1,28 @@
 import { appendFile } from "node:fs/promises";
-import type { LogFields, Logger } from "./types.js";
+import type { LogFields, Logger, LogLevel } from "./types.js";
 
-export function createFileLogger(path: string): Logger {
+const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+};
+
+export function createFileLogger(path: string, level: LogLevel = "info"): Logger {
   return {
     async info(message: string, fields?: LogFields): Promise<void> {
+      if (!shouldLog("info", level)) {
+        return;
+      }
+
       await writeLogLine(path, "INFO", message, fields);
       console.log(formatConsoleLog(message, fields));
     },
     async error(message: string, fields?: LogFields, error?: unknown): Promise<void> {
+      if (!shouldLog("error", level)) {
+        return;
+      }
+
       await writeLogLine(path, "ERROR", message, fields);
       if (error !== undefined) {
         await writeLogLine(path, "ERROR", formatError(error), fields);
@@ -19,6 +34,10 @@ export function createFileLogger(path: string): Logger {
       }
     },
   };
+}
+
+function shouldLog(entryLevel: LogLevel, configuredLevel: LogLevel): boolean {
+  return LOG_LEVEL_PRIORITY[entryLevel] >= LOG_LEVEL_PRIORITY[configuredLevel];
 }
 
 async function writeLogLine(
