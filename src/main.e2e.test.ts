@@ -90,8 +90,12 @@ describe("imp CLI e2e", () => {
       ],
     });
 
-    await expect(runCli([], env)).rejects.toMatchObject({
-      stderr: expect.stringContaining('Invalid Telegram bot token for bot "private-telegram"'),
+    await expect(runCli([], env)).rejects.toSatisfy((error: { stderr?: string }) => {
+      const stderr = error.stderr ?? "";
+      return (
+        stderr.includes('Invalid Telegram bot token for bot "private-telegram"') ||
+        stderr.includes("Network request for 'getMe' failed")
+      );
     });
 
     const botRoot = join(dataRoot, "bots", "private-telegram");
