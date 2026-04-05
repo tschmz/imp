@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import type { AgentContextConfig } from "../domain/agent.js";
 import type { DaemonConfig } from "../daemon/types.js";
 import type { AppConfig } from "./types.js";
 
@@ -22,6 +23,7 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
   }
 
   const botRoot = join(appConfig.paths.dataRoot, "bots", bot.id);
+  const configDir = dirname(configPath);
 
   return {
     paths: {
@@ -35,12 +37,28 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
     },
     configPath,
     defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,
-    agents: appConfig.agents,
+    agents: appConfig.agents.map((agent) => ({
+      ...agent,
+      ...(agent.context ? { context: resolveAgentContext(agent.context, configDir) } : {}),
+    })),
     activeBot: {
       id: bot.id,
       type: bot.type,
       token: bot.token,
       allowedUserIds: bot.access.allowedUserIds,
     },
+  };
+}
+
+function resolveAgentContext(context: AgentContextConfig, configDir: string): AgentContextConfig {
+  return {
+    ...context,
+    ...(context.files
+      ? {
+          files: context.files.map((path) =>
+            isAbsolute(path) ? path : resolve(configDir, path),
+          ),
+        }
+      : {}),
   };
 }

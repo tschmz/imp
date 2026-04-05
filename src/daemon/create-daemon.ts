@@ -137,6 +137,7 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
       systemPrompt: configuredAgent.systemPrompt ?? builtIn?.systemPrompt ?? "",
       model: configuredAgent.model ?? builtIn?.model ?? { provider: "", modelId: "" },
       inference: configuredAgent.inference ?? builtIn?.inference,
+      context: configuredAgent.context ?? builtIn?.context,
       tools: builtIn?.tools ?? [],
       extensions: builtIn?.extensions ?? [],
     };

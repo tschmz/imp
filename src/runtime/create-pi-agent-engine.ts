@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { Agent, type AgentOptions } from "@mariozechner/pi-agent-core";
 import {
   getModel,
@@ -31,6 +32,7 @@ const EMPTY_USAGE: Usage = {
 interface PiAgentEngineDependencies {
   resolveModel?: (provider: string, modelId: string) => Model<AiApi> | undefined;
   createAgent?: (options: AgentOptions) => AgentHandle;
+  readTextFile?: (path: string) => Promise<string>;
 }
 
 interface AgentHandle {
@@ -45,6 +47,7 @@ export function createPiAgentEngine(
 ): AgentEngine {
   const resolveModel = dependencies.resolveModel ?? defaultResolveModel;
   const createAgent = dependencies.createAgent ?? defaultCreateAgent;
+  const readTextFile = dependencies.readTextFile ?? defaultReadTextFile;
 
   return {
     async run(input) {
@@ -56,10 +59,11 @@ export function createPiAgentEngine(
         );
       }
 
+      const systemPrompt = await buildSystemPrompt(input.agent, readTextFile);
       const onPayload = createOnPayloadOverride(input.agent);
       const agent = createAgent({
         initialState: {
-          systemPrompt: input.agent.systemPrompt,
+          systemPrompt,
           model,
           thinkingLevel: "off",
           tools: [],
@@ -108,6 +112,10 @@ function defaultCreateAgent(options: AgentOptions): AgentHandle {
   return new Agent(options);
 }
 
+async function defaultReadTextFile(path: string): Promise<string> {
+  return readFile(path, "utf8");
+}
+
 function createOnPayloadOverride(
   agent: AgentDefinition,
 ): StreamOptions["onPayload"] | undefined {
@@ -142,6 +150,35 @@ function createOnPayloadOverride(
       ...(request ?? {}),
     };
   };
+}
+
+async function buildSystemPrompt(
+  agent: AgentDefinition,
+  readTextFile: (path: string) => Promise<string>,
+): Promise<string> {
+  const sections = [agent.systemPrompt];
+  const contextFiles = agent.context?.files ?? [];
+
+  for (const path of contextFiles) {
+    let content: string;
+    try {
+      content = await readTextFile(path);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to read context file for agent "${agent.id}": ${path} (${detail})`,
+      );
+    }
+
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      continue;
+    }
+
+    sections.push(`[Context File: ${path}]\n${trimmedContent}`);
+  }
+
+  return sections.join("\n\n");
 }
 
 function toAgentMessages(

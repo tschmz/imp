@@ -104,6 +104,41 @@ describe("resolveRuntimeConfig", () => {
     expect(result.defaultAgentId).toBe("default-agent");
   });
 
+  it("resolves relative context file paths against the config directory", () => {
+    const appConfig = createAppConfig({
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          context: {
+            files: ["./AGENTS.md", "/opt/shared/README.md"],
+          },
+          systemPrompt: "You are concise.",
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.context).toEqual({
+      files: ["/etc/imp/AGENTS.md", "/opt/shared/README.md"],
+    });
+  });
+
   it("fails when no bot is enabled", () => {
     const appConfig = createAppConfig({
       bots: [

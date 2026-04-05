@@ -4,6 +4,10 @@ export interface InferenceSettings {
   request?: Record<string, unknown>;
 }
 
+export interface AgentContextConfig {
+  files?: string[];
+}
+
 export interface ModelRef {
   provider: string;
   modelId: string;
@@ -15,6 +19,7 @@ export interface AgentDefinition {
   systemPrompt: string;
   model: ModelRef;
   inference?: InferenceSettings;
+  context?: AgentContextConfig;
   tools: string[];
   extensions: string[];
 }

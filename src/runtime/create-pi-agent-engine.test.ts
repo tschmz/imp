@@ -22,7 +22,11 @@ describe("createPiAgentEngine", () => {
     registrations.push(registration);
     registration.setResponses([
       (context) => {
-        expect(context.systemPrompt).toBe("You are concise.");
+        expect(context.systemPrompt).toBe(
+          "You are concise.\n\n" +
+            "[Context File: /workspace/AGENTS.md]\n" +
+            "Follow the workspace instructions.",
+        );
         expect(context.messages).toHaveLength(3);
         expect(context.messages[0]).toMatchObject({
           role: "user",
@@ -47,6 +51,10 @@ describe("createPiAgentEngine", () => {
         }
 
         return registration.getModel("faux-1");
+      },
+      readTextFile: async (path) => {
+        expect(path).toBe("/workspace/AGENTS.md");
+        return "Follow the workspace instructions.";
       },
     });
 
@@ -91,6 +99,7 @@ describe("createPiAgentEngine", () => {
 
     const engine = createPiAgentEngine({
       resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async () => "unused context",
     });
 
     await expect(
@@ -119,6 +128,7 @@ describe("createPiAgentEngine", () => {
 
     const engine = createPiAgentEngine({
       resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async () => "unused context",
     });
 
     await expect(
@@ -142,6 +152,7 @@ describe("createPiAgentEngine", () => {
           provider: "openai",
           api: "openai-responses",
         }) as never,
+      readTextFile: async () => "unused context",
       createAgent: (options) => {
         capturedOnPayload = options.onPayload as typeof capturedOnPayload;
         return {
@@ -200,6 +211,33 @@ describe("createPiAgentEngine", () => {
       service_tier: "priority",
     });
   });
+
+  it("fails clearly when a configured context file cannot be read", async () => {
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      createAgent: () => {
+        throw new Error("createAgent should not be called when context loading fails");
+      },
+      readTextFile: async () => {
+        throw new Error("ENOENT");
+      },
+    });
+
+    await expect(
+      engine.run({
+        agent: createAgent(),
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow(
+      'Failed to read context file for agent "default": /workspace/AGENTS.md (ENOENT)',
+    );
+  });
 });
 
 function createAgent(): AgentDefinition {
@@ -210,6 +248,9 @@ function createAgent(): AgentDefinition {
     model: {
       provider: "faux",
       modelId: "faux-1",
+    },
+    context: {
+      files: ["/workspace/AGENTS.md"],
     },
     tools: [],
     extensions: [],

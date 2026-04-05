@@ -18,6 +18,11 @@
         "provider": "openai",
         "modelId": "gpt-5.4"
       },
+      "context": {
+        "files": [
+          "/path/to/workspace/AGENTS.md"
+        ]
+      },
       "inference": {
         "metadata": {
           "app": "imp"

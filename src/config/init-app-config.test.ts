@@ -36,6 +36,9 @@ describe("initAppConfig", () => {
           provider: string;
           modelId: string;
         };
+        context?: {
+          files?: string[];
+        };
         inference?: {
           maxOutputTokens?: number;
           metadata?: Record<string, unknown>;
@@ -53,6 +56,7 @@ describe("initAppConfig", () => {
       provider: "openai",
       modelId: "gpt-5.4",
     });
+    expect(config.agents[0]?.context).toBeUndefined();
     expect(config.agents[0]?.inference).toEqual({
       metadata: {
         app: "imp",

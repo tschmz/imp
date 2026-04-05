@@ -12,12 +12,17 @@ const inferenceSettingsSchema = z.object({
   request: z.record(z.string(), z.unknown()).optional(),
 });
 
+const agentContextConfigSchema = z.object({
+  files: z.string().min(1).array().optional(),
+});
+
 const agentConfigSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).optional(),
   systemPrompt: z.string().min(1).optional(),
   model: modelConfigSchema.optional(),
   inference: inferenceSettingsSchema.optional(),
+  context: agentContextConfigSchema.optional(),
 });
 
 const telegramBotSchema = z.object({

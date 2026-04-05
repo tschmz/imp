@@ -1,4 +1,4 @@
-import type { InferenceSettings, ModelRef } from "../domain/agent.js";
+import type { AgentContextConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
 
 export interface TelegramBotRuntimeConfig {
   id: string;
@@ -35,4 +35,5 @@ export interface ConfiguredAgent {
   systemPrompt?: string;
   model?: ModelRef;
   inference?: InferenceSettings;
+  context?: AgentContextConfig;
 }
