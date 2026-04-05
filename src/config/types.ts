@@ -20,6 +20,12 @@ export interface LoggingConfig {
 
 export interface DefaultsConfig {
   agentId: string;
+  model?: ModelConfig;
+}
+
+export interface ModelConfig {
+  provider: string;
+  modelId: string;
 }
 
 export type BotConfig = TelegramBotConfig;

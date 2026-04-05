@@ -1,6 +1,7 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
+import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationState } from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createFileLogger } from "../logging/file-logger.js";
@@ -35,10 +36,13 @@ export function createDaemon(
   const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
   const engine = dependencies.engine ?? createPiAgentEngine();
   const createTransport = dependencies.createTransport ?? createTelegramTransport;
+  const defaultAgent = applyConfiguredModel(
+    agentRegistry.get(config.defaultAgentId),
+    config.defaultModel,
+  );
 
   return {
     async start() {
-      const defaultAgent = agentRegistry.get(config.defaultAgentId);
       if (!defaultAgent) {
         throw new Error(`Unknown default agent: ${config.defaultAgentId}`);
       }
@@ -77,7 +81,9 @@ export function createDaemon(
               defaultAgent.id,
               conversationStore,
             );
-            const agent = agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
+            const agent =
+              applyConfiguredModel(agentRegistry.get(conversation.state.agentId), config.defaultModel) ??
+              defaultAgent;
             const response = await engine.run({
               agent,
               conversation,
@@ -107,6 +113,20 @@ export function createDaemon(
         await cleanup.run();
       }
     },
+  };
+}
+
+function applyConfiguredModel(
+  agent: AgentDefinition | undefined,
+  model: DaemonConfig["defaultModel"],
+): AgentDefinition | undefined {
+  if (!agent || !model) {
+    return agent;
+  }
+
+  return {
+    ...agent,
+    model,
   };
 }
 

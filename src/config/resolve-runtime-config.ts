@@ -35,6 +35,7 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
     },
     configPath,
     defaultAgentId: bot.routing?.defaultAgentId ?? appConfig.defaults.agentId,
+    defaultModel: appConfig.defaults.model,
     activeBot: {
       id: bot.id,
       type: bot.type,

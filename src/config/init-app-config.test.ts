@@ -27,11 +27,16 @@ describe("initAppConfig", () => {
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
+      defaults: { model: { provider: string; modelId: string } };
       bots: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
+    expect(config.defaults.model).toEqual({
+      provider: "openai",
+      modelId: "gpt-5.4",
+    });
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
   });
 

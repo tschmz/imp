@@ -41,6 +41,10 @@ function buildDefaultConfig(env: NodeJS.ProcessEnv): string {
       },
       defaults: {
         agentId: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
       },
       bots: [
         {

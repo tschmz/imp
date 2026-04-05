@@ -7,8 +7,8 @@ export function loadBuiltInAgents(): AgentDefinition[] {
       name: "Default",
       systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
       model: {
-        provider: "anthropic",
-        modelId: "claude-sonnet-4-5",
+        provider: "openai",
+        modelId: "gpt-5.4",
       },
       tools: [],
       extensions: [],

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
+const modelConfigSchema = z.object({
+  provider: z.string().min(1),
+  modelId: z.string().min(1),
+});
 
 const telegramBotSchema = z.object({
   id: z.string().min(1),
@@ -36,6 +40,7 @@ export const appConfigSchema = z.object({
     .optional(),
   defaults: z.object({
     agentId: z.string().min(1),
+    model: modelConfigSchema.optional(),
   }),
   bots: telegramBotSchema.array().min(1),
 });

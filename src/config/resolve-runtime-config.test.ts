@@ -7,6 +7,10 @@ describe("resolveRuntimeConfig", () => {
     const appConfig = createAppConfig({
       defaults: {
         agentId: "default-agent",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
       },
       bots: [
         {
@@ -28,6 +32,10 @@ describe("resolveRuntimeConfig", () => {
 
     expect(result.configPath).toBe("/etc/imp/config.json");
     expect(result.defaultAgentId).toBe("ops-agent");
+    expect(result.defaultModel).toEqual({
+      provider: "openai",
+      modelId: "gpt-5.4",
+    });
     expect(result.activeBot).toEqual({
       id: "private-telegram",
       type: "telegram",
