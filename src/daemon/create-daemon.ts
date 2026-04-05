@@ -4,7 +4,7 @@ import { createAgentRegistry } from "../agents/registry.js";
 import type { ConversationContext, ConversationState } from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createFileLogger } from "../logging/file-logger.js";
-import { createDraftEngine } from "../runtime/create-draft-engine.js";
+import { createPiAgentEngine } from "../runtime/create-pi-agent-engine.js";
 import type { AgentEngine } from "../runtime/types.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import type { ConversationStore } from "../storage/types.js";
@@ -33,7 +33,7 @@ export function createDaemon(
 ): Daemon {
   const agentRegistry = dependencies.agentRegistry ?? createAgentRegistry(loadBuiltInAgents());
   const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
-  const engine = dependencies.engine ?? createDraftEngine();
+  const engine = dependencies.engine ?? createPiAgentEngine();
   const createTransport = dependencies.createTransport ?? createTelegramTransport;
 
   return {
