@@ -1,6 +1,8 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { getDefaultUserConfigPath, getDefaultUserDataRoot } from "./discover-config-path.js";
+
+const ownerReadWriteMode = 0o600;
 
 export async function initAppConfig(options: {
   configPath?: string;
@@ -12,10 +14,13 @@ export async function initAppConfig(options: {
 
   await mkdir(dirname(configPath), { recursive: true });
   try {
-    await writeFile(configPath, `${buildDefaultConfig(env)}\n`, {
-      encoding: "utf8",
-      flag: options.force ? "w" : "wx",
-    });
+    const file = await open(configPath, options.force ? "w" : "wx", ownerReadWriteMode);
+    try {
+      await file.writeFile(`${buildDefaultConfig(env)}\n`, { encoding: "utf8" });
+      await file.chmod(ownerReadWriteMode);
+    } finally {
+      await file.close();
+    }
   } catch (error) {
     if (isAlreadyExistsError(error)) {
       throw new Error(`Config file already exists: ${configPath}\nRe-run with --force to overwrite.`);

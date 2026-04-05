@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -81,6 +81,9 @@ describe("initAppConfig", () => {
       "You are a concise and pragmatic assistant running through a local daemon.",
     );
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
+
+    const fileMode = (await stat(configPath)).mode & 0o777;
+    expect(fileMode).toBe(0o600);
   });
 
   it("refuses to overwrite an existing config without force", async () => {
@@ -92,6 +95,19 @@ describe("initAppConfig", () => {
     await expect(initAppConfig({ configPath })).rejects.toThrowError(
       `Config file already exists: ${configPath}\nRe-run with --force to overwrite.`,
     );
+  });
+
+  it("resets config permissions to owner read/write when overwriting with force", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+
+    await initAppConfig({ configPath });
+    await chmod(configPath, 0o644);
+
+    await initAppConfig({ configPath, force: true });
+
+    const fileMode = (await stat(configPath)).mode & 0o777;
+    expect(fileMode).toBe(0o600);
   });
 });
 
