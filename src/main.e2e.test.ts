@@ -221,6 +221,20 @@ describe("imp CLI e2e", () => {
       ),
     });
   });
+
+  it("fails before prompting when the config already exists", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+
+    await runCli(["init", "--defaults"], env);
+
+    await expect(runCli(["init"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        `Config file already exists: ${configPath}\nRe-run with --force to overwrite.`,
+      ),
+    });
+  });
 });
 
 async function createTempDir(): Promise<string> {

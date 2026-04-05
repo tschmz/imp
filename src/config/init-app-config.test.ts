@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildInitialAppConfig } from "./default-app-config.js";
-import { initAppConfig } from "./init-app-config.js";
+import { assertInitConfigCanBeCreated, initAppConfig } from "./init-app-config.js";
 
 const tempDirs: string[] = [];
 
@@ -91,8 +91,19 @@ describe("initAppConfig", () => {
 
     await initAppConfig({ configPath });
 
-    await expect(initAppConfig({ configPath })).rejects.toThrowError(
+    await expect(assertInitConfigCanBeCreated({ configPath })).rejects.toThrowError(
       `Config file already exists: ${configPath}\nRe-run with --force to overwrite.`,
+    );
+  });
+
+  it("allows overwriting an existing config when force is set", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+
+    await initAppConfig({ configPath });
+
+    await expect(assertInitConfigCanBeCreated({ configPath, force: true })).resolves.toBe(
+      configPath,
     );
   });
 

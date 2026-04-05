@@ -1,4 +1,4 @@
-import { mkdir, open } from "node:fs/promises";
+import { access, mkdir, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createDefaultAppConfig } from "./default-app-config.js";
 import { getDefaultUserConfigPath } from "./discover-config-path.js";
@@ -15,7 +15,7 @@ export async function initAppConfig(options: {
   config?: AppConfig;
 } = {}): Promise<string> {
   const env = options.env ?? process.env;
-  const configPath = resolve(options.configPath ?? getDefaultUserConfigPath(env));
+  const configPath = resolveConfigPath({ configPath: options.configPath, env });
   const config = appConfigSchema.parse(options.config ?? createDefaultAppConfig(env));
 
   await mkdir(dirname(configPath), { recursive: true });
@@ -40,6 +40,29 @@ export async function initAppConfig(options: {
   }
 
   return configPath;
+}
+
+export async function assertInitConfigCanBeCreated(options: {
+  configPath?: string;
+  force?: boolean;
+  env?: NodeJS.ProcessEnv;
+} = {}): Promise<string> {
+  const configPath = resolveConfigPath(options);
+
+  if (options.force) {
+    return configPath;
+  }
+
+  try {
+    await access(configPath);
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return configPath;
+    }
+    throw error;
+  }
+
+  throw new Error(`Config file already exists: ${configPath}\nRe-run with --force to overwrite.`);
 }
 
 async function backupExistingConfig(configPath: string, now: Date): Promise<void> {
@@ -70,6 +93,14 @@ async function backupExistingConfig(configPath: string, now: Date): Promise<void
 
 function formatBackupTimestamp(date: Date): string {
   return date.toISOString().replaceAll(":", "-");
+}
+
+function resolveConfigPath(options: {
+  configPath?: string;
+  env?: NodeJS.ProcessEnv;
+}): string {
+  const env = options.env ?? process.env;
+  return resolve(options.configPath ?? getDefaultUserConfigPath(env));
 }
 
 function isAlreadyExistsError(error: unknown): error is NodeJS.ErrnoException {

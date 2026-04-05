@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { createCli } from "./cli/create-cli.js";
 import { discoverConfigPath } from "./config/discover-config-path.js";
-import { initAppConfig } from "./config/init-app-config.js";
+import { assertInitConfigCanBeCreated, initAppConfig } from "./config/init-app-config.js";
 import { loadAppConfig } from "./config/load-app-config.js";
 import { promptForInitialAppConfig } from "./config/prompt-init-config.js";
 import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
@@ -14,8 +14,13 @@ async function main(): Promise<void> {
   const cli = createCli({
     startDaemon: runDaemon,
     initConfig: async ({ configPath, force, defaults }) => {
+      const resolvedConfigPath = await assertInitConfigCanBeCreated({ configPath, force });
       const config = defaults ? undefined : await resolveInitConfig();
-      const createdConfigPath = await initAppConfig({ configPath, force, config });
+      const createdConfigPath = await initAppConfig({
+        configPath: resolvedConfigPath,
+        force,
+        config,
+      });
       console.log(`Created config at ${createdConfigPath}`);
     },
   });
