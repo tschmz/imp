@@ -76,7 +76,7 @@ function buildMissingConfigMessage(
     `- ${recommendedPath}`,
     "",
     "Or start with:",
-    "- imp --config /path/to/config.json",
+      "- imp start --config /path/to/config.json",
   ].join("\n");
 }
 

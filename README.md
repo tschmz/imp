@@ -51,7 +51,7 @@ imp start
 Or with an explicit config path:
 
 ```bash
-imp --config /path/to/config.json start
+imp start --config /path/to/config.json
 ```
 
 ## How It Works

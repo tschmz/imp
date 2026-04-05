@@ -47,8 +47,27 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("Usage: imp");
     expect(stdout).toContain("start");
     expect(stdout).toContain("init");
-    expect(stdout).toContain("--config <path>");
     expect(stdout).toContain("--version");
+  });
+
+  it("shows command-specific config help for start", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["start", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp start");
+    expect(stdout).toContain("--config <path>");
+  });
+
+  it("shows command-specific config help for init", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["init", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp init");
+    expect(stdout).toContain("--config <path>");
   });
 
   it("shows version output", async () => {

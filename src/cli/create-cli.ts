@@ -16,27 +16,29 @@ export function createCli(dependencies: CliDependencies): Command {
   program
     .name("imp")
     .description("Run and manage imp agent daemons")
-    .option("-c, --config <path>", "Path to the config file")
     .showHelpAfterError()
     .version(getCliVersion());
 
   program
     .command("start")
     .description("Start the imp daemon")
-    .action(async function action(this: Command) {
-      const options = this.optsWithGlobals<{ config?: string }>();
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, options: { config?: string }) {
       await dependencies.startDaemon({ configPath: options.config });
     });
 
   program
     .command("init")
     .description("Create an initial config file")
+    .option("-c, --config <path>", "Path to the config file")
     .option("-f, --force", "Overwrite an existing config file")
     .option("--defaults", "Skip prompts and write the default config template")
-    .action(async function action(this: Command, options: { force?: boolean; defaults?: boolean }) {
-      const globalOptions = this.optsWithGlobals<{ config?: string }>();
+    .action(async function action(
+      this: Command,
+      options: { config?: string; force?: boolean; defaults?: boolean },
+    ) {
       await dependencies.initConfig({
-        configPath: globalOptions.config,
+        configPath: options.config,
         force: options.force ?? false,
         defaults: options.defaults ?? false,
       });
