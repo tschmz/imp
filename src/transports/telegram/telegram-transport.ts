@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Bot, GrammyError } from "grammy";
 import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
 import type { Logger } from "../../logging/types.js";
+import { renderTelegramMessage } from "./render-telegram-message.js";
 import type { Transport, TransportHandler } from "../types.js";
 
 interface TelegramBotAdapter {
@@ -24,7 +25,12 @@ interface TelegramMessageContext {
   from?: {
     id: number;
   };
-  reply(text: string): Promise<unknown>;
+  reply(
+    text: string,
+    other?: {
+      parse_mode?: "HTML" | "MarkdownV2";
+    },
+  ): Promise<unknown>;
 }
 
 export function createTelegramTransport(
@@ -105,7 +111,9 @@ export function createTelegramTransport(
             text: ctx.message.text,
             receivedAt: new Date().toISOString(),
           });
-          await ctx.reply(response.text);
+          await ctx.reply(renderTelegramMessage(response.text), {
+            parse_mode: "HTML",
+          });
           await logger?.debug("replied to telegram message", {
             botId: config.id,
             transport: "telegram",

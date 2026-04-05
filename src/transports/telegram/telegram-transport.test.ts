@@ -45,7 +45,9 @@ describe("createTelegramTransport", () => {
       text: "ping",
       receivedAt: expect.any(String),
     });
-    expect(bot.reply).toHaveBeenCalledWith("pong");
+    expect(bot.reply).toHaveBeenCalledWith("pong", {
+      parse_mode: "HTML",
+    });
     expect(logger.error).not.toHaveBeenCalled();
   });
 
@@ -136,7 +138,12 @@ function createFakeBot(): {
       chat?: { id: number; type: string };
       message?: { message_id: number; text: string };
       from?: { id: number };
-      reply(text: string): Promise<unknown>;
+      reply(
+        text: string,
+        other?: {
+          parse_mode?: "HTML" | "MarkdownV2";
+        },
+      ): Promise<unknown>;
     }) => Promise<void>,
   ): void;
   start(): Promise<void>;
@@ -145,18 +152,27 @@ function createFakeBot(): {
     from: { id: number };
     message: { message_id: number; text: string };
   }): Promise<void>;
-  reply: ReturnType<typeof vi.fn<(text: string) => Promise<void>>>;
+  reply: ReturnType<
+    typeof vi.fn<(text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }) => Promise<void>>
+  >;
 } {
   let onTextMessage:
     | ((ctx: {
         chat?: { id: number; type: string };
         message?: { message_id: number; text: string };
         from?: { id: number };
-        reply(text: string): Promise<unknown>;
+        reply(
+          text: string,
+          other?: {
+            parse_mode?: "HTML" | "MarkdownV2";
+          },
+        ): Promise<unknown>;
       }) => Promise<void>)
     | undefined;
 
-  const reply = vi.fn<(text: string) => Promise<void>>().mockResolvedValue();
+  const reply = vi
+    .fn<(text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }) => Promise<void>>()
+    .mockResolvedValue();
 
   return {
     api: {
