@@ -1,5 +1,5 @@
-import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
+import type { AgentRunInput, AgentRunResult } from "./context.js";
 
 export interface AgentRunner {
-  run(message: IncomingMessage): Promise<OutgoingMessage>;
+  run(input: AgentRunInput): Promise<AgentRunResult>;
 }

@@ -1,7 +1,7 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
-import type { ConversationState } from "../domain/conversation.js";
+import type { ConversationContext, ConversationState } from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createFileLogger } from "../logging/file-logger.js";
 import { createAgentRunner } from "../runtime/agent-runner.js";
@@ -65,14 +65,18 @@ export function createDaemon(config: DaemonConfig): Daemon {
             );
             const agent = agentRegistry.get(conversation.agentId) ?? defaultAgent;
             const runner = createAgentRunner(agent);
-            const response = await runner.run(message);
+            const response = await runner.run({
+              agent,
+              conversation: toConversationContext(conversation),
+              message,
+            });
 
             await conversationStore.put({
               ...conversation,
               updatedAt: message.receivedAt,
             });
 
-            return response;
+            return response.message;
           },
         };
 
@@ -107,6 +111,13 @@ async function getOrCreateConversationState(
 
   await conversationStore.put(created);
   return created;
+}
+
+function toConversationContext(state: ConversationState): ConversationContext {
+  return {
+    state,
+    messages: [],
+  };
 }
 
 async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
