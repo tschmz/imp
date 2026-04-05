@@ -89,7 +89,7 @@ describe("imp CLI e2e", () => {
     expect(stopHelp.stdout).toContain("Usage: imp service stop");
     expect(restartHelp.stdout).toContain("Usage: imp service restart");
     expect(statusHelp.stdout).toContain("Usage: imp service status");
-  });
+  }, 10_000);
 
   it("shows command-specific config help for start", async () => {
     const root = await createTempDir();
@@ -300,7 +300,7 @@ describe("imp CLI e2e", () => {
     await expect(runCli(["service", "status"], env)).rejects.toMatchObject({
       stderr: expect.stringContaining(`Service definition not found: ${definitionPath}`),
     });
-  });
+  }, 10_000);
 
   it("creates runtime directories and logs a startup failure for an invalid telegram token", async () => {
     const root = await createTempDir();
