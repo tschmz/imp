@@ -1,5 +1,5 @@
 import type { AgentRunInput, AgentRunResult } from "./context.js";
 
-export interface AgentRunner {
+export interface AgentEngine {
   run(input: AgentRunInput): Promise<AgentRunResult>;
 }

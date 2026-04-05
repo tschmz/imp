@@ -1,12 +1,11 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
-import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationState } from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createFileLogger } from "../logging/file-logger.js";
-import { createAgentRunner } from "../runtime/agent-runner.js";
-import type { AgentRunner } from "../runtime/types.js";
+import { createDraftEngine } from "../runtime/create-draft-engine.js";
+import type { AgentEngine } from "../runtime/types.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import type { ConversationStore } from "../storage/types.js";
 import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
@@ -24,7 +23,7 @@ interface RuntimeState {
 interface DaemonDependencies {
   agentRegistry?: ReturnType<typeof createAgentRegistry>;
   conversationStore?: ConversationStore;
-  createRunner?: (agent: AgentDefinition) => AgentRunner;
+  engine?: AgentEngine;
   createTransport?: (config: DaemonConfig["activeBot"]) => Transport;
 }
 
@@ -34,7 +33,7 @@ export function createDaemon(
 ): Daemon {
   const agentRegistry = dependencies.agentRegistry ?? createAgentRegistry(loadBuiltInAgents());
   const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
-  const createRunner = dependencies.createRunner ?? createAgentRunner;
+  const engine = dependencies.engine ?? createDraftEngine();
   const createTransport = dependencies.createTransport ?? createTelegramTransport;
 
   return {
@@ -79,8 +78,7 @@ export function createDaemon(
               conversationStore,
             );
             const agent = agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
-            const runner = createRunner(agent);
-            const response = await runner.run({
+            const response = await engine.run({
               agent,
               conversation,
               message,

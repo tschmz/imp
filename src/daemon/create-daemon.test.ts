@@ -6,7 +6,7 @@ import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { AgentRunInput } from "../runtime/context.js";
-import type { AgentRunner } from "../runtime/types.js";
+import type { AgentEngine } from "../runtime/types.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import type { TransportHandler } from "../transports/types.js";
 import { createDaemon } from "./create-daemon.js";
@@ -30,7 +30,7 @@ describe("createDaemon", () => {
     const config = createConfig(paths);
     const conversationStore = createFsConversationStore(paths);
     const runInputs: AgentRunInput[] = [];
-    const runner: AgentRunner = {
+    const engine: AgentEngine = {
       run: vi.fn(async (input) => {
         runInputs.push(input);
         return {
@@ -45,7 +45,7 @@ describe("createDaemon", () => {
     const daemon = createDaemon(config, {
       agentRegistry: createAgentRegistry([createDefaultAgent()]),
       conversationStore,
-      createRunner: () => runner,
+      engine,
       createTransport: () => ({
         async start(handler: TransportHandler) {
           await handler.handle(createIncomingMessage("1", "hello"));
