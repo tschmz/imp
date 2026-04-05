@@ -75,7 +75,8 @@ export function createDaemon(
             dependencies.engine ??
             createPiAgentEngine({
               logger,
-              getApiKey: createOAuthApiKeyResolver(config.authFilePath, logger),
+              getApiKey: (provider, agent) =>
+                createOAuthApiKeyResolver(agent.authFile, logger)(provider),
               ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
               createBuiltInToolRegistry: createBuiltInRegistry,
             });
@@ -170,6 +171,7 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
       name: configuredAgent.name ?? builtIn?.name ?? configuredAgent.id,
       systemPrompt: configuredAgent.systemPrompt ?? builtIn?.systemPrompt ?? "",
       model: configuredAgent.model ?? builtIn?.model ?? { provider: "", modelId: "" },
+      authFile: configuredAgent.authFile ?? builtIn?.authFile,
       inference: configuredAgent.inference ?? builtIn?.inference,
       context: configuredAgent.context ?? builtIn?.context,
       tools: configuredAgent.tools ?? builtIn?.tools ?? [],

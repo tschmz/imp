@@ -22,6 +22,7 @@ const agentConfigSchema = z.object({
   name: z.string().min(1).optional(),
   systemPrompt: z.string().min(1).optional(),
   model: modelConfigSchema.optional(),
+  authFile: z.string().min(1).optional(),
   inference: inferenceSettingsSchema.optional(),
   context: agentContextConfigSchema.optional(),
   tools: z.string().min(1).array().optional(),
@@ -53,7 +54,6 @@ export const appConfigSchema = z.object({
   }),
   paths: z.object({
     dataRoot: z.string().min(1),
-    authFile: z.string().min(1).optional(),
   }),
   logging: z
     .object({

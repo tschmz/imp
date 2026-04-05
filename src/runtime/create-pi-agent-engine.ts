@@ -42,7 +42,10 @@ const EMPTY_USAGE: Usage = {
 interface PiAgentEngineDependencies {
   logger?: Logger;
   resolveModel?: (provider: string, modelId: string) => Model<AiApi> | undefined;
-  getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
+  getApiKey?: (
+    provider: string,
+    agent: AgentDefinition,
+  ) => Promise<string | undefined> | string | undefined;
   createAgent?: (options: AgentOptions) => AgentHandle;
   readTextFile?: (path: string) => Promise<string>;
   getContextFileFingerprint?: (path: string) => Promise<string>;
@@ -121,7 +124,11 @@ export function createPiAgentEngine(
             tools,
             messages: toAgentMessages(input.conversation.messages, model),
           },
-          ...(getApiKey ? { getApiKey } : {}),
+          ...(getApiKey
+            ? {
+                getApiKey: (provider: string) => getApiKey(provider, input.agent),
+              }
+            : {}),
           ...(onPayload ? { onPayload } : {}),
         });
 

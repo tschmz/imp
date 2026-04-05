@@ -25,7 +25,6 @@ export interface ActiveBotRuntimeConfig extends TelegramBotRuntimeConfig {
 
 export interface DaemonConfig {
   configPath: string;
-  authFilePath?: string;
   logging: {
     level: LogLevel;
   };
@@ -42,6 +41,7 @@ export interface ConfiguredAgent {
   name?: string;
   systemPrompt?: string;
   model?: ModelRef;
+  authFile?: string;
   inference?: InferenceSettings;
   context?: AgentContextConfig;
   tools?: string[];

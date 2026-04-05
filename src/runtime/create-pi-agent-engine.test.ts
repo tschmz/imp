@@ -287,7 +287,10 @@ describe("createPiAgentEngine", () => {
       | undefined;
 
     const engine = createPiAgentEngine({
-      getApiKey: async (provider) => (provider === "openai-codex" ? "oauth-token" : undefined),
+      getApiKey: async (provider, agent) =>
+        provider === "openai-codex" && agent.authFile === "/workspace/auth.json"
+          ? "oauth-token"
+          : undefined,
       resolveModel: () =>
         ({
           id: "gpt-5.4",
@@ -309,6 +312,7 @@ describe("createPiAgentEngine", () => {
     await engine.run({
       agent: {
         ...createAgent(),
+        authFile: "/workspace/auth.json",
         model: {
           provider: "openai",
           modelId: "gpt-5.4",

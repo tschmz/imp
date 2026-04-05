@@ -3,8 +3,7 @@
     "name": "home"
   },
   "paths": {
-    "dataRoot": "/var/lib/imp",
-    "authFile": "/var/lib/imp/auth.json"
+    "dataRoot": "/var/lib/imp"
   },
   "logging": {
     "level": "info"
@@ -16,9 +15,10 @@
     {
       "id": "default",
       "model": {
-        "provider": "openai",
+        "provider": "openai-codex",
         "modelId": "gpt-5.4"
       },
+      "authFile": "/var/lib/imp/auth.json",
       "tools": [
         "read",
         "bash",
@@ -33,20 +33,6 @@
         "files": [
           "/path/to/workspace/AGENTS.md"
         ]
-      },
-      "inference": {
-        "metadata": {
-          "app": "imp"
-        },
-        "request": {
-          "store": true,
-          "reasoning": {
-            "effort": "medium"
-          },
-          "text": {
-            "verbosity": "low"
-          }
-        }
       },
       "systemPrompt": "You are a concise and pragmatic assistant running through a local daemon."
     },

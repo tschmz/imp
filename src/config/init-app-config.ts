@@ -50,6 +50,7 @@ function buildDefaultConfig(env: NodeJS.ProcessEnv): string {
             provider: "openai",
             modelId: "gpt-5.4",
           },
+          authFile: resolve(getDefaultUserDataRoot(env), "auth.json"),
           tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
           inference: {
             metadata: {

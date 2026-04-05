@@ -36,6 +36,7 @@ describe("initAppConfig", () => {
           provider: string;
           modelId: string;
         };
+        authFile?: string;
         tools?: string[];
         context?: {
           files?: string[];
@@ -52,12 +53,12 @@ describe("initAppConfig", () => {
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
-    expect(config.paths.authFile).toBe(join(root, "state-home", "imp", "auth.json"));
     expect(config.defaults.agentId).toBe("default");
     expect(config.agents[0]?.model).toEqual({
       provider: "openai",
       modelId: "gpt-5.4",
     });
+    expect(config.agents[0]?.authFile).toBe(join(root, "state-home", "imp", "auth.json"));
     expect(config.agents[0]?.tools).toEqual([
       "read",
       "bash",
