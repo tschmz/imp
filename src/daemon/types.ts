@@ -23,6 +23,7 @@ export interface DaemonConfig {
     provider: string;
     modelId: string;
   };
+  defaultSystemPrompt?: string;
   activeBot: TelegramBotRuntimeConfig;
 }
 

@@ -45,6 +45,7 @@ function buildDefaultConfig(env: NodeJS.ProcessEnv): string {
           provider: "openai",
           modelId: "gpt-5.4",
         },
+        systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
       },
       bots: [
         {

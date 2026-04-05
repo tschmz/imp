@@ -36,9 +36,9 @@ export function createDaemon(
   const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
   const engine = dependencies.engine ?? createPiAgentEngine();
   const createTransport = dependencies.createTransport ?? createTelegramTransport;
-  const defaultAgent = applyConfiguredModel(
+  const defaultAgent = applyConfiguredDefaults(
     agentRegistry.get(config.defaultAgentId),
-    config.defaultModel,
+    config,
   );
 
   return {
@@ -82,7 +82,7 @@ export function createDaemon(
               conversationStore,
             );
             const agent =
-              applyConfiguredModel(agentRegistry.get(conversation.state.agentId), config.defaultModel) ??
+              applyConfiguredDefaults(agentRegistry.get(conversation.state.agentId), config) ??
               defaultAgent;
             const response = await engine.run({
               agent,
@@ -116,17 +116,18 @@ export function createDaemon(
   };
 }
 
-function applyConfiguredModel(
+function applyConfiguredDefaults(
   agent: AgentDefinition | undefined,
-  model: DaemonConfig["defaultModel"],
+  config: Pick<DaemonConfig, "defaultModel" | "defaultSystemPrompt">,
 ): AgentDefinition | undefined {
-  if (!agent || !model) {
+  if (!agent) {
     return agent;
   }
 
   return {
     ...agent,
-    model,
+    model: config.defaultModel ?? agent.model,
+    systemPrompt: config.defaultSystemPrompt ?? agent.systemPrompt,
   };
 }
 

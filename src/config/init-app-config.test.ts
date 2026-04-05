@@ -27,7 +27,10 @@ describe("initAppConfig", () => {
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
-      defaults: { model: { provider: string; modelId: string } };
+      defaults: {
+        model: { provider: string; modelId: string };
+        systemPrompt: string;
+      };
       bots: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
@@ -37,6 +40,9 @@ describe("initAppConfig", () => {
       provider: "openai",
       modelId: "gpt-5.4",
     });
+    expect(config.defaults.systemPrompt).toBe(
+      "You are a concise and pragmatic assistant running through a local daemon.",
+    );
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
   });
 

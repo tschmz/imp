@@ -11,6 +11,7 @@ describe("resolveRuntimeConfig", () => {
           provider: "openai",
           modelId: "gpt-5.4",
         },
+        systemPrompt: "You are the configured default agent.",
       },
       bots: [
         {
@@ -36,6 +37,7 @@ describe("resolveRuntimeConfig", () => {
       provider: "openai",
       modelId: "gpt-5.4",
     });
+    expect(result.defaultSystemPrompt).toBe("You are the configured default agent.");
     expect(result.activeBot).toEqual({
       id: "private-telegram",
       type: "telegram",

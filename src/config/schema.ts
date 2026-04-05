@@ -41,6 +41,7 @@ export const appConfigSchema = z.object({
   defaults: z.object({
     agentId: z.string().min(1),
     model: modelConfigSchema.optional(),
+    systemPrompt: z.string().min(1).optional(),
   }),
   bots: telegramBotSchema.array().min(1),
 });

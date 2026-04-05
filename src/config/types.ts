@@ -21,6 +21,7 @@ export interface LoggingConfig {
 export interface DefaultsConfig {
   agentId: string;
   model?: ModelConfig;
+  systemPrompt?: string;
 }
 
 export interface ModelConfig {
