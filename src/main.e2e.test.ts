@@ -87,6 +87,61 @@ describe("imp CLI e2e", () => {
       code: "ENOENT",
     });
   });
+
+  it("rejects a second daemon start while the first instance is still running", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const dataRoot = join(root, "state-home", "imp");
+    const runtimeStatePath = join(
+      dataRoot,
+      "bots",
+      "private-telegram",
+      "runtime",
+      "daemon.json",
+    );
+
+    await runCli(["init"], env);
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "default",
+      },
+      paths: {
+        dataRoot,
+      },
+      logging: {
+        level: "info",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "123456:valid-format-but-invalid-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    await writeRuntimeState(runtimeStatePath, {
+      pid: process.pid,
+      botId: "private-telegram",
+      startedAt: "2026-04-05T00:00:00.000Z",
+      configPath,
+      logFilePath: join(dataRoot, "bots", "private-telegram", "logs", "daemon.log"),
+    });
+
+    await expect(runCli([], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        `Another daemon instance is already running with pid ${process.pid}.`,
+      ),
+    });
+  });
 });
 
 async function createTempDir(): Promise<string> {
@@ -106,6 +161,12 @@ function createTestEnv(root: string): NodeJS.ProcessEnv {
 async function overwriteConfig(path: string, config: unknown): Promise<void> {
   const { writeFile } = await import("node:fs/promises");
   await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+async function writeRuntimeState(path: string, state: unknown): Promise<void> {
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
 async function runCli(

@@ -2,8 +2,33 @@ import { Bot, GrammyError } from "grammy";
 import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
 import type { Transport, TransportHandler } from "../types.js";
 
-export function createTelegramTransport(config: TelegramBotRuntimeConfig): Transport {
-  const bot = new Bot(config.token);
+interface TelegramBotAdapter {
+  api: {
+    getMe(): Promise<unknown>;
+  };
+  on(filter: "message:text", handler: (ctx: TelegramMessageContext) => Promise<void>): void;
+  start(): Promise<void>;
+}
+
+interface TelegramMessageContext {
+  chat?: {
+    id: number;
+    type: string;
+  };
+  message?: {
+    message_id: number;
+    text: string;
+  };
+  from?: {
+    id: number;
+  };
+  reply(text: string): Promise<unknown>;
+}
+
+export function createTelegramTransport(
+  config: TelegramBotRuntimeConfig,
+  bot: TelegramBotAdapter = new Bot(config.token),
+): Transport {
   const allowedUserIds = new Set(config.allowedUserIds);
 
   return {
@@ -47,7 +72,7 @@ export function createTelegramTransport(config: TelegramBotRuntimeConfig): Trans
 }
 
 async function validateBotToken(
-  bot: Bot,
+  bot: TelegramBotAdapter,
   config: TelegramBotRuntimeConfig,
 ): Promise<void> {
   try {
