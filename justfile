@@ -37,9 +37,9 @@ init *args: build
   node dist/main.js init {{args}}
 
 # Install the package globally from the local checkout.
-install-global: clean check build
+install: clean build
   npm install -g .
 
 # Remove the globally installed package.
-uninstall-global:
+uninstall:
   npm uninstall -g @tschmz/imp
