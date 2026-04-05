@@ -41,12 +41,18 @@ function buildDefaultConfig(env: NodeJS.ProcessEnv): string {
       },
       defaults: {
         agentId: "default",
-        model: {
-          provider: "openai",
-          modelId: "gpt-5.4",
-        },
-        systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
       },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt:
+            "You are a concise and pragmatic assistant running through a local daemon.",
+        },
+      ],
       bots: [
         {
           id: "private-telegram",

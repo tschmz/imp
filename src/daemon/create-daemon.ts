@@ -32,14 +32,12 @@ export function createDaemon(
   config: DaemonConfig,
   dependencies: DaemonDependencies = {},
 ): Daemon {
-  const agentRegistry = dependencies.agentRegistry ?? createAgentRegistry(loadBuiltInAgents());
+  const agentRegistry =
+    dependencies.agentRegistry ?? createAgentRegistry(buildAgents(config.agents));
   const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
   const engine = dependencies.engine ?? createPiAgentEngine();
   const createTransport = dependencies.createTransport ?? createTelegramTransport;
-  const defaultAgent = applyConfiguredDefaults(
-    agentRegistry.get(config.defaultAgentId),
-    config,
-  );
+  const defaultAgent = agentRegistry.get(config.defaultAgentId);
 
   return {
     async start() {
@@ -81,9 +79,7 @@ export function createDaemon(
               defaultAgent.id,
               conversationStore,
             );
-            const agent =
-              applyConfiguredDefaults(agentRegistry.get(conversation.state.agentId), config) ??
-              defaultAgent;
+            const agent = agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
             const response = await engine.run({
               agent,
               conversation,
@@ -116,19 +112,34 @@ export function createDaemon(
   };
 }
 
-function applyConfiguredDefaults(
-  agent: AgentDefinition | undefined,
-  config: Pick<DaemonConfig, "defaultModel" | "defaultSystemPrompt">,
-): AgentDefinition | undefined {
-  if (!agent) {
-    return agent;
-  }
+function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[] {
+  const builtIns = loadBuiltInAgents();
+  const builtInsById = new Map(builtIns.map((agent) => [agent.id, agent]));
 
-  return {
-    ...agent,
-    model: config.defaultModel ?? agent.model,
-    systemPrompt: config.defaultSystemPrompt ?? agent.systemPrompt,
-  };
+  return configuredAgents.map((configuredAgent) => {
+    const builtIn = builtInsById.get(configuredAgent.id);
+
+    if (!builtIn) {
+      if (!configuredAgent.systemPrompt) {
+        throw new Error(
+          `Configured agent "${configuredAgent.id}" must define systemPrompt.`,
+        );
+      }
+
+      if (!configuredAgent.model) {
+        throw new Error(`Configured agent "${configuredAgent.id}" must define model.`);
+      }
+    }
+
+    return {
+      id: configuredAgent.id,
+      name: configuredAgent.name ?? builtIn?.name ?? configuredAgent.id,
+      systemPrompt: configuredAgent.systemPrompt ?? builtIn?.systemPrompt ?? "",
+      model: configuredAgent.model ?? builtIn?.model ?? { provider: "", modelId: "" },
+      tools: builtIn?.tools ?? [],
+      extensions: builtIn?.extensions ?? [],
+    };
+  });
 }
 
 async function getOrCreateConversationContext(

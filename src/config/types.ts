@@ -1,11 +1,3 @@
-export interface AppConfig {
-  instance: InstanceConfig;
-  paths: PathsConfig;
-  logging?: LoggingConfig;
-  defaults: DefaultsConfig;
-  bots: BotConfig[];
-}
-
 export interface InstanceConfig {
   name: string;
 }
@@ -20,13 +12,18 @@ export interface LoggingConfig {
 
 export interface DefaultsConfig {
   agentId: string;
-  model?: ModelConfig;
-  systemPrompt?: string;
 }
 
 export interface ModelConfig {
   provider: string;
   modelId: string;
+}
+
+export interface AgentConfig {
+  id: string;
+  name?: string;
+  systemPrompt?: string;
+  model?: ModelConfig;
 }
 
 export type BotConfig = TelegramBotConfig;
@@ -46,4 +43,13 @@ export interface TelegramAccessConfig {
 
 export interface BotRoutingConfig {
   defaultAgentId?: string;
+}
+
+export interface AppConfig {
+  instance: InstanceConfig;
+  paths: PathsConfig;
+  logging?: LoggingConfig;
+  defaults: DefaultsConfig;
+  agents: AgentConfig[];
+  bots: BotConfig[];
 }

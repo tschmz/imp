@@ -29,11 +29,13 @@ describe("imp CLI e2e", () => {
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
+      agents: Array<{ id: string }>;
       bots: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
     expect(stdout).toContain(`Created config at ${configPath}`);
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
+    expect(config.agents[0]?.id).toBe("default");
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
   });
 
@@ -57,6 +59,17 @@ describe("imp CLI e2e", () => {
       defaults: {
         agentId: "default",
       },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt:
+            "You are a concise and pragmatic assistant running through a local daemon.",
+        },
+      ],
       bots: [
         {
           id: "private-telegram",
@@ -115,6 +128,17 @@ describe("imp CLI e2e", () => {
       defaults: {
         agentId: "default",
       },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt:
+            "You are a concise and pragmatic assistant running through a local daemon.",
+        },
+      ],
       bots: [
         {
           id: "private-telegram",

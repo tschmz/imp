@@ -7,12 +7,17 @@ describe("resolveRuntimeConfig", () => {
     const appConfig = createAppConfig({
       defaults: {
         agentId: "default-agent",
-        model: {
-          provider: "openai",
-          modelId: "gpt-5.4",
-        },
-        systemPrompt: "You are the configured default agent.",
       },
+      agents: [
+        {
+          id: "default-agent",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt: "You are the configured default agent.",
+        },
+      ],
       bots: [
         {
           id: "private-telegram",
@@ -33,11 +38,16 @@ describe("resolveRuntimeConfig", () => {
 
     expect(result.configPath).toBe("/etc/imp/config.json");
     expect(result.defaultAgentId).toBe("ops-agent");
-    expect(result.defaultModel).toEqual({
-      provider: "openai",
-      modelId: "gpt-5.4",
-    });
-    expect(result.defaultSystemPrompt).toBe("You are the configured default agent.");
+    expect(result.agents).toEqual([
+      {
+        id: "default-agent",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        systemPrompt: "You are the configured default agent.",
+      },
+    ]);
     expect(result.activeBot).toEqual({
       id: "private-telegram",
       type: "telegram",
@@ -143,6 +153,16 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
       agentId: "default",
       ...overrides.defaults,
     },
+    agents: overrides.agents ?? [
+      {
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        systemPrompt: "You are concise.",
+      },
+    ],
     bots: overrides.bots ?? [],
   };
 }

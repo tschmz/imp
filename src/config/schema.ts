@@ -6,6 +6,13 @@ const modelConfigSchema = z.object({
   modelId: z.string().min(1),
 });
 
+const agentConfigSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).optional(),
+  systemPrompt: z.string().min(1).optional(),
+  model: modelConfigSchema.optional(),
+});
+
 const telegramBotSchema = z.object({
   id: z.string().min(1),
   type: z.literal("telegram"),
@@ -40,8 +47,7 @@ export const appConfigSchema = z.object({
     .optional(),
   defaults: z.object({
     agentId: z.string().min(1),
-    model: modelConfigSchema.optional(),
-    systemPrompt: z.string().min(1).optional(),
   }),
+  agents: agentConfigSchema.array().min(1),
   bots: telegramBotSchema.array().min(1),
 });

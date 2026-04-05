@@ -82,6 +82,59 @@ describe("createDaemon", () => {
 
     expect(persistedMessages).toHaveLength(4);
   });
+
+  it("builds the default agent from configured agents", async () => {
+    const root = await createTempDir();
+    const paths = createRuntimePaths(root);
+    const runInputs: AgentRunInput[] = [];
+    const engine: AgentEngine = {
+      run: vi.fn(async (input) => {
+        runInputs.push(input);
+        return {
+          message: {
+            conversation: input.message.conversation,
+            text: "configured",
+          },
+        };
+      }),
+    };
+
+    const daemon = createDaemon(
+      {
+        ...createConfig(paths),
+        agents: [
+          {
+            id: "default",
+            systemPrompt: "You are configured from json.",
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+          },
+        ],
+      },
+      {
+        engine,
+        createTransport: () => ({
+          async start(handler: TransportHandler) {
+            await handler.handle(createIncomingMessage("1", "hello"));
+          },
+        }),
+      },
+    );
+
+    await daemon.start();
+
+    expect(runInputs).toHaveLength(1);
+    expect(runInputs[0]?.agent).toMatchObject({
+      id: "default",
+      systemPrompt: "You are configured from json.",
+      model: {
+        provider: "openai",
+        modelId: "gpt-5.4",
+      },
+    });
+  });
 });
 
 async function createTempDir(): Promise<string> {
@@ -107,6 +160,16 @@ function createConfig(paths: RuntimePaths): DaemonConfig {
     paths,
     configPath: join(paths.dataRoot, "config.json"),
     defaultAgentId: "default",
+    agents: [
+      {
+        id: "default",
+        systemPrompt: "You are concise.",
+        model: {
+          provider: "test",
+          modelId: "stub",
+        },
+      },
+    ],
     activeBot: {
       id: "private-telegram",
       type: "telegram",

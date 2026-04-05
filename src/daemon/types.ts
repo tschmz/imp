@@ -19,14 +19,20 @@ export interface DaemonConfig {
   paths: RuntimePaths;
   configPath: string;
   defaultAgentId: string;
-  defaultModel?: {
-    provider: string;
-    modelId: string;
-  };
-  defaultSystemPrompt?: string;
+  agents: ConfiguredAgent[];
   activeBot: TelegramBotRuntimeConfig;
 }
 
 export interface Daemon {
   start(): Promise<void>;
+}
+
+export interface ConfiguredAgent {
+  id: string;
+  name?: string;
+  systemPrompt?: string;
+  model?: {
+    provider: string;
+    modelId: string;
+  };
 }

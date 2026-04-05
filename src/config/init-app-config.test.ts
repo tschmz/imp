@@ -28,19 +28,24 @@ describe("initAppConfig", () => {
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
       defaults: {
+        agentId: string;
+      };
+      agents: Array<{
+        id: string;
         model: { provider: string; modelId: string };
         systemPrompt: string;
-      };
+      }>;
       bots: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
-    expect(config.defaults.model).toEqual({
+    expect(config.defaults.agentId).toBe("default");
+    expect(config.agents[0]?.model).toEqual({
       provider: "openai",
       modelId: "gpt-5.4",
     });
-    expect(config.defaults.systemPrompt).toBe(
+    expect(config.agents[0]?.systemPrompt).toBe(
       "You are a concise and pragmatic assistant running through a local daemon.",
     );
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
