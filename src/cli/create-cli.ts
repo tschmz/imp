@@ -3,6 +3,7 @@ import { Command } from "commander";
 
 export interface CliDependencies {
   startDaemon: (options: { configPath?: string }) => Promise<void>;
+  viewLogs: (options: { configPath?: string; botId?: string; follow: boolean; lines: number }) => Promise<void>;
   initConfig: (options: {
     configPath?: string;
     force: boolean;
@@ -32,6 +33,27 @@ export function createCli(dependencies: CliDependencies): Command {
     .action(async function action(this: Command, options: { config?: string }) {
       await dependencies.startDaemon({ configPath: options.config });
     });
+
+  program
+    .command("log")
+    .description("Show daemon log output")
+    .option("-c, --config <path>", "Path to the config file")
+    .option("-b, --bot <id>", "Show logs for a specific bot ID")
+    .option("-f, --follow", "Follow appended log lines")
+    .option("-n, --lines <count>", "Number of recent lines to show", parseIntegerOption, 50)
+    .action(
+      async function action(
+        this: Command,
+        options: { config?: string; bot?: string; follow?: boolean; lines?: number },
+      ) {
+        await dependencies.viewLogs({
+          configPath: options.config,
+          botId: options.bot,
+          follow: options.follow ?? false,
+          lines: options.lines ?? 50,
+        });
+      },
+    );
 
   program
     .command("init")
@@ -118,4 +140,8 @@ function getCliVersion(): string {
   const require = createRequire(import.meta.url);
   const packageJson = require("../../package.json") as { version?: string };
   return packageJson.version ?? "0.0.0";
+}
+
+function parseIntegerOption(value: string): number {
+  return Number.parseInt(value, 10);
 }

@@ -9,6 +9,7 @@ import { promptForInitialAppConfig } from "./config/prompt-init-config.js";
 import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
 import { createDaemon } from "./daemon/create-daemon.js";
 import { createFileLogger } from "./logging/file-logger.js";
+import { viewDaemonLogs } from "./logging/view-logs.js";
 import { assertServiceInstallCanProceed, installService, resolveServiceDefinitionPath } from "./service/install-service.js";
 import { restartService, startService, statusService, stopService } from "./service/manage-service.js";
 import { createServiceInstallPlan, renderServiceDefinition } from "./service/install-plan.js";
@@ -17,6 +18,20 @@ import { uninstallService } from "./service/uninstall-service.js";
 async function main(): Promise<void> {
   const cli = createCli({
     startDaemon: runDaemon,
+    viewLogs: async ({ configPath, botId, follow, lines }) => {
+      const { configPath: resolvedConfigPath } = await discoverConfigPath({
+        cliConfigPath: configPath,
+      });
+      const appConfig = await loadAppConfig(resolvedConfigPath);
+      const runtimeConfig = resolveRuntimeConfig(appConfig, resolvedConfigPath);
+
+      await viewDaemonLogs({
+        runtimeConfig,
+        botId,
+        follow,
+        lines,
+      });
+    },
     initConfig: async ({ configPath, force, defaults }) => {
       const resolvedConfigPath = await assertInitConfigCanBeCreated({ configPath, force });
       const initSetup = defaults

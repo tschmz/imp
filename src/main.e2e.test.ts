@@ -48,6 +48,7 @@ describe("imp CLI e2e", () => {
 
     expect(stdout).toContain("Usage: imp");
     expect(stdout).toContain("start");
+    expect(stdout).toContain("log");
     expect(stdout).toContain("init");
     expect(stdout).toContain("service");
     expect(stdout).toContain("--version");
@@ -98,6 +99,18 @@ describe("imp CLI e2e", () => {
 
     expect(stdout).toContain("Usage: imp start");
     expect(stdout).toContain("--config <path>");
+  });
+
+  it("shows command-specific config help for log", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["log", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp log");
+    expect(stdout).toContain("--bot <id>");
+    expect(stdout).toContain("--follow");
+    expect(stdout).toContain("--lines <count>");
   });
 
   it("shows command-specific config help for init", async () => {
@@ -326,6 +339,176 @@ describe("imp CLI e2e", () => {
     });
   });
 
+  it("shows recent daemon log lines", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const logFilePath = join(root, "state-home", "imp", "bots", "private-telegram", "logs", "daemon.log");
+
+    await runCli(["init", "--defaults"], env);
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "default",
+      },
+      paths: {
+        dataRoot: join(root, "state-home", "imp"),
+      },
+      logging: {
+        level: "info",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt:
+            "You are a concise and pragmatic assistant running through a local daemon.",
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "123456:valid-format-but-invalid-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+    await writeLogFile(logFilePath, ["one", "two", "three"]);
+
+    const { stdout } = await runCli(["log", "--lines", "2"], env);
+
+    expect(stdout).toBe("two\nthree\n");
+  });
+
+  it("shows prefixed log lines when multiple bots are enabled", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const dataRoot = join(root, "state-home", "imp");
+
+    await runCli(["init", "--defaults"], env);
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "default",
+      },
+      paths: {
+        dataRoot,
+      },
+      logging: {
+        level: "info",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt:
+            "You are a concise and pragmatic assistant running through a local daemon.",
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "token-1",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+        {
+          id: "ops-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "token-2",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+    await writeLogFile(join(dataRoot, "bots", "private-telegram", "logs", "daemon.log"), ["one", "two"]);
+    await writeLogFile(join(dataRoot, "bots", "ops-telegram", "logs", "daemon.log"), ["three", "four"]);
+
+    const { stdout } = await runCli(["log", "--lines", "1"], env);
+
+    expect(stdout).toBe("[private-telegram] two\n[ops-telegram] four\n");
+  });
+
+  it("filters logs to a selected bot", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const dataRoot = join(root, "state-home", "imp");
+
+    await runCli(["init", "--defaults"], env);
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "default",
+      },
+      paths: {
+        dataRoot,
+      },
+      logging: {
+        level: "info",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt:
+            "You are a concise and pragmatic assistant running through a local daemon.",
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "token-1",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+        {
+          id: "ops-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "token-2",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+    await writeLogFile(join(dataRoot, "bots", "private-telegram", "logs", "daemon.log"), ["one", "two"]);
+    await writeLogFile(join(dataRoot, "bots", "ops-telegram", "logs", "daemon.log"), ["three", "four"]);
+
+    const { stdout } = await runCli(["log", "--bot", "ops-telegram", "--lines", "1"], env);
+
+    expect(stdout).toBe("four\n");
+  });
+
   it("rejects a second daemon start while the first instance is still running", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
@@ -467,6 +650,12 @@ async function writeRuntimeState(path: string, state: unknown): Promise<void> {
   const { mkdir, writeFile } = await import("node:fs/promises");
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+}
+
+async function writeLogFile(path: string, lines: string[]): Promise<void> {
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${lines.join("\n")}\n`, "utf8");
 }
 
 async function runCli(
