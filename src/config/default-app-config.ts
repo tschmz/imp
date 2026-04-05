@@ -1,6 +1,6 @@
-import { join } from "node:path";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
+import { getDefaultAgentSystemPromptFilePath } from "../agents/default-system-prompt.js";
+import { join } from "node:path";
 import { getDefaultUserDataRoot } from "./discover-config-path.js";
 import type { AppConfig } from "./types.js";
 
@@ -21,13 +21,16 @@ export interface InitialConfigAnswers {
 }
 
 export function createDefaultAppConfig(env: NodeJS.ProcessEnv): AppConfig {
+  const dataRoot = getDefaultUserDataRoot(env);
+
   return buildInitialAppConfig(env, {
     instanceName: "default",
-    dataRoot: getDefaultUserDataRoot(env),
+    dataRoot,
     provider: "openai",
     modelId: "gpt-5.4",
     telegramToken: "replace-me",
     allowedUserIds: [],
+    systemPromptFile: getDefaultAgentSystemPromptFilePath(dataRoot),
   });
 }
 
@@ -69,9 +72,8 @@ export function buildInitialAppConfig(
             store: true,
           },
         },
-        ...(answers.systemPromptFile
-          ? { systemPromptFile: answers.systemPromptFile }
-          : { systemPrompt: DEFAULT_AGENT_SYSTEM_PROMPT }),
+        systemPromptFile:
+          answers.systemPromptFile ?? getDefaultAgentSystemPromptFilePath(answers.dataRoot),
       },
     ],
     bots: [

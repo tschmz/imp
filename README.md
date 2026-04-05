@@ -39,6 +39,9 @@ imp init
 imp init --defaults
 ```
 
+Both variants create a starter `SYSTEM.md` under the configured `dataRoot` and wire the
+default agent to that `systemPromptFile`.
+
 You can also inspect
 [`config.example.json`](./config.example.json) for a more complete example.
 

@@ -138,6 +138,7 @@ describe("imp CLI e2e", () => {
 
     const { stdout } = await runCli(["init", "--defaults"], env);
     const configPath = join(root, "config-home", "imp", "config.json");
+    const promptPath = join(root, "state-home", "imp", "SYSTEM.md");
     const servicePath =
       process.platform === "darwin"
         ? join(root, "Library", "LaunchAgents", "dev.imp.plist")
@@ -147,7 +148,7 @@ describe("imp CLI e2e", () => {
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
-      agents: Array<{ id: string }>;
+      agents: Array<{ id: string; systemPromptFile: string }>;
       bots: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
@@ -158,7 +159,9 @@ describe("imp CLI e2e", () => {
     }
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
+    expect(config.agents[0]?.systemPromptFile).toBe(promptPath);
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
+    await expect(readFile(promptPath, "utf8")).resolves.toContain("# Role");
   });
 
   it("prints a native service definition in dry-run mode", async () => {

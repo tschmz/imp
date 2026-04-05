@@ -2,11 +2,21 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildInitialAppConfig,
+  createDefaultAppConfig,
   parseCommaSeparatedValues,
   validateTelegramUserIds,
 } from "./default-app-config.js";
 
 describe("default app config helpers", () => {
+  it("uses a system prompt file by default", () => {
+    const config = createDefaultAppConfig({
+      XDG_STATE_HOME: "/tmp/state-home",
+    });
+
+    expect(config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
+    expect(config.agents[0]?.systemPrompt).toBeUndefined();
+  });
+
   it("adds authFile for OAuth-capable providers", () => {
     const config = buildInitialAppConfig(process.env, {
       instanceName: "default",

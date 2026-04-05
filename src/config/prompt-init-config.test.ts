@@ -19,7 +19,6 @@ describe("promptForInitialAppConfig", () => {
     const confirm = vi
       .fn()
       .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(true);
     const select = vi.fn().mockResolvedValue("openai");
 
@@ -35,9 +34,10 @@ describe("promptForInitialAppConfig", () => {
       workingDirectory: "/workspace",
       files: ["/workspace/AGENTS.md", "/workspace/RULES.md"],
     });
+    expect(result.config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
     expect(result.config.bots[0]?.access.allowedUserIds).toEqual(["1", "2"]);
     expect(confirm).toHaveBeenNthCalledWith(
-      3,
+      2,
       expect.objectContaining({
         message: "Install and start imp as a background service now?",
         default: true,
@@ -68,5 +68,6 @@ describe("promptForInitialAppConfig", () => {
     });
 
     expect(result.installService).toBe(false);
+    expect(result.config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
   });
 });

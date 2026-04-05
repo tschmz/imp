@@ -2,6 +2,7 @@ import { chmod, mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
 import { buildInitialAppConfig } from "./default-app-config.js";
 import { assertInitConfigCanBeCreated, initAppConfig } from "./init-app-config.js";
 
@@ -46,7 +47,7 @@ describe("initAppConfig", () => {
           metadata?: Record<string, unknown>;
           request?: Record<string, unknown>;
         };
-        systemPrompt: string;
+        systemPromptFile: string;
       }>;
       bots: Array<{ access: { allowedUserIds: string[] } }>;
     };
@@ -76,20 +77,24 @@ describe("initAppConfig", () => {
         store: true,
       },
     });
-    expect(config.agents[0]?.systemPrompt).toBe(
-      "You are a concise and pragmatic assistant running through a local daemon.",
-    );
+    expect(config.agents[0]?.systemPromptFile).toBe(join(root, "state-home", "imp", "SYSTEM.md"));
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
 
     const fileMode = (await stat(configPath)).mode & 0o777;
     expect(fileMode).toBe(0o600);
+    await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).resolves.toBe(
+      `${DEFAULT_AGENT_SYSTEM_PROMPT}\n`,
+    );
   });
 
   it("refuses to overwrite an existing config without force", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
+    const env = {
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
 
-    await initAppConfig({ configPath });
+    await initAppConfig({ configPath, env });
 
     await expect(assertInitConfigCanBeCreated({ configPath })).rejects.toThrowError(
       `Config file already exists: ${configPath}\nRe-run with --force to overwrite.`,
@@ -99,8 +104,11 @@ describe("initAppConfig", () => {
   it("allows overwriting an existing config when force is set", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
+    const env = {
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
 
-    await initAppConfig({ configPath });
+    await initAppConfig({ configPath, env });
 
     await expect(assertInitConfigCanBeCreated({ configPath, force: true })).resolves.toBe(
       configPath,
@@ -110,11 +118,14 @@ describe("initAppConfig", () => {
   it("resets config permissions to owner read/write when overwriting with force", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
+    const env = {
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
 
-    await initAppConfig({ configPath });
+    await initAppConfig({ configPath, env });
     await chmod(configPath, 0o644);
 
-    await initAppConfig({ configPath, force: true });
+    await initAppConfig({ configPath, force: true, env });
 
     const fileMode = (await stat(configPath)).mode & 0o777;
     expect(fileMode).toBe(0o600);
@@ -124,18 +135,67 @@ describe("initAppConfig", () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
     const backupPath = `${configPath}.2026-04-05T18-15-00.000Z.bak`;
+    const env = {
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
 
-    await initAppConfig({ configPath });
+    await initAppConfig({ configPath, env });
     const originalContent = await readFile(configPath, "utf8");
 
     await chmod(configPath, 0o644);
     await initAppConfig({
       configPath,
       force: true,
+      env,
       now: new Date("2026-04-05T18:15:00.000Z"),
     });
 
     await expect(readFile(backupPath, "utf8")).resolves.toBe(originalContent);
+    const backupMode = (await stat(backupPath)).mode & 0o777;
+    expect(backupMode).toBe(0o600);
+  });
+
+  it("writes the default agent system prompt file with owner read/write permissions", async () => {
+    const root = await createTempDir();
+    const env = {
+      XDG_CONFIG_HOME: join(root, "config-home"),
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
+
+    await initAppConfig({ env });
+
+    const promptPath = join(root, "state-home", "imp", "SYSTEM.md");
+    await expect(readFile(promptPath, "utf8")).resolves.toBe(`${DEFAULT_AGENT_SYSTEM_PROMPT}\n`);
+    const fileMode = (await stat(promptPath)).mode & 0o777;
+    expect(fileMode).toBe(0o600);
+  });
+
+  it("creates a backup before overwriting an existing system prompt file with force", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    const promptPath = join(root, "SYSTEM.md");
+    const backupPath = `${promptPath}.2026-04-05T18-15-00.000Z.bak`;
+    const config = buildInitialAppConfig(process.env, {
+      instanceName: "default",
+      dataRoot: root,
+      provider: "openai",
+      modelId: "gpt-5.4",
+      telegramToken: "replace-me",
+      allowedUserIds: [],
+      systemPromptFile: promptPath,
+    });
+
+    await initAppConfig({ configPath, config });
+    await chmod(promptPath, 0o644);
+
+    await initAppConfig({
+      configPath,
+      config,
+      force: true,
+      now: new Date("2026-04-05T18:15:00.000Z"),
+    });
+
+    await expect(readFile(backupPath, "utf8")).resolves.toBe(`${DEFAULT_AGENT_SYSTEM_PROMPT}\n`);
     const backupMode = (await stat(backupPath)).mode & 0o777;
     expect(backupMode).toBe(0o600);
   });

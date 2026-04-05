@@ -1,5 +1,6 @@
 import { confirm, input, select } from "@inquirer/prompts";
 import { join } from "node:path";
+import { getDefaultAgentSystemPromptFilePath } from "../agents/default-system-prompt.js";
 import {
   buildInitialAppConfig,
   createDefaultAppConfig,
@@ -104,19 +105,6 @@ export async function promptForInitialAppConfig(
     default: "",
   });
 
-  const useSystemPromptFile = await dependencies.confirm({
-    message: "Use a system prompt file?",
-    default: false,
-  });
-
-  const systemPromptFile = useSystemPromptFile
-    ? await dependencies.input({
-        message: "System prompt file path",
-        default: join(dataRoot, "SYSTEM.md"),
-        validate: requireNonEmpty("System prompt file path is required."),
-      })
-    : undefined;
-
   const installService =
     process.platform === "win32"
       ? false
@@ -138,7 +126,7 @@ export async function promptForInitialAppConfig(
         ...(includeAgentsFile ? [join(workingDirectory, "AGENTS.md")] : []),
         ...parseCommaSeparatedValues(extraContextFilesRaw),
       ],
-      ...(systemPromptFile ? { systemPromptFile } : {}),
+      systemPromptFile: getDefaultAgentSystemPromptFilePath(dataRoot),
     }),
     installService,
   };
