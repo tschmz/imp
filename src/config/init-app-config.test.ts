@@ -107,6 +107,26 @@ describe("initAppConfig", () => {
     const fileMode = (await stat(configPath)).mode & 0o777;
     expect(fileMode).toBe(0o600);
   });
+
+  it("creates a backup before overwriting an existing config with force", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    const backupPath = `${configPath}.2026-04-05T18-15-00.000Z.bak`;
+
+    await initAppConfig({ configPath });
+    const originalContent = await readFile(configPath, "utf8");
+
+    await chmod(configPath, 0o644);
+    await initAppConfig({
+      configPath,
+      force: true,
+      now: new Date("2026-04-05T18:15:00.000Z"),
+    });
+
+    await expect(readFile(backupPath, "utf8")).resolves.toBe(originalContent);
+    const backupMode = (await stat(backupPath)).mode & 0o777;
+    expect(backupMode).toBe(0o600);
+  });
 });
 
 async function createTempDir(): Promise<string> {
