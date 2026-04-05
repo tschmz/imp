@@ -1,9 +1,10 @@
 import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
+import type { Logger } from "../logging/types.js";
 import { createPiAgentEngine } from "./create-pi-agent-engine.js";
 
 const registrations: FauxProviderRegistration[] = [];
@@ -77,7 +78,9 @@ describe("createPiAgentEngine", () => {
   });
 
   it("fails clearly when the configured model cannot be resolved", async () => {
+    const logger = createMockLogger();
     const engine = createPiAgentEngine({
+      logger,
       resolveModel: () => undefined,
     });
 
@@ -88,6 +91,20 @@ describe("createPiAgentEngine", () => {
         message: createIncomingMessage(),
       }),
     ).rejects.toThrow('Unknown model for agent "default": faux/faux-1');
+    expect(logger.error).toHaveBeenCalledWith(
+      "agent engine run failed",
+      expect.objectContaining({
+        botId: "private-telegram",
+        transport: "telegram",
+        conversationId: "42",
+        messageId: "2",
+        correlationId: "corr-2",
+        agentId: "default",
+        durationMs: expect.any(Number),
+        errorType: "Error",
+      }),
+      expect.any(Error),
+    );
   });
 
   it("fails clearly when the assistant response contains no text", async () => {
@@ -526,13 +543,22 @@ function createConversation(): ConversationContext {
 
 function createIncomingMessage(): IncomingMessage {
   return {
+    botId: "private-telegram",
     conversation: {
       transport: "telegram",
       externalId: "42",
     },
     messageId: "2",
+    correlationId: "corr-2",
     userId: "7",
     text: "what did I just say?",
     receivedAt: "2026-04-05T00:00:02.000Z",
+  };
+}
+
+function createMockLogger(): Logger {
+  return {
+    info: vi.fn(async () => {}),
+    error: vi.fn(async () => {}),
   };
 }

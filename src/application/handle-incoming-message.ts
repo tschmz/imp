@@ -47,7 +47,12 @@ export function createHandleIncomingMessage(
         messages: [
           ...conversation.messages,
           toUserConversationMessage(message),
-          toAssistantConversationMessage(response.message, message.messageId, respondedAt),
+          toAssistantConversationMessage(
+            response.message,
+            message.messageId,
+            respondedAt,
+            message.correlationId,
+          ),
         ],
       });
 
@@ -95,6 +100,7 @@ function toUserConversationMessage(message: IncomingMessage) {
     role: "user" as const,
     text: message.text,
     createdAt: message.receivedAt,
+    correlationId: message.correlationId,
   };
 }
 
@@ -102,11 +108,13 @@ function toAssistantConversationMessage(
   message: OutgoingMessage,
   parentMessageId: string,
   createdAt: string,
+  correlationId: string,
 ) {
   return {
     id: `${parentMessageId}:assistant`,
     role: "assistant" as const,
     text: message.text,
     createdAt,
+    correlationId,
   };
 }

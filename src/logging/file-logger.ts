@@ -1,23 +1,19 @@
 import { appendFile } from "node:fs/promises";
+import type { LogFields, Logger } from "./types.js";
 
-export interface FileLogger {
-  info(message: string): Promise<void>;
-  error(message: string, error?: unknown): Promise<void>;
-}
-
-export function createFileLogger(path: string): FileLogger {
+export function createFileLogger(path: string): Logger {
   return {
-    async info(message: string): Promise<void> {
-      await writeLogLine(path, "INFO", message);
-      console.log(message);
+    async info(message: string, fields?: LogFields): Promise<void> {
+      await writeLogLine(path, "INFO", message, fields);
+      console.log(formatConsoleLog(message, fields));
     },
-    async error(message: string, error?: unknown): Promise<void> {
-      await writeLogLine(path, "ERROR", message);
+    async error(message: string, fields?: LogFields, error?: unknown): Promise<void> {
+      await writeLogLine(path, "ERROR", message, fields);
       if (error !== undefined) {
-        await writeLogLine(path, "ERROR", formatError(error));
+        await writeLogLine(path, "ERROR", formatError(error), fields);
       }
 
-      console.error(message);
+      console.error(formatConsoleLog(message, fields));
       if (error !== undefined) {
         console.error(error);
       }
@@ -25,8 +21,20 @@ export function createFileLogger(path: string): FileLogger {
   };
 }
 
-async function writeLogLine(path: string, level: string, message: string): Promise<void> {
-  await appendFile(path, `[${new Date().toISOString()}] ${level} ${message}\n`, "utf8");
+async function writeLogLine(
+  path: string,
+  level: string,
+  message: string,
+  fields?: LogFields,
+): Promise<void> {
+  const payload = {
+    ts: new Date().toISOString(),
+    level,
+    message,
+    ...(fields ?? {}),
+  };
+
+  await appendFile(path, `${JSON.stringify(payload)}\n`, "utf8");
 }
 
 function formatError(error: unknown): string {
@@ -35,4 +43,12 @@ function formatError(error: unknown): string {
   }
 
   return String(error);
+}
+
+function formatConsoleLog(message: string, fields?: LogFields): string {
+  if (!fields || Object.keys(fields).length === 0) {
+    return message;
+  }
+
+  return `${message} ${JSON.stringify(fields)}`;
 }

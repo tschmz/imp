@@ -10,6 +10,7 @@ export interface ConversationMessage {
   role: ConversationMessageRole;
   text: string;
   createdAt: string;
+  correlationId?: string;
 }
 
 export interface ConversationState {

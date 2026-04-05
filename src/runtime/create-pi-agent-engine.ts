@@ -19,6 +19,7 @@ import {
 } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationMessage } from "../domain/conversation.js";
+import type { Logger } from "../logging/types.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { AgentEngine } from "./types.js";
@@ -39,6 +40,7 @@ const EMPTY_USAGE: Usage = {
 };
 
 interface PiAgentEngineDependencies {
+  logger?: Logger;
   resolveModel?: (provider: string, modelId: string) => Model<AiApi> | undefined;
   createAgent?: (options: AgentOptions) => AgentHandle;
   readTextFile?: (path: string) => Promise<string>;
@@ -66,68 +68,88 @@ export function createPiAgentEngine(
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
   const systemPromptCache = new Map<string, string>();
   const latestSystemPromptCacheKeyByAgentId = new Map<string, string>();
+  const logger = dependencies.logger;
 
   return {
     async run(input) {
-      const model = resolveModel(input.agent.model.provider, input.agent.model.modelId);
-      if (!model) {
-        throw new Error(
-          `Unknown model for agent "${input.agent.id}": ` +
-            `${input.agent.model.provider}/${input.agent.model.modelId}`,
+      const startedAt = Date.now();
+      try {
+        const model = resolveModel(input.agent.model.provider, input.agent.model.modelId);
+        if (!model) {
+          throw new Error(
+            `Unknown model for agent "${input.agent.id}": ` +
+              `${input.agent.model.provider}/${input.agent.model.modelId}`,
+          );
+        }
+
+        const systemPrompt = await resolveSystemPrompt({
+          agent: input.agent,
+          readTextFile,
+          getContextFileFingerprint,
+          cache: systemPromptCache,
+          latestCacheKeyByAgentId: latestSystemPromptCacheKeyByAgentId,
+        });
+        const toolRegistry =
+          dependencies.toolRegistry ??
+          buildToolRegistry(resolveWorkingDirectory(input.agent));
+        const tools = resolveAgentTools(input.agent, toolRegistry);
+        const onPayload = createOnPayloadOverride(input.agent);
+        const agent = createAgent({
+          initialState: {
+            systemPrompt,
+            model,
+            thinkingLevel: "off",
+            tools,
+            messages: toAgentMessages(input.conversation.messages, model),
+          },
+          ...(onPayload ? { onPayload } : {}),
+        });
+
+        await agent.prompt(input.message.text);
+
+        const assistantMessage = [...agent.state.messages]
+          .reverse()
+          .find((message): message is AssistantMessage => message.role === "assistant");
+
+        if (!assistantMessage) {
+          throw new Error(`Agent "${input.agent.id}" did not produce an assistant message.`);
+        }
+
+        if (assistantMessage.stopReason === "error" || assistantMessage.stopReason === "aborted") {
+          throw new Error(
+            `Agent "${input.agent.id}" failed: ` +
+              `${assistantMessage.errorMessage ?? "unknown upstream error"}`,
+          );
+        }
+
+        const responseText = getAssistantText(assistantMessage);
+        if (!responseText.trim()) {
+          throw new Error(`Agent "${input.agent.id}" produced an assistant message without text content.`);
+        }
+
+        return {
+          message: {
+            conversation: input.message.conversation,
+            text: responseText,
+          },
+        };
+      } catch (error) {
+        await logger?.error(
+          "agent engine run failed",
+          {
+            botId: input.message.botId,
+            transport: input.message.conversation.transport,
+            conversationId: input.message.conversation.externalId,
+            messageId: input.message.messageId,
+            correlationId: input.message.correlationId,
+            agentId: input.agent.id,
+            durationMs: Date.now() - startedAt,
+            errorType: error instanceof Error ? error.name : typeof error,
+          },
+          error,
         );
+        throw error;
       }
-
-      const systemPrompt = await resolveSystemPrompt({
-        agent: input.agent,
-        readTextFile,
-        getContextFileFingerprint,
-        cache: systemPromptCache,
-        latestCacheKeyByAgentId: latestSystemPromptCacheKeyByAgentId,
-      });
-      const toolRegistry =
-        dependencies.toolRegistry ??
-        buildToolRegistry(resolveWorkingDirectory(input.agent));
-      const tools = resolveAgentTools(input.agent, toolRegistry);
-      const onPayload = createOnPayloadOverride(input.agent);
-      const agent = createAgent({
-        initialState: {
-          systemPrompt,
-          model,
-          thinkingLevel: "off",
-          tools,
-          messages: toAgentMessages(input.conversation.messages, model),
-        },
-        ...(onPayload ? { onPayload } : {}),
-      });
-
-      await agent.prompt(input.message.text);
-
-      const assistantMessage = [...agent.state.messages]
-        .reverse()
-        .find((message): message is AssistantMessage => message.role === "assistant");
-
-      if (!assistantMessage) {
-        throw new Error(`Agent "${input.agent.id}" did not produce an assistant message.`);
-      }
-
-      if (assistantMessage.stopReason === "error" || assistantMessage.stopReason === "aborted") {
-        throw new Error(
-          `Agent "${input.agent.id}" failed: ` +
-            `${assistantMessage.errorMessage ?? "unknown upstream error"}`,
-        );
-      }
-
-      const responseText = getAssistantText(assistantMessage);
-      if (!responseText.trim()) {
-        throw new Error(`Agent "${input.agent.id}" produced an assistant message without text content.`);
-      }
-
-      return {
-        message: {
-          conversation: input.message.conversation,
-          text: responseText,
-        },
-      };
     },
   };
 }
