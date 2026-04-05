@@ -6,6 +6,7 @@ import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createFileLogger } from "../logging/file-logger.js";
 import { createAgentRunner } from "../runtime/agent-runner.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
+import type { ConversationStore } from "../storage/types.js";
 import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
 import type { TransportHandler } from "../transports/types.js";
 import type { Daemon, DaemonConfig, RuntimePaths } from "./types.js";
@@ -58,22 +59,30 @@ export function createDaemon(config: DaemonConfig): Daemon {
         const transport = createTelegramTransport(config.activeBot);
         const handler: TransportHandler = {
           handle: async (message: IncomingMessage): Promise<OutgoingMessage> => {
-            const conversation = await getOrCreateConversationState(
+            const conversation = await getOrCreateConversationContext(
               message,
               defaultAgent.id,
               conversationStore,
             );
-            const agent = agentRegistry.get(conversation.agentId) ?? defaultAgent;
+            const agent = agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
             const runner = createAgentRunner(agent);
             const response = await runner.run({
               agent,
-              conversation: toConversationContext(conversation),
+              conversation,
               message,
             });
+            const respondedAt = new Date().toISOString();
 
             await conversationStore.put({
-              ...conversation,
-              updatedAt: message.receivedAt,
+              state: {
+                ...conversation.state,
+                updatedAt: respondedAt,
+              },
+              messages: [
+                ...conversation.messages,
+                toUserConversationMessage(message),
+                toAssistantConversationMessage(response.message, message.messageId, respondedAt),
+              ],
             });
 
             return response.message;
@@ -89,34 +98,51 @@ export function createDaemon(config: DaemonConfig): Daemon {
   };
 }
 
-async function getOrCreateConversationState(
+async function getOrCreateConversationContext(
   message: IncomingMessage,
   defaultAgentId: string,
-  conversationStore: {
-    get(ref: IncomingMessage["conversation"]): Promise<ConversationState | undefined>;
-    put(state: ConversationState): Promise<void>;
-  },
-): Promise<ConversationState> {
+  conversationStore: ConversationStore,
+): Promise<ConversationContext> {
   const existing = await conversationStore.get(message.conversation);
   if (existing) {
     return existing;
   }
 
-  const created: ConversationState = {
+  const createdState: ConversationState = {
     conversation: message.conversation,
     agentId: defaultAgentId,
     createdAt: message.receivedAt,
     updatedAt: message.receivedAt,
   };
 
-  await conversationStore.put(created);
-  return created;
+  const createdContext: ConversationContext = {
+    state: createdState,
+    messages: [],
+  };
+
+  await conversationStore.put(createdContext);
+  return createdContext;
 }
 
-function toConversationContext(state: ConversationState): ConversationContext {
+function toUserConversationMessage(message: IncomingMessage) {
   return {
-    state,
-    messages: [],
+    id: message.messageId,
+    role: "user" as const,
+    text: message.text,
+    createdAt: message.receivedAt,
+  };
+}
+
+function toAssistantConversationMessage(
+  message: OutgoingMessage,
+  parentMessageId: string,
+  createdAt: string,
+) {
+  return {
+    id: `${parentMessageId}:assistant`,
+    role: "assistant" as const,
+    text: message.text,
+    createdAt,
   };
 }
 
