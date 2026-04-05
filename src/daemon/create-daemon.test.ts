@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { access, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +15,7 @@ import type { DaemonConfig, RuntimePaths } from "./types.js";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(
     tempDirs.splice(0).map(async (path) => {
       const { rm } = await import("node:fs/promises");
@@ -300,6 +301,43 @@ describe("createDaemon", () => {
     await expect(readFile(opsBot.paths.logFilePath, "utf8")).resolves.toContain(
       '"message":"starting daemon with default agent \\"ops\\""',
     );
+  });
+
+  it("exits cleanly on SIGTERM", async () => {
+    const root = await createTempDir();
+    const botConfig = createBotConfig(root);
+    const config = createConfig(botConfig);
+    let releaseTransportStart: (() => void) | undefined;
+
+    const transportStopped = new Promise<void>((resolve) => {
+      releaseTransportStart = resolve;
+    });
+
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(((code?: number) => {
+        expect(code).toBe(0);
+        releaseTransportStart?.();
+        return undefined as never;
+      }) as typeof process.exit);
+
+    const daemon = createDaemon(config, {
+      agentRegistry: createAgentRegistry([createDefaultAgent()]),
+      engine: {
+        run: vi.fn(),
+      },
+      createTransport: () => ({
+        async start() {
+          process.emit("SIGTERM");
+          await transportStopped;
+        },
+      }),
+    });
+
+    await daemon.start();
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
   });
 });
 

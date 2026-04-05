@@ -215,7 +215,7 @@ function registerRuntimeCleanup(paths: Array<{ runtimeStatePath: string }>): {
 
   const handleSigterm = () => {
     void run().finally(() => {
-      process.exit(143);
+      process.exit(0);
     });
   };
 
