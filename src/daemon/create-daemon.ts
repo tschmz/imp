@@ -11,6 +11,7 @@ import {
   resolveAgentTools,
   resolveWorkingDirectory,
 } from "../runtime/create-pi-agent-engine.js";
+import { createOAuthApiKeyResolver } from "../runtime/create-oauth-api-key-resolver.js";
 import type { AgentEngine } from "../runtime/types.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import type { ConversationStore } from "../storage/types.js";
@@ -74,6 +75,7 @@ export function createDaemon(
             dependencies.engine ??
             createPiAgentEngine({
               logger,
+              getApiKey: createOAuthApiKeyResolver(config.authFilePath, logger),
               ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
               createBuiltInToolRegistry: createBuiltInRegistry,
             });

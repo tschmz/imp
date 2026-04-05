@@ -7,6 +7,7 @@ export interface InstanceConfig {
 
 export interface PathsConfig {
   dataRoot: string;
+  authFile?: string;
 }
 
 export interface LoggingConfig {

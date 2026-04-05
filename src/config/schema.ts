@@ -53,6 +53,7 @@ export const appConfigSchema = z.object({
   }),
   paths: z.object({
     dataRoot: z.string().min(1),
+    authFile: z.string().min(1).optional(),
   }),
   logging: z
     .object({

@@ -26,7 +26,7 @@ describe("initAppConfig", () => {
     const configPath = await initAppConfig({ env });
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
-      paths: { dataRoot: string };
+      paths: { dataRoot: string; authFile?: string };
       defaults: {
         agentId: string;
       };
@@ -52,6 +52,7 @@ describe("initAppConfig", () => {
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
+    expect(config.paths.authFile).toBe(join(root, "state-home", "imp", "auth.json"));
     expect(config.defaults.agentId).toBe("default");
     expect(config.agents[0]?.model).toEqual({
       provider: "openai",

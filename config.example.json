@@ -3,7 +3,8 @@
     "name": "home"
   },
   "paths": {
-    "dataRoot": "/var/lib/pi-daemon"
+    "dataRoot": "/var/lib/imp",
+    "authFile": "/var/lib/imp/auth.json"
   },
   "logging": {
     "level": "info"

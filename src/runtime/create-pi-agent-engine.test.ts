@@ -281,6 +281,48 @@ describe("createPiAgentEngine", () => {
     expect(capturedTools).toEqual([tool]);
   });
 
+  it("passes a dynamic api key resolver into the agent runtime", async () => {
+    let capturedGetApiKey:
+      | ((provider: string) => Promise<string | undefined> | string | undefined)
+      | undefined;
+
+    const engine = createPiAgentEngine({
+      getApiKey: async (provider) => (provider === "openai-codex" ? "oauth-token" : undefined),
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        capturedGetApiKey = options.getApiKey;
+        return {
+          state: {
+            messages: [fauxAssistantMessage("ok")],
+          },
+          prompt: async () => {},
+        };
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(capturedGetApiKey).toBeTypeOf("function");
+    await expect(capturedGetApiKey?.("openai-codex")).resolves.toBe("oauth-token");
+    await expect(capturedGetApiKey?.("openai")).resolves.toBeUndefined();
+  });
+
   it("registers built-in tools in the default runtime path", async () => {
     let capturedTools: Array<{ name: string }> | undefined;
     let capturedWorkingDirectory: string | undefined;

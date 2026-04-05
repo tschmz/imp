@@ -35,6 +35,7 @@ function buildDefaultConfig(env: NodeJS.ProcessEnv): string {
       },
       paths: {
         dataRoot: getDefaultUserDataRoot(env),
+        authFile: resolve(getDefaultUserDataRoot(env), "auth.json"),
       },
       logging: {
         level: "info",

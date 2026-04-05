@@ -25,6 +25,7 @@ export interface ActiveBotRuntimeConfig extends TelegramBotRuntimeConfig {
 
 export interface DaemonConfig {
   configPath: string;
+  authFilePath?: string;
   logging: {
     level: LogLevel;
   };

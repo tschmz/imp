@@ -13,6 +13,9 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
 
   return {
     configPath,
+    authFilePath: appConfig.paths.authFile
+      ? resolveConfigPath(appConfig.paths.authFile, configDir)
+      : undefined,
     logging: {
       level: appConfig.logging?.level ?? "info",
     },
@@ -47,21 +50,21 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
   };
 }
 
+function resolveConfigPath(path: string, configDir: string): string {
+  return isAbsolute(path) ? path : resolve(configDir, path);
+}
+
 function resolveAgentContext(context: AgentContextConfig, configDir: string): AgentContextConfig {
   return {
     ...context,
     ...(context.workingDirectory
       ? {
-          workingDirectory: isAbsolute(context.workingDirectory)
-            ? context.workingDirectory
-            : resolve(configDir, context.workingDirectory),
+          workingDirectory: resolveConfigPath(context.workingDirectory, configDir),
         }
       : {}),
     ...(context.files
       ? {
-          files: context.files.map((path) =>
-            isAbsolute(path) ? path : resolve(configDir, path),
-          ),
+          files: context.files.map((path) => resolveConfigPath(path, configDir)),
         }
       : {}),
   };

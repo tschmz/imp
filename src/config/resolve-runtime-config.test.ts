@@ -150,6 +150,30 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.tools).toEqual(["read", "bash"]);
   });
 
+  it("resolves a relative auth file path against the config directory", () => {
+    const appConfig = createAppConfig({
+      paths: {
+        dataRoot: "/var/lib/imp",
+        authFile: "./auth.json",
+      },
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.authFilePath).toBe("/etc/imp/auth.json");
+  });
+
   it("fails when no bot is enabled", () => {
     const appConfig = createAppConfig({
       bots: [
@@ -231,6 +255,7 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
     },
     paths: {
       dataRoot: "/var/lib/imp",
+      ...overrides.paths,
     },
     logging: {
       level: "info",

@@ -42,6 +42,7 @@ const EMPTY_USAGE: Usage = {
 interface PiAgentEngineDependencies {
   logger?: Logger;
   resolveModel?: (provider: string, modelId: string) => Model<AiApi> | undefined;
+  getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
   createAgent?: (options: AgentOptions) => AgentHandle;
   readTextFile?: (path: string) => Promise<string>;
   getContextFileFingerprint?: (path: string) => Promise<string>;
@@ -66,6 +67,7 @@ export function createPiAgentEngine(
     dependencies.getContextFileFingerprint ?? defaultGetContextFileFingerprint;
   const buildToolRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
+  const getApiKey = dependencies.getApiKey;
   const systemPromptCache = new Map<string, string>();
   const latestSystemPromptCacheKeyByAgentId = new Map<string, string>();
   const logger = dependencies.logger;
@@ -119,6 +121,7 @@ export function createPiAgentEngine(
             tools,
             messages: toAgentMessages(input.conversation.messages, model),
           },
+          ...(getApiKey ? { getApiKey } : {}),
           ...(onPayload ? { onPayload } : {}),
         });
 
