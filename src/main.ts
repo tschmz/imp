@@ -10,7 +10,7 @@ import { resolveRuntimeConfig } from "./config/resolve-runtime-config.js";
 import { createDaemon } from "./daemon/create-daemon.js";
 import { createFileLogger } from "./logging/file-logger.js";
 import { assertServiceInstallCanProceed, installService, resolveServiceDefinitionPath } from "./service/install-service.js";
-import { restartService, startService, stopService } from "./service/manage-service.js";
+import { restartService, startService, statusService, stopService } from "./service/manage-service.js";
 import { createServiceInstallPlan, renderServiceDefinition } from "./service/install-plan.js";
 import { uninstallService } from "./service/uninstall-service.js";
 
@@ -82,6 +82,14 @@ async function main(): Promise<void> {
       const serviceTarget = resolveServiceTarget(configPath);
       await restartService(serviceTarget);
       console.log(`Restarted ${serviceTarget.platform} service ${serviceTarget.serviceName}`);
+    },
+    statusService: async ({ configPath }) => {
+      const serviceTarget = resolveServiceTarget(configPath);
+      const output = await statusService(serviceTarget);
+
+      if (output.length > 0) {
+        console.log(output);
+      }
     },
   });
 

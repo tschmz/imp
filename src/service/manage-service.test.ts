@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { restartService, startService, stopService } from "./manage-service.js";
+import { restartService, startService, statusService, stopService } from "./manage-service.js";
 
 const tempDirs: string[] = [];
 
@@ -88,6 +88,38 @@ describe("manageService", () => {
     ]);
   });
 
+  it("reads the status of a linux user service", async () => {
+    const root = await createTempDir();
+    const definitionPath = join(root, ".config", "systemd", "user", "imp.service");
+    const calls: Array<{ command: string; args: string[] }> = [];
+
+    await createServiceDefinition(definitionPath);
+
+    const output = await statusService({
+      platform: "linux-systemd-user",
+      definitionPath,
+      serviceName: "imp",
+      serviceLabel: "dev.imp",
+      installer: {
+        async run() {
+          throw new Error("not used");
+        },
+        async runAndCapture(command, args) {
+          calls.push({ command, args });
+          return {
+            stdout: "active\n",
+            stderr: "",
+          };
+        },
+      },
+    });
+
+    expect(output).toBe("active");
+    expect(calls).toEqual([
+      { command: "systemctl", args: ["--user", "status", "--no-pager", "imp.service"] },
+    ]);
+  });
+
   it("starts and restarts a macOS launch agent", async () => {
     const root = await createTempDir();
     const definitionPath = join(root, "Library", "LaunchAgents", "dev.imp.plist");
@@ -161,6 +193,39 @@ describe("manageService", () => {
 
     expect(calls).toEqual([
       { command: "launchctl", args: ["bootout", "gui/501", definitionPath] },
+    ]);
+  });
+
+  it("reads the status of a macOS launch agent", async () => {
+    const root = await createTempDir();
+    const definitionPath = join(root, "Library", "LaunchAgents", "dev.imp.plist");
+    const calls: Array<{ command: string; args: string[] }> = [];
+
+    await createServiceDefinition(definitionPath);
+
+    const output = await statusService({
+      platform: "macos-launchd-agent",
+      definitionPath,
+      serviceName: "imp",
+      serviceLabel: "dev.imp",
+      uid: 501,
+      installer: {
+        async run() {
+          throw new Error("not used");
+        },
+        async runAndCapture(command, args) {
+          calls.push({ command, args });
+          return {
+            stdout: "state = running\n",
+            stderr: "",
+          };
+        },
+      },
+    });
+
+    expect(output).toBe("state = running");
+    expect(calls).toEqual([
+      { command: "launchctl", args: ["print", "gui/501/dev.imp"] },
     ]);
   });
 });

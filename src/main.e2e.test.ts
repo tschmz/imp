@@ -81,10 +81,12 @@ describe("imp CLI e2e", () => {
     const startHelp = await runCli(["service", "start", "--help"], env);
     const stopHelp = await runCli(["service", "stop", "--help"], env);
     const restartHelp = await runCli(["service", "restart", "--help"], env);
+    const statusHelp = await runCli(["service", "status", "--help"], env);
 
     expect(startHelp.stdout).toContain("Usage: imp service start");
     expect(stopHelp.stdout).toContain("Usage: imp service stop");
     expect(restartHelp.stdout).toContain("Usage: imp service restart");
+    expect(statusHelp.stdout).toContain("Usage: imp service status");
   });
 
   it("shows command-specific config help for start", async () => {
@@ -241,6 +243,9 @@ describe("imp CLI e2e", () => {
       stderr: expect.stringContaining(`Service definition not found: ${definitionPath}`),
     });
     await expect(runCli(["service", "restart"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(`Service definition not found: ${definitionPath}`),
+    });
+    await expect(runCli(["service", "status"], env)).rejects.toMatchObject({
       stderr: expect.stringContaining(`Service definition not found: ${definitionPath}`),
     });
   });

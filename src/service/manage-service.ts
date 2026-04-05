@@ -90,6 +90,43 @@ export async function restartService(options: {
   }
 }
 
+export async function statusService(options: {
+  platform: ServicePlatform;
+  definitionPath: string;
+  serviceName: string;
+  serviceLabel: string;
+  uid?: number;
+  installer?: ServiceInstaller;
+}): Promise<string> {
+  await assertServiceDefinitionExists(options.definitionPath);
+  const installer = options.installer ?? createSystemServiceInstaller();
+
+  if (!installer.runAndCapture) {
+    throw new Error("Service status inspection is not available with the current installer.");
+  }
+
+  switch (options.platform) {
+    case "linux-systemd-user": {
+      const result = await installer.runAndCapture("systemctl", [
+        "--user",
+        "status",
+        "--no-pager",
+        `${options.serviceName}.service`,
+      ]);
+      return joinCommandOutput(result.stdout, result.stderr);
+    }
+    case "macos-launchd-agent": {
+      const result = await installer.runAndCapture("launchctl", [
+        "print",
+        `${getLaunchdDomainTarget(options.uid)}/${options.serviceLabel}`,
+      ]);
+      return joinCommandOutput(result.stdout, result.stderr);
+    }
+    case "windows-winsw":
+      throw new Error("Automatic Windows service status is not implemented yet.");
+  }
+}
+
 function getLaunchdDomainTarget(uid: number | undefined): string {
   const resolvedUid = uid ?? process.getuid?.();
   if (resolvedUid === undefined) {
@@ -109,6 +146,36 @@ function createSystemServiceInstaller(): ServiceInstaller {
         env: process.env,
       });
     },
+    async runAndCapture(command: string, args: string[]) {
+      const { execFile } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const execFileAsync = promisify(execFile);
+
+      try {
+        const result = await execFileAsync(command, args, {
+          env: process.env,
+        });
+        return {
+          stdout: result.stdout,
+          stderr: result.stderr,
+        };
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          "stdout" in error &&
+          "stderr" in error &&
+          typeof error.stdout === "string" &&
+          typeof error.stderr === "string"
+        ) {
+          return {
+            stdout: error.stdout,
+            stderr: error.stderr,
+          };
+        }
+
+        throw error;
+      }
+    },
   };
 }
 
@@ -122,4 +189,8 @@ async function runIgnoringFailure(
   } catch {
     // launchd may report bootstrap/bootout failures when the current state already matches the target state.
   }
+}
+
+function joinCommandOutput(stdout: string, stderr: string): string {
+  return [stdout.trimEnd(), stderr.trimEnd()].filter((chunk) => chunk.length > 0).join("\n");
 }

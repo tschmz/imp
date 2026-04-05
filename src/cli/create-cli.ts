@@ -13,6 +13,7 @@ export interface CliDependencies {
   startService: (options: { configPath?: string }) => Promise<void>;
   stopService: (options: { configPath?: string }) => Promise<void>;
   restartService: (options: { configPath?: string }) => Promise<void>;
+  statusService: (options: { configPath?: string }) => Promise<void>;
 }
 
 export function createCli(dependencies: CliDependencies): Command {
@@ -100,6 +101,14 @@ export function createCli(dependencies: CliDependencies): Command {
     .option("-c, --config <path>", "Path to the config file")
     .action(async function action(this: Command, options: { config?: string }) {
       await dependencies.restartService({ configPath: options.config });
+    });
+
+  serviceCommand
+    .command("status")
+    .description("Show the native status for an installed background service")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, options: { config?: string }) {
+      await dependencies.statusService({ configPath: options.config });
     });
 
   return program;
