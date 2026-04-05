@@ -11,7 +11,6 @@ const telegramBotSchema = z.object({
     allowedUserIds: z
       .string()
       .array()
-      .min(1)
       .refine((values) => values.every((value) => /^\d+$/.test(value)), {
         message: "Telegram user IDs must contain digits only.",
       }),
