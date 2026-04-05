@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
 
 const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
 const modelConfigSchema = z.object({
@@ -29,9 +30,36 @@ const agentConfigSchema = z
     context: agentContextConfigSchema.optional(),
     tools: z.string().min(1).array().optional(),
   })
-  .refine((agent) => !(agent.systemPrompt && agent.systemPromptFile), {
-    message: "Specify either systemPrompt or systemPromptFile, not both.",
-    path: ["systemPromptFile"],
+  .superRefine((agent, ctx) => {
+    if (agent.systemPrompt && agent.systemPromptFile) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["systemPromptFile"],
+        message: "Specify either systemPrompt or systemPromptFile, not both.",
+      });
+    }
+
+    if (!agent.authFile) {
+      return;
+    }
+
+    const provider = agent.model?.provider;
+    if (!provider) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["authFile"],
+        message: "`authFile` requires `model.provider` to be set to an OAuth-capable provider.",
+      });
+      return;
+    }
+
+    if (!getOAuthProvider(provider)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["authFile"],
+        message: `\`authFile\` is not supported for provider \`${provider}\`.`,
+      });
+    }
   });
 
 const telegramBotSchema = z.object({
