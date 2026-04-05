@@ -43,10 +43,26 @@ describe("createHandleIncomingMessage", () => {
 
     const persisted = byConversation.get("42");
     expect(persisted?.messages).toHaveLength(4);
-    expect(persisted?.messages[0]).toMatchObject({ role: "user", text: "hello" });
-    expect(persisted?.messages[1]).toMatchObject({ role: "assistant", text: "reply" });
-    expect(persisted?.messages[2]).toMatchObject({ role: "user", text: "again" });
-    expect(persisted?.messages[3]).toMatchObject({ role: "assistant", text: "reply" });
+    expect(persisted?.messages[0]).toMatchObject({
+      role: "user",
+      text: "hello",
+      correlationId: "corr-1",
+    });
+    expect(persisted?.messages[1]).toMatchObject({
+      role: "assistant",
+      text: "reply",
+      correlationId: "corr-1",
+    });
+    expect(persisted?.messages[2]).toMatchObject({
+      role: "user",
+      text: "again",
+      correlationId: "corr-2",
+    });
+    expect(persisted?.messages[3]).toMatchObject({
+      role: "assistant",
+      text: "reply",
+      correlationId: "corr-2",
+    });
   });
 
   it("fails when the default agent cannot be resolved", () => {
@@ -82,11 +98,13 @@ function createDefaultAgent(): AgentDefinition {
 
 function createIncomingMessage(messageId: string, text: string): IncomingMessage {
   return {
+    botId: "private-telegram",
     conversation: {
       transport: "telegram",
       externalId: "42",
     },
     messageId,
+    correlationId: `corr-${messageId}`,
     userId: "7",
     text,
     receivedAt: "2026-04-05T00:00:00.000Z",

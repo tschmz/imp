@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
+import type { Logger } from "../../logging/types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
 
 describe("createTelegramTransport", () => {
   it("forwards a private text message from an allowed user", async () => {
     const bot = createFakeBot();
+    const logger = createMockLogger();
     const handler = vi.fn<(message: IncomingMessage) => Promise<OutgoingMessage>>().mockResolvedValue({
       conversation: {
         transport: "telegram",
@@ -21,6 +23,7 @@ describe("createTelegramTransport", () => {
         allowedUserIds: ["7"],
       },
       bot,
+      logger,
     );
 
     await transport.start({ handle: handler });
@@ -35,16 +38,20 @@ describe("createTelegramTransport", () => {
         transport: "telegram",
         externalId: "42",
       },
+      botId: "private-telegram",
       messageId: "99",
+      correlationId: expect.any(String),
       userId: "7",
       text: "ping",
       receivedAt: expect.any(String),
     });
     expect(bot.reply).toHaveBeenCalledWith("pong");
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it("ignores a private text message from a disallowed user", async () => {
     const bot = createFakeBot();
+    const logger = createMockLogger();
     const handler = vi.fn<(message: IncomingMessage) => Promise<OutgoingMessage>>();
 
     const transport = createTelegramTransport(
@@ -55,6 +62,7 @@ describe("createTelegramTransport", () => {
         allowedUserIds: ["7"],
       },
       bot,
+      logger,
     );
 
     await transport.start({ handle: handler });
@@ -66,14 +74,15 @@ describe("createTelegramTransport", () => {
 
     expect(handler).not.toHaveBeenCalled();
     expect(bot.reply).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it("replies with a stable error message when handling fails", async () => {
     const bot = createFakeBot();
+    const logger = createMockLogger();
     const handler = vi
       .fn<(message: IncomingMessage) => Promise<OutgoingMessage>>()
       .mockRejectedValue(new Error("boom"));
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const transport = createTelegramTransport(
       {
@@ -83,6 +92,7 @@ describe("createTelegramTransport", () => {
         allowedUserIds: ["7"],
       },
       bot,
+      logger,
     );
 
     await transport.start({ handle: handler });
@@ -95,10 +105,27 @@ describe("createTelegramTransport", () => {
     expect(bot.reply).toHaveBeenCalledWith(
       "Sorry, something went wrong while processing your message.",
     );
-
-    errorSpy.mockRestore();
+    expect(logger.error).toHaveBeenCalledWith(
+      "failed to handle telegram message",
+      expect.objectContaining({
+        botId: "private-telegram",
+        transport: "telegram",
+        conversationId: "42",
+        messageId: "99",
+        durationMs: expect.any(Number),
+        errorType: "Error",
+      }),
+      expect.any(Error),
+    );
   });
 });
+
+function createMockLogger(): Logger {
+  return {
+    info: vi.fn(async () => {}),
+    error: vi.fn(async () => {}),
+  };
+}
 
 function createFakeBot(): {
   api: { getMe(): Promise<unknown> };

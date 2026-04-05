@@ -4,6 +4,7 @@ import { loadBuiltInAgents } from "../agents/definitions.js";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import { createFileLogger } from "../logging/file-logger.js";
+import type { Logger } from "../logging/types.js";
 import {
   createBuiltInToolRegistry,
   createPiAgentEngine,
@@ -24,12 +25,13 @@ import {
 import type { Daemon, DaemonConfig, RuntimePaths } from "./types.js";
 
 interface DaemonDependencies {
+  logger?: Logger;
   agentRegistry?: ReturnType<typeof createAgentRegistry>;
   conversationStore?: ConversationStore;
   engine?: AgentEngine;
   toolRegistry?: ToolRegistry;
   createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
-  createTransport?: (config: DaemonConfig["activeBot"]) => Transport;
+  createTransport?: (config: DaemonConfig["activeBot"], logger: Logger) => Transport;
 }
 
 export function createDaemon(
@@ -41,13 +43,17 @@ export function createDaemon(
   const conversationStore = dependencies.conversationStore ?? createFsConversationStore(config.paths);
   const createBuiltInRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
+  const logger = dependencies.logger ?? createFileLogger(config.paths.logFilePath);
   const engine =
     dependencies.engine ??
     createPiAgentEngine({
+      logger,
       ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
       createBuiltInToolRegistry: createBuiltInRegistry,
     });
-  const createTransport = dependencies.createTransport ?? createTelegramTransport;
+  const createTransport =
+    dependencies.createTransport ??
+    ((botConfig, runtimeLogger) => createTelegramTransport(botConfig, undefined, runtimeLogger));
 
   return {
     async start() {
@@ -61,7 +67,6 @@ export function createDaemon(
 
       await ensureRuntimePaths(config.paths);
       await ensureLogFile(config.paths.logFilePath);
-      const logger = createFileLogger(config.paths.logFilePath);
       const runtimeStatePath = config.paths.runtimeStatePath;
       await assertNoRunningInstance(runtimeStatePath);
       await writeRuntimeState(runtimeStatePath, {
@@ -86,10 +91,8 @@ export function createDaemon(
 
         await logger.info(`active bot: ${config.activeBot.id}`);
 
-        const transport = createTransport(config.activeBot);
-        await transport.start({
-          handle: (message) => handleIncomingMessage.handle(message),
-        });
+        const transport = createTransport(config.activeBot, logger);
+        await transport.start(handleIncomingMessage);
       } finally {
         cleanup.dispose();
         await cleanup.run();
@@ -140,7 +143,6 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
     };
   });
 }
-
 async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
   await mkdir(paths.dataRoot, { recursive: true });
   await mkdir(paths.botRoot, { recursive: true });

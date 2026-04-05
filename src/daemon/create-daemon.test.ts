@@ -64,12 +64,14 @@ describe("createDaemon", () => {
         role: "user",
         text: "hello",
         createdAt: "2026-04-05T00:00:00.000Z",
+        correlationId: "corr-1",
       },
       {
         id: "1:assistant",
         role: "assistant",
         text: "reply:1",
         createdAt: expect.any(String),
+        correlationId: "corr-1",
       },
     ]);
 
@@ -236,11 +238,13 @@ function createDefaultAgent(): AgentDefinition {
 
 function createIncomingMessage(messageId: string, text: string): IncomingMessage {
   return {
+    botId: "private-telegram",
     conversation: {
       transport: "telegram",
       externalId: "42",
     },
     messageId,
+    correlationId: `corr-${messageId}`,
     userId: "7",
     text,
     receivedAt: "2026-04-05T00:00:00.000Z",

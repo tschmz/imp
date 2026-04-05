@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { Bot, GrammyError } from "grammy";
 import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
+import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportHandler } from "../types.js";
 
 interface TelegramBotAdapter {
@@ -28,6 +30,7 @@ interface TelegramMessageContext {
 export function createTelegramTransport(
   config: TelegramBotRuntimeConfig,
   bot: TelegramBotAdapter = new Bot(config.token),
+  logger?: Logger,
 ): Transport {
   const allowedUserIds = new Set(config.allowedUserIds);
 
@@ -53,20 +56,36 @@ export function createTelegramTransport(
           return;
         }
 
+        const startedAt = Date.now();
+        const correlationId = randomUUID();
+
         try {
           const response = await handler.handle({
+            botId: config.id,
             conversation: {
               transport: "telegram",
               externalId: String(ctx.chat.id),
             },
             messageId: String(ctx.message.message_id),
+            correlationId,
             userId: String(ctx.from.id),
             text: ctx.message.text,
             receivedAt: new Date().toISOString(),
           });
           await ctx.reply(response.text);
         } catch (error) {
-          console.error("failed to handle telegram message", error);
+          await logger?.error(
+            "failed to handle telegram message",
+            {
+              botId: config.id,
+              transport: "telegram",
+              conversationId: String(ctx.chat.id),
+              messageId: String(ctx.message.message_id),
+              durationMs: Date.now() - startedAt,
+              errorType: error instanceof Error ? error.name : typeof error,
+            },
+            error,
+          );
           await ctx.reply("Sorry, something went wrong while processing your message.");
         }
       });

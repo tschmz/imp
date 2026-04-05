@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   } catch (error) {
     await ensureStartupLogFile(runtimeConfig.paths.logFilePath);
     const logger = createFileLogger(runtimeConfig.paths.logFilePath);
-    await logger.error("daemon failed to start", error);
+    await logger.error("daemon failed to start", undefined, error);
     process.exitCode = 1;
   }
 }
