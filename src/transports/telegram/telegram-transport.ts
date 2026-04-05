@@ -53,17 +53,22 @@ export function createTelegramTransport(
           return;
         }
 
-        const response = await handler.handle({
-          conversation: {
-            transport: "telegram",
-            externalId: String(ctx.chat.id),
-          },
-          messageId: String(ctx.message.message_id),
-          userId: String(ctx.from.id),
-          text: ctx.message.text,
-          receivedAt: new Date().toISOString(),
-        });
-        await ctx.reply(response.text);
+        try {
+          const response = await handler.handle({
+            conversation: {
+              transport: "telegram",
+              externalId: String(ctx.chat.id),
+            },
+            messageId: String(ctx.message.message_id),
+            userId: String(ctx.from.id),
+            text: ctx.message.text,
+            receivedAt: new Date().toISOString(),
+          });
+          await ctx.reply(response.text);
+        } catch (error) {
+          console.error("failed to handle telegram message", error);
+          await ctx.reply("Sorry, something went wrong while processing your message.");
+        }
       });
 
       await bot.start();

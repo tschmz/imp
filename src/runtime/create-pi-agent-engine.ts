@@ -64,6 +64,13 @@ export function createPiAgentEngine(
         throw new Error(`Agent "${input.agent.id}" did not produce an assistant message.`);
       }
 
+      if (assistantMessage.stopReason === "error" || assistantMessage.stopReason === "aborted") {
+        throw new Error(
+          `Agent "${input.agent.id}" failed: ` +
+            `${assistantMessage.errorMessage ?? "unknown upstream error"}`,
+        );
+      }
+
       const responseText = getAssistantText(assistantMessage);
       if (!responseText.trim()) {
         throw new Error(`Agent "${input.agent.id}" produced an assistant message without text content.`);

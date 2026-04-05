@@ -67,6 +67,37 @@ describe("createTelegramTransport", () => {
     expect(handler).not.toHaveBeenCalled();
     expect(bot.reply).not.toHaveBeenCalled();
   });
+
+  it("replies with a stable error message when handling fails", async () => {
+    const bot = createFakeBot();
+    const handler = vi
+      .fn<(message: IncomingMessage) => Promise<OutgoingMessage>>()
+      .mockRejectedValue(new Error("boom"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+    );
+
+    await transport.start({ handle: handler });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "ping" },
+    });
+
+    expect(bot.reply).toHaveBeenCalledWith(
+      "Sorry, something went wrong while processing your message.",
+    );
+
+    errorSpy.mockRestore();
+  });
 });
 
 function createFakeBot(): {

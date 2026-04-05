@@ -103,6 +103,32 @@ describe("createPiAgentEngine", () => {
       'Agent "default" produced an assistant message without text content.',
     );
   });
+
+  it("surfaces upstream agent errors instead of masking them as empty text", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      fauxAssistantMessage([], {
+        stopReason: "error",
+        errorMessage: "No API key for provider: faux",
+      }),
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+    });
+
+    await expect(
+      engine.run({
+        agent: createAgent(),
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow('Agent "default" failed: No API key for provider: faux');
+  });
 });
 
 function createAgent(): AgentDefinition {
