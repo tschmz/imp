@@ -57,7 +57,15 @@ describe("initAppConfig", () => {
       provider: "openai",
       modelId: "gpt-5.4",
     });
-    expect(config.agents[0]?.tools).toEqual([]);
+    expect(config.agents[0]?.tools).toEqual([
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "grep",
+      "find",
+      "ls",
+    ]);
     expect(config.agents[0]?.context).toBeUndefined();
     expect(config.agents[0]?.inference).toEqual({
       metadata: {

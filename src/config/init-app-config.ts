@@ -49,7 +49,7 @@ function buildDefaultConfig(env: NodeJS.ProcessEnv): string {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          tools: [],
+          tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
           inference: {
             metadata: {
               app: "imp",

@@ -18,7 +18,15 @@
         "provider": "openai",
         "modelId": "gpt-5.4"
       },
-      "tools": [],
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
       "context": {
         "workingDirectory": "/path/to/workspace",
         "files": [
