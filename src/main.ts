@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 import { createCli } from "./cli/create-cli.js";
 import { createInitConfigUseCase } from "./application/init-config-use-case.js";
-import { createRunDaemonUseCase } from "./application/run-daemon-use-case.js";
+import { createRunDaemonUseCase, type RunDaemonOutcome } from "./application/run-daemon-use-case.js";
 import { createServiceUseCases } from "./application/service-use-cases.js";
 import { createViewLogsUseCase } from "./application/view-logs-use-case.js";
+import { createDaemonStartupFailureReporter } from "./logging/daemon-startup-failure-reporter.js";
 
 async function main(): Promise<void> {
   const serviceUseCases = createServiceUseCases();
+  const startupFailureReporter = createDaemonStartupFailureReporter();
+  const runDaemonUseCase = createRunDaemonUseCase({ startupFailureReporter });
   const cli = createCli({
-    startDaemon: createRunDaemonUseCase(),
+    startDaemon: async (options) => {
+      const outcome = await runDaemonUseCase(options);
+      presentRunDaemonOutcome(outcome);
+    },
     viewLogs: createViewLogsUseCase(),
     initConfig: createInitConfigUseCase(),
     installService: serviceUseCases.installService,
@@ -25,6 +31,15 @@ async function main(): Promise<void> {
   }
 
   await cli.parseAsync(process.argv);
+}
+
+function presentRunDaemonOutcome(outcome: RunDaemonOutcome): void {
+  if (outcome.status === "started") {
+    return;
+  }
+
+  console.error(outcome.error instanceof Error ? outcome.error.message : outcome.error);
+  process.exitCode = 1;
 }
 
 main().catch((error: unknown) => {
