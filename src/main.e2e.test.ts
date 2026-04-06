@@ -362,7 +362,8 @@ describe("imp CLI e2e", () => {
     const sourceEnv = createTestEnv(sourceRoot);
     const sourceConfigPath = join(sourceRoot, "config-home", "imp", "config.json");
     const sourceDataRoot = join(sourceRoot, "state-home", "imp");
-    const sourcePromptPath = join(sourceRoot, "config-home", "imp", "SYSTEM.md");
+    const sourcePromptPath = join(sourceDataRoot, "agents", "SYSTEM.md");
+    const sourceInstructionPath = join(sourceDataRoot, "agents", "instructions", "STYLE.md");
     const sourceAuthPath = join(sourceRoot, "config-home", "imp", "auth.json");
     const sourceConversationPath = join(
       sourceDataRoot,
@@ -387,8 +388,9 @@ describe("imp CLI e2e", () => {
           authFile: "./auth.json",
           prompt: {
             base: {
-              file: "./SYSTEM.md",
+              file: sourcePromptPath,
             },
+            instructions: [{ file: sourceInstructionPath }],
           },
         },
       ],
@@ -403,6 +405,7 @@ describe("imp CLI e2e", () => {
       ],
     });
     await writeTextFile(sourcePromptPath, "backup prompt\n");
+    await writeTextFile(sourceInstructionPath, "style instruction\n");
     await writeTextFile(sourceAuthPath, '{"token":"secret"}\n');
     await writeTextFile(sourceConversationPath, '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}\n');
 
@@ -420,8 +423,26 @@ describe("imp CLI e2e", () => {
 
     expect(restoreResult.stdout).toContain(`Config: ${targetConfigPath}`);
     expect(restoreResult.stdout).toContain(`Data root: ${targetDataRoot}`);
-    expect(await readFile(targetConfigPath, "utf8")).toContain(`"dataRoot": "${targetDataRoot}"`);
-    expect(await readFile(join(targetRoot, "restore-config", "SYSTEM.md"), "utf8")).toBe("backup prompt\n");
+    const restoredConfig = JSON.parse(await readFile(targetConfigPath, "utf8")) as {
+      paths: { dataRoot: string };
+      agents: Array<{
+        authFile?: string;
+        prompt: {
+          base: { file?: string };
+          instructions?: Array<{ file?: string }>;
+        };
+      }>;
+    };
+    expect(restoredConfig.paths.dataRoot).toBe(targetDataRoot);
+    expect(restoredConfig.agents[0]?.authFile).toBe("./auth.json");
+    expect(restoredConfig.agents[0]?.prompt.base.file).toBe(join(targetDataRoot, "agents", "SYSTEM.md"));
+    expect(restoredConfig.agents[0]?.prompt.instructions?.[0]?.file).toBe(
+      join(targetDataRoot, "agents", "instructions", "STYLE.md"),
+    );
+    expect(await readFile(join(targetDataRoot, "agents", "SYSTEM.md"), "utf8")).toBe("backup prompt\n");
+    expect(await readFile(join(targetDataRoot, "agents", "instructions", "STYLE.md"), "utf8")).toBe(
+      "style instruction\n",
+    );
     expect(await readFile(join(targetRoot, "restore-config", "auth.json"), "utf8")).toBe('{"token":"secret"}\n');
     expect(
       await readFile(

@@ -1,5 +1,5 @@
 import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { discoverConfigPath, getDefaultUserConfigPath } from "../config/discover-config-path.js";
 import { loadAppConfig } from "../config/load-app-config.js";
@@ -129,6 +129,8 @@ export function createBackupUseCases(dependencies: Partial<BackupDependencies> =
         const restoredConfig = archiveConfig
           ? applyConfigRestoreOverrides(archiveConfig, {
               dataRoot,
+              manifest,
+              targetConfigPath,
             })
           : undefined;
         const targetDataRoot = resolveTargetDataRoot({
@@ -163,6 +165,7 @@ export function createBackupUseCases(dependencies: Partial<BackupDependencies> =
             stageRoot,
             manifest,
             targetConfigPath,
+            targetDataRoot,
             force,
           });
         }
@@ -354,12 +357,14 @@ async function restoreAgentFiles(options: {
   stageRoot: string;
   manifest: BackupManifest;
   targetConfigPath: string;
+  targetDataRoot?: string;
   force: boolean;
 }): Promise<void> {
   for (const entry of options.manifest.agentFiles ?? []) {
-    const targetPath = entry.configRelativePath
-      ? resolve(dirname(options.targetConfigPath), entry.configRelativePath)
-      : entry.sourcePath;
+    const targetPath = relocateArchivedAgentFile(entry, options.manifest, {
+      targetConfigPath: options.targetConfigPath,
+      targetDataRoot: options.targetDataRoot,
+    });
     const sourcePath = join(options.stageRoot, entry.archivePath);
     const content = await readFile(sourcePath, "utf8");
 
@@ -467,18 +472,155 @@ function resolveTargetDataRoot(options: {
   return undefined;
 }
 
-function applyConfigRestoreOverrides(appConfig: AppConfig, options: { dataRoot?: string }): AppConfig {
-  if (!options.dataRoot) {
+function applyConfigRestoreOverrides(
+  appConfig: AppConfig,
+  options: {
+    dataRoot?: string;
+    manifest: BackupManifest;
+    targetConfigPath?: string;
+  },
+): AppConfig {
+  const resolvedDataRoot = options.dataRoot ? resolve(options.dataRoot) : appConfig.paths.dataRoot;
+  const relocatedConfig = relocateConfigFileReferences(appConfig, {
+    manifest: {
+      ...options.manifest,
+      source: {
+        ...options.manifest.source,
+        dataRoot: appConfig.paths.dataRoot,
+      },
+    },
+    targetConfigPath: options.targetConfigPath,
+    targetDataRoot: resolvedDataRoot,
+  });
+
+  return {
+    ...relocatedConfig,
+    paths: {
+      ...relocatedConfig.paths,
+      dataRoot: resolvedDataRoot,
+    },
+  };
+}
+
+function relocateConfigFileReferences(
+  appConfig: AppConfig,
+  options: {
+    manifest: BackupManifest;
+    targetConfigPath?: string;
+    targetDataRoot?: string;
+  },
+): AppConfig {
+  const relocationMap = createAgentFileRelocationMap(options.manifest, {
+    targetConfigPath: options.targetConfigPath,
+    targetDataRoot: options.targetDataRoot,
+  });
+  if (relocationMap.size === 0) {
     return appConfig;
   }
 
+  const sourceConfigDir = dirname(options.manifest.source.configPath);
+
   return {
     ...appConfig,
-    paths: {
-      ...appConfig.paths,
-      dataRoot: resolve(options.dataRoot),
-    },
+    agents: appConfig.agents.map((agent) => ({
+      ...agent,
+      authFile: relocateConfiguredFilePath(agent.authFile, sourceConfigDir, relocationMap),
+      prompt: {
+        ...agent.prompt,
+        base: relocatePromptSource(agent.prompt.base, sourceConfigDir, relocationMap),
+        instructions: agent.prompt.instructions?.map((source) =>
+          relocatePromptSource(source, sourceConfigDir, relocationMap),
+        ),
+        references: agent.prompt.references?.map((source) =>
+          relocatePromptSource(source, sourceConfigDir, relocationMap),
+        ),
+      },
+    })),
   };
+}
+
+function relocatePromptSource(
+  source: AppConfig["agents"][number]["prompt"]["base"],
+  sourceConfigDir: string,
+  relocationMap: ReadonlyMap<string, string>,
+): AppConfig["agents"][number]["prompt"]["base"] {
+  if (!source.file) {
+    return source;
+  }
+
+  return {
+    ...source,
+    file: relocateConfiguredFilePath(source.file, sourceConfigDir, relocationMap) ?? source.file,
+  };
+}
+
+function relocateConfiguredFilePath(
+  configuredPath: string | undefined,
+  sourceConfigDir: string,
+  relocationMap: ReadonlyMap<string, string>,
+): string | undefined {
+  if (!configuredPath) {
+    return undefined;
+  }
+
+  const resolvedSourcePath = resolveConfigPath(configuredPath, sourceConfigDir);
+  const relocatedPath = relocationMap.get(resolvedSourcePath);
+  if (!relocatedPath) {
+    return configuredPath;
+  }
+
+  return isAbsolute(configuredPath) ? relocatedPath : configuredPath;
+}
+
+function createAgentFileRelocationMap(
+  manifest: BackupManifest,
+  options: {
+    targetConfigPath?: string;
+    targetDataRoot?: string;
+  },
+): Map<string, string> {
+  const relocationMap = new Map<string, string>();
+
+  for (const entry of manifest.agentFiles ?? []) {
+    const relocatedPath = relocateArchivedAgentFile(entry, manifest, options);
+    relocationMap.set(entry.sourcePath, relocatedPath);
+  }
+
+  return relocationMap;
+}
+
+function relocateArchivedAgentFile(
+  entry: BackupAgentFileEntry,
+  manifest: BackupManifest,
+  options: {
+    targetConfigPath?: string;
+    targetDataRoot?: string;
+  },
+): string {
+  if (entry.configRelativePath && options.targetConfigPath) {
+    return resolve(dirname(options.targetConfigPath), entry.configRelativePath);
+  }
+
+  const sourceDataRootRelativePath = relativeIfContained(manifest.source.dataRoot, entry.sourcePath);
+  if (sourceDataRootRelativePath && options.targetDataRoot) {
+    return resolve(options.targetDataRoot, sourceDataRootRelativePath);
+  }
+
+  const sourceConfigDirRelativePath = relativeIfContained(dirname(manifest.source.configPath), entry.sourcePath);
+  if (sourceConfigDirRelativePath && options.targetConfigPath) {
+    return resolve(dirname(options.targetConfigPath), sourceConfigDirRelativePath);
+  }
+
+  return entry.sourcePath;
+}
+
+function relativeIfContained(rootPath: string, candidatePath: string): string | undefined {
+  const relativePath = relative(resolve(rootPath), resolve(candidatePath));
+  if (!relativePath || relativePath.startsWith("..") || isAbsolute(relativePath)) {
+    return undefined;
+  }
+
+  return relativePath;
 }
 
 async function readBackupManifest(stageRoot: string): Promise<BackupManifest> {

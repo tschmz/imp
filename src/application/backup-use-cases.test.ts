@@ -185,6 +185,104 @@ describe("backup use cases", () => {
       "Agent file restore requires either restoring config in the same command or pointing --config at an existing target config file.",
     );
   });
+
+  it("restores absolute agent file paths into the target layout and rewrites config references", async () => {
+    const sourceRoot = await createTempDir();
+    const sourceConfigPath = join(sourceRoot, "config", "config.json");
+    const sourceDataRoot = join(sourceRoot, "state");
+    const sourceBasePromptPath = join(sourceDataRoot, "agents", "SYSTEM.md");
+    const sourceInstructionPath = join(sourceDataRoot, "agents", "instructions", "STYLE.md");
+    const sourceConversationPath = join(
+      sourceDataRoot,
+      "bots",
+      "private-telegram",
+      "conversations",
+      "telegram",
+      "42",
+      "conversation.json",
+    );
+    const backupPath = join(sourceRoot, "backup.tar");
+    const targetRoot = await createTempDir();
+    const targetConfigPath = join(targetRoot, "config", "config.json");
+    const targetDataRoot = join(targetRoot, "state");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await writeTextFile(
+      sourceConfigPath,
+      `${JSON.stringify(
+        {
+          instance: { name: "default" },
+          paths: { dataRoot: sourceDataRoot },
+          logging: { level: "info" },
+          defaults: { agentId: "default" },
+          agents: [
+            {
+              id: "default",
+              model: { provider: "openai-codex", modelId: "gpt-5.4" },
+              authFile: "./oauth.json",
+              prompt: {
+                base: { file: sourceBasePromptPath },
+                instructions: [{ file: sourceInstructionPath }],
+              },
+            },
+          ],
+          bots: [
+            {
+              id: "private-telegram",
+              type: "telegram",
+              enabled: true,
+              token: "test-token",
+              access: { allowedUserIds: [] },
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeTextFile(sourceBasePromptPath, "base prompt\n");
+    await writeTextFile(sourceInstructionPath, "instruction prompt\n");
+    await writeTextFile(join(sourceRoot, "config", "oauth.json"), "{\"token\":\"secret\"}\n");
+    await writeTextFile(sourceConversationPath, "{\"messages\":[{\"id\":\"1\"}]}\n");
+
+    await useCases.createBackup({
+      configPath: sourceConfigPath,
+      outputPath: backupPath,
+      force: false,
+    });
+
+    await useCases.restoreBackup({
+      inputPath: backupPath,
+      configPath: targetConfigPath,
+      dataRoot: targetDataRoot,
+      force: true,
+    });
+
+    const restoredConfig = JSON.parse(await readFile(targetConfigPath, "utf8")) as {
+      paths: { dataRoot: string };
+      agents: Array<{
+        authFile?: string;
+        prompt: {
+          base: { file?: string };
+          instructions?: Array<{ file?: string }>;
+        };
+      }>;
+    };
+
+    expect(restoredConfig.paths.dataRoot).toBe(targetDataRoot);
+    expect(restoredConfig.agents[0]?.authFile).toBe("./oauth.json");
+    expect(restoredConfig.agents[0]?.prompt.base.file).toBe(join(targetDataRoot, "agents", "SYSTEM.md"));
+    expect(restoredConfig.agents[0]?.prompt.instructions?.[0]?.file).toBe(
+      join(targetDataRoot, "agents", "instructions", "STYLE.md"),
+    );
+    await expect(readFile(join(targetDataRoot, "agents", "SYSTEM.md"), "utf8")).resolves.toBe("base prompt\n");
+    await expect(readFile(join(targetDataRoot, "agents", "instructions", "STYLE.md"), "utf8")).resolves.toBe(
+      "instruction prompt\n",
+    );
+    await expect(readFile(join(targetRoot, "config", "oauth.json"), "utf8")).resolves.toBe("{\"token\":\"secret\"}\n");
+  });
 });
 
 async function writeConfig(configPath: string, dataRoot: string): Promise<void> {
