@@ -1,30 +1,57 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import { createDaemon } from "../daemon/create-daemon.js";
-import { createFileLogger } from "../logging/file-logger.js";
+import type { DaemonConfig } from "../daemon/types.js";
 import { resolveRuntimeTarget } from "./runtime-target.js";
 
-export function createRunDaemonUseCase(): (options: { configPath?: string }) => Promise<void> {
+export type RunDaemonOutcome = RunDaemonSuccessOutcome | RunDaemonStartupFailureOutcome;
+
+export interface RunDaemonSuccessOutcome {
+  status: "started";
+}
+
+export interface RunDaemonStartupFailureOutcome {
+  status: "startup_failed";
+  error: unknown;
+  failedBotIds: string[];
+}
+
+export interface DaemonStartupFailureReporter {
+  report(options: { runtimeConfig: DaemonConfig; error: unknown }): Promise<void>;
+}
+
+interface RunDaemonUseCaseDependencies {
+  resolveRuntimeTarget: typeof resolveRuntimeTarget;
+  createDaemon: typeof createDaemon;
+  startupFailureReporter: DaemonStartupFailureReporter;
+}
+
+export function createRunDaemonUseCase(
+  dependencies: Partial<RunDaemonUseCaseDependencies> = {},
+): (options: { configPath?: string }) => Promise<RunDaemonOutcome> {
+  const deps: RunDaemonUseCaseDependencies = {
+    resolveRuntimeTarget,
+    createDaemon,
+    startupFailureReporter: {
+      report: async () => {
+        // no-op default to keep the use case portable in tests and alternative runtimes.
+      },
+    },
+    ...dependencies,
+  };
+
   return async ({ configPath }) => {
-    const { runtimeConfig } = await resolveRuntimeTarget({ cliConfigPath: configPath });
-    const daemon = createDaemon(runtimeConfig);
+    const { runtimeConfig } = await deps.resolveRuntimeTarget({ cliConfigPath: configPath });
+    const daemon = deps.createDaemon(runtimeConfig);
 
     try {
       await daemon.start();
+      return { status: "started" };
     } catch (error) {
-      await Promise.all(
-        runtimeConfig.activeBots.map(async (bot) => {
-          await ensureStartupLogFile(bot.paths.logFilePath);
-          const logger = createFileLogger(bot.paths.logFilePath, runtimeConfig.logging.level);
-          await logger.error("daemon failed to start", { botId: bot.id }, error);
-        }),
-      );
-      process.exitCode = 1;
+      await deps.startupFailureReporter.report({ runtimeConfig, error });
+      return {
+        status: "startup_failed",
+        error,
+        failedBotIds: runtimeConfig.activeBots.map((bot) => bot.id),
+      };
     }
   };
-}
-
-async function ensureStartupLogFile(path: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, "", { encoding: "utf8", flag: "a" });
 }
