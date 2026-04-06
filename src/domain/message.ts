@@ -1,5 +1,7 @@
 import type { ConversationRef } from "./conversation.js";
 
+export type IncomingMessageCommand = "new";
+
 export interface IncomingMessage {
   botId: string;
   conversation: ConversationRef;
@@ -8,6 +10,7 @@ export interface IncomingMessage {
   userId: string;
   text: string;
   receivedAt: string;
+  command?: IncomingMessageCommand;
 }
 
 export interface OutgoingMessage {

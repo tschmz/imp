@@ -126,6 +126,8 @@ A Telegram bot definition includes:
 - allowed user IDs
 - optional default agent routing
 
+Telegram bots automatically register a `/new` command that starts a fresh conversation and backs up the previous one.
+
 ## Data and Logs
 
 Runtime data is stored under `paths.dataRoot`.

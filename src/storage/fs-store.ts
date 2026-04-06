@@ -1,5 +1,6 @@
-import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { createTimestampedBackupPath } from "../files/backup.js";
 import type {
   ConversationMessage,
   ConversationContext,
@@ -53,6 +54,31 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
           await mkdir(dirname(snapshotPath), { recursive: true });
           await writeFile(tempPath, JSON.stringify(nextSnapshot, null, 2));
           await rename(tempPath, snapshotPath);
+        });
+      });
+    },
+    async reset(ref, options) {
+      const existing = await readConversationSnapshot(paths.conversationsDir, ref);
+      if (!existing) {
+        return;
+      }
+
+      await withConversationWriteQueue(ref, async () => {
+        await withConversationLock(paths.conversationsDir, ref, async () => {
+          const snapshot = await readConversationSnapshot(paths.conversationsDir, ref);
+          if (!snapshot) {
+            return;
+          }
+
+          const conversationDir = getConversationDir(paths.conversationsDir, ref);
+          const snapshotPath = getConversationSnapshotPath(paths.conversationsDir, ref);
+          const backupPath = createTimestampedBackupPath(
+            snapshotPath,
+            options?.now ?? new Date(),
+          );
+
+          await writeConversationBackup(backupPath, snapshot);
+          await removeActiveConversationFiles(conversationDir);
         });
       });
     },
@@ -114,6 +140,46 @@ async function readLegacyMessages(
 
     throw error;
   }
+}
+
+async function writeConversationBackup(
+  backupPath: string,
+  snapshot: ConversationContext,
+): Promise<void> {
+  await mkdir(dirname(backupPath), { recursive: true });
+  const backupFile = await open(backupPath, "wx", 0o600);
+
+  try {
+    await backupFile.writeFile(JSON.stringify(snapshot, null, 2), { encoding: "utf8" });
+    await backupFile.chmod(0o600);
+  } finally {
+    await backupFile.close();
+  }
+}
+
+async function removeActiveConversationFiles(conversationDir: string): Promise<void> {
+  let entries;
+  try {
+    entries = await readdir(conversationDir, { withFileTypes: true });
+  } catch (error) {
+    if (isMissingFile(error)) {
+      return;
+    }
+    throw error;
+  }
+
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (entry.name.endsWith(".bak") || entry.name === "conversation.lock") {
+        return;
+      }
+
+      await rm(join(conversationDir, entry.name), {
+        recursive: entry.isDirectory(),
+        force: true,
+      });
+    }),
+  );
 }
 
 function normalizeSnapshot(snapshot: ConversationContext): ConversationContext {

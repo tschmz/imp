@@ -1,5 +1,6 @@
 import { access, mkdir, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { createTimestampedBackupPath } from "./backup.js";
 
 export interface ManagedFileOptions {
   path: string;
@@ -83,7 +84,7 @@ async function backupExistingFile(options: {
 
   try {
     const content = await sourceFile.readFile({ encoding: "utf8" });
-    const backupPath = `${options.path}.${formatBackupTimestamp(options.now)}.bak`;
+    const backupPath = createTimestampedBackupPath(options.path, options.now);
     const backupFile = await open(backupPath, "w", options.mode);
     try {
       await backupFile.writeFile(content, { encoding: "utf8" });
@@ -94,10 +95,6 @@ async function backupExistingFile(options: {
   } finally {
     await sourceFile.close();
   }
-}
-
-function formatBackupTimestamp(date: Date): string {
-  return date.toISOString().replaceAll(":", "-");
 }
 
 function isAlreadyExistsError(error: unknown): error is NodeJS.ErrnoException {

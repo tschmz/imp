@@ -7,6 +7,7 @@ export interface LogFields {
   messageId?: string;
   agentId?: string;
   correlationId?: string;
+  command?: string;
   durationMs?: number;
   errorType?: string;
 }

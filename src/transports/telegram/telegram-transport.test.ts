@@ -4,6 +4,30 @@ import type { Logger } from "../../logging/types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
 
 describe("createTelegramTransport", () => {
+  it("registers the new command on startup", async () => {
+    const bot = createFakeBot();
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+    );
+
+    await transport.start({
+      handle: vi.fn(async () => {}),
+    });
+
+    expect(bot.api.setMyCommands).toHaveBeenCalledWith([
+      {
+        command: "new",
+        description: "Start a fresh conversation",
+      },
+    ]);
+  });
+
   it("forwards a validated inbound event from an allowed private text message", async () => {
     const bot = createFakeBot();
     const logger = createMockLogger();
@@ -64,6 +88,60 @@ describe("createTelegramTransport", () => {
     });
     expect(bot.api.sendChatAction).toHaveBeenCalledWith(42, "typing");
     expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("marks /new as a reset command for the application layer", async () => {
+    const bot = createFakeBot();
+    let capturedMessage: IncomingMessage | undefined;
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedMessage = event.message;
+      }),
+    });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "/new" },
+    });
+
+    expect(capturedMessage?.command).toBe("new");
+  });
+
+  it("ignores commands addressed to a different Telegram bot username", async () => {
+    const bot = createFakeBot();
+    let capturedMessage: IncomingMessage | undefined;
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedMessage = event.message;
+      }),
+    });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "/new@other_bot" },
+    });
+
+    expect(capturedMessage?.command).toBeUndefined();
   });
 
   it("ignores a private text message from a disallowed user", async () => {
@@ -132,16 +210,8 @@ describe("createTelegramTransport", () => {
     });
 
     expect(bot.reply).toHaveBeenCalledTimes(2);
-    expect(bot.reply).toHaveBeenNthCalledWith(
-      1,
-      "x".repeat(4096),
-      { parse_mode: "HTML" },
-    );
-    expect(bot.reply).toHaveBeenNthCalledWith(
-      2,
-      "x".repeat(904),
-      { parse_mode: "HTML" },
-    );
+    expect(bot.reply).toHaveBeenNthCalledWith(1, "x".repeat(4096), { parse_mode: "HTML" });
+    expect(bot.reply).toHaveBeenNthCalledWith(2, "x".repeat(904), { parse_mode: "HTML" });
   });
 
   it("replies with a stable error message through the error delivery hook", async () => {
@@ -210,7 +280,7 @@ describe("createTelegramTransport", () => {
         logger,
       );
 
-    await transport.start(handler);
+      await transport.start(handler);
       const pendingMessage = bot.emitTextMessage({
         chat: { id: 42, type: "private" },
         from: { id: 7 },
@@ -246,8 +316,9 @@ function createMockLogger(): Logger {
 
 function createFakeBot(): {
   api: {
-    getMe(): Promise<unknown>;
+    getMe(): Promise<{ username: string }>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
+    setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;
   };
   on(
     filter: "message:text",
@@ -296,6 +367,7 @@ function createFakeBot(): {
     api: {
       getMe: vi.fn(async () => ({ username: "test_bot" })),
       sendChatAction: vi.fn(async () => ({})),
+      setMyCommands: vi.fn(async () => ({})),
     },
     on(_filter, handler) {
       onTextMessage = handler;

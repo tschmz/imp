@@ -3,4 +3,5 @@ import type { ConversationContext, ConversationRef } from "../domain/conversatio
 export interface ConversationStore {
   get(ref: ConversationRef): Promise<ConversationContext | undefined>;
   put(context: ConversationContext): Promise<void>;
+  reset(ref: ConversationRef, options?: { now?: Date }): Promise<void>;
 }

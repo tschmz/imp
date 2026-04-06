@@ -28,6 +28,29 @@ export function createHandleIncomingMessage(
 
   return {
     async handle(message: IncomingMessage): Promise<OutgoingMessage> {
+      if (message.command === "new") {
+        await dependencies.conversationStore.reset(message.conversation);
+        await createConversationContext(
+          message,
+          defaultAgent.id,
+          dependencies.conversationStore,
+          dependencies.logger,
+        );
+        await dependencies.logger?.debug("reset conversation via inbound command", {
+          botId: message.botId,
+          transport: message.conversation.transport,
+          conversationId: message.conversation.externalId,
+          messageId: message.messageId,
+          correlationId: message.correlationId,
+          command: message.command,
+          agentId: defaultAgent.id,
+        });
+        return {
+          conversation: message.conversation,
+          text: "Started a fresh conversation. The previous conversation was backed up.",
+        };
+      }
+
       const conversation = await getOrCreateConversationContext(
         message,
         defaultAgent.id,
@@ -92,6 +115,15 @@ async function getOrCreateConversationContext(
     return existing;
   }
 
+  return createConversationContext(message, defaultAgentId, conversationStore, logger);
+}
+
+async function createConversationContext(
+  message: IncomingMessage,
+  defaultAgentId: string,
+  conversationStore: ConversationStore,
+  logger?: Logger,
+): Promise<ConversationContext> {
   const createdState: ConversationState = {
     conversation: message.conversation,
     agentId: defaultAgentId,

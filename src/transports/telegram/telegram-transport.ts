@@ -1,18 +1,31 @@
 import { randomUUID } from "node:crypto";
 import { Bot, GrammyError } from "grammy";
 import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
+import type { IncomingMessageCommand } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
-import { renderTelegramMessages } from "./render-telegram-message.js";
 import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
+import { renderTelegramMessages } from "./render-telegram-message.js";
+
+const telegramCommands = [
+  {
+    command: "new",
+    description: "Start a fresh conversation",
+  },
+] as const;
 
 interface TelegramBotAdapter {
   api: {
-    getMe(): Promise<unknown>;
+    getMe(): Promise<TelegramBotProfile>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
+    setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;
   };
   on(filter: "message:text", handler: (ctx: TelegramMessageContext) => Promise<void>): void;
   start(): Promise<void>;
   stop(): void;
+}
+
+interface TelegramBotProfile {
+  username?: string;
 }
 
 interface TelegramMessageContext {
@@ -44,8 +57,14 @@ export function createTelegramTransport(
 
   return {
     async start(handler: TransportHandler): Promise<void> {
-      await validateBotToken(bot, config);
+      const profile = await getTelegramBotProfile(bot, config);
       await logger?.debug("validated telegram bot token", {
+        botId: config.id,
+        transport: "telegram",
+      });
+
+      await registerTelegramCommands(bot, config);
+      await logger?.debug("registered telegram bot commands", {
         botId: config.id,
         transport: "telegram",
       });
@@ -103,6 +122,9 @@ export function createTelegramTransport(
           correlationId,
           safeContext,
           bot,
+          {
+            command: parseTelegramCommand(text, profile.username),
+          },
           logger,
         );
         await logger?.debug("received telegram message", {
@@ -136,6 +158,7 @@ function createTelegramInboundEvent(
   correlationId: string,
   ctx: Required<Pick<TelegramMessageContext, "chat" | "message" | "from" | "reply">>,
   bot: TelegramBotAdapter,
+  options: { command?: IncomingMessageCommand },
   logger?: Logger,
 ): TransportInboundEvent {
   return {
@@ -150,6 +173,7 @@ function createTelegramInboundEvent(
       userId: String(ctx.from.id),
       text: ctx.message.text,
       receivedAt: new Date().toISOString(),
+      ...(options.command ? { command: options.command } : {}),
     },
     async runWithProcessing<T>(operation: () => Promise<T>): Promise<T> {
       const stopTyping = startTypingStatus(bot, ctx.chat.id);
@@ -179,12 +203,12 @@ function createTelegramInboundEvent(
   };
 }
 
-async function validateBotToken(
+async function getTelegramBotProfile(
   bot: TelegramBotAdapter,
   config: TelegramBotRuntimeConfig,
-): Promise<void> {
+): Promise<TelegramBotProfile> {
   try {
-    await bot.api.getMe();
+    return await bot.api.getMe();
   } catch (error) {
     if (error instanceof GrammyError) {
       throw new Error(
@@ -196,10 +220,47 @@ async function validateBotToken(
   }
 }
 
-function startTypingStatus(
+async function registerTelegramCommands(
   bot: TelegramBotAdapter,
-  chatId: number,
-): () => void {
+  config: TelegramBotRuntimeConfig,
+): Promise<void> {
+  try {
+    await bot.api.setMyCommands(telegramCommands);
+  } catch (error) {
+    if (error instanceof GrammyError) {
+      throw new Error(
+        `Failed to register Telegram commands for bot "${config.id}" (${error.error_code}: ${error.description})`,
+      );
+    }
+
+    throw error;
+  }
+}
+
+function parseTelegramCommand(
+  text: string,
+  botUsername?: string,
+): IncomingMessageCommand | undefined {
+  const match = /^\/(?<command>[a-z0-9_]+)(?:@(?<target>[a-z0-9_]+))?(?:\s|$)/i.exec(text);
+  if (!match?.groups) {
+    return undefined;
+  }
+
+  if (match.groups.command.toLowerCase() !== "new") {
+    return undefined;
+  }
+
+  if (
+    match.groups.target &&
+    (!botUsername || match.groups.target.toLowerCase() !== botUsername.toLowerCase())
+  ) {
+    return undefined;
+  }
+
+  return "new";
+}
+
+function startTypingStatus(bot: TelegramBotAdapter, chatId: number): () => void {
   let active = true;
   let timeout: NodeJS.Timeout | undefined;
 
