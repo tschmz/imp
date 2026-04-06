@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DaemonConfig } from "../daemon/types.js";
-import { AgentExecutionError } from "../domain/errors.js";
+import { AgentExecutionError, ConfigError } from "../domain/errors.js";
 import { createRunDaemonUseCase } from "./run-daemon-use-case.js";
 
 describe("createRunDaemonUseCase", () => {
@@ -45,6 +45,31 @@ describe("createRunDaemonUseCase", () => {
     expect(outcome.error.details).toEqual({ failedBotIds: ["bot-1"] });
     expect(report).toHaveBeenCalledOnce();
     expect(report).toHaveBeenCalledWith({ runtimeConfig, error: outcome.error });
+  });
+
+  it("preserves resolve runtime target failure message in config errors", async () => {
+    const report = vi.fn(async () => undefined);
+    const useCase = createRunDaemonUseCase({
+      resolveRuntimeTarget: async () => {
+        throw new Error("No config found in /etc/imp/config.json");
+      },
+      createDaemon: () => ({ start: vi.fn(async () => undefined) }),
+      startupFailureReporter: { report },
+    });
+
+    const outcome = await useCase({ configPath: "/etc/imp/config.json" });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) {
+      throw new Error("Expected error outcome");
+    }
+    expect(outcome.error).toBeInstanceOf(ConfigError);
+    expect(outcome.error.message).toBe("No config found in /etc/imp/config.json");
+    expect(outcome.error.details).toEqual({
+      configPath: "/etc/imp/config.json",
+      originalMessage: "No config found in /etc/imp/config.json",
+    });
+    expect(report).not.toHaveBeenCalled();
   });
 });
 

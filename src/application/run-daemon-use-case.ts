@@ -42,11 +42,15 @@ export function createRunDaemonUseCase(
       const resolved = await deps.resolveRuntimeTarget({ cliConfigPath: configPath });
       runtimeConfig = resolved.runtimeConfig;
     } catch (error) {
+      const resolvedError = asAppError(error);
       return {
         ok: false,
-        error: new ConfigError("Failed to resolve runtime configuration.", {
+        error: new ConfigError(resolvedError.message, {
           cause: error,
-          details: { configPath: configPath ?? null },
+          details: {
+            configPath: configPath ?? null,
+            originalMessage: resolvedError.message,
+          },
         }),
       };
     }
