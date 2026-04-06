@@ -322,6 +322,118 @@ describe("createFsConversationStore", () => {
 
     await expect(store.get(ref)).resolves.toBeUndefined();
     await expect(readFile(backupPath, "utf8")).resolves.toContain('"text": "hello"');
+    await expect(store.listBackups(ref)).resolves.toEqual([
+      {
+        id: "conversation.json.2026-04-05T00-03-04.000Z.bak",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:00:00.000Z",
+        agentId: "default",
+        messageCount: 1,
+      },
+    ]);
+  });
+
+  it("restores a selected backup into the active conversation", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const ref = { transport: "telegram", externalId: "42" };
+
+    await store.put({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+        workingDirectory: "/workspace/app",
+        version: 0,
+      },
+      messages: [
+        {
+          id: "msg-1",
+          role: "user",
+          text: "hello",
+          createdAt: "2026-04-05T00:00:00.000Z",
+        },
+      ],
+    });
+
+    await store.reset(ref, {
+      now: new Date("2026-04-05T00:03:04.000Z"),
+    });
+
+    const restored = await store.restore(ref, "conversation.json.2026-04-05T00-03-04.000Z.bak");
+
+    expect(restored).toBe(true);
+    await expect(store.get(ref)).resolves.toEqual({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+        workingDirectory: "/workspace/app",
+        version: 1,
+      },
+      messages: [
+        {
+          id: "msg-1",
+          role: "user",
+          text: "hello",
+          createdAt: "2026-04-05T00:00:00.000Z",
+        },
+      ],
+    });
+  });
+
+  it("sorts backups from newest to oldest", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const ref = { transport: "telegram", externalId: "42" };
+
+    await store.put({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+        version: 0,
+      },
+      messages: [],
+    });
+    await store.reset(ref, {
+      now: new Date("2026-04-05T00:02:04.000Z"),
+    });
+
+    await store.put({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:10:00.000Z",
+        updatedAt: "2026-04-05T00:11:00.000Z",
+        version: 0,
+      },
+      messages: [
+        {
+          id: "msg-2",
+          role: "assistant",
+          text: "world",
+          createdAt: "2026-04-05T00:11:00.000Z",
+        },
+      ],
+    });
+    await store.reset(ref, {
+      now: new Date("2026-04-05T00:12:04.000Z"),
+    });
+
+    await expect(store.listBackups(ref)).resolves.toMatchObject([
+      {
+        id: "conversation.json.2026-04-05T00-12-04.000Z.bak",
+        updatedAt: "2026-04-05T00:11:00.000Z",
+      },
+      {
+        id: "conversation.json.2026-04-05T00-02-04.000Z.bak",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+    ]);
   });
 
   it("ignores orphan temp files from interrupted writes", async () => {

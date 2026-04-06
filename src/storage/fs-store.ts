@@ -7,7 +7,7 @@ import type {
   ConversationRef,
 } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
-import type { ConversationStore } from "./types.js";
+import type { ConversationBackupSummary, ConversationStore } from "./types.js";
 
 const conversationWriteQueues = new Map<string, Promise<void>>();
 // The critical section is intentionally short: read latest snapshot, compute next state, atomically rename.
@@ -57,6 +57,34 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
         });
       });
     },
+    async listBackups(ref) {
+      return readConversationBackups(paths.conversationsDir, ref);
+    },
+    async restore(ref, backupId) {
+      return withConversationWriteQueue(ref, async () =>
+        withConversationLock(paths.conversationsDir, ref, async () => {
+          const backup = await readConversationBackup(paths.conversationsDir, ref, backupId);
+          if (!backup) {
+            return false;
+          }
+
+          const snapshotPath = getConversationSnapshotPath(paths.conversationsDir, ref);
+          const tempPath = `${snapshotPath}.${process.pid}.tmp`;
+          const normalized = normalizeSnapshot({
+            ...backup,
+            state: {
+              ...backup.state,
+              conversation: ref,
+            },
+          });
+
+          await mkdir(dirname(snapshotPath), { recursive: true });
+          await writeFile(tempPath, JSON.stringify(normalized, null, 2));
+          await rename(tempPath, snapshotPath);
+          return true;
+        }),
+      );
+    },
     async reset(ref, options) {
       const existing = await readConversationSnapshot(paths.conversationsDir, ref);
       if (!existing) {
@@ -85,6 +113,50 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
   };
 }
 
+async function readConversationBackups(
+  conversationsDir: string,
+  ref: ConversationRef,
+): Promise<ConversationBackupSummary[]> {
+  const conversationDir = getConversationDir(conversationsDir, ref);
+  let entries;
+
+  try {
+    entries = await readdir(conversationDir, { withFileTypes: true });
+  } catch (error) {
+    if (isMissingFile(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  const backupIds = entries
+    .filter((entry) => entry.isFile() && isConversationBackupFile(entry.name))
+    .map((entry) => entry.name)
+    .sort((left, right) => right.localeCompare(left));
+
+  const backups = await Promise.all(
+    backupIds.map(async (backupId) => {
+      const snapshot = await readConversationBackup(conversationsDir, ref, backupId);
+      if (!snapshot) {
+        return undefined;
+      }
+
+      return {
+        id: backupId,
+        createdAt: snapshot.state.createdAt,
+        updatedAt: snapshot.state.updatedAt,
+        agentId: snapshot.state.agentId,
+        messageCount: snapshot.messages.length,
+        ...(snapshot.state.workingDirectory
+          ? { workingDirectory: snapshot.state.workingDirectory }
+          : {}),
+      } satisfies ConversationBackupSummary;
+    }),
+  );
+
+  return backups.filter((backup): backup is ConversationBackupSummary => backup !== undefined);
+}
+
 async function readConversationSnapshot(
   conversationsDir: string,
   ref: ConversationRef,
@@ -96,6 +168,24 @@ async function readConversationSnapshot(
   } catch (error: unknown) {
     if (isMissingFile(error)) {
       return readLegacyConversation(conversationsDir, ref);
+    }
+    throw error;
+  }
+}
+
+async function readConversationBackup(
+  conversationsDir: string,
+  ref: ConversationRef,
+  backupId: string,
+): Promise<ConversationContext | undefined> {
+  const backupPath = join(getConversationDir(conversationsDir, ref), backupId);
+
+  try {
+    const raw = await readFile(backupPath, "utf8");
+    return normalizeSnapshot(JSON.parse(raw) as ConversationContext);
+  } catch (error: unknown) {
+    if (isMissingFile(error)) {
+      return undefined;
     }
     throw error;
   }
@@ -408,6 +498,10 @@ function parseLockExpiry(raw: string): number | undefined {
   } catch {
     return undefined;
   }
+}
+
+function isConversationBackupFile(name: string): boolean {
+  return /^conversation\.json\..+\.bak$/i.test(name);
 }
 
 async function delay(ms: number): Promise<void> {

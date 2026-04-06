@@ -22,8 +22,24 @@ describe("createTelegramTransport", () => {
 
     expect(bot.api.setMyCommands).toHaveBeenCalledWith([
       {
+        command: "help",
+        description: "Show available commands",
+      },
+      {
         command: "new",
         description: "Start a fresh conversation",
+      },
+      {
+        command: "status",
+        description: "Show current conversation status",
+      },
+      {
+        command: "history",
+        description: "List restore points",
+      },
+      {
+        command: "restore",
+        description: "Restore a backup with /restore <n>",
       },
     ]);
   });
@@ -115,6 +131,34 @@ describe("createTelegramTransport", () => {
     });
 
     expect(capturedMessage?.command).toBe("new");
+  });
+
+  it("captures command arguments for /restore", async () => {
+    const bot = createFakeBot();
+    let capturedMessage: IncomingMessage | undefined;
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedMessage = event.message;
+      }),
+    });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "/restore@test_bot 2" },
+    });
+
+    expect(capturedMessage?.command).toBe("restore");
+    expect(capturedMessage?.commandArgs).toBe("2");
   });
 
   it("ignores commands addressed to a different Telegram bot username", async () => {

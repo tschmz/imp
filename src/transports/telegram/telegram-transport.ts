@@ -8,8 +8,24 @@ import { renderTelegramMessages } from "./render-telegram-message.js";
 
 const telegramCommands = [
   {
+    command: "help",
+    description: "Show available commands",
+  },
+  {
     command: "new",
     description: "Start a fresh conversation",
+  },
+  {
+    command: "status",
+    description: "Show current conversation status",
+  },
+  {
+    command: "history",
+    description: "List restore points",
+  },
+  {
+    command: "restore",
+    description: "Restore a backup with /restore <n>",
   },
 ] as const;
 
@@ -122,9 +138,7 @@ export function createTelegramTransport(
           correlationId,
           safeContext,
           bot,
-          {
-            command: parseTelegramCommand(text, profile.username),
-          },
+          parseTelegramCommand(text, profile.username),
           logger,
         );
         await logger?.debug("received telegram message", {
@@ -158,7 +172,7 @@ function createTelegramInboundEvent(
   correlationId: string,
   ctx: Required<Pick<TelegramMessageContext, "chat" | "message" | "from" | "reply">>,
   bot: TelegramBotAdapter,
-  options: { command?: IncomingMessageCommand },
+  options?: { command: IncomingMessageCommand; commandArgs?: string },
   logger?: Logger,
 ): TransportInboundEvent {
   return {
@@ -173,7 +187,7 @@ function createTelegramInboundEvent(
       userId: String(ctx.from.id),
       text: ctx.message.text,
       receivedAt: new Date().toISOString(),
-      ...(options.command ? { command: options.command } : {}),
+      ...(options ? options : {}),
     },
     async runWithProcessing<T>(operation: () => Promise<T>): Promise<T> {
       const stopTyping = startTypingStatus(bot, ctx.chat.id);
@@ -240,13 +254,20 @@ async function registerTelegramCommands(
 function parseTelegramCommand(
   text: string,
   botUsername?: string,
-): IncomingMessageCommand | undefined {
+): { command: IncomingMessageCommand; commandArgs?: string } | undefined {
   const match = /^\/(?<command>[a-z0-9_]+)(?:@(?<target>[a-z0-9_]+))?(?:\s|$)/i.exec(text);
   if (!match?.groups) {
     return undefined;
   }
 
-  if (match.groups.command.toLowerCase() !== "new") {
+  const command = match.groups.command.toLowerCase() as IncomingMessageCommand;
+  if (
+    command !== "new" &&
+    command !== "help" &&
+    command !== "status" &&
+    command !== "history" &&
+    command !== "restore"
+  ) {
     return undefined;
   }
 
@@ -257,7 +278,10 @@ function parseTelegramCommand(
     return undefined;
   }
 
-  return "new";
+  return {
+    command,
+    commandArgs: text.slice(match[0].length).trim() || undefined,
+  };
 }
 
 function startTypingStatus(bot: TelegramBotAdapter, chatId: number): () => void {
