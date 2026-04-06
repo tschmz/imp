@@ -226,11 +226,9 @@ function detachTelegramEventProcessing(
   },
 ): void {
   void Promise.resolve()
-    .then(async () => {
-      await operation;
-    })
-    .catch(async (error) => {
-      await logTelegramTerminalFailure(
+    .then(() => operation)
+    .catch((error) => {
+      void logTelegramTerminalFailure(
         options.logger,
         {
           botId: options.botId,
@@ -240,7 +238,9 @@ function detachTelegramEventProcessing(
           errorType: error instanceof Error ? error.name : typeof error,
         },
         error,
-      );
+      ).catch(() => {
+        // Detached processing must never leak terminal failure logging errors.
+      });
     });
 }
 

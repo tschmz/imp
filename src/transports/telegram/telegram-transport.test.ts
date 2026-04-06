@@ -454,6 +454,83 @@ describe("createTelegramTransport", () => {
     );
   });
 
+  it("swallows detached rejection chains when error delivery and terminal logging both fail", async () => {
+    const bot = createFakeBot();
+    const logger = createMockLogger();
+    const handler = {
+      handle: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    };
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (error: unknown) => {
+      unhandledRejections.push(error);
+    };
+
+    logger.debug = vi.fn(async (message: string) => {
+      if (message === "sending telegram processing error response") {
+        throw new Error("debug failed");
+      }
+    });
+    logger.error = vi.fn(async () => {
+      throw new Error("log failed");
+    });
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      logger,
+    );
+
+    process.on("unhandledRejection", onUnhandledRejection);
+    try {
+      await transport.start(handler);
+      await bot.emitTextMessage({
+        chat: { id: 42, type: "private" },
+        from: { id: 7 },
+        message: { message_id: 99, text: "ping" },
+      });
+      await waitForAsync(
+        () =>
+          ((logger.error as unknown as { mock?: { calls: unknown[][] } }).mock?.calls.length ?? 0) === 2,
+      );
+    } finally {
+      process.off("unhandledRejection", onUnhandledRejection);
+    }
+
+    expect(unhandledRejections).toEqual([]);
+    expect(logger.error).toHaveBeenNthCalledWith(
+      1,
+      "failed to process telegram message",
+      expect.objectContaining({
+        botId: "private-telegram",
+        transport: "telegram",
+        conversationId: "42",
+        messageId: "99",
+        errorType: "Error",
+      }),
+      expect.objectContaining({ message: "boom" }),
+    );
+    expect(logger.error).toHaveBeenNthCalledWith(
+      2,
+      "telegram message processing terminated after an unhandled failure",
+      expect.objectContaining({
+        botId: "private-telegram",
+        transport: "telegram",
+        conversationId: "42",
+        messageId: "99",
+        errorType: "Error",
+      }),
+      expect.objectContaining({ message: "debug failed" }),
+    );
+    expect(bot.reply).not.toHaveBeenCalled();
+  });
+
   it("keeps sending typing status while a reply is still being generated", async () => {
     vi.useFakeTimers();
     try {
