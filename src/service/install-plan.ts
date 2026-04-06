@@ -1,4 +1,5 @@
 import { dirname, resolve } from "node:path";
+import { getServicePlatformAdapter } from "./platforms/get-service-platform-adapter.js";
 
 export type ServicePlatform = "linux-systemd-user" | "macos-launchd-agent" | "windows-winsw";
 
@@ -42,14 +43,7 @@ export function createServiceInstallPlan(options: {
 }
 
 export function renderServiceDefinition(plan: ServiceInstallPlan): string {
-  switch (plan.platform) {
-    case "linux-systemd-user":
-      return renderSystemdUserUnit(plan);
-    case "macos-launchd-agent":
-      return renderLaunchdPlist(plan);
-    case "windows-winsw":
-      return renderWinSwConfig(plan);
-  }
+  return getServicePlatformAdapter(plan.platform).renderDefinition(plan);
 }
 
 export function detectServicePlatform(
@@ -97,78 +91,4 @@ function resolveServiceCommandLine(options: {
 
 function shouldInvokeViaNode(execPath: string, entrypoint: string): boolean {
   return entrypoint.endsWith(".js") || entrypoint.endsWith(".mjs") || execPath.includes("node");
-}
-
-function renderSystemdUserUnit(plan: ServiceInstallPlan): string {
-  return [
-    "[Unit]",
-    "Description=imp daemon",
-    "After=network-online.target",
-    "Wants=network-online.target",
-    "",
-    "[Service]",
-    "Type=simple",
-    `WorkingDirectory=${plan.workingDirectory}`,
-    ...(plan.environmentPath ? [`EnvironmentFile=${quoteSystemdValue(plan.environmentPath)}`] : []),
-    `ExecStart=${[plan.command, ...plan.args].map(quoteSystemdValue).join(" ")}`,
-    "Restart=on-failure",
-    "RestartSec=3",
-    "",
-    "[Install]",
-    "WantedBy=default.target",
-  ].join("\n");
-}
-
-function renderLaunchdPlist(plan: ServiceInstallPlan): string {
-  const programArguments = [plan.command, ...plan.args]
-    .map((argument) => `    <string>${escapeXml(argument)}</string>`)
-    .join("\n");
-
-  return [
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-    "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",
-    "<plist version=\"1.0\">",
-    "<dict>",
-    "  <key>Label</key>",
-    `  <string>${escapeXml(plan.serviceLabel)}</string>`,
-    "  <key>ProgramArguments</key>",
-    "  <array>",
-    programArguments,
-    "  </array>",
-    "  <key>RunAtLoad</key>",
-    "  <true/>",
-    "  <key>KeepAlive</key>",
-    "  <true/>",
-    "  <key>WorkingDirectory</key>",
-    `  <string>${escapeXml(plan.workingDirectory)}</string>`,
-    "</dict>",
-    "</plist>",
-  ].join("\n");
-}
-
-function renderWinSwConfig(plan: ServiceInstallPlan): string {
-  return [
-    "<service>",
-    `  <id>${escapeXml(plan.serviceName)}</id>`,
-    `  <name>${escapeXml(plan.serviceName)}</name>`,
-    "  <description>imp daemon</description>",
-    `  <executable>${escapeXml(plan.command)}</executable>`,
-    `  <arguments>${escapeXml(plan.args.join(" "))}</arguments>`,
-    `  <workingdirectory>${escapeXml(plan.workingDirectory)}</workingdirectory>`,
-    "  <onfailure action=\"restart\" delay=\"5 sec\" />",
-    "</service>",
-  ].join("\n");
-}
-
-function quoteSystemdValue(value: string): string {
-  return `"${value.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"")}"`;
-}
-
-function escapeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&apos;");
 }

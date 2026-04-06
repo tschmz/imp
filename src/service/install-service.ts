@@ -1,5 +1,3 @@
-import { homedir } from "node:os";
-import { resolve } from "node:path";
 import { assertManagedFileCanBeWritten, writeManagedFile } from "../files/managed-file.js";
 import {
   createServiceInstallPlan,
@@ -8,11 +6,13 @@ import {
   renderServiceDefinition,
 } from "./install-plan.js";
 import { renderLinuxServiceEnvironment } from "./linux-service-environment.js";
+import { getServicePlatformAdapter } from "./platforms/get-service-platform-adapter.js";
+import {
+  createSystemServiceInstaller,
+  type ServiceInstaller,
+} from "./service-installer.js";
 
-export interface ServiceInstaller {
-  run(command: string, args: string[]): Promise<void>;
-  runAndCapture?(command: string, args: string[]): Promise<{ stdout: string; stderr: string }>;
-}
+export type { ServiceInstaller };
 
 export interface ServiceInstallResult {
   platform: ServicePlatform;
@@ -38,8 +38,8 @@ export async function installService(options: {
     execPath: options.execPath,
     platform: options.platform,
   });
-  const definitionPath = resolveServiceDefinitionPath({
-    platform: plan.platform,
+  const platformAdapter = getServicePlatformAdapter(plan.platform);
+  const definitionPath = platformAdapter.resolveDefinitionPath({
     homeDir: options.homeDir,
     serviceName: plan.serviceName,
     serviceLabel: plan.serviceLabel,
@@ -71,7 +71,7 @@ export async function installService(options: {
   });
 
   const installer = options.installer ?? createSystemServiceInstaller();
-  await activateInstalledService({
+  await platformAdapter.install({
     installer,
     definitionPath,
     plan,
@@ -91,7 +91,7 @@ export async function assertServiceInstallCanProceed(options: {
   force?: boolean;
 }): Promise<string> {
   return assertManagedFileCanBeWritten({
-    path: resolve(options.definitionPath),
+    path: options.definitionPath,
     resourceLabel: "Service definition",
     force: options.force,
   });
@@ -103,101 +103,9 @@ export function resolveServiceDefinitionPath(options: {
   serviceName: string;
   serviceLabel: string;
 }): string {
-  const userHome = resolve(options.homeDir ?? homedir());
-
-  switch (options.platform) {
-    case "linux-systemd-user":
-      return resolve(userHome, ".config", "systemd", "user", `${options.serviceName}.service`);
-    case "macos-launchd-agent":
-      return resolve(userHome, "Library", "LaunchAgents", `${options.serviceLabel}.plist`);
-    case "windows-winsw":
-      throw new Error("Automatic Windows service installation is not implemented yet.");
-  }
-}
-
-async function activateInstalledService(options: {
-  installer: ServiceInstaller;
-  definitionPath: string;
-  plan: ServiceInstallPlan;
-  uid?: number;
-}): Promise<void> {
-  switch (options.plan.platform) {
-    case "linux-systemd-user":
-      await options.installer.run("systemctl", ["--user", "daemon-reload"]);
-      await options.installer.run("systemctl", ["--user", "enable", "--now", `${options.plan.serviceName}.service`]);
-      return;
-    case "macos-launchd-agent": {
-      const uid = options.uid ?? process.getuid?.();
-      if (uid === undefined) {
-        throw new Error("Could not determine the current user ID for launchd service installation.");
-      }
-
-      const domainTarget = `gui/${uid}`;
-      await runIgnoringFailure(options.installer, "launchctl", [
-        "bootout",
-        domainTarget,
-        options.definitionPath,
-      ]);
-      await options.installer.run("launchctl", ["bootstrap", domainTarget, options.definitionPath]);
-      await options.installer.run("launchctl", ["kickstart", "-k", `${domainTarget}/${options.plan.serviceLabel}`]);
-      return;
-    }
-    case "windows-winsw":
-      throw new Error("Automatic Windows service installation is not implemented yet.");
-  }
-}
-
-function createSystemServiceInstaller(): ServiceInstaller {
-  return {
-    async run(command: string, args: string[]) {
-      const { execFile } = await import("node:child_process");
-      const { promisify } = await import("node:util");
-      const execFileAsync = promisify(execFile);
-      await execFileAsync(command, args, {
-        env: process.env,
-      });
-    },
-    async runAndCapture(command: string, args: string[]) {
-      const { execFile } = await import("node:child_process");
-      const { promisify } = await import("node:util");
-      const execFileAsync = promisify(execFile);
-
-      try {
-        const result = await execFileAsync(command, args, {
-          env: process.env,
-        });
-        return {
-          stdout: result.stdout,
-          stderr: result.stderr,
-        };
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          "stdout" in error &&
-          "stderr" in error &&
-          typeof error.stdout === "string" &&
-          typeof error.stderr === "string"
-        ) {
-          return {
-            stdout: error.stdout,
-            stderr: error.stderr,
-          };
-        }
-
-        throw error;
-      }
-    },
-  };
-}
-
-async function runIgnoringFailure(
-  installer: ServiceInstaller,
-  command: string,
-  args: string[],
-): Promise<void> {
-  try {
-    await installer.run(command, args);
-  } catch {
-    // launchd returns an error when the agent is not loaded yet.
-  }
+  return getServicePlatformAdapter(options.platform).resolveDefinitionPath({
+    homeDir: options.homeDir,
+    serviceName: options.serviceName,
+    serviceLabel: options.serviceLabel,
+  });
 }
