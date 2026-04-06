@@ -325,7 +325,9 @@ describe("createDaemon", () => {
     runtimeProcess.emitSignal("SIGTERM");
     await started;
 
-    expect(runtimeProcess.exit).toHaveBeenCalledWith(0);
+    await vi.waitFor(() => {
+      expect(runtimeProcess.exit).toHaveBeenCalledWith(0);
+    });
     expect(transport.stop).toHaveBeenCalledTimes(1);
     await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
   });
@@ -350,7 +352,9 @@ describe("createDaemon", () => {
     runtimeProcess.emitSignal("SIGINT");
     await started;
 
-    expect(runtimeProcess.exit).toHaveBeenCalledWith(130);
+    await vi.waitFor(() => {
+      expect(runtimeProcess.exit).toHaveBeenCalledWith(130);
+    });
     expect(transport.stop).toHaveBeenCalledTimes(1);
     await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
   });
@@ -584,6 +588,10 @@ function createFailingTransport(
 function createFakeProcess(): {
   emitSignal(signal: "SIGINT" | "SIGTERM"): void;
   exit: ReturnType<typeof vi.fn<(code?: number) => never>>;
+  execPath: string;
+  argv: string[];
+  env: NodeJS.ProcessEnv;
+  cwd(): string;
   off(event: "SIGINT" | "SIGTERM", listener: () => void): EventEmitter;
   once(event: "SIGINT" | "SIGTERM", listener: () => void): EventEmitter;
 } {
@@ -594,6 +602,10 @@ function createFakeProcess(): {
       emitter.emit(signal);
     },
     exit: vi.fn((() => undefined as never) as (code?: number) => never),
+    execPath: process.execPath,
+    argv: [process.execPath, "/workspace/dist/main.js", "start"],
+    env: process.env,
+    cwd: () => "/workspace",
     off(event, listener) {
       emitter.off(event, listener);
       return emitter;

@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "../domain/message.js";
+import type { OutgoingMessageDeliveryAction } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
 import type { TransportHandler, TransportInboundEvent } from "../transports/types.js";
 
@@ -12,6 +13,10 @@ export interface MessageProcessorDependencies {
   retryDelayMs?: (attempt: number, event: TransportInboundEvent) => number | Promise<number>;
   onError?: (error: unknown, attempt: number, event: TransportInboundEvent) => Promise<void> | void;
   onRetry?: (error: unknown, attempt: number, event: TransportInboundEvent) => Promise<void> | void;
+  afterDeliveryAction?: (
+    action: OutgoingMessageDeliveryAction,
+    event: TransportInboundEvent,
+  ) => Promise<void> | void;
 }
 
 export type MessageProcessor = TransportHandler;
@@ -69,6 +74,9 @@ async function processEvent(
       await event.runWithProcessing(async () => {
         const response = await dependencies.handler.handle(event.message);
         await event.deliver(response);
+        if (response.deliveryAction) {
+          await dependencies.afterDeliveryAction?.(response.deliveryAction, event);
+        }
       });
       return;
     } catch (error) {

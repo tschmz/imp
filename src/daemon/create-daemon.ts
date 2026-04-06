@@ -54,15 +54,24 @@ export function createDaemon(
         );
         throw error;
       }
+      const runtimeControl = {
+        requestAction: (() => {}) as (action: "reload" | "restart") => void,
+      };
       const runtimeEntries = createRuntimeEntries(runtimes, {
         agentRegistry,
         createTransport: dependencies.createTransport,
+        requestControlAction: (action) => {
+          runtimeControl.requestAction(action);
+        },
       });
       const shutdown = createRuntimeShutdown(
         runtimeEntries,
         runtimes.map((runtime) => runtime.botConfig.paths.runtimeStatePath),
         dependencies.runtimeProcess,
       );
+      runtimeControl.requestAction = (action) => {
+        shutdown.requestControlAction(action);
+      };
       const registeredSignals = shutdown.registerSignalHandlers();
 
       try {

@@ -83,6 +83,35 @@ describe("createMessageProcessor", () => {
     expect(onError).toHaveBeenCalledTimes(1);
     expect(deliveredErrors).toHaveLength(1);
   });
+
+  it("runs deferred delivery actions after the response is sent", async () => {
+    const afterDeliveryAction = vi.fn(async () => {});
+    const deliver = vi.fn(async () => {});
+    const processor = createMessageProcessor({
+      handler: {
+        handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => ({
+          conversation: message.conversation,
+          text: "reply",
+          deliveryAction: "restart",
+        })),
+      },
+      afterDeliveryAction,
+    });
+
+    await processor.handle(
+      createEvent(createIncomingMessage("1", "42"), {
+        deliver,
+      }),
+    );
+
+    expect(deliver).toHaveBeenCalledOnce();
+    expect(afterDeliveryAction).toHaveBeenCalledWith(
+      "restart",
+      expect.objectContaining({
+        message: expect.objectContaining({ messageId: "1" }),
+      }),
+    );
+  });
 });
 
 function createEvent(

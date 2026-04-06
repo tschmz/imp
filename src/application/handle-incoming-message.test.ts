@@ -35,6 +35,7 @@ describe("createHandleIncomingMessage", () => {
       conversationStore,
       engine,
       defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
     });
 
     const firstResponse = await service.handle(createIncomingMessage("1", "hello"));
@@ -109,6 +110,7 @@ describe("createHandleIncomingMessage", () => {
       conversationStore,
       engine,
       defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
     });
 
     await service.handle(createIncomingMessage("1", "hello"));
@@ -144,6 +146,7 @@ describe("createHandleIncomingMessage", () => {
       conversationStore,
       engine,
       defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
     });
 
     const response = await service.handle(createIncomingMessage("3", "/new", "new"));
@@ -190,6 +193,7 @@ describe("createHandleIncomingMessage", () => {
           run: vi.fn(),
         },
         defaultAgentId: "missing",
+        runtimeInfo: createRuntimeInfo(),
       }),
     ).toThrow("Unknown default agent: missing");
   });
@@ -214,6 +218,7 @@ describe("createHandleIncomingMessage", () => {
       conversationStore,
       engine,
       defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
     });
 
     const response = await service.handle(createIncomingMessage("4", "/help", "help"));
@@ -267,6 +272,7 @@ describe("createHandleIncomingMessage", () => {
       conversationStore,
       engine: { run: vi.fn() },
       defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
     });
 
     const response = await service.handle(createIncomingMessage("5", "/status", "status"));
@@ -307,6 +313,7 @@ describe("createHandleIncomingMessage", () => {
       conversationStore,
       engine: { run: vi.fn() },
       defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
     });
 
     const historyResponse = await service.handle(createIncomingMessage("6", "/history", "history"));
@@ -324,6 +331,7 @@ describe("createHandleIncomingMessage", () => {
       "conversation.json.2026-04-05T00-02-04.000Z.bak",
     );
     expect(restoreResponse.text).toContain("Restored backup 2.");
+    expect(restoreResponse.text).toContain("previously active conversation was backed up");
   });
 
   it("returns restore usage when the index is missing or invalid", async () => {
@@ -348,19 +356,146 @@ describe("createHandleIncomingMessage", () => {
       conversationStore,
       engine: { run: vi.fn() },
       defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
     });
 
-    const response = await service.handle(createIncomingMessage("8", "/restore nope", "restore", "nope"));
+    const response = await service.handle(
+      createIncomingMessage("8", "/restore nope", "restore", "nope"),
+    );
 
     expect(response.text).toContain("Usage: /restore <n>");
     expect(conversationStore.restore).not.toHaveBeenCalled();
   });
+
+  it("supports identity, rename, clear, and export commands", async () => {
+    const conversationStore = createMutableConversationStore({
+      state: {
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+        },
+        agentId: "default",
+        title: "Old title",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+        workingDirectory: "/workspace/app",
+        version: 1,
+      },
+      messages: [
+        {
+          id: "msg-1",
+          role: "user" as const,
+          text: "hello",
+          createdAt: "2026-04-05T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([createDefaultAgent()]),
+      conversationStore,
+      engine: { run: vi.fn() },
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    const whoami = await service.handle(createIncomingMessage("9", "/whoami", "whoami"));
+    const renamed = await service.handle(
+      createIncomingMessage("10", "/rename Project Alpha", "rename", "Project Alpha"),
+    );
+    const exported = await service.handle(createIncomingMessage("11", "/export", "export"));
+    const cleared = await service.handle(createIncomingMessage("12", "/clear", "clear"));
+
+    expect(whoami.text).toContain("User ID: 7");
+    expect(whoami.text).toContain("Current agent: default");
+    expect(renamed.text).toContain('Renamed the current conversation to "Project Alpha".');
+    expect(exported.text).toContain("Conversation export");
+    expect(exported.text).toContain("Title: Project Alpha");
+    expect(cleared.text).toContain("Cleared the active conversation.");
+    expect(await conversationStore.get({ transport: "telegram", externalId: "42" })).toMatchObject({
+      state: {
+        agentId: "default",
+        title: "Project Alpha",
+      },
+      messages: [],
+    });
+  });
+
+  it("shows config, ping, agent state, and recent logs", async () => {
+    const conversationStore = createMutableConversationStore({
+      state: {
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+        },
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+        version: 1,
+      },
+      messages: [],
+    });
+    const loadAppConfigMock = vi.fn(async () => ({
+      instance: { name: "dev" },
+      paths: { dataRoot: "/var/lib/imp" },
+      defaults: { agentId: "default" },
+      agents: [],
+      bots: [],
+    }));
+    const readRecentLogLinesMock = vi.fn(async () => ['{"level":"info","message":"ok"}']);
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([createDefaultAgent(), createAgent("ops")]),
+      conversationStore,
+      engine: { run: vi.fn() },
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+      loadAppConfig: loadAppConfigMock as never,
+      readRecentLogLines: readRecentLogLinesMock,
+    });
+
+    const ping = await service.handle(createIncomingMessage("13", "/ping", "ping"));
+    const config = await service.handle(createIncomingMessage("14", "/config", "config"));
+    const agentBefore = await service.handle(createIncomingMessage("15", "/agent", "agent"));
+    const agentAfter = await service.handle(createIncomingMessage("16", "/agent ops", "agent", "ops"));
+    const logs = await service.handle(createIncomingMessage("17", "/logs 5", "logs", "5"));
+
+    expect(ping.text).toContain("pong");
+    expect(config.text).toContain("Instance: dev");
+    expect(config.text).toContain("Config path: /tmp/config.json");
+    expect(agentBefore.text).toContain("Available: default, ops");
+    expect(agentAfter.text).toContain('Switched the current conversation to agent "ops".');
+    expect(logs.text).toContain('{"level":"info","message":"ok"}');
+    expect(readRecentLogLinesMock).toHaveBeenCalledWith("/tmp/private-telegram.log", 5);
+  });
+
+  it("returns scheduled delivery actions for reload and restart", async () => {
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([createDefaultAgent()]),
+      conversationStore: createMutableConversationStore(),
+      engine: { run: vi.fn() },
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    const reload = await service.handle(createIncomingMessage("18", "/reload", "reload"));
+    const restart = await service.handle(createIncomingMessage("19", "/restart", "restart"));
+
+    expect(reload.deliveryAction).toBe("reload");
+    expect(reload.text).toContain("Reload scheduled.");
+    expect(restart.deliveryAction).toBe("restart");
+    expect(restart.text).toContain("Restart scheduled.");
+  });
 });
 
 function createDefaultAgent(): AgentDefinition {
+  return createAgent("default");
+}
+
+function createAgent(id: string): AgentDefinition {
   return {
-    id: "default",
-    name: "Default",
+    id,
+    name: id === "default" ? "Default" : id,
     systemPrompt: "You are concise.",
     model: {
       provider: "test",
@@ -368,6 +503,35 @@ function createDefaultAgent(): AgentDefinition {
     },
     tools: [],
     extensions: [],
+  };
+}
+
+function createRuntimeInfo() {
+  return {
+    botId: "private-telegram",
+    configPath: "/tmp/config.json",
+    dataRoot: "/tmp/data",
+    logFilePath: "/tmp/private-telegram.log",
+    loggingLevel: "info" as const,
+    activeBotIds: ["private-telegram", "ops-telegram"],
+  };
+}
+
+function createMutableConversationStore(
+  initial?: Awaited<ReturnType<ConversationStore["get"]>>,
+): ConversationStore {
+  let current = initial;
+
+  return {
+    get: vi.fn(async () => current),
+    put: vi.fn(async (context) => {
+      current = context;
+    }),
+    listBackups: vi.fn(async () => []),
+    restore: vi.fn(async () => false),
+    reset: vi.fn(async () => {
+      current = undefined;
+    }),
   };
 }
 

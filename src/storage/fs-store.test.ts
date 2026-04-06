@@ -361,7 +361,28 @@ describe("createFsConversationStore", () => {
       now: new Date("2026-04-05T00:03:04.000Z"),
     });
 
-    const restored = await store.restore(ref, "conversation.json.2026-04-05T00-03-04.000Z.bak");
+    await store.put({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        title: "Current",
+        createdAt: "2026-04-05T00:04:00.000Z",
+        updatedAt: "2026-04-05T00:05:00.000Z",
+        version: 0,
+      },
+      messages: [
+        {
+          id: "msg-current",
+          role: "assistant",
+          text: "newer",
+          createdAt: "2026-04-05T00:05:00.000Z",
+        },
+      ],
+    });
+
+    const restored = await store.restore(ref, "conversation.json.2026-04-05T00-03-04.000Z.bak", {
+      now: new Date("2026-04-05T00:06:04.000Z"),
+    });
 
     expect(restored).toBe(true);
     await expect(store.get(ref)).resolves.toEqual({
@@ -382,6 +403,16 @@ describe("createFsConversationStore", () => {
         },
       ],
     });
+    await expect(store.listBackups(ref)).resolves.toMatchObject([
+      {
+        id: "conversation.json.2026-04-05T00-06-04.000Z.bak",
+        updatedAt: "2026-04-05T00:05:00.000Z",
+        messageCount: 1,
+      },
+      {
+        id: "conversation.json.2026-04-05T00-03-04.000Z.bak",
+      },
+    ]);
   });
 
   it("sorts backups from newest to oldest", async () => {

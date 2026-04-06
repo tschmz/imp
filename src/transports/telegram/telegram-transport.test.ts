@@ -26,8 +26,20 @@ describe("createTelegramTransport", () => {
         description: "Show available commands",
       },
       {
+        command: "whoami",
+        description: "Show bot and user IDs",
+      },
+      {
         command: "new",
         description: "Start a fresh conversation",
+      },
+      {
+        command: "rename",
+        description: "Rename with /rename <title>",
+      },
+      {
+        command: "clear",
+        description: "Clear the active conversation",
       },
       {
         command: "status",
@@ -40,6 +52,34 @@ describe("createTelegramTransport", () => {
       {
         command: "restore",
         description: "Restore a backup with /restore <n>",
+      },
+      {
+        command: "export",
+        description: "Export the current conversation",
+      },
+      {
+        command: "ping",
+        description: "Check bot responsiveness",
+      },
+      {
+        command: "config",
+        description: "Show runtime config details",
+      },
+      {
+        command: "agent",
+        description: "Show or switch the current agent",
+      },
+      {
+        command: "logs",
+        description: "Show recent bot log lines",
+      },
+      {
+        command: "reload",
+        description: "Restart after this reply to reload config",
+      },
+      {
+        command: "restart",
+        description: "Restart after this reply",
       },
     ]);
   });

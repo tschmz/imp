@@ -126,7 +126,27 @@ A Telegram bot definition includes:
 - allowed user IDs
 - optional default agent routing
 
-Telegram bots automatically register a `/new` command that starts a fresh conversation and backs up the previous one.
+Telegram bots automatically register their command menus on startup. The built-in commands include:
+
+- `/help`
+- `/whoami`
+- `/new`
+- `/rename <title>`
+- `/clear`
+- `/status`
+- `/history`
+- `/restore <n>`
+- `/export`
+- `/ping`
+- `/config`
+- `/agent`
+- `/agent <id>`
+- `/logs`
+- `/logs <lines>`
+- `/reload`
+- `/restart`
+
+See [Telegram commands](./docs/telegram.md) for the command behavior details.
 
 ## Data and Logs
 

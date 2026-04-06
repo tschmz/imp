@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import type { AgentDefinition } from "../domain/agent.js";
 import { createFileLogger } from "../logging/file-logger.js";
-import type { Logger } from "../logging/types.js";
+import type { LogLevel, Logger } from "../logging/types.js";
 import {
   createBuiltInToolRegistry,
   type WorkingDirectoryState,
@@ -21,6 +21,8 @@ import type { ActiveBotRuntimeConfig, DaemonConfig, RuntimePaths } from "./types
 
 export interface BootstrappedRuntime {
   botConfig: ActiveBotRuntimeConfig;
+  configPath: string;
+  loggingLevel: LogLevel;
   logger: Logger;
   conversationStore: ConversationStore;
   engine: AgentEngine;
@@ -80,6 +82,8 @@ export async function bootstrapRuntime(
 
     return {
       botConfig,
+      configPath: config.configPath,
+      loggingLevel: config.logging.level,
       logger,
       conversationStore,
       engine,

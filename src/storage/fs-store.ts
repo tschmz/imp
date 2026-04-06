@@ -60,9 +60,10 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     async listBackups(ref) {
       return readConversationBackups(paths.conversationsDir, ref);
     },
-    async restore(ref, backupId) {
+    async restore(ref, backupId, options) {
       return withConversationWriteQueue(ref, async () =>
         withConversationLock(paths.conversationsDir, ref, async () => {
+          const current = await readConversationSnapshot(paths.conversationsDir, ref);
           const backup = await readConversationBackup(paths.conversationsDir, ref, backupId);
           if (!backup) {
             return false;
@@ -70,6 +71,13 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
 
           const snapshotPath = getConversationSnapshotPath(paths.conversationsDir, ref);
           const tempPath = `${snapshotPath}.${process.pid}.tmp`;
+          if (current) {
+            const currentBackupPath = createTimestampedBackupPath(
+              snapshotPath,
+              options?.now ?? new Date(),
+            );
+            await writeConversationBackup(currentBackupPath, current);
+          }
           const normalized = normalizeSnapshot({
             ...backup,
             state: {

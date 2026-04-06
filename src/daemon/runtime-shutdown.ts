@@ -1,6 +1,8 @@
 import { cleanupRuntimeState } from "./runtime-state.js";
 import { stopRuntimeEntries, type RuntimeEntry } from "./runtime-runner.js";
 
+export type RuntimeControlAction = "reload" | "restart";
+
 export interface RuntimeLifecycleProcess {
   once(event: "SIGINT" | "SIGTERM", listener: () => void): void;
   off(event: "SIGINT" | "SIGTERM", listener: () => void): void;
@@ -10,6 +12,7 @@ export interface RuntimeLifecycleProcess {
 export interface RuntimeShutdown {
   registerSignalHandlers(): { dispose(): void };
   shutdown(): Promise<void>;
+  requestControlAction(action: RuntimeControlAction): void;
 }
 
 export function createRuntimeShutdown(
@@ -18,6 +21,7 @@ export function createRuntimeShutdown(
   runtimeProcess: RuntimeLifecycleProcess = process,
 ): RuntimeShutdown {
   let shutdownPromise: Promise<void> | undefined;
+  let exitStarted = false;
 
   const shutdown = (): Promise<void> => {
     shutdownPromise ??= (async () => {
@@ -33,18 +37,25 @@ export function createRuntimeShutdown(
     return shutdownPromise;
   };
 
+  const beginExit = (code: number): void => {
+    if (exitStarted) {
+      return;
+    }
+    exitStarted = true;
+
+    void shutdown().finally(() => {
+      runtimeProcess.exit(code);
+    });
+  };
+
   return {
     registerSignalHandlers() {
       const handleSigint = () => {
-        void shutdown().finally(() => {
-          runtimeProcess.exit(130);
-        });
+        beginExit(130);
       };
 
       const handleSigterm = () => {
-        void shutdown().finally(() => {
-          runtimeProcess.exit(0);
-        });
+        beginExit(0);
       };
 
       runtimeProcess.once("SIGINT", handleSigint);
@@ -58,5 +69,9 @@ export function createRuntimeShutdown(
       };
     },
     shutdown,
+    requestControlAction(action) {
+      void action;
+      beginExit(75);
+    },
   };
 }

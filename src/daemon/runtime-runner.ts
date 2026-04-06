@@ -4,6 +4,7 @@ import { createAgentRegistry } from "../agents/registry.js";
 import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
 import type { Transport } from "../transports/types.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
+import type { RuntimeControlAction } from "./runtime-shutdown.js";
 import type { ActiveBotRuntimeConfig } from "./types.js";
 
 export interface RuntimeEntry {
@@ -14,6 +15,7 @@ export interface RuntimeEntry {
 interface RuntimeRunnerDependencies {
   agentRegistry: ReturnType<typeof createAgentRegistry>;
   createTransport?: (config: ActiveBotRuntimeConfig, logger: BootstrappedRuntime["logger"]) => Transport;
+  requestControlAction?: (action: RuntimeControlAction) => void;
 }
 
 export function createRuntimeEntries(
@@ -30,11 +32,20 @@ export function createRuntimeEntries(
       conversationStore: runtime.conversationStore,
       engine: runtime.engine,
       defaultAgentId: runtime.botConfig.defaultAgentId,
+      runtimeInfo: {
+        botId: runtime.botConfig.id,
+        configPath: runtime.configPath,
+        dataRoot: runtime.botConfig.paths.dataRoot,
+        logFilePath: runtime.botConfig.paths.logFilePath,
+        loggingLevel: runtime.loggingLevel,
+        activeBotIds: runtimes.map((entry) => entry.botConfig.id),
+      },
       logger: runtime.logger,
     });
     const messageProcessor = createMessageProcessor({
       handler: handleIncomingMessage,
       logger: runtime.logger,
+      afterDeliveryAction: dependencies.requestControlAction,
     });
     let transport: Transport | undefined;
     let stopped = false;
