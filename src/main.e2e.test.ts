@@ -49,9 +49,20 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("Usage: imp");
     expect(stdout).toContain("start");
     expect(stdout).toContain("log");
+    expect(stdout).toContain("config");
     expect(stdout).toContain("init");
     expect(stdout).toContain("service");
     expect(stdout).toContain("--version");
+  });
+
+  it("shows help output for config validate", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["config", "validate", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp config validate");
+    expect(stdout).toContain("--config <path>");
   });
 
   it("shows help output for service install", async () => {
@@ -168,6 +179,87 @@ describe("imp CLI e2e", () => {
     await expect(readFile(promptPath, "utf8")).resolves.toContain(
       "You are a local coding and operations assistant running through a local Imp daemon.",
     );
+  });
+
+  it("validates the discovered config through `imp config validate`", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+
+    await runCli(["init", "--defaults"], env);
+
+    const { stdout } = await runCli(["config", "validate"], env);
+
+    expect(stdout).toBe(`Config valid: ${configPath}\n`);
+  });
+
+  it("validates an explicit config path through `imp config validate --config`", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "custom", "imp.json");
+
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "default",
+      },
+      paths: {
+        dataRoot: join(root, "state-home", "imp"),
+      },
+      logging: {
+        level: "info",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: false,
+          token: "test-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const { stdout } = await runCli(["config", "validate", "--config", configPath], env);
+
+    expect(stdout).toBe(`Config valid: ${configPath}\n`);
+  });
+
+  it("fails with the existing missing-config error for `imp config validate`", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    await expect(runCli(["config", "validate"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining("No config file found."),
+    });
+  });
+
+  it("fails with the existing invalid-config error for `imp config validate`", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+
+    await overwriteConfig(configPath, {
+      invalid: true,
+    });
+
+    await expect(runCli(["config", "validate"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(`Invalid config file ${configPath}`),
+    });
   });
 
   it("copies the default provider key into the linux service environment during `imp init --defaults`", async () => {
@@ -693,7 +785,8 @@ function createTestEnv(root: string): NodeJS.ProcessEnv {
 }
 
 async function overwriteConfig(path: string, config: unknown): Promise<void> {
-  const { writeFile } = await import("node:fs/promises");
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
 

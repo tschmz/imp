@@ -4,6 +4,7 @@ import { Command } from "commander";
 export interface CliDependencies {
   startDaemon: (options: { configPath?: string }) => Promise<void>;
   viewLogs: (options: { configPath?: string; botId?: string; follow: boolean; lines: number }) => Promise<void>;
+  validateConfig: (options: { configPath?: string }) => Promise<void>;
   initConfig: (options: {
     configPath?: string;
     force: boolean;
@@ -70,6 +71,16 @@ export function createCli(dependencies: CliDependencies): Command {
         force: options.force ?? false,
         defaults: options.defaults ?? false,
       });
+    });
+
+  const configCommand = program.command("config").description("Inspect and validate config files");
+
+  configCommand
+    .command("validate")
+    .description("Validate a discovered or explicit config file")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, options: { config?: string }) {
+      await dependencies.validateConfig({ configPath: options.config });
     });
 
   const serviceCommand = program.command("service").description("Manage imp background services");

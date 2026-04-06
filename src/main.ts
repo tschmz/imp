@@ -3,6 +3,7 @@ import { createCli } from "./cli/create-cli.js";
 import { createInitConfigUseCase } from "./application/init-config-use-case.js";
 import { createRunDaemonUseCase, type RunDaemonOutcome } from "./application/run-daemon-use-case.js";
 import { createServiceUseCases } from "./application/service-use-cases.js";
+import { createValidateConfigUseCase } from "./application/validate-config-use-case.js";
 import { createViewLogsUseCase } from "./application/view-logs-use-case.js";
 import { createDaemonStartupFailureReporter } from "./logging/daemon-startup-failure-reporter.js";
 
@@ -10,12 +11,14 @@ async function main(): Promise<void> {
   const serviceUseCases = createServiceUseCases();
   const startupFailureReporter = createDaemonStartupFailureReporter();
   const runDaemonUseCase = createRunDaemonUseCase({ startupFailureReporter });
+  const validateConfigUseCase = createValidateConfigUseCase();
   const cli = createCli({
     startDaemon: async (options) => {
       const outcome = await runDaemonUseCase(options);
       presentRunDaemonOutcome(outcome);
     },
     viewLogs: createViewLogsUseCase(),
+    validateConfig: validateConfigUseCase,
     initConfig: createInitConfigUseCase(),
     installService: serviceUseCases.installService,
     uninstallService: serviceUseCases.uninstallService,
