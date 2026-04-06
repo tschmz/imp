@@ -38,7 +38,7 @@ describe("createPiAgentEngine", () => {
       (context) => {
         expect(context.systemPrompt).toBe(
           "You are concise.\n\n" +
-            '<INSTRUCTIONS from="/workspace/AGENTS.md">\n' +
+            '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
             "Follow the workspace instructions.\n" +
             "</INSTRUCTIONS>",
         );
@@ -524,12 +524,55 @@ describe("createPiAgentEngine", () => {
       (context) => {
         expect(context.systemPrompt).toBe(
           "You are concise.\n\n" +
-            '<INSTRUCTIONS from="/workspace/RULES.md">\n' +
+            '<INSTRUCTIONS from="/workspace/RULES.md">\n\n' +
             "Follow the explicit rules.\n" +
             "</INSTRUCTIONS>\n\n" +
-            '<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n' +
+            '<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n\n' +
             "Follow the workspace instructions.\n" +
             "</INSTRUCTIONS>",
+        );
+        return fauxAssistantMessage("ok");
+      },
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async (path) => {
+        if (path === "/workspace/RULES.md") {
+          return "Follow the explicit rules.";
+        }
+
+        if (path === "/workspace/project/AGENTS.md") {
+          return "Follow the workspace instructions.";
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        context: {
+          workingDirectory: "/workspace/project",
+          files: ["/workspace/RULES.md"],
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+  });
+
+  it("separates context instruction blocks with blank lines", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        expect(context.systemPrompt).toContain(
+          'You are concise.\n\n<INSTRUCTIONS from="/workspace/RULES.md">\n\nFollow the explicit rules.\n</INSTRUCTIONS>\n\n<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n\nFollow the workspace instructions.\n</INSTRUCTIONS>',
         );
         return fauxAssistantMessage("ok");
       },
@@ -573,7 +616,7 @@ describe("createPiAgentEngine", () => {
       (context) => {
         expect(context.systemPrompt).toBe(
           "You are concise.\n\n" +
-            '<INSTRUCTIONS from="/workspace/next/AGENTS.md">\n' +
+            '<INSTRUCTIONS from="/workspace/next/AGENTS.md">\n\n' +
             "Follow the next workspace instructions.\n" +
             "</INSTRUCTIONS>",
         );
@@ -656,7 +699,7 @@ describe("createPiAgentEngine", () => {
       (context) => {
         expect(context.systemPrompt).toBe(
           "You are concise.\n\n" +
-            '<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n' +
+            '<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n\n' +
             "Follow the workspace instructions.\n" +
             "</INSTRUCTIONS>",
         );
@@ -709,7 +752,7 @@ describe("createPiAgentEngine", () => {
       (context) => {
         expect(context.systemPrompt).toBe(
           "You are defined in a file.\n\n" +
-            '<INSTRUCTIONS from="/workspace/AGENTS.md">\n' +
+            '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
             "Follow the workspace instructions.\n" +
             "</INSTRUCTIONS>",
         );
@@ -906,8 +949,8 @@ describe("createPiAgentEngine", () => {
       "/workspace/AGENTS.md",
     ]);
     expect(systemPrompts).toEqual([
-      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\ncontext v1\n</INSTRUCTIONS>',
-      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\ncontext v2\n</INSTRUCTIONS>',
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\ncontext v1\n</INSTRUCTIONS>',
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\ncontext v2\n</INSTRUCTIONS>',
     ]);
   });
 

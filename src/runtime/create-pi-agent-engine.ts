@@ -479,7 +479,7 @@ async function buildSystemPrompt(
 }
 
 function formatContextInstructions(path: string, content: string): string {
-  return `<INSTRUCTIONS from="${escapeInstructionAttribute(path)}">\n${content}\n</INSTRUCTIONS>`;
+  return `<INSTRUCTIONS from="${escapeInstructionAttribute(path)}">\n\n${content}\n</INSTRUCTIONS>`;
 }
 
 function escapeInstructionAttribute(value: string): string {
