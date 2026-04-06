@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { stat } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { delimiter as pathDelimiter, join } from "node:path";
 import { Agent, type AgentMessage, type AgentOptions } from "@mariozechner/pi-agent-core";
 import {
   createCodingTools,
@@ -314,13 +314,85 @@ function resolveBuiltInToolOptions(agent?: AgentDefinition): ToolsOptions | unde
       spawnHook: ({ command, cwd, env }) => ({
         command,
         cwd,
-        env: {
-          ...env,
-          PATH: shellPath.join(":"),
-        },
+        env: mergeShellPathEntries(env, shellPath),
       }),
     },
   };
+}
+
+export function mergeShellPathEntries(
+  env: NodeJS.ProcessEnv,
+  additionalEntries: string[],
+  options: { delimiter?: string; platform?: NodeJS.Platform } = {},
+): NodeJS.ProcessEnv {
+  const delimiter = options.delimiter ?? pathDelimiter;
+  const platform = options.platform ?? process.platform;
+  const pathKey = resolvePathEnvironmentKey(env, platform);
+  const currentPath = env[pathKey];
+  const envWithoutDuplicatePathKeys = removeDuplicatePathKeys(env, platform);
+
+  return {
+    ...envWithoutDuplicatePathKeys,
+    [pathKey]: appendPathEntries(currentPath, additionalEntries, delimiter),
+  };
+}
+
+function resolvePathEnvironmentKey(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
+  if (platform === "win32") {
+    if ("Path" in env) {
+      return "Path";
+    }
+
+    if ("PATH" in env) {
+      return "PATH";
+    }
+
+    const existingKey = Object.keys(env).find((key) => key.toLowerCase() === "path");
+    if (existingKey) {
+      return existingKey;
+    }
+
+    return "Path";
+  }
+
+  return "PATH";
+}
+
+function removeDuplicatePathKeys(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+): NodeJS.ProcessEnv {
+  if (platform !== "win32") {
+    return env;
+  }
+
+  return Object.fromEntries(
+    Object.entries(env).filter(([key]) => key.toLowerCase() !== "path"),
+  );
+}
+
+function appendPathEntries(
+  currentPath: string | undefined,
+  additionalEntries: string[],
+  delimiter: string,
+): string {
+  const mergedEntries = [
+    ...splitPathEntries(currentPath, delimiter),
+    ...additionalEntries,
+  ];
+
+  return [...new Set(mergedEntries)].join(delimiter);
+}
+
+function splitPathEntries(pathValue: string | undefined, delimiter: string): string[] {
+  if (!pathValue) {
+    return [];
+  }
+
+  return pathValue
+    .split(delimiter)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }
 
 function createGetWorkingDirectoryTool(workingDirectoryState: WorkingDirectoryState): ToolDefinition {

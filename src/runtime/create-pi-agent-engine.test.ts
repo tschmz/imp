@@ -8,7 +8,11 @@ import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
-import { createBuiltInToolRegistry, createPiAgentEngine } from "./create-pi-agent-engine.js";
+import {
+  createBuiltInToolRegistry,
+  createPiAgentEngine,
+  mergeShellPathEntries,
+} from "./create-pi-agent-engine.js";
 
 const registrations: FauxProviderRegistration[] = [];
 const tempDirs: string[] = [];
@@ -445,7 +449,7 @@ describe("createPiAgentEngine", () => {
     expect(secondListingText).toContain("from-second.txt");
   });
 
-  it("uses the agent shell PATH for bash tool execution", async () => {
+  it("appends the agent shell PATH for bash tool execution", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-shell-path-"));
     tempDirs.push(root);
 
@@ -469,7 +473,64 @@ describe("createPiAgentEngine", () => {
       .flatMap((item) => (item.type === "text" ? [item.text] : []))
       .join("\n");
 
-    expect(output).toContain("/custom/bin:/usr/bin:/bin");
+    const outputEntries = output.split(":");
+
+    expect(outputEntries).toEqual(
+      expect.arrayContaining(["/usr/bin", "/bin", "/custom/bin"]),
+    );
+    expect(outputEntries.indexOf("/custom/bin")).toBeGreaterThan(outputEntries.indexOf("/bin"));
+  });
+
+  it("preserves the existing Windows PATH key and delimiter when merging shell path entries", () => {
+    const env = {
+      Path: "C:\\Windows\\System32;C:\\Program Files\\Git\\bin",
+      PATHEXT: ".EXE;.CMD",
+    };
+
+    const merged = mergeShellPathEntries(env, ["C:\\project\\node_modules\\.bin"], {
+      platform: "win32",
+      delimiter: ";",
+    });
+
+    expect(merged.Path).toBe(
+      "C:\\Windows\\System32;C:\\Program Files\\Git\\bin;C:\\project\\node_modules\\.bin",
+    );
+    expect(merged.PATH).toBeUndefined();
+    expect(merged.PATHEXT).toBe(".EXE;.CMD");
+  });
+
+  it("removes duplicate Windows PATH keys before setting the merged path", () => {
+    const env = {
+      PATH: "C:\\stale\\bin",
+      Path: "C:\\Windows\\System32",
+      HOME: "C:\\Users\\thomas",
+    };
+
+    const merged = mergeShellPathEntries(env, ["C:\\project\\node_modules\\.bin"], {
+      platform: "win32",
+      delimiter: ";",
+    });
+
+    expect(merged).toEqual({
+      Path: "C:\\Windows\\System32;C:\\project\\node_modules\\.bin",
+      HOME: "C:\\Users\\thomas",
+    });
+  });
+
+  it("creates a POSIX PATH entry even when a differently cased key exists", () => {
+    const env = {
+      Path: "/wrapper/bin",
+      HOME: "/tmp/home",
+    };
+
+    const merged = mergeShellPathEntries(env, ["/project/node_modules/.bin"], {
+      platform: "linux",
+      delimiter: ":",
+    });
+
+    expect(merged.PATH).toBe("/project/node_modules/.bin");
+    expect(merged.Path).toBe("/wrapper/bin");
+    expect(merged.HOME).toBe("/tmp/home");
   });
 
   it("rejects cd when the target is not a directory", async () => {
