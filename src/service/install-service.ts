@@ -60,7 +60,6 @@ export async function installService(options: {
       content: await renderLinuxServiceEnvironment({
         path: environmentPath,
         env: options.serviceEnvironment,
-        pathEnv: process.env,
         force: options.force,
       }),
       force: options.force,

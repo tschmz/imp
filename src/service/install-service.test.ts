@@ -66,7 +66,7 @@ describe("installService", () => {
     await expect(readFile(result.definitionPath, "utf8")).resolves.toContain(
       `EnvironmentFile=${join(root, ".config", "imp", "service.env")}`,
     );
-    await expect(readFile(join(root, ".config", "imp", "service.env"), "utf8")).resolves.toContain("PATH=");
+    await expect(readFile(join(root, ".config", "imp", "service.env"), "utf8")).resolves.toBe("\n");
     expect(calls).toEqual([
       { command: "systemctl", args: ["--user", "daemon-reload"] },
       { command: "systemctl", args: ["--user", "enable", "--now", "imp.service"] },

@@ -159,7 +159,7 @@ describe("imp CLI e2e", () => {
       await expect(stat(servicePath)).resolves.toBeDefined();
     }
     if (process.platform === "linux") {
-      await expect(readFile(environmentPath, "utf8")).resolves.toContain("PATH=");
+      await expect(readFile(environmentPath, "utf8")).resolves.not.toContain("PATH=");
     }
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
