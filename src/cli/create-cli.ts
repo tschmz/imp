@@ -5,6 +5,7 @@ export interface CliDependencies {
   startDaemon: (options: { configPath?: string }) => Promise<void>;
   viewLogs: (options: { configPath?: string; botId?: string; follow: boolean; lines: number }) => Promise<void>;
   validateConfig: (options: { configPath?: string }) => Promise<void>;
+  reloadConfig: (options: { configPath?: string }) => Promise<void>;
   getConfigValue: (options: { configPath?: string; keyPath: string }) => Promise<void>;
   setConfigValue: (options: { configPath?: string; keyPath: string; value: string }) => Promise<void>;
   initConfig: (options: {
@@ -75,7 +76,7 @@ export function createCli(dependencies: CliDependencies): Command {
       });
     });
 
-  const configCommand = program.command("config").description("Inspect and validate config files");
+  const configCommand = program.command("config").description("Inspect, reload, and validate config files");
 
   configCommand
     .command("get")
@@ -111,6 +112,14 @@ export function createCli(dependencies: CliDependencies): Command {
     .option("-c, --config <path>", "Path to the config file")
     .action(async function action(this: Command, options: { config?: string }) {
       await dependencies.validateConfig({ configPath: options.config });
+    });
+
+  configCommand
+    .command("reload")
+    .description("Reload a discovered or explicit config in the installed service")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, options: { config?: string }) {
+      await dependencies.reloadConfig({ configPath: options.config });
     });
 
   const serviceCommand = program.command("service").description("Manage imp background services");

@@ -65,6 +65,16 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("--config <path>");
   });
 
+  it("shows help output for config reload", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["config", "reload", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp config reload");
+    expect(stdout).toContain("--config <path>");
+  });
+
   it("shows help output for config get", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
