@@ -26,8 +26,9 @@ describe("createPiAgentEngine", () => {
       (context) => {
         expect(context.systemPrompt).toBe(
           "You are concise.\n\n" +
-            "[Context File: /workspace/AGENTS.md]\n" +
-            "Follow the workspace instructions.",
+            '<INSTRUCTIONS from="/workspace/AGENTS.md">\n' +
+            "Follow the workspace instructions.\n" +
+            "</INSTRUCTIONS>",
         );
         expect(context.messages).toHaveLength(3);
         expect(context.messages[0]).toMatchObject({
@@ -452,8 +453,9 @@ describe("createPiAgentEngine", () => {
       (context) => {
         expect(context.systemPrompt).toBe(
           "You are defined in a file.\n\n" +
-            "[Context File: /workspace/AGENTS.md]\n" +
-            "Follow the workspace instructions.",
+            '<INSTRUCTIONS from="/workspace/AGENTS.md">\n' +
+            "Follow the workspace instructions.\n" +
+            "</INSTRUCTIONS>",
         );
         return fauxAssistantMessage("ok");
       },
@@ -648,8 +650,8 @@ describe("createPiAgentEngine", () => {
       "/workspace/AGENTS.md",
     ]);
     expect(systemPrompts).toEqual([
-      "You are concise.\n\n[Context File: /workspace/AGENTS.md]\ncontext v1",
-      "You are concise.\n\n[Context File: /workspace/AGENTS.md]\ncontext v2",
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\ncontext v1\n</INSTRUCTIONS>',
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\ncontext v2\n</INSTRUCTIONS>',
     ]);
   });
 

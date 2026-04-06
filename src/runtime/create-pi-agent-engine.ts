@@ -326,10 +326,18 @@ async function buildSystemPrompt(
       continue;
     }
 
-    sections.push(`[Context File: ${path}]\n${trimmedContent}`);
+    sections.push(formatContextInstructions(path, trimmedContent));
   }
 
   return sections.join("\n\n");
+}
+
+function formatContextInstructions(path: string, content: string): string {
+  return `<INSTRUCTIONS from="${escapeInstructionAttribute(path)}">\n${content}\n</INSTRUCTIONS>`;
+}
+
+function escapeInstructionAttribute(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
 async function resolveSystemPrompt(options: {
