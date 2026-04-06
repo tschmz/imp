@@ -1,0 +1,18 @@
+import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
+
+export const restartCommandHandler: InboundCommandHandler = {
+  canHandle(command) {
+    return command === "restart";
+  },
+  async handle({ message }: InboundCommandContext) {
+    return {
+      conversation: message.conversation,
+      text: [
+        "Restart scheduled.",
+        "The daemon will exit after this reply so a supervisor can restart it.",
+        "If imp is not running under a service manager yet, start it again manually.",
+      ].join("\n"),
+      deliveryAction: "restart",
+    };
+  },
+};

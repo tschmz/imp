@@ -1,0 +1,32 @@
+import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
+
+export const clearCommandHandler: InboundCommandHandler = {
+  canHandle(command) {
+    return command === "clear";
+  },
+  async handle({ message, dependencies }: InboundCommandContext) {
+    const existing = await dependencies.conversationStore.get(message.conversation);
+    if (!existing) {
+      return {
+        conversation: message.conversation,
+        text: "There is no active conversation to clear.",
+      };
+    }
+
+    await dependencies.conversationStore.put({
+      state: {
+        conversation: existing.state.conversation,
+        agentId: existing.state.agentId,
+        ...(existing.state.title ? { title: existing.state.title } : {}),
+        createdAt: message.receivedAt,
+        updatedAt: message.receivedAt,
+        version: existing.state.version,
+      },
+      messages: [],
+    });
+    return {
+      conversation: message.conversation,
+      text: "Cleared the active conversation. The current agent and title were preserved.",
+    };
+  },
+};
