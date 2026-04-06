@@ -5,6 +5,7 @@ export interface CliDependencies {
   startDaemon: (options: { configPath?: string }) => Promise<void>;
   viewLogs: (options: { configPath?: string; botId?: string; follow: boolean; lines: number }) => Promise<void>;
   validateConfig: (options: { configPath?: string }) => Promise<void>;
+  getConfigValue: (options: { configPath?: string; keyPath: string }) => Promise<void>;
   initConfig: (options: {
     configPath?: string;
     force: boolean;
@@ -74,6 +75,18 @@ export function createCli(dependencies: CliDependencies): Command {
     });
 
   const configCommand = program.command("config").description("Inspect and validate config files");
+
+  configCommand
+    .command("get")
+    .description("Read a value from a discovered or explicit config file")
+    .argument("<keyPath>", "Dot-separated config key path")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(async function action(this: Command, keyPath: string, options: { config?: string }) {
+      await dependencies.getConfigValue({
+        configPath: options.config,
+        keyPath,
+      });
+    });
 
   configCommand
     .command("validate")

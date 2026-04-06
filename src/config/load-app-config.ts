@@ -6,7 +6,7 @@ import { appConfigSchema } from "./schema.js";
 export async function loadAppConfig(configPath: string): Promise<AppConfig> {
   const absolutePath = resolve(configPath);
   const raw = await readFile(absolutePath, "utf8");
-  const parsed = JSON.parse(raw) as unknown;
+  const parsed = parseConfigJson(raw, absolutePath);
   const result = appConfigSchema.safeParse(parsed);
 
   if (!result.success) {
@@ -17,4 +17,13 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
   }
 
   return result.data;
+}
+
+function parseConfigJson(raw: string, absolutePath: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid config file ${absolutePath}\nMalformed JSON: ${message}`);
+  }
 }
