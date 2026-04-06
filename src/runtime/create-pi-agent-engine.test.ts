@@ -1,18 +1,30 @@
 import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
-import { createPiAgentEngine } from "./create-pi-agent-engine.js";
+import { createBuiltInToolRegistry, createPiAgentEngine } from "./create-pi-agent-engine.js";
 
 const registrations: FauxProviderRegistration[] = [];
+const tempDirs: string[] = [];
 
 afterEach(() => {
   while (registrations.length > 0) {
     registrations.pop()?.unregister();
   }
+});
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirs.splice(0).map(async (path) => {
+      await rm(path, { recursive: true, force: true });
+    }),
+  );
 });
 
 describe("createPiAgentEngine", () => {
@@ -386,6 +398,64 @@ describe("createPiAgentEngine", () => {
 
     expect(capturedWorkingDirectory).toBe("/workspace/project");
     expect(capturedTools?.map((tool) => tool.name)).toEqual(["read", "bash"]);
+  });
+
+  it("allows agents to inspect and change their working directory via tools", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-working-directory-"));
+    tempDirs.push(root);
+    const firstDir = join(root, "first");
+    const secondDir = join(root, "second");
+    await mkdir(firstDir);
+    await mkdir(secondDir);
+    await writeFile(join(firstDir, "from-first.txt"), "first", "utf8");
+    await writeFile(join(secondDir, "from-second.txt"), "second", "utf8");
+
+    const registry = createBuiltInToolRegistry(firstDir);
+    const getWorkingDirectory = registry.get("pwd");
+    const setWorkingDirectory = registry.get("cd");
+    const ls = registry.get("ls");
+
+    expect(getWorkingDirectory).toBeDefined();
+    expect(setWorkingDirectory).toBeDefined();
+    expect(ls).toBeDefined();
+
+    await expect(getWorkingDirectory!.execute("1", {})).resolves.toMatchObject({
+      details: { workingDirectory: firstDir },
+    });
+
+    const firstListing = await ls!.execute("2", { path: "." });
+    const firstListingText = firstListing.content
+      .flatMap((item) => (item.type === "text" ? [item.text] : []))
+      .join("\n");
+    expect(firstListingText).toContain("from-first.txt");
+
+    await expect(setWorkingDirectory!.execute("3", { path: secondDir })).resolves.toMatchObject({
+      details: { workingDirectory: secondDir },
+    });
+
+    await expect(getWorkingDirectory!.execute("4", {})).resolves.toMatchObject({
+      details: { workingDirectory: secondDir },
+    });
+
+    const secondListing = await ls!.execute("5", { path: "." });
+    const secondListingText = secondListing.content
+      .flatMap((item) => (item.type === "text" ? [item.text] : []))
+      .join("\n");
+    expect(secondListingText).toContain("from-second.txt");
+  });
+
+  it("rejects cd when the target is not a directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-working-directory-"));
+    tempDirs.push(root);
+    const filePath = join(root, "file.txt");
+    await writeFile(filePath, "hello", "utf8");
+
+    const registry = createBuiltInToolRegistry(root);
+    const setWorkingDirectory = registry.get("cd");
+
+    await expect(setWorkingDirectory!.execute("1", { path: filePath })).rejects.toThrow(
+      `Not a directory: ${filePath}`,
+    );
   });
 
   it("fails clearly when a configured tool cannot be resolved", async () => {

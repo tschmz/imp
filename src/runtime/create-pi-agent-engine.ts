@@ -61,6 +61,11 @@ interface AgentHandle {
   };
 }
 
+interface WorkingDirectoryState {
+  get(): string;
+  set(path: string): void;
+}
+
 export function createPiAgentEngine(
   dependencies: PiAgentEngineDependencies = {},
 ): AgentEngine {
@@ -214,12 +219,120 @@ export function resolveWorkingDirectory(agent: AgentDefinition): string {
 }
 
 export function createBuiltInToolRegistry(workingDirectory: string): ToolRegistry {
+  const workingDirectoryState = createWorkingDirectoryState(workingDirectory);
+
   return createToolRegistry([
+    ...createDynamicBuiltInTools(workingDirectoryState),
+    createGetWorkingDirectoryTool(workingDirectoryState),
+    createSetWorkingDirectoryTool(workingDirectoryState),
+  ]);
+}
+
+function createWorkingDirectoryState(initialWorkingDirectory: string): WorkingDirectoryState {
+  let workingDirectory = initialWorkingDirectory;
+
+  return {
+    get() {
+      return workingDirectory;
+    },
+    set(path: string) {
+      workingDirectory = path;
+    },
+  };
+}
+
+function createDynamicBuiltInTools(workingDirectoryState: WorkingDirectoryState): ToolDefinition[] {
+  return createBaseBuiltInTools(workingDirectoryState.get()).map((tool) => ({
+    ...tool,
+    async execute(toolCallId, params, signal, onUpdate) {
+      const delegatedTool = createBaseBuiltInTools(workingDirectoryState.get()).find(
+        (candidate) => candidate.name === tool.name,
+      );
+      if (!delegatedTool) {
+        throw new Error(`Unknown built-in tool: ${tool.name}`);
+      }
+
+      return delegatedTool.execute(toolCallId, params, signal, onUpdate);
+    },
+  }));
+}
+
+function createBaseBuiltInTools(workingDirectory: string): ToolDefinition[] {
+  return [
     ...createCodingTools(workingDirectory),
     createGrepTool(workingDirectory),
     createFindTool(workingDirectory),
     createLsTool(workingDirectory),
-  ]);
+  ];
+}
+
+function createGetWorkingDirectoryTool(workingDirectoryState: WorkingDirectoryState): ToolDefinition {
+  const parameters = {
+    type: "object",
+    properties: {},
+    additionalProperties: false,
+  } as unknown as ToolDefinition["parameters"];
+
+  return {
+    name: "pwd",
+    label: "pwd",
+    description: "Return the current working directory used by filesystem and shell tools.",
+    parameters,
+    async execute() {
+      const workingDirectory = workingDirectoryState.get();
+      return {
+        content: [{ type: "text", text: workingDirectory }],
+        details: { workingDirectory },
+      };
+    },
+  };
+}
+
+function createSetWorkingDirectoryTool(workingDirectoryState: WorkingDirectoryState): ToolDefinition {
+  const parameters = {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        minLength: 1,
+      },
+    },
+    required: ["path"],
+    additionalProperties: false,
+  } as unknown as ToolDefinition["parameters"];
+
+  return {
+    name: "cd",
+    label: "cd",
+    description: "Set the working directory used by subsequent filesystem and shell tool calls.",
+    parameters,
+    async execute(_toolCallId, params) {
+      const { path } = parseSetWorkingDirectoryParams(params);
+      const directoryStats = await stat(path);
+      if (!directoryStats.isDirectory()) {
+        throw new Error(`Not a directory: ${path}`);
+      }
+
+      workingDirectoryState.set(path);
+      return {
+        content: [{ type: "text", text: path }],
+        details: { workingDirectory: path },
+      };
+    },
+  };
+}
+
+function parseSetWorkingDirectoryParams(params: unknown): { path: string } {
+  if (typeof params !== "object" || params === null) {
+    throw new Error("cd requires an object parameter with a path.");
+  }
+
+  const path = "path" in params ? params.path : undefined;
+  if (typeof path !== "string" || path.length === 0) {
+    throw new Error("cd requires a non-empty string path.");
+  }
+
+  return { path };
 }
 
 export function resolveAgentTools(
