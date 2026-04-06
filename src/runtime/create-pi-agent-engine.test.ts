@@ -101,13 +101,15 @@ describe("createPiAgentEngine", () => {
       resolveModel: () => undefined,
     });
 
-    await expect(
-      engine.run({
-        agent: createAgent(),
-        conversation: createConversation(),
-        message: createIncomingMessage(),
-      }),
-    ).rejects.toThrow('Unknown model for agent "default": faux/faux-1');
+    const runPromise = engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    await expect(runPromise).rejects.toThrow('Unknown model for agent "default": faux/faux-1');
+
+    const runError = await runPromise.catch((error: unknown) => error);
     expect(logger.error).toHaveBeenCalledWith(
       "agent engine run failed",
       expect.objectContaining({
@@ -120,7 +122,7 @@ describe("createPiAgentEngine", () => {
         durationMs: expect.any(Number),
         errorType: "Error",
       }),
-      expect.any(Error),
+      runError,
     );
   });
 

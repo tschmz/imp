@@ -51,6 +51,7 @@ interface PipelineEvent {
   durationMs?: number;
   cacheHit?: boolean;
   errorType?: string;
+  error?: unknown;
 }
 
 export function createPiAgentEngine(
@@ -143,6 +144,7 @@ export function createPiAgentEngine(
           status: "failed",
           durationMs: Date.now() - startedAt,
           errorType: error instanceof Error ? error.name : typeof error,
+          error,
         });
         throw error;
       }
@@ -168,7 +170,7 @@ async function logPipelineEvent(
         durationMs: event.durationMs,
         errorType: event.errorType,
       },
-      new Error("agent-engine.pipeline failed"),
+      event.error instanceof Error ? event.error : new Error(String(event.error ?? "Unknown pipeline error")),
     );
   }
 }
