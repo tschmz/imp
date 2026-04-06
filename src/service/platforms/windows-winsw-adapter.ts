@@ -1,4 +1,5 @@
 import type { ServiceInstallPlan } from "../install-plan.js";
+import { ServiceOperationError } from "../service-error.js";
 import type { ServicePlatformAdapter } from "./service-platform-adapter.js";
 
 export const windowsWinSwAdapter: ServicePlatformAdapter = {
@@ -17,25 +18,25 @@ export const windowsWinSwAdapter: ServicePlatformAdapter = {
     ].join("\n");
   },
   resolveDefinitionPath() {
-    throw new Error("Automatic Windows service installation is not implemented yet.");
+    throw new ServiceOperationError("unsupported", "Automatic Windows service installation is not implemented yet.");
   },
   async install() {
-    throw new Error("Automatic Windows service installation is not implemented yet.");
+    throw new ServiceOperationError("unsupported", "Automatic Windows service installation is not implemented yet.");
   },
   async uninstall() {
-    throw new Error("Automatic Windows service uninstallation is not implemented yet.");
+    throw new ServiceOperationError("unsupported", "Automatic Windows service uninstallation is not implemented yet.");
   },
   async start() {
-    throw new Error("Automatic Windows service control is not implemented yet.");
+    throw new ServiceOperationError("unsupported", "Automatic Windows service control is not implemented yet.");
   },
   async stop() {
-    throw new Error("Automatic Windows service control is not implemented yet.");
+    throw new ServiceOperationError("unsupported", "Automatic Windows service control is not implemented yet.");
   },
   async restart() {
-    throw new Error("Automatic Windows service control is not implemented yet.");
+    throw new ServiceOperationError("unsupported", "Automatic Windows service control is not implemented yet.");
   },
   async status() {
-    throw new Error("Automatic Windows service status is not implemented yet.");
+    throw new ServiceOperationError("unsupported", "Automatic Windows service status is not implemented yet.");
   },
 };
 

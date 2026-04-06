@@ -46,25 +46,55 @@ export const macosLaunchdAdapter: ServicePlatformAdapter = {
     await runIgnoringFailure(options.installer, "launchctl", ["bootout", domainTarget, options.definitionPath]);
     await options.installer.run("launchctl", ["bootstrap", domainTarget, options.definitionPath]);
     await options.installer.run("launchctl", ["kickstart", "-k", `${domainTarget}/${options.plan.serviceLabel}`]);
+    return {
+      operation: "install",
+      platform: "macos-launchd-agent",
+      serviceName: options.plan.serviceName,
+      definitionPath: options.definitionPath,
+    };
   },
   async uninstall(context: ServiceRuntimeContext) {
     const domainTarget = getLaunchdDomainTarget(context.uid);
     await runIgnoringFailure(context.installer, "launchctl", ["bootout", domainTarget, context.definitionPath]);
+    return {
+      operation: "uninstall",
+      platform: "macos-launchd-agent",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+    };
   },
   async start(context: ServiceRuntimeContext) {
     const domainTarget = getLaunchdDomainTarget(context.uid);
     await runIgnoringFailure(context.installer, "launchctl", ["bootstrap", domainTarget, context.definitionPath]);
     await runIgnoringFailure(context.installer, "launchctl", ["kickstart", "-k", `${domainTarget}/${context.serviceLabel}`]);
+    return {
+      operation: "start",
+      platform: "macos-launchd-agent",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+    };
   },
   async stop(context: ServiceRuntimeContext) {
     const domainTarget = getLaunchdDomainTarget(context.uid);
     await context.installer.run("launchctl", ["bootout", domainTarget, context.definitionPath]);
+    return {
+      operation: "stop",
+      platform: "macos-launchd-agent",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+    };
   },
   async restart(context: ServiceRuntimeContext) {
     const domainTarget = getLaunchdDomainTarget(context.uid);
     await runIgnoringFailure(context.installer, "launchctl", ["bootout", domainTarget, context.definitionPath]);
     await context.installer.run("launchctl", ["bootstrap", domainTarget, context.definitionPath]);
     await runIgnoringFailure(context.installer, "launchctl", ["kickstart", "-k", `${domainTarget}/${context.serviceLabel}`]);
+    return {
+      operation: "restart",
+      platform: "macos-launchd-agent",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+    };
   },
   async status(context: ServiceRuntimeContext) {
     if (!context.installer.runAndCapture) {
@@ -75,7 +105,13 @@ export const macosLaunchdAdapter: ServicePlatformAdapter = {
       "print",
       `${getLaunchdDomainTarget(context.uid)}/${context.serviceLabel}`,
     ]);
-    return joinCommandOutput(result.stdout, result.stderr);
+    return {
+      operation: "status",
+      platform: "macos-launchd-agent",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+      statusOutput: joinCommandOutput(result.stdout, result.stderr),
+    };
   },
 };
 

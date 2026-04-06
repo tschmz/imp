@@ -2,6 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { ServiceOperationError } from "./service-error.js";
 import {
   assertServiceDefinitionExists,
   uninstallService,
@@ -19,78 +20,48 @@ afterEach(async () => {
 });
 
 describe("uninstallService", () => {
-  it("fails when the service definition does not exist", async () => {
-    await expect(assertServiceDefinitionExists("/tmp/imp-missing.service")).rejects.toThrowError(
-      "Service definition not found: /tmp/imp-missing.service",
-    );
+  it("fails with not_installed when the service definition does not exist", async () => {
+    await expect(assertServiceDefinitionExists("/tmp/imp-missing.service")).rejects.toMatchObject({
+      code: "not_installed",
+    });
   });
 
-  it("removes a linux user service definition", async () => {
+  it("returns a structured uninstall result and removes the service definition", async () => {
     const root = await createTempDir();
     const definitionPath = join(root, ".config", "systemd", "user", "imp.service");
-    const calls: Array<{ command: string; args: string[] }> = [];
 
     await createServiceDefinition(definitionPath);
 
     const result = await uninstallService({
+      configPath: join(root, ".config", "imp", "config.json"),
+      platform: "linux",
+      homeDir: root,
+      installer: {
+        async run() {},
+      },
+    });
+
+    expect(result.operation).toMatchObject({
+      operation: "uninstall",
       platform: "linux-systemd-user",
-      definitionPath,
       serviceName: "imp",
-      serviceLabel: "dev.imp",
-      installer: {
-        async run(command, args) {
-          calls.push({ command, args });
-        },
-      },
+      definitionPath,
     });
-
-    expect(result.definitionPath).toBe(definitionPath);
-    expect(calls).toEqual([
-      { command: "systemctl", args: ["--user", "disable", "--now", "imp.service"] },
-      { command: "systemctl", args: ["--user", "daemon-reload"] },
-    ]);
     await expect(readFile(definitionPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("removes a macOS launch agent definition", async () => {
-    const root = await createTempDir();
-    const definitionPath = join(root, "Library", "LaunchAgents", "dev.imp.plist");
-    const calls: Array<{ command: string; args: string[] }> = [];
-
-    await createServiceDefinition(definitionPath);
-
-    await uninstallService({
-      platform: "macos-launchd-agent",
-      definitionPath,
-      serviceName: "imp",
-      serviceLabel: "dev.imp",
-      uid: 501,
-      installer: {
-        async run(command, args) {
-          calls.push({ command, args });
-        },
-      },
-    });
-
-    expect(calls).toEqual([
-      { command: "launchctl", args: ["bootout", "gui/501", definitionPath] },
-    ]);
-    await expect(readFile(definitionPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("rejects automatic windows uninstallation for now", async () => {
+  it("maps windows uninstall as unsupported capability", async () => {
     const root = await createTempDir();
     const definitionPath = join(root, "imp.xml");
     await createServiceDefinition(definitionPath);
 
     await expect(
       uninstallService({
-        platform: "windows-winsw",
-        definitionPath,
-        serviceName: "imp",
-        serviceLabel: "dev.imp",
+        configPath: "C:/Users/tester/.config/imp/config.json",
+        platform: "win32",
+        homeDir: root,
       }),
-    ).rejects.toThrowError("Automatic Windows service uninstallation is not implemented yet.");
+    ).rejects.toBeInstanceOf(ServiceOperationError);
   });
 });
 

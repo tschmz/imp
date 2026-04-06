@@ -60,10 +60,10 @@ describe("installService", () => {
       },
     });
 
-    expect(result.definitionPath).toBe(join(root, ".config", "systemd", "user", "imp.service"));
+    expect(result.operation.definitionPath).toBe(join(root, ".config", "systemd", "user", "imp.service"));
     expect(result.environmentPath).toBe(join(root, ".config", "imp", "service.env"));
-    await expect(readFile(result.definitionPath, "utf8")).resolves.toContain("ExecStart=");
-    await expect(readFile(result.definitionPath, "utf8")).resolves.toContain(
+    await expect(readFile(result.operation.definitionPath, "utf8")).resolves.toContain("ExecStart=");
+    await expect(readFile(result.operation.definitionPath, "utf8")).resolves.toContain(
       `EnvironmentFile=${join(root, ".config", "imp", "service.env")}`,
     );
     await expect(readFile(join(root, ".config", "imp", "service.env"), "utf8")).resolves.toBe("\n");
@@ -116,8 +116,8 @@ describe("installService", () => {
       },
     });
 
-    expect(result.definitionPath).toBe(join(root, "Library", "LaunchAgents", "dev.imp.plist"));
-    await expect(readFile(result.definitionPath, "utf8")).resolves.toContain("<plist version=\"1.0\">");
+    expect(result.operation.definitionPath).toBe(join(root, "Library", "LaunchAgents", "dev.imp.plist"));
+    await expect(readFile(result.operation.definitionPath, "utf8")).resolves.toContain("<plist version=\"1.0\">");
     expect(calls).toEqual([
       {
         command: "launchctl",
