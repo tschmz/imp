@@ -478,7 +478,7 @@ describe("createPiAgentEngine", () => {
     expect(outputEntries).toEqual(
       expect.arrayContaining(["/usr/bin", "/bin", "/custom/bin"]),
     );
-    expect(outputEntries.indexOf("/custom/bin")).toBeGreaterThan(outputEntries.indexOf("/bin"));
+    expect(outputEntries.indexOf("/custom/bin")).toBeLessThan(outputEntries.indexOf("/bin"));
   });
 
   it("preserves the existing Windows PATH key and delimiter when merging shell path entries", () => {
