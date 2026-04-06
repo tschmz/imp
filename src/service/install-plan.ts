@@ -38,7 +38,9 @@ export function createServiceInstallPlan(options: {
     command: commandLine.command,
     args: commandLine.args,
     environmentPath:
-      platform === "linux-systemd-user" ? resolve(options.environmentPath ?? `${configPath}.service.env`) : undefined,
+      platform === "linux-systemd-user"
+        ? resolve(options.environmentPath ?? dirname(configPath), "service.env")
+        : undefined,
   };
 }
 

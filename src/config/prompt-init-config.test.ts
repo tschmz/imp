@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { promptForInitialAppConfig } from "./prompt-init-config.js";
+import { getProviderEnvironmentVariables, promptForInitialAppConfig } from "./prompt-init-config.js";
 
 describe("promptForInitialAppConfig", () => {
   it("returns a config and enables service installation by default", async () => {
@@ -15,7 +15,9 @@ describe("promptForInitialAppConfig", () => {
       .mockResolvedValueOnce("123:abc")
       .mockResolvedValueOnce("1, 2")
       .mockResolvedValueOnce("/workspace")
-      .mockResolvedValueOnce("/workspace/RULES.md");
+      .mockResolvedValueOnce("/workspace/RULES.md")
+      .mockResolvedValueOnce("sk-test")
+      .mockResolvedValueOnce("IMP_DEBUG=true");
     const confirm = vi
       .fn()
       .mockResolvedValueOnce(true)
@@ -36,6 +38,14 @@ describe("promptForInitialAppConfig", () => {
     });
     expect(result.config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
     expect(result.config.bots[0]?.access.allowedUserIds).toEqual(["1", "2"]);
+    if (process.platform === "linux") {
+      expect(result.serviceEnvironment).toEqual({
+        OPENAI_API_KEY: "sk-test",
+        IMP_DEBUG: "true",
+      });
+    } else {
+      expect(result.serviceEnvironment).toBeUndefined();
+    }
     expect(confirm).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
@@ -69,5 +79,9 @@ describe("promptForInitialAppConfig", () => {
 
     expect(result.installService).toBe(false);
     expect(result.config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
+  });
+
+  it("lists the expected environment variables for the openai provider", () => {
+    expect(getProviderEnvironmentVariables("openai")).toEqual(["OPENAI_API_KEY"]);
   });
 });

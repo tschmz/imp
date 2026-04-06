@@ -139,6 +139,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["init", "--defaults"], env);
     const configPath = join(root, "config-home", "imp", "config.json");
     const promptPath = join(root, "state-home", "imp", "SYSTEM.md");
+    const environmentPath = join(root, "config-home", "imp", "service.env");
     const servicePath =
       process.platform === "darwin"
         ? join(root, "Library", "LaunchAgents", "dev.imp.plist")
@@ -157,12 +158,33 @@ describe("imp CLI e2e", () => {
       expect(stdout).toContain(`Installed`);
       await expect(stat(servicePath)).resolves.toBeDefined();
     }
+    if (process.platform === "linux") {
+      await expect(readFile(environmentPath, "utf8")).resolves.toContain("PATH=");
+    }
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
     expect(config.agents[0]?.systemPromptFile).toBe(promptPath);
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
     await expect(readFile(promptPath, "utf8")).resolves.toContain(
       "You are a local coding and operations assistant running through a local Imp daemon.",
+    );
+  });
+
+  it("copies the default provider key into the linux service environment during `imp init --defaults`", async () => {
+    if (process.platform !== "linux") {
+      return;
+    }
+
+    const root = await createTempDir();
+    const env = {
+      ...createTestEnv(root),
+      OPENAI_API_KEY: "sk-test-default",
+    };
+
+    await runCli(["init", "--defaults"], env);
+
+    await expect(readFile(join(root, "config-home", "imp", "service.env"), "utf8")).resolves.toContain(
+      'OPENAI_API_KEY="sk-test-default"',
     );
   });
 

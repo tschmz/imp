@@ -21,7 +21,7 @@ export const linuxSystemdUserAdapter: ServicePlatformAdapter = {
       "[Service]",
       "Type=simple",
       `WorkingDirectory=${plan.workingDirectory}`,
-      ...(plan.environmentPath ? [`EnvironmentFile=${quoteSystemdValue(plan.environmentPath)}`] : []),
+      ...(plan.environmentPath ? [`EnvironmentFile=${plan.environmentPath}`] : []),
       `ExecStart=${[plan.command, ...plan.args].map(quoteSystemdValue).join(" ")}`,
       "Restart=on-failure",
       "RestartSec=3",
@@ -37,6 +37,7 @@ export const linuxSystemdUserAdapter: ServicePlatformAdapter = {
   async install(options) {
     await options.installer.run("systemctl", ["--user", "daemon-reload"]);
     await options.installer.run("systemctl", ["--user", "enable", "--now", `${options.plan.serviceName}.service`]);
+    await options.installer.run("systemctl", ["--user", "restart", `${options.plan.serviceName}.service`]);
   },
   async uninstall(context: ServiceRuntimeContext) {
     await runIgnoringFailure(context.installer, "systemctl", ["--user", "disable", "--now", `${context.serviceName}.service`]);

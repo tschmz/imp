@@ -65,7 +65,10 @@ imp service install
 
 On Linux, `imp service install` and `imp init` now install a user systemd unit together with a
 managed environment file. The unit reads `PATH` from that generated environment file so the daemon
-and child processes get a stable, predictable command lookup environment by default.
+and child processes get a stable, predictable command lookup environment by default. Interactive
+`imp init` also prompts for provider-specific service credentials such as `OPENAI_API_KEY` and
+stores them in that managed environment file so the user service can start independently of your
+login shell.
 
 When your shell environment changes, refresh the installed service with:
 
@@ -74,7 +77,9 @@ imp service install --force
 ```
 
 That regenerates both the unit and the managed environment file without requiring manual edits to
-`~/.config/systemd/user/imp.service`.
+`~/.config/systemd/user/imp.service`. Existing custom variables from the managed environment file
+are preserved across `--force` reinstalls unless you replace them through `imp init`.
+On Linux, that managed environment file lives next to the config as `~/.config/imp/service.env`.
 
 ## How It Works
 

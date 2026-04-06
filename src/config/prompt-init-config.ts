@@ -19,6 +19,7 @@ interface PromptDependencies {
 export interface InitialAppSetup {
   config: AppConfig;
   installService: boolean;
+  serviceEnvironment?: Record<string, string>;
 }
 
 const providerChoices = [
@@ -113,6 +114,11 @@ export async function promptForInitialAppConfig(
           default: true,
         });
 
+  const serviceEnvironment =
+    installService && process.platform === "linux"
+      ? await promptForServiceEnvironment(provider, env, dependencies)
+      : undefined;
+
   return {
     config: buildInitialAppConfig(env, {
       instanceName,
@@ -129,7 +135,43 @@ export async function promptForInitialAppConfig(
       systemPromptFile: getDefaultAgentSystemPromptFilePath(dataRoot),
     }),
     installService,
+    ...(serviceEnvironment ? { serviceEnvironment } : {}),
   };
+}
+
+async function promptForServiceEnvironment(
+  provider: string,
+  env: NodeJS.ProcessEnv,
+  dependencies: PromptDependencies,
+): Promise<Record<string, string> | undefined> {
+  const providerVariables = getProviderEnvironmentVariables(provider);
+  const values = new Map<string, string>();
+
+  for (const variableName of providerVariables) {
+    const existingValue = env[variableName]?.trim();
+    const variableValue = await dependencies.input({
+      message: `Service environment value for ${variableName}`,
+      default: existingValue ?? "",
+      validate: requireNonEmpty(`${variableName} is required to run the ${provider} provider as a service.`),
+    });
+    values.set(variableName, variableValue.trim());
+  }
+
+  const extraVariablesRaw = await dependencies.input({
+    message: "Additional service environment variables (KEY=value, comma-separated, optional)",
+    default: "",
+    validate: validateServiceEnvironmentVariables,
+  });
+
+  for (const [name, value] of parseServiceEnvironmentVariables(extraVariablesRaw)) {
+    values.set(name, value);
+  }
+
+  if (values.size === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(values);
 }
 
 function requireNonEmpty(message: string): (value: string) => true | string {
@@ -140,4 +182,77 @@ function requireNonEmpty(message: string): (value: string) => true | string {
 
     return message;
   };
+}
+
+export function getProviderEnvironmentVariables(provider: string): string[] {
+  switch (provider) {
+    case "anthropic":
+      return ["ANTHROPIC_API_KEY"];
+    case "azure-openai-responses":
+      return ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_BASE_URL"];
+    case "cerebras":
+      return ["CEREBRAS_API_KEY"];
+    case "google":
+      return ["GEMINI_API_KEY"];
+    case "groq":
+      return ["GROQ_API_KEY"];
+    case "huggingface":
+      return ["HF_TOKEN"];
+    case "kimi-coding":
+      return ["KIMI_API_KEY"];
+    case "minimax":
+      return ["MINIMAX_API_KEY"];
+    case "minimax-cn":
+      return ["MINIMAX_CN_API_KEY"];
+    case "mistral":
+      return ["MISTRAL_API_KEY"];
+    case "openai":
+      return ["OPENAI_API_KEY"];
+    case "opencode":
+    case "opencode-go":
+      return ["OPENCODE_API_KEY"];
+    case "openrouter":
+      return ["OPENROUTER_API_KEY"];
+    case "vercel-ai-gateway":
+      return ["AI_GATEWAY_API_KEY"];
+    case "xai":
+      return ["XAI_API_KEY"];
+    case "zai":
+      return ["ZAI_API_KEY"];
+    default:
+      return [];
+  }
+}
+
+function validateServiceEnvironmentVariables(raw: string): true | string {
+  try {
+    parseServiceEnvironmentVariables(raw);
+    return true;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Invalid service environment variables.";
+  }
+}
+
+function parseServiceEnvironmentVariables(raw: string): Array<[string, string]> {
+  const values = parseCommaSeparatedValues(raw);
+
+  return values.map((entry) => {
+    const separatorIndex = entry.indexOf("=");
+    if (separatorIndex <= 0) {
+      throw new Error("Use KEY=value entries for additional service environment variables.");
+    }
+
+    const name = entry.slice(0, separatorIndex).trim();
+    const value = entry.slice(separatorIndex + 1).trim();
+
+    if (!/^[A-Z_][A-Z0-9_]*$/i.test(name)) {
+      throw new Error(`Invalid environment variable name: ${name}`);
+    }
+
+    if (value.length === 0) {
+      throw new Error(`Environment variable ${name} requires a value.`);
+    }
+
+    return [name, value];
+  });
 }

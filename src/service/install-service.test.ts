@@ -61,16 +61,38 @@ describe("installService", () => {
     });
 
     expect(result.definitionPath).toBe(join(root, ".config", "systemd", "user", "imp.service"));
-    expect(result.environmentPath).toBe(`${configPath}.service.env`);
+    expect(result.environmentPath).toBe(join(root, ".config", "imp", "service.env"));
     await expect(readFile(result.definitionPath, "utf8")).resolves.toContain("ExecStart=");
     await expect(readFile(result.definitionPath, "utf8")).resolves.toContain(
-      `EnvironmentFile="${configPath}.service.env"`,
+      `EnvironmentFile=${join(root, ".config", "imp", "service.env")}`,
     );
-    await expect(readFile(`${configPath}.service.env`, "utf8")).resolves.toContain("PATH=");
+    await expect(readFile(join(root, ".config", "imp", "service.env"), "utf8")).resolves.toContain("PATH=");
     expect(calls).toEqual([
       { command: "systemctl", args: ["--user", "daemon-reload"] },
       { command: "systemctl", args: ["--user", "enable", "--now", "imp.service"] },
+      { command: "systemctl", args: ["--user", "restart", "imp.service"] },
     ]);
+  });
+
+  it("writes explicit service environment variables into the linux environment file", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, ".config", "imp", "config.json");
+
+    const result = await installService({
+      platform: "linux",
+      homeDir: root,
+      configPath,
+      execPath: "/usr/bin/node",
+      argv: ["/usr/bin/node", "/app/dist/main.js"],
+      serviceEnvironment: {
+        OPENAI_API_KEY: "sk-test",
+      },
+      installer: {
+        async run() {},
+      },
+    });
+
+    await expect(readFile(result.environmentPath!, "utf8")).resolves.toContain('OPENAI_API_KEY="sk-test"');
   });
 
   it("writes and activates a macOS launch agent", async () => {
@@ -166,7 +188,7 @@ describe("installService", () => {
     const root = await createTempDir();
     const configPath = join(root, ".config", "imp", "config.json");
     const definitionPath = join(root, ".config", "systemd", "user", "imp.service");
-    const environmentPath = `${configPath}.service.env`;
+    const environmentPath = join(root, ".config", "imp", "service.env");
     const definitionBackupPath = `${definitionPath}.2026-04-05T19-30-00.000Z.bak`;
     const environmentBackupPath = `${environmentPath}.2026-04-05T19-30-00.000Z.bak`;
 
@@ -198,6 +220,41 @@ describe("installService", () => {
 
     await expect(readFile(definitionBackupPath, "utf8")).resolves.toBe(originalDefinitionContent);
     await expect(readFile(environmentBackupPath, "utf8")).resolves.toBe(originalEnvironmentContent);
+  });
+
+  it("preserves existing custom environment variables when reinstalling with force", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, ".config", "imp", "config.json");
+    const environmentPath = join(root, ".config", "imp", "service.env");
+
+    await installService({
+      platform: "linux",
+      homeDir: root,
+      configPath,
+      execPath: "/usr/bin/node",
+      argv: ["/usr/bin/node", "/app/dist/main.js"],
+      serviceEnvironment: {
+        OPENAI_API_KEY: "sk-original",
+      },
+      installer: {
+        async run() {},
+      },
+    });
+
+    await installService({
+      platform: "linux",
+      homeDir: root,
+      configPath,
+      execPath: "/usr/bin/node",
+      argv: ["/usr/bin/node", "/app/dist/main.js"],
+      installer: {
+        async run() {},
+      },
+      force: true,
+      now: new Date("2026-04-05T19:30:00.000Z"),
+    });
+
+    await expect(readFile(environmentPath, "utf8")).resolves.toContain('OPENAI_API_KEY="sk-original"');
   });
 });
 

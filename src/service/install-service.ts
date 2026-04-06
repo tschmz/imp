@@ -31,6 +31,7 @@ export async function installService(options: {
   installer?: ServiceInstaller;
   force?: boolean;
   now?: Date;
+  serviceEnvironment?: NodeJS.ProcessEnv;
 }): Promise<ServiceInstallResult> {
   const plan = createServiceInstallPlan({
     configPath: options.configPath,
@@ -56,7 +57,12 @@ export async function installService(options: {
     await writeManagedFile({
       path: environmentPath,
       resourceLabel: "Service environment file",
-      content: renderLinuxServiceEnvironment(),
+      content: await renderLinuxServiceEnvironment({
+        path: environmentPath,
+        env: options.serviceEnvironment,
+        pathEnv: process.env,
+        force: options.force,
+      }),
       force: options.force,
       now: options.now,
     });
