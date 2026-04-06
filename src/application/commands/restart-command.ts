@@ -1,6 +1,10 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const restartCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "restart",
+    description: "Restart after this reply",
+  },
   canHandle(command) {
     return command === "restart";
   },

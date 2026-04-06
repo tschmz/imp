@@ -2,6 +2,10 @@ import { createConversationContext } from "./conversation-context.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const newCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "new",
+    description: "Start a fresh conversation",
+  },
   canHandle(command) {
     return command === "new";
   },

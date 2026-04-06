@@ -3,6 +3,11 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 import { pickRestoreBackup } from "./utils.js";
 
 export const restoreCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "restore",
+    description: "Restore a backup with /restore <n>",
+    usage: "/restore <n>",
+  },
   canHandle(command) {
     return command === "restore";
   },

@@ -1,6 +1,10 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const clearCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "clear",
+    description: "Clear the active conversation",
+  },
   canHandle(command) {
     return command === "clear";
   },

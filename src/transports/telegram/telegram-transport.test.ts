@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { inboundCommandMenu } from "../../application/commands/registry.js";
 import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
@@ -20,68 +21,7 @@ describe("createTelegramTransport", () => {
       handle: vi.fn(async () => {}),
     });
 
-    expect(bot.api.setMyCommands).toHaveBeenCalledWith([
-      {
-        command: "help",
-        description: "Show available commands",
-      },
-      {
-        command: "whoami",
-        description: "Show bot and user IDs",
-      },
-      {
-        command: "new",
-        description: "Start a fresh conversation",
-      },
-      {
-        command: "rename",
-        description: "Rename with /rename <title>",
-      },
-      {
-        command: "clear",
-        description: "Clear the active conversation",
-      },
-      {
-        command: "status",
-        description: "Show current conversation status",
-      },
-      {
-        command: "history",
-        description: "List restore points",
-      },
-      {
-        command: "restore",
-        description: "Restore a backup with /restore <n>",
-      },
-      {
-        command: "export",
-        description: "Export the current conversation",
-      },
-      {
-        command: "ping",
-        description: "Check bot responsiveness",
-      },
-      {
-        command: "config",
-        description: "Show runtime config details",
-      },
-      {
-        command: "agent",
-        description: "Show or switch the current agent",
-      },
-      {
-        command: "logs",
-        description: "Show recent bot log lines",
-      },
-      {
-        command: "reload",
-        description: "Restart after this reply to reload config",
-      },
-      {
-        command: "restart",
-        description: "Restart after this reply",
-      },
-    ]);
+    expect(bot.api.setMyCommands).toHaveBeenCalledWith(inboundCommandMenu);
   });
 
   it("forwards a validated inbound event from an allowed private text message", async () => {

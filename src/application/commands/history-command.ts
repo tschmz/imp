@@ -2,6 +2,10 @@ import { renderHistoryMessage } from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const historyCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "history",
+    description: "List restore points",
+  },
   canHandle(command) {
     return command === "history";
   },

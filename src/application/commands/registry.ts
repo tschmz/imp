@@ -32,3 +32,12 @@ export const inboundCommandHandlers: InboundCommandHandler[] = [
   reloadCommandHandler,
   restartCommandHandler,
 ];
+
+export const inboundCommandMenu = inboundCommandHandlers.map((handler) => ({
+  command: handler.metadata.name,
+  description: handler.metadata.description,
+}));
+
+export const inboundCommandNames = new Set(
+  inboundCommandHandlers.map((handler) => handler.metadata.name),
+);
