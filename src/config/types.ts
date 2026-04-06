@@ -31,16 +31,19 @@ export interface AgentConfig {
   tools?: string[];
 }
 
-export type BotConfig = TelegramBotConfig;
-
-export interface TelegramBotConfig {
+interface BaseBotConfig {
   id: string;
-  type: "telegram";
   enabled: boolean;
-  token: string;
-  access: TelegramAccessConfig;
   routing?: BotRoutingConfig;
 }
+
+export interface TelegramBotConfig extends BaseBotConfig {
+  type: "telegram";
+  token: string;
+  access: TelegramAccessConfig;
+}
+
+export type BotConfig = TelegramBotConfig;
 
 export interface TelegramAccessConfig {
   allowedUserIds: string[];

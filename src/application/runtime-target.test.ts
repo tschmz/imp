@@ -8,13 +8,17 @@ import {
   resolveServiceTarget,
 } from "./runtime-target.js";
 
-const { createTelegramTransportMock } = vi.hoisted(() => ({
-  createTelegramTransportMock: vi.fn(),
+const { createTransportMock } = vi.hoisted(() => ({
+  createTransportMock: vi.fn(),
 }));
 
-vi.mock("../transports/telegram/telegram-transport.js", () => ({
-  createTelegramTransport: createTelegramTransportMock,
-}));
+vi.mock("../transports/registry.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../transports/registry.js")>();
+  return {
+    ...actual,
+    createTransport: createTransportMock,
+  };
+});
 
 describe("resolveServiceConfigPath", () => {
   it("prefers --config over IMP_CONFIG_PATH", () => {
@@ -86,12 +90,12 @@ describe("resolveServiceTarget", () => {
 });
 
 describe("createRuntimeTransportFactory", () => {
-  it("creates telegram transports for telegram runtime bots", () => {
+  it("creates transports via the centralized transport registry", () => {
     const transport = {
       start: vi.fn(async () => undefined),
       stop: vi.fn(async () => undefined),
     };
-    createTelegramTransportMock.mockReturnValueOnce(transport);
+    createTransportMock.mockReturnValueOnce(transport);
     const botConfig = {
       id: "private-telegram",
       type: "telegram" as const,
@@ -117,6 +121,6 @@ describe("createRuntimeTransportFactory", () => {
     const resolved = createRuntimeTransportFactory(botConfig, logger);
 
     expect(resolved).toBe(transport);
-    expect(createTelegramTransportMock).toHaveBeenCalledWith(botConfig, undefined, logger);
+    expect(createTransportMock).toHaveBeenCalledWith(botConfig.type, botConfig, logger);
   });
 });
