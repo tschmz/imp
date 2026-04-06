@@ -1,49 +1,27 @@
-import { readFile } from "node:fs/promises";
-import { stat } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { delimiter as pathDelimiter, join } from "node:path";
-import { Agent, type AgentMessage, type AgentOptions } from "@mariozechner/pi-agent-core";
-import {
-  createCodingTools,
-  type ToolsOptions,
-  createFindTool,
-  createGrepTool,
-  createLsTool,
-} from "@mariozechner/pi-coding-agent";
-import {
-  getModel,
-  type Api as AiApi,
-  type AssistantMessage,
-  type Model,
-  type StreamOptions,
-  type Usage,
-  type UserMessage,
-} from "@mariozechner/pi-ai";
+import { readFile, stat } from "node:fs/promises";
+import type { AgentOptions } from "@mariozechner/pi-agent-core";
 import type { AgentDefinition } from "../domain/agent.js";
-import type { ConversationContext, ConversationMessage } from "../domain/conversation.js";
+import type { ConversationContext } from "../domain/conversation.js";
 import type { Logger } from "../logging/types.js";
-import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
-import type { ToolDefinition } from "../tools/types.js";
+import type { ToolRegistry } from "../tools/registry.js";
+import type { AgentHandle } from "./agent-execution.js";
+import { executeAgent } from "./agent-execution.js";
+import { defaultResolveModel, resolveModelOrThrow, type ModelResolver } from "./model-resolution.js";
+import { resolveSystemPrompt } from "./system-prompt-resolution.js";
+import { InMemoryCacheStrategy, SystemPromptCache } from "./system-prompt-cache.js";
 import type { AgentEngine } from "./types.js";
-
-const EMPTY_USAGE: Usage = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    total: 0,
-  },
-};
+import {
+  createBuiltInToolRegistry,
+  createOnPayloadOverride,
+  createWorkingDirectoryState,
+  resolveAgentTools,
+  resolveWorkingDirectory,
+  type WorkingDirectoryState,
+} from "./tool-resolution.js";
 
 interface PiAgentEngineDependencies {
   logger?: Logger;
-  resolveModel?: (provider: string, modelId: string) => Model<AiApi> | undefined;
+  resolveModel?: ModelResolver;
   getApiKey?: (
     provider: string,
     agent: AgentDefinition,
@@ -58,164 +36,141 @@ interface PiAgentEngineDependencies {
   ) => ToolRegistry;
 }
 
-interface AgentHandle {
-  prompt(text: string): Promise<void>;
-  state: {
-    messages: AgentMessage[];
-  };
+interface EngineLogContext {
+  botId: string;
+  transport: string;
+  conversationId: string;
+  messageId: string;
+  correlationId: string;
+  agentId: string;
 }
 
-export interface WorkingDirectoryState {
-  get(): string;
-  set(path: string): void;
+interface PipelineEvent {
+  step: string;
+  status: "started" | "completed" | "failed";
+  durationMs?: number;
+  cacheHit?: boolean;
+  errorType?: string;
 }
 
 export function createPiAgentEngine(
   dependencies: PiAgentEngineDependencies = {},
 ): AgentEngine {
   const resolveModel = dependencies.resolveModel ?? defaultResolveModel;
-  const createAgent = dependencies.createAgent ?? defaultCreateAgent;
   const readTextFile = dependencies.readTextFile ?? defaultReadTextFile;
   const getContextFileFingerprint =
     dependencies.getContextFileFingerprint ?? defaultGetContextFileFingerprint;
   const buildToolRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
-  const getApiKey = dependencies.getApiKey;
-  const systemPromptCache = new Map<string, string>();
-  const latestSystemPromptCacheKeyByAgentId = new Map<string, string>();
   const logger = dependencies.logger;
+  const systemPromptCache = new SystemPromptCache({
+    readTextFile,
+    getContextFileFingerprint,
+    strategy: new InMemoryCacheStrategy<string>(),
+  });
 
   return {
     async run(input) {
       const startedAt = Date.now();
+      const context: EngineLogContext = {
+        botId: input.message.botId,
+        transport: input.message.conversation.transport,
+        conversationId: input.message.conversation.externalId,
+        messageId: input.message.messageId,
+        correlationId: input.message.correlationId,
+        agentId: input.agent.id,
+      };
+
       try {
         const initialWorkingDirectory = resolveConversationWorkingDirectory(
           input.agent,
           input.conversation,
         );
+        const promptWorkingDirectory = resolvePromptWorkingDirectory(input.agent, input.conversation);
         const workingDirectoryState = createWorkingDirectoryState(initialWorkingDirectory);
-        const model = resolveModel(input.agent.model.provider, input.agent.model.modelId);
-        if (!model) {
-          throw new Error(
-            `Unknown model for agent "${input.agent.id}": ` +
-              `${input.agent.model.provider}/${input.agent.model.modelId}`,
-          );
-        }
-        await logger?.debug("resolved agent model", {
-          botId: input.message.botId,
-          transport: input.message.conversation.transport,
-          conversationId: input.message.conversation.externalId,
-          messageId: input.message.messageId,
-          correlationId: input.message.correlationId,
-          agentId: input.agent.id,
+
+        await logPipelineEvent(logger, context, { step: "model-resolution", status: "started" });
+        const model = resolveModelOrThrow(input.agent, resolveModel);
+        await logPipelineEvent(logger, context, { step: "model-resolution", status: "completed" });
+
+        await logPipelineEvent(logger, context, { step: "system-prompt-resolution", status: "started" });
+        const systemPromptResolution = await resolveSystemPrompt({
+          agent: input.agent,
+          promptWorkingDirectory,
+          readTextFile,
+          cache: systemPromptCache,
+        });
+        await logPipelineEvent(logger, context, {
+          step: "system-prompt-resolution",
+          status: "completed",
+          cacheHit: systemPromptResolution.cacheHit,
         });
 
-        const systemPrompt = await resolveSystemPrompt({
-          agent: input.agent,
-          promptWorkingDirectory: resolvePromptWorkingDirectory(input.agent, input.conversation),
-          readTextFile,
-          getContextFileFingerprint,
-          cache: systemPromptCache,
-          latestCacheKeyByAgentId: latestSystemPromptCacheKeyByAgentId,
-          logger,
-        });
+        await logPipelineEvent(logger, context, { step: "tool-resolution", status: "started" });
         const toolRegistry =
           dependencies.toolRegistry ??
           buildToolRegistry(workingDirectoryState, input.agent);
         const tools = resolveAgentTools(input.agent, toolRegistry);
-        await logger?.debug("prepared agent runtime", {
-          botId: input.message.botId,
-          transport: input.message.conversation.transport,
-          conversationId: input.message.conversation.externalId,
-          messageId: input.message.messageId,
-          correlationId: input.message.correlationId,
-          agentId: input.agent.id,
+        await logPipelineEvent(logger, context, { step: "tool-resolution", status: "completed" });
+
+        await logPipelineEvent(logger, context, { step: "agent-execution", status: "started" });
+        const result = await executeAgent({
+          createAgent: dependencies.createAgent,
+          getApiKey: dependencies.getApiKey,
+          agent: input.agent,
+          model,
+          systemPrompt: systemPromptResolution.systemPrompt,
+          tools,
+          userText: input.message.text,
+          conversationMessages: input.conversation.messages,
+          onPayload: createOnPayloadOverride(input.agent),
+          workingDirectoryState,
+          initialWorkingDirectory,
+          conversation: input.message.conversation,
         });
-        const onPayload = createOnPayloadOverride(input.agent);
-        const agent = createAgent({
-          initialState: {
-            systemPrompt,
-            model,
-            thinkingLevel: "off",
-            tools,
-            messages: toAgentMessages(input.conversation.messages, model),
-          },
-          ...(getApiKey
-            ? {
-                getApiKey: (provider: string) => getApiKey(provider, input.agent),
-              }
-            : {}),
-          ...(onPayload ? { onPayload } : {}),
-        });
+        await logPipelineEvent(logger, context, { step: "agent-execution", status: "completed" });
 
-        await agent.prompt(input.message.text);
-
-        const assistantMessage = [...agent.state.messages]
-          .reverse()
-          .find((message): message is AssistantMessage => message.role === "assistant");
-
-        if (!assistantMessage) {
-          throw new Error(`Agent "${input.agent.id}" did not produce an assistant message.`);
-        }
-
-        if (assistantMessage.stopReason === "error" || assistantMessage.stopReason === "aborted") {
-          throw new Error(
-            `Agent "${input.agent.id}" failed: ` +
-              `${assistantMessage.errorMessage ?? "unknown upstream error"}`,
-          );
-        }
-
-        const responseText = getAssistantText(assistantMessage);
-        if (!responseText.trim()) {
-          throw new Error(`Agent "${input.agent.id}" produced an assistant message without text content.`);
-        }
-
-        await logger?.debug("agent engine run completed", {
-          botId: input.message.botId,
-          transport: input.message.conversation.transport,
-          conversationId: input.message.conversation.externalId,
-          messageId: input.message.messageId,
-          correlationId: input.message.correlationId,
-          agentId: input.agent.id,
+        await logPipelineEvent(logger, context, {
+          step: "pipeline",
+          status: "completed",
           durationMs: Date.now() - startedAt,
         });
 
-        return {
-          message: {
-            conversation: input.message.conversation,
-            text: responseText,
-          },
-          ...(workingDirectoryState.get() !== initialWorkingDirectory
-            ? { workingDirectory: workingDirectoryState.get() }
-            : {}),
-        };
+        return result;
       } catch (error) {
-        await logger?.error(
-          "agent engine run failed",
-          {
-            botId: input.message.botId,
-            transport: input.message.conversation.transport,
-            conversationId: input.message.conversation.externalId,
-            messageId: input.message.messageId,
-            correlationId: input.message.correlationId,
-            agentId: input.agent.id,
-            durationMs: Date.now() - startedAt,
-            errorType: error instanceof Error ? error.name : typeof error,
-          },
-          error,
-        );
+        await logPipelineEvent(logger, context, {
+          step: "pipeline",
+          status: "failed",
+          durationMs: Date.now() - startedAt,
+          errorType: error instanceof Error ? error.name : typeof error,
+        });
         throw error;
       }
     },
   };
 }
 
-function defaultResolveModel(provider: string, modelId: string): Model<AiApi> | undefined {
-  return getModel(provider as never, modelId as never);
-}
+async function logPipelineEvent(
+  logger: Logger | undefined,
+  context: EngineLogContext,
+  event: PipelineEvent,
+): Promise<void> {
+  await logger?.debug("agent-engine.pipeline", {
+    ...context,
+    ...event,
+  });
 
-function defaultCreateAgent(options: AgentOptions): AgentHandle {
-  return new Agent(options);
+  if (event.status === "failed") {
+    await logger?.error(
+      "agent engine run failed",
+      {
+        ...context,
+        durationMs: event.durationMs,
+        errorType: event.errorType,
+      },
+      new Error("agent-engine.pipeline failed"),
+    );
+  }
 }
 
 async function defaultReadTextFile(path: string): Promise<string> {
@@ -225,10 +180,6 @@ async function defaultReadTextFile(path: string): Promise<string> {
 async function defaultGetContextFileFingerprint(path: string): Promise<string> {
   const fileStats = await stat(path);
   return `${fileStats.mtimeMs}:${fileStats.size}`;
-}
-
-export function resolveWorkingDirectory(agent: AgentDefinition): string {
-  return agent.context?.workingDirectory ?? process.cwd();
 }
 
 function resolveConversationWorkingDirectory(
@@ -245,507 +196,10 @@ function resolvePromptWorkingDirectory(
   return conversation.state.workingDirectory ?? agent.context?.workingDirectory;
 }
 
-export function createBuiltInToolRegistry(
-  workingDirectory: string | WorkingDirectoryState,
-  agent?: AgentDefinition,
-): ToolRegistry {
-  const workingDirectoryState =
-    typeof workingDirectory === "string"
-      ? createWorkingDirectoryState(workingDirectory)
-      : workingDirectory;
-
-  return createToolRegistry([
-    ...createDynamicBuiltInTools(workingDirectoryState, agent),
-    createGetWorkingDirectoryTool(workingDirectoryState),
-    createSetWorkingDirectoryTool(workingDirectoryState),
-  ]);
-}
-
-function createWorkingDirectoryState(initialWorkingDirectory: string): WorkingDirectoryState {
-  let workingDirectory = initialWorkingDirectory;
-
-  return {
-    get() {
-      return workingDirectory;
-    },
-    set(path: string) {
-      workingDirectory = path;
-    },
-  };
-}
-
-function createDynamicBuiltInTools(
-  workingDirectoryState: WorkingDirectoryState,
-  agent?: AgentDefinition,
-): ToolDefinition[] {
-  return createBaseBuiltInTools(workingDirectoryState.get(), agent).map((tool) => ({
-    ...tool,
-    async execute(toolCallId, params, signal, onUpdate) {
-      const delegatedTool = createBaseBuiltInTools(workingDirectoryState.get(), agent).find(
-        (candidate) => candidate.name === tool.name,
-      );
-      if (!delegatedTool) {
-        throw new Error(`Unknown built-in tool: ${tool.name}`);
-      }
-
-      return delegatedTool.execute(toolCallId, params, signal, onUpdate);
-    },
-  }));
-}
-
-function createBaseBuiltInTools(workingDirectory: string, agent?: AgentDefinition): ToolDefinition[] {
-  const toolOptions = resolveBuiltInToolOptions(agent);
-  return [
-    ...createCodingTools(workingDirectory, toolOptions),
-    createGrepTool(workingDirectory),
-    createFindTool(workingDirectory),
-    createLsTool(workingDirectory),
-  ];
-}
-
-function resolveBuiltInToolOptions(agent?: AgentDefinition): ToolsOptions | undefined {
-  const shellPath = agent?.context?.shell?.path;
-  if (!shellPath || shellPath.length === 0) {
-    return undefined;
-  }
-
-  return {
-    bash: {
-      spawnHook: ({ command, cwd, env }) => ({
-        command,
-        cwd,
-        env: mergeShellPathEntries(env, shellPath),
-      }),
-    },
-  };
-}
-
-export function mergeShellPathEntries(
-  env: NodeJS.ProcessEnv,
-  additionalEntries: string[],
-  options: { delimiter?: string; platform?: NodeJS.Platform } = {},
-): NodeJS.ProcessEnv {
-  const delimiter = options.delimiter ?? pathDelimiter;
-  const platform = options.platform ?? process.platform;
-  const pathKey = resolvePathEnvironmentKey(env, platform);
-  const currentPath = env[pathKey];
-  const envWithoutDuplicatePathKeys = removeDuplicatePathKeys(env, platform);
-
-  return {
-    ...envWithoutDuplicatePathKeys,
-    [pathKey]: appendPathEntries(currentPath, additionalEntries, delimiter),
-  };
-}
-
-function resolvePathEnvironmentKey(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
-  if (platform === "win32") {
-    if ("Path" in env) {
-      return "Path";
-    }
-
-    if ("PATH" in env) {
-      return "PATH";
-    }
-
-    const existingKey = Object.keys(env).find((key) => key.toLowerCase() === "path");
-    if (existingKey) {
-      return existingKey;
-    }
-
-    return "Path";
-  }
-
-  return "PATH";
-}
-
-function removeDuplicatePathKeys(
-  env: NodeJS.ProcessEnv,
-  platform: NodeJS.Platform,
-): NodeJS.ProcessEnv {
-  if (platform !== "win32") {
-    return env;
-  }
-
-  return Object.fromEntries(
-    Object.entries(env).filter(([key]) => key.toLowerCase() !== "path"),
-  );
-}
-
-function appendPathEntries(
-  currentPath: string | undefined,
-  additionalEntries: string[],
-  delimiter: string,
-): string {
-  const mergedEntries = [
-    ...splitPathEntries(currentPath, delimiter),
-    ...additionalEntries,
-  ];
-
-  return [...new Set(mergedEntries)].join(delimiter);
-}
-
-function splitPathEntries(pathValue: string | undefined, delimiter: string): string[] {
-  if (!pathValue) {
-    return [];
-  }
-
-  return pathValue
-    .split(delimiter)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-}
-
-function createGetWorkingDirectoryTool(workingDirectoryState: WorkingDirectoryState): ToolDefinition {
-  const parameters = {
-    type: "object",
-    properties: {},
-    additionalProperties: false,
-  } as unknown as ToolDefinition["parameters"];
-
-  return {
-    name: "pwd",
-    label: "pwd",
-    description: "Return the current working directory used by filesystem and shell tools.",
-    parameters,
-    async execute() {
-      const workingDirectory = workingDirectoryState.get();
-      return {
-        content: [{ type: "text", text: workingDirectory }],
-        details: { workingDirectory },
-      };
-    },
-  };
-}
-
-function createSetWorkingDirectoryTool(workingDirectoryState: WorkingDirectoryState): ToolDefinition {
-  const parameters = {
-    type: "object",
-    properties: {
-      path: {
-        type: "string",
-        minLength: 1,
-      },
-    },
-    required: ["path"],
-    additionalProperties: false,
-  } as unknown as ToolDefinition["parameters"];
-
-  return {
-    name: "cd",
-    label: "cd",
-    description: "Set the working directory used by subsequent filesystem and shell tool calls.",
-    parameters,
-    async execute(_toolCallId, params) {
-      const { path } = parseSetWorkingDirectoryParams(params);
-      const directoryStats = await stat(path);
-      if (!directoryStats.isDirectory()) {
-        throw new Error(`Not a directory: ${path}`);
-      }
-
-      workingDirectoryState.set(path);
-      return {
-        content: [{ type: "text", text: path }],
-        details: { workingDirectory: path },
-      };
-    },
-  };
-}
-
-function parseSetWorkingDirectoryParams(params: unknown): { path: string } {
-  if (typeof params !== "object" || params === null) {
-    throw new Error("cd requires an object parameter with a path.");
-  }
-
-  const path = "path" in params ? params.path : undefined;
-  if (typeof path !== "string" || path.length === 0) {
-    throw new Error("cd requires a non-empty string path.");
-  }
-
-  return { path };
-}
-
-export function resolveAgentTools(
-  agent: AgentDefinition,
-  toolRegistry: ToolRegistry,
-): ToolDefinition[] {
-  if (agent.tools.length === 0) {
-    return [];
-  }
-
-  const resolvedTools = toolRegistry.pick(agent.tools);
-  const resolvedNames = new Set(resolvedTools.map((tool) => tool.name));
-  const missingTools = agent.tools.filter((name) => !resolvedNames.has(name));
-  if (missingTools.length > 0) {
-    throw new Error(
-      `Unknown tools for agent "${agent.id}": ${missingTools.join(", ")}`,
-    );
-  }
-
-  return resolvedTools;
-}
-
-function createOnPayloadOverride(
-  agent: AgentDefinition,
-): StreamOptions["onPayload"] | undefined {
-  const maxOutputTokens = agent.inference?.maxOutputTokens;
-  const metadata = agent.inference?.metadata;
-  const request = agent.inference?.request;
-  if (
-    metadata === undefined &&
-    request === undefined &&
-    maxOutputTokens === undefined
-  ) {
-    return undefined;
-  }
-
-  return (payload, model) => {
-    if (
-      model.api !== "openai-responses" &&
-      model.api !== "openai-codex-responses" &&
-      model.api !== "azure-openai-responses"
-    ) {
-      return undefined;
-    }
-
-    if (!isRecord(payload)) {
-      return undefined;
-    }
-
-    return {
-      ...payload,
-      ...(metadata !== undefined ? { metadata } : {}),
-      ...(maxOutputTokens !== undefined ? { max_output_tokens: maxOutputTokens } : {}),
-      ...(request ?? {}),
-    };
-  };
-}
-
-async function buildSystemPrompt(
-  agent: AgentDefinition,
-  promptWorkingDirectory: string | undefined,
-  readTextFile: (path: string) => Promise<string>,
-): Promise<string> {
-  const sections: string[] = [];
-
-  if (agent.systemPromptFile) {
-    let content: string;
-    try {
-      content = await readTextFile(agent.systemPromptFile);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to read system prompt file for agent "${agent.id}": ${agent.systemPromptFile} (${detail})`,
-      );
-    }
-
-    const trimmedContent = content.trim();
-    if (!trimmedContent) {
-      throw new Error(
-        `System prompt file for agent "${agent.id}" is empty: ${agent.systemPromptFile}`,
-      );
-    }
-
-    sections.push(trimmedContent);
-  } else if (agent.systemPrompt) {
-    sections.push(agent.systemPrompt);
-  } else {
-    throw new Error(`Agent "${agent.id}" must define systemPrompt or systemPromptFile.`);
-  }
-
-  const contextFiles = resolveContextPromptFiles(agent, promptWorkingDirectory);
-
-  for (const file of contextFiles) {
-    let content: string;
-    try {
-      content = await readTextFile(file.path);
-    } catch (error) {
-      if (file.optional && isFileNotFoundError(error)) {
-        continue;
-      }
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to read context file for agent "${agent.id}": ${file.path} (${detail})`,
-      );
-    }
-
-    const trimmedContent = content.trim();
-    if (!trimmedContent) {
-      continue;
-    }
-
-    sections.push(formatContextInstructions(file.path, trimmedContent));
-  }
-
-  return sections.join("\n\n");
-}
-
-function formatContextInstructions(path: string, content: string): string {
-  return `<INSTRUCTIONS from="${escapeInstructionAttribute(path)}">\n\n${content}\n</INSTRUCTIONS>`;
-}
-
-function escapeInstructionAttribute(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
-}
-
-function resolveContextPromptFiles(
-  agent: AgentDefinition,
-  promptWorkingDirectory: string | undefined,
-): Array<{ path: string; optional: boolean }> {
-  const files = (agent.context?.files ?? []).map((path) => ({ path, optional: false }));
-  const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(promptWorkingDirectory);
-  if (workingDirectoryAgentsFile && !files.some((file) => file.path === workingDirectoryAgentsFile)) {
-    files.push({ path: workingDirectoryAgentsFile, optional: true });
-  }
-  return files;
-}
-
-function resolveWorkingDirectoryAgentsFile(workingDirectory: string | undefined): string | undefined {
-  if (!workingDirectory) {
-    return undefined;
-  }
-
-  return join(workingDirectory, "AGENTS.md");
-}
-
-function isFileNotFoundError(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-
-  const code = "code" in error ? error.code : undefined;
-  if (code === "ENOENT") {
-    return true;
-  }
-
-  const message = "message" in error ? error.message : undefined;
-  return typeof message === "string" && message.includes("ENOENT");
-}
-
-async function resolveSystemPrompt(options: {
-  agent: AgentDefinition;
-  promptWorkingDirectory?: string;
-  readTextFile: (path: string) => Promise<string>;
-  getContextFileFingerprint: (path: string) => Promise<string>;
-  cache: Map<string, string>;
-  latestCacheKeyByAgentId: Map<string, string>;
-  logger?: Logger;
-}): Promise<string> {
-  const cacheKey = await buildSystemPromptCacheKey(
-    options.agent,
-    options.promptWorkingDirectory,
-    options.getContextFileFingerprint,
-    options.readTextFile,
-  );
-  const cachedPrompt = options.cache.get(cacheKey);
-  if (cachedPrompt !== undefined) {
-    await options.logger?.debug("reused cached system prompt", {
-      agentId: options.agent.id,
-    });
-    return cachedPrompt;
-  }
-
-  const systemPrompt = await buildSystemPrompt(
-    options.agent,
-    options.promptWorkingDirectory,
-    options.readTextFile,
-  );
-  options.cache.set(cacheKey, systemPrompt);
-  await options.logger?.debug("rebuilt system prompt", {
-    agentId: options.agent.id,
-  });
-
-  const previousCacheKey = options.latestCacheKeyByAgentId.get(options.agent.id);
-  if (previousCacheKey !== undefined && previousCacheKey !== cacheKey) {
-    options.cache.delete(previousCacheKey);
-  }
-  options.latestCacheKeyByAgentId.set(options.agent.id, cacheKey);
-
-  return systemPrompt;
-}
-
-async function buildSystemPromptCacheKey(
-  agent: AgentDefinition,
-  promptWorkingDirectory: string | undefined,
-  getContextFileFingerprint: (path: string) => Promise<string>,
-  readTextFile: (path: string) => Promise<string>,
-): Promise<string> {
-  const promptFiles = [
-    agent.systemPromptFile,
-    ...resolveContextPromptFiles(agent, promptWorkingDirectory).map((file) => file.path),
-  ].filter((path): path is string => path !== undefined);
-  const fileFingerprints = await Promise.all(
-    promptFiles.map(async (path) => {
-      try {
-        const fingerprint = await getContextFileFingerprint(path);
-        return `${path}:${fingerprint}`;
-      } catch {
-        try {
-          const content = await readTextFile(path);
-          const hash = createHash("sha256").update(content).digest("hex");
-          return `${path}:sha256:${hash}`;
-        } catch {
-          return `${path}:unreadable`;
-        }
-      }
-    }),
-  );
-
-  return JSON.stringify({
-    agentId: agent.id,
-    systemPrompt: agent.systemPrompt,
-    systemPromptFile: agent.systemPromptFile,
-    promptWorkingDirectory,
-    files: fileFingerprints,
-  });
-}
-
-function toAgentMessages(
-  messages: ConversationMessage[],
-  model: Model<AiApi>,
-): Array<UserMessage | AssistantMessage> {
-  return messages.reduce<Array<UserMessage | AssistantMessage>>((result, message) => {
-    if (message.role === "user") {
-      result.push(toUserMessage(message));
-      return result;
-    }
-
-    if (message.role === "assistant") {
-      result.push(toAssistantMessage(message, model));
-      return result;
-    }
-
-    return result;
-  }, []);
-}
-
-function toUserMessage(message: ConversationMessage): UserMessage {
-  return {
-    role: "user",
-    content: message.text,
-    timestamp: Date.parse(message.createdAt),
-  };
-}
-
-function toAssistantMessage(message: ConversationMessage, model: Model<AiApi>): AssistantMessage {
-  return {
-    role: "assistant",
-    content: [{ type: "text", text: message.text }],
-    api: model.api,
-    provider: model.provider,
-    model: model.id,
-    usage: EMPTY_USAGE,
-    stopReason: "stop",
-    timestamp: Date.parse(message.createdAt),
-  };
-}
-
-function getAssistantText(message: AssistantMessage): string {
-  return message.content
-    .filter((content) => content.type === "text")
-    .map((content) => content.text)
-    .join("\n");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+export {
+  createBuiltInToolRegistry,
+  mergeShellPathEntries,
+  resolveAgentTools,
+  resolveWorkingDirectory,
+  type WorkingDirectoryState,
+} from "./tool-resolution.js";
