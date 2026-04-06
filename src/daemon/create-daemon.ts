@@ -7,7 +7,7 @@ import {
   resolveWorkingDirectory,
 } from "../runtime/create-pi-agent-engine.js";
 import type { ToolRegistry } from "../tools/registry.js";
-import type { Transport } from "../transports/types.js";
+import type { TransportFactory } from "../transports/types.js";
 import {
   bootstrapRuntime,
   type BootstrappedRuntime,
@@ -26,13 +26,13 @@ import type { ActiveBotRuntimeConfig, Daemon, DaemonConfig } from "./types.js";
 
 interface DaemonDependencies extends RuntimeBootstrapDependencies {
   agentRegistry?: ReturnType<typeof createAgentRegistry>;
-  createTransport?: (config: ActiveBotRuntimeConfig, logger: Logger) => Transport;
+  createTransport: TransportFactory<ActiveBotRuntimeConfig, Logger>;
   runtimeProcess?: RuntimeLifecycleProcess;
 }
 
 export function createDaemon(
   config: DaemonConfig,
-  dependencies: DaemonDependencies = {},
+  dependencies: DaemonDependencies,
 ): Daemon {
   const agentRegistry =
     dependencies.agentRegistry ?? createAgentRegistry(buildAgents(config.agents));

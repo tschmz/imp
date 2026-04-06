@@ -2,12 +2,24 @@ import { discoverConfigPath, getDefaultUserConfigPath } from "../config/discover
 import { loadAppConfig } from "../config/load-app-config.js";
 import { resolveRuntimeConfig } from "../config/resolve-runtime-config.js";
 import type { DaemonConfig } from "../daemon/types.js";
+import type { Logger } from "../logging/types.js";
 import { createServiceInstallPlan } from "../service/install-plan.js";
 import { resolveServiceDefinitionPath } from "../service/install-service.js";
+import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
+import type { Transport, TransportFactory } from "../transports/types.js";
+
+export const createRuntimeTransportFactory: TransportFactory<DaemonConfig["activeBots"][number], Logger> =
+  (botConfig, logger): Transport => {
+    if (botConfig.type === "telegram") {
+      return createTelegramTransport(botConfig, undefined, logger);
+    }
+    throw new Error(`Unsupported bot transport: ${botConfig.type}`);
+  };
 
 export async function resolveRuntimeTarget(options: { cliConfigPath?: string } = {}): Promise<{
   configPath: string;
   runtimeConfig: DaemonConfig;
+  createTransport: TransportFactory<DaemonConfig["activeBots"][number], Logger>;
 }> {
   const { configPath } = await discoverConfigPath({
     cliConfigPath: options.cliConfigPath,
@@ -17,6 +29,7 @@ export async function resolveRuntimeTarget(options: { cliConfigPath?: string } =
   return {
     configPath,
     runtimeConfig: resolveRuntimeConfig(appConfig, configPath),
+    createTransport: createRuntimeTransportFactory,
   };
 }
 

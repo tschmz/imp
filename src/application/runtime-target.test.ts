@@ -1,8 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getDefaultUserConfigPath } from "../config/discover-config-path.js";
 import { createServiceInstallPlan } from "../service/install-plan.js";
 import { resolveServiceDefinitionPath } from "../service/install-service.js";
-import { resolveServiceConfigPath, resolveServiceTarget } from "./runtime-target.js";
+import {
+  createRuntimeTransportFactory,
+  resolveServiceConfigPath,
+  resolveServiceTarget,
+} from "./runtime-target.js";
+
+const { createTelegramTransportMock } = vi.hoisted(() => ({
+  createTelegramTransportMock: vi.fn(),
+}));
+
+vi.mock("../transports/telegram/telegram-transport.js", () => ({
+  createTelegramTransport: createTelegramTransportMock,
+}));
 
 describe("resolveServiceConfigPath", () => {
   it("prefers --config over IMP_CONFIG_PATH", () => {
@@ -70,5 +82,41 @@ describe("resolveServiceTarget", () => {
     const target = resolveServiceTarget({ env });
 
     expect(target.configPath).toBe(env.IMP_CONFIG_PATH);
+  });
+});
+
+describe("createRuntimeTransportFactory", () => {
+  it("creates telegram transports for telegram runtime bots", () => {
+    const transport = {
+      start: vi.fn(async () => undefined),
+      stop: vi.fn(async () => undefined),
+    };
+    createTelegramTransportMock.mockReturnValueOnce(transport);
+    const botConfig = {
+      id: "private-telegram",
+      type: "telegram" as const,
+      token: "123:abc",
+      allowedUserIds: ["7"],
+      defaultAgentId: "default",
+      paths: {
+        dataRoot: "/tmp",
+        botRoot: "/tmp/bot",
+        conversationsDir: "/tmp/bot/conversations",
+        logsDir: "/tmp/bot/logs",
+        logFilePath: "/tmp/bot/logs/daemon.log",
+        runtimeDir: "/tmp/bot/runtime",
+        runtimeStatePath: "/tmp/bot/runtime/daemon.json",
+      },
+    };
+    const logger = {
+      debug: vi.fn(async () => undefined),
+      info: vi.fn(async () => undefined),
+      error: vi.fn(async () => undefined),
+    };
+
+    const resolved = createRuntimeTransportFactory(botConfig, logger);
+
+    expect(resolved).toBe(transport);
+    expect(createTelegramTransportMock).toHaveBeenCalledWith(botConfig, undefined, logger);
   });
 });
