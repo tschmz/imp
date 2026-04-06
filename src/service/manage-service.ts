@@ -1,4 +1,4 @@
-import { createServiceInstallPlan } from "./install-plan.js";
+import { createServiceInstallPlan, type ServicePlatformInput } from "./install-plan.js";
 import { getServicePlatformAdapter } from "./platforms/get-service-platform-adapter.js";
 import type { ServiceOperationResult } from "./service-operation-result.js";
 import {
@@ -8,9 +8,9 @@ import {
 import { resolveServiceDefinitionPath } from "./install-service.js";
 import { assertServiceDefinitionExists } from "./uninstall-service.js";
 
-type ManageServiceOptions = {
+export type ManageServiceOptions = {
   configPath: string;
-  platform?: NodeJS.Platform;
+  platform?: ServicePlatformInput;
   homeDir?: string;
   uid?: number;
   installer?: ServiceInstaller;

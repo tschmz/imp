@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppConfig } from "../config/types.js";
+import type { ServiceOperationResult } from "../service/service-operation-result.js";
 import { createReloadConfigUseCase } from "./reload-config-use-case.js";
 
 describe("createReloadConfigUseCase", () => {
@@ -16,7 +17,12 @@ describe("createReloadConfigUseCase", () => {
       serviceName: "imp",
       serviceLabel: "dev.imp",
     }));
-    const restartService = vi.fn(async () => undefined);
+    const restartService = vi.fn(async (): Promise<ServiceOperationResult> => ({
+      operation: "restart",
+      platform: "linux-systemd-user",
+      serviceName: "imp",
+      definitionPath: "/tmp/imp.service",
+    }));
     const writeOutput = vi.fn();
     const reloadConfig = createReloadConfigUseCase({
       discoverConfigPath,
@@ -60,7 +66,12 @@ describe("createReloadConfigUseCase", () => {
       serviceName: "imp",
       serviceLabel: "dev.imp",
     }));
-    const restartService = vi.fn(async () => undefined);
+    const restartService = vi.fn(async (): Promise<ServiceOperationResult> => ({
+      operation: "restart",
+      platform: "macos-launchd-agent",
+      serviceName: "imp",
+      definitionPath: "/tmp/dev.imp.plist",
+    }));
     const reloadConfig = createReloadConfigUseCase({
       discoverConfigPath,
       loadAppConfig,

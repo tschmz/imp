@@ -2,6 +2,7 @@ import { dirname, resolve } from "node:path";
 import { getServicePlatformAdapter } from "./platforms/get-service-platform-adapter.js";
 
 export type ServicePlatform = "linux-systemd-user" | "macos-launchd-agent" | "windows-winsw";
+export type ServicePlatformInput = NodeJS.Platform | ServicePlatform;
 
 export interface ServiceInstallPlan {
   platform: ServicePlatform;
@@ -18,7 +19,7 @@ export function createServiceInstallPlan(options: {
   configPath: string;
   argv?: string[];
   execPath?: string;
-  platform?: NodeJS.Platform;
+  platform?: ServicePlatformInput;
   environmentPath?: string;
 }): ServiceInstallPlan {
   const configPath = resolve(options.configPath);
@@ -49,8 +50,12 @@ export function renderServiceDefinition(plan: ServiceInstallPlan): string {
 }
 
 export function detectServicePlatform(
-  platform: NodeJS.Platform = process.platform,
+  platform: ServicePlatformInput = process.platform,
 ): ServicePlatform {
+  if (isServicePlatform(platform)) {
+    return platform;
+  }
+
   switch (platform) {
     case "linux":
       return "linux-systemd-user";
@@ -61,6 +66,14 @@ export function detectServicePlatform(
     default:
       throw new Error(`Service installation is not supported on platform: ${platform}`);
   }
+}
+
+function isServicePlatform(platform: ServicePlatformInput): platform is ServicePlatform {
+  return (
+    platform === "linux-systemd-user" ||
+    platform === "macos-launchd-agent" ||
+    platform === "windows-winsw"
+  );
 }
 
 function resolveServiceCommandLine(options: {
