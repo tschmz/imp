@@ -238,7 +238,8 @@ function parseTelegramCommand(
     return undefined;
   }
 
-  const command = match.groups.command.toLowerCase() as IncomingMessageCommand;
+  const parsedCommand = match.groups.command.toLowerCase();
+  const command = (parsedCommand === "start" ? "new" : parsedCommand) as IncomingMessageCommand;
   if (!inboundCommandNames.has(command)) {
     return undefined;
   }

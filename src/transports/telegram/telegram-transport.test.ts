@@ -113,6 +113,33 @@ describe("createTelegramTransport", () => {
     expect(capturedMessage?.command).toBe("new");
   });
 
+  it("treats /start as an alias for /new", async () => {
+    const bot = createFakeBot();
+    let capturedMessage: IncomingMessage | undefined;
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedMessage = event.message;
+      }),
+    });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "/start" },
+    });
+
+    expect(capturedMessage?.command).toBe("new");
+  });
+
   it("captures command arguments for /restore", async () => {
     const bot = createFakeBot();
     let capturedMessage: IncomingMessage | undefined;
