@@ -16,6 +16,48 @@ afterEach(async () => {
 });
 
 describe("manageService", () => {
+
+  it("fails for all operations when service definition is missing", async () => {
+    const root = await createTempDir();
+    const definitionPath = join(root, ".config", "systemd", "user", "missing.service");
+
+    const operations = [
+      () =>
+        startService({
+          platform: "linux-systemd-user",
+          definitionPath,
+          serviceName: "imp",
+          serviceLabel: "dev.imp",
+        }),
+      () =>
+        stopService({
+          platform: "linux-systemd-user",
+          definitionPath,
+          serviceName: "imp",
+          serviceLabel: "dev.imp",
+        }),
+      () =>
+        restartService({
+          platform: "linux-systemd-user",
+          definitionPath,
+          serviceName: "imp",
+          serviceLabel: "dev.imp",
+        }),
+      () =>
+        statusService({
+          platform: "linux-systemd-user",
+          definitionPath,
+          serviceName: "imp",
+          serviceLabel: "dev.imp",
+        }),
+    ];
+
+    await Promise.all(
+      operations.map(async (operation) => {
+        await expect(operation()).rejects.toThrow(`Service definition not found: ${definitionPath}`);
+      }),
+    );
+  });
   it("starts a linux user service", async () => {
     const root = await createTempDir();
     const definitionPath = join(root, ".config", "systemd", "user", "imp.service");
