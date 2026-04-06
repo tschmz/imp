@@ -38,6 +38,8 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("Usage: imp");
     expect(stdout).toContain("start");
     expect(stdout).toContain("init");
+    expect(stdout).toContain("backup");
+    expect(stdout).toContain("restore");
     expect(stdout).toContain("service");
   });
 
@@ -52,6 +54,8 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("log");
     expect(stdout).toContain("config");
     expect(stdout).toContain("init");
+    expect(stdout).toContain("backup");
+    expect(stdout).toContain("restore");
     expect(stdout).toContain("service");
     expect(stdout).toContain("--version");
   });
@@ -168,6 +172,43 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("--config <path>");
   });
 
+  it("shows help output for backup", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["backup", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp backup");
+    expect(stdout).toContain("create");
+  });
+
+  it("shows help output for backup create", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["backup", "create", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp backup create");
+    expect(stdout).toContain("--config <path>");
+    expect(stdout).toContain("--output <path>");
+    expect(stdout).toContain("--only <scopes>");
+    expect(stdout).toContain("--force");
+  });
+
+  it("shows help output for restore", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["restore", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp restore");
+    expect(stdout).toContain("<inputPath>");
+    expect(stdout).toContain("--config <path>");
+    expect(stdout).toContain("--data-root <path>");
+    expect(stdout).toContain("--only <scopes>");
+    expect(stdout).toContain("--force");
+  });
+
   it("shows version output", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
@@ -213,6 +254,189 @@ describe("imp CLI e2e", () => {
     await expect(readFile(promptPath, "utf8")).resolves.toContain(
       "You are a local coding and operations assistant running through a local Imp daemon.",
     );
+  });
+
+  it("creates and restores a backup with config, agent files, and conversations", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const dataRoot = join(root, "state-home", "imp");
+    const backupPath = join(root, "backup.tar");
+    const promptPath = join(dataRoot, "SYSTEM.md");
+    const authPath = join(dataRoot, "auth.json");
+    const conversationPath = join(dataRoot, "bots", "private-telegram", "conversations", "telegram", "42", "conversation.json");
+
+    await runCli(["init", "--defaults"], env);
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "default",
+      },
+      paths: {
+        dataRoot,
+      },
+      logging: {
+        level: "info",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai-codex",
+            modelId: "gpt-5.4",
+          },
+          authFile: authPath,
+          prompt: {
+            base: {
+              file: promptPath,
+            },
+          },
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "test-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+    await writeTextFile(promptPath, "backup prompt\n");
+    await writeTextFile(authPath, '{"token":"secret"}\n');
+    await writeTextFile(conversationPath, '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}\n');
+
+    const backupResult = await runCli(["backup", "create", "--output", backupPath], env);
+
+    expect(backupResult.stdout).toContain(`Created backup at ${backupPath}`);
+
+    await overwriteConfig(configPath, {
+      instance: { name: "mutated" },
+      paths: { dataRoot },
+      logging: { level: "warn" },
+      defaults: { agentId: "default" },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai-codex",
+            modelId: "gpt-5.4",
+          },
+          prompt: {
+            base: {
+              text: "mutated",
+            },
+          },
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "changed-token",
+          access: { allowedUserIds: [] },
+        },
+      ],
+    });
+    await writeTextFile(promptPath, "mutated prompt\n");
+    await writeTextFile(authPath, '{"token":"changed"}\n');
+    await writeTextFile(conversationPath, '{"messages":[]}\n');
+
+    const restoreResult = await runCli(["restore", backupPath, "--force"], env);
+
+    expect(restoreResult.stdout).toContain(`Restored backup from ${backupPath}`);
+    expect(await readFile(configPath, "utf8")).toContain('"token": "test-token"');
+    expect(await readFile(promptPath, "utf8")).toBe("backup prompt\n");
+    expect(await readFile(authPath, "utf8")).toBe('{"token":"secret"}\n');
+    expect(await readFile(conversationPath, "utf8")).toContain('"hi"');
+  });
+
+  it("restores a backup into a bare target config path and data root", async () => {
+    const sourceRoot = await createTempDir();
+    const sourceEnv = createTestEnv(sourceRoot);
+    const sourceConfigPath = join(sourceRoot, "config-home", "imp", "config.json");
+    const sourceDataRoot = join(sourceRoot, "state-home", "imp");
+    const sourcePromptPath = join(sourceRoot, "config-home", "imp", "SYSTEM.md");
+    const sourceAuthPath = join(sourceRoot, "config-home", "imp", "auth.json");
+    const sourceConversationPath = join(
+      sourceDataRoot,
+      "bots",
+      "private-telegram",
+      "conversations",
+      "telegram",
+      "42",
+      "conversation.json",
+    );
+    const backupPath = join(sourceRoot, "backup.tar");
+
+    await overwriteConfig(sourceConfigPath, {
+      instance: { name: "default" },
+      paths: { dataRoot: sourceDataRoot },
+      logging: { level: "info" },
+      defaults: { agentId: "default" },
+      agents: [
+        {
+          id: "default",
+          model: { provider: "openai-codex", modelId: "gpt-5.4" },
+          authFile: "./auth.json",
+          prompt: {
+            base: {
+              file: "./SYSTEM.md",
+            },
+          },
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "test-token",
+          access: { allowedUserIds: [] },
+        },
+      ],
+    });
+    await writeTextFile(sourcePromptPath, "backup prompt\n");
+    await writeTextFile(sourceAuthPath, '{"token":"secret"}\n');
+    await writeTextFile(sourceConversationPath, '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}\n');
+
+    await runCli(["backup", "create", "--output", backupPath], sourceEnv);
+
+    const targetRoot = await createTempDir();
+    const targetEnv = createTestEnv(targetRoot);
+    const targetConfigPath = join(targetRoot, "restore-config", "config.json");
+    const targetDataRoot = join(targetRoot, "restore-state");
+
+    const restoreResult = await runCli(
+      ["restore", backupPath, "--config", targetConfigPath, "--data-root", targetDataRoot, "--force"],
+      targetEnv,
+    );
+
+    expect(restoreResult.stdout).toContain(`Config: ${targetConfigPath}`);
+    expect(restoreResult.stdout).toContain(`Data root: ${targetDataRoot}`);
+    expect(await readFile(targetConfigPath, "utf8")).toContain(`"dataRoot": "${targetDataRoot}"`);
+    expect(await readFile(join(targetRoot, "restore-config", "SYSTEM.md"), "utf8")).toBe("backup prompt\n");
+    expect(await readFile(join(targetRoot, "restore-config", "auth.json"), "utf8")).toBe('{"token":"secret"}\n');
+    expect(
+      await readFile(
+        join(
+          targetDataRoot,
+          "bots",
+          "private-telegram",
+          "conversations",
+          "telegram",
+          "42",
+          "conversation.json",
+        ),
+        "utf8",
+      ),
+    ).toContain('"hi"');
   });
 
   it("validates the discovered config through `imp config validate`", async () => {
@@ -1079,6 +1303,12 @@ async function writeLogFile(path: string, lines: string[]): Promise<void> {
   const { mkdir, writeFile } = await import("node:fs/promises");
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${lines.join("\n")}\n`, "utf8");
+}
+
+async function writeTextFile(path: string, content: string): Promise<void> {
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, "utf8");
 }
 
 async function runCli(

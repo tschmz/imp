@@ -82,6 +82,51 @@ That regenerates both the unit and the managed environment file without requirin
 are preserved across `--force` reinstalls unless you replace them through `imp init`.
 On Linux, that managed environment file lives next to the config as `~/.config/imp/service.env`.
 
+### Create a backup
+
+```bash
+imp backup create
+```
+
+By default this writes a tar archive next to the active config and includes:
+
+- the active config file
+- agent prompt/auth files referenced from the config
+- bot conversation stores under `paths.dataRoot`
+
+If a referenced prompt or auth file is missing, backup creation fails with a targeted error that
+identifies the agent reference and path instead of producing a partial archive.
+
+You can scope the archive with `--only`, for example:
+
+```bash
+imp backup create --only conversations
+imp backup create --only config,agents --output /tmp/imp-backup.tar
+```
+
+### Restore a backup
+
+```bash
+imp restore /path/to/imp-backup.tar --force
+```
+
+For a bare restore into a new installation, pass an explicit target config path and data root:
+
+```bash
+imp restore /path/to/imp-backup.tar \
+  --config /path/to/config.json \
+  --data-root /path/to/data-root \
+  --force
+```
+
+`imp restore` only rewrites the selected backup scopes. Conversation restores replace only the
+targeted `bots/<id>/conversations` subtree and leave unrelated data under `paths.dataRoot`
+untouched.
+
+`--only agents` is intentionally stricter: it is only valid when you also restore `config`, or
+when `--config` points to an already existing target config file. This prevents restoring relative
+prompt/auth files into an undefined layout.
+
 ## How It Works
 
 `imp` runs as a local daemon. It loads a JSON configuration, resolves agent and bot definitions,

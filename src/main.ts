@@ -9,12 +9,14 @@ import { createServiceUseCases } from "./application/service-use-cases.js";
 import { createValidateConfigUseCase } from "./application/validate-config-use-case.js";
 import { createViewLogsUseCase } from "./application/view-logs-use-case.js";
 import { createDaemonStartupFailureReporter } from "./logging/daemon-startup-failure-reporter.js";
+import { createBackupUseCases } from "./application/backup-use-cases.js";
 
 async function main(): Promise<void> {
   const serviceUseCases = createServiceUseCases();
   const startupFailureReporter = createDaemonStartupFailureReporter();
   const runDaemonUseCase = createRunDaemonUseCase({ startupFailureReporter });
   const validateConfigUseCase = createValidateConfigUseCase();
+  const backupUseCases = createBackupUseCases();
   const cli = createCli({
     startDaemon: async (options) => {
       const outcome = await runDaemonUseCase(options);
@@ -26,6 +28,8 @@ async function main(): Promise<void> {
     getConfigValue: createGetConfigValueUseCase(),
     setConfigValue: createSetConfigValueUseCase(),
     initConfig: createInitConfigUseCase(),
+    createBackup: backupUseCases.createBackup,
+    restoreBackup: backupUseCases.restoreBackup,
     installService: serviceUseCases.installService,
     uninstallService: serviceUseCases.uninstallService,
     startService: serviceUseCases.startService,

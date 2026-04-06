@@ -13,6 +13,19 @@ export interface CliDependencies {
     force: boolean;
     defaults: boolean;
   }) => Promise<void>;
+  createBackup: (options: {
+    configPath?: string;
+    outputPath?: string;
+    only?: string;
+    force: boolean;
+  }) => Promise<void>;
+  restoreBackup: (options: {
+    configPath?: string;
+    dataRoot?: string;
+    inputPath: string;
+    only?: string;
+    force: boolean;
+  }) => Promise<void>;
   installService: (options: { configPath?: string; dryRun: boolean; force: boolean }) => Promise<void>;
   uninstallService: (options: { configPath?: string }) => Promise<void>;
   startService: (options: { configPath?: string }) => Promise<void>;
@@ -120,6 +133,52 @@ export function createCli(dependencies: CliDependencies): Command {
     .option("-c, --config <path>", "Path to the config file")
     .action(async function action(this: Command, options: { config?: string }) {
       await dependencies.reloadConfig({ configPath: options.config });
+    });
+
+  const backupCommand = program.command("backup").description("Create and inspect imp backup archives");
+
+  backupCommand
+    .command("create")
+    .description("Create a backup archive from config, agent files, and conversation data")
+    .option("-c, --config <path>", "Path to the config file")
+    .option("-o, --output <path>", "Path to the backup archive")
+    .option("--only <scopes>", "Comma-separated scopes: config,agents,conversations")
+    .option("-f, --force", "Overwrite an existing backup archive")
+    .action(async function action(
+      this: Command,
+      options: { config?: string; output?: string; only?: string; force?: boolean },
+    ) {
+      await dependencies.createBackup({
+        configPath: options.config,
+        outputPath: options.output,
+        only: options.only,
+        force: options.force ?? false,
+      });
+    });
+
+  program
+    .command("restore")
+    .description("Restore config, agent files, and conversations from a backup archive")
+    .argument("<inputPath>", "Path to the backup archive")
+    .option("-c, --config <path>", "Target config path")
+    .option("--data-root <path>", "Override paths.dataRoot when restoring conversations or config")
+    .option(
+      "--only <scopes>",
+      "Comma-separated scopes: config,agents,conversations. Agents-only restore requires a restored or existing target config.",
+    )
+    .option("-f, --force", "Overwrite existing files")
+    .action(async function action(
+      this: Command,
+      inputPath: string,
+      options: { config?: string; dataRoot?: string; only?: string; force?: boolean },
+    ) {
+      await dependencies.restoreBackup({
+        configPath: options.config,
+        dataRoot: options.dataRoot,
+        inputPath,
+        only: options.only,
+        force: options.force ?? false,
+      });
     });
 
   const serviceCommand = program.command("service").description("Manage imp background services");
