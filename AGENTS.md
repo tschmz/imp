@@ -15,11 +15,12 @@
 - `dist/`: built output.
 
 ### Runtime and CLI entry points
-- `src/main.ts`: main executable entry point. Wires CLI commands to app logic, starts the daemon, handles `init`, `log`, and `service` subcommands.
+- `src/main.ts`: main executable entry point. Wires CLI commands to app logic, starts the daemon, handles `init`, `log`, `config`, and `service` subcommands.
 - `src/cli/create-cli.ts`: defines the full command surface:
   - `imp start`
   - `imp log`
   - `imp init`
+  - `imp config validate|get|set|reload`
   - `imp service install|uninstall|start|stop|restart|status`
 - `src/index.ts`: library export surface; currently exports `createDaemon` and daemon types.
 - `package.json` scripts:
