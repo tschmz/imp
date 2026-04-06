@@ -1,5 +1,10 @@
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 
+export type TransportFactory<TConfig = unknown, TLogger = unknown> = (
+  config: TConfig,
+  logger: TLogger,
+) => Transport;
+
 export interface TransportInboundEvent {
   message: IncomingMessage;
   runWithProcessing<T>(operation: () => Promise<T>): Promise<T>;

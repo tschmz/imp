@@ -39,8 +39,10 @@ export function createRunDaemonUseCase(
   };
 
   return async ({ configPath }) => {
-    const { runtimeConfig } = await deps.resolveRuntimeTarget({ cliConfigPath: configPath });
-    const daemon = deps.createDaemon(runtimeConfig);
+    const { runtimeConfig, createTransport } = await deps.resolveRuntimeTarget({
+      cliConfigPath: configPath,
+    });
+    const daemon = deps.createDaemon(runtimeConfig, { createTransport });
 
     try {
       await daemon.start();

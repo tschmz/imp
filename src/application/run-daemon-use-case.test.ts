@@ -5,11 +5,13 @@ import { createRunDaemonUseCase } from "./run-daemon-use-case.js";
 describe("createRunDaemonUseCase", () => {
   it("returns started when daemon startup succeeds", async () => {
     const runtimeConfig = createRuntimeConfig();
+    const createTransport = vi.fn();
     const report = vi.fn(async () => undefined);
     const start = vi.fn(async () => undefined);
+    const createDaemon = vi.fn(() => ({ start }));
     const useCase = createRunDaemonUseCase({
-      resolveRuntimeTarget: async () => ({ configPath: "/tmp/config.json", runtimeConfig }),
-      createDaemon: () => ({ start }),
+      resolveRuntimeTarget: async () => ({ configPath: "/tmp/config.json", runtimeConfig, createTransport }),
+      createDaemon,
       startupFailureReporter: { report },
     });
 
@@ -18,19 +20,22 @@ describe("createRunDaemonUseCase", () => {
     expect(outcome).toEqual({ status: "started" });
     expect(start).toHaveBeenCalledOnce();
     expect(report).not.toHaveBeenCalled();
+    expect(createDaemon).toHaveBeenCalledWith(runtimeConfig, { createTransport });
   });
 
   it("returns startup_failed and delegates reporting when daemon startup fails", async () => {
     const runtimeConfig = createRuntimeConfig();
+    const createTransport = vi.fn();
     const startupError = new Error("boom");
     const report = vi.fn(async () => undefined);
+    const createDaemon = vi.fn(() => ({
+      start: async () => {
+        throw startupError;
+      },
+    }));
     const useCase = createRunDaemonUseCase({
-      resolveRuntimeTarget: async () => ({ configPath: "/tmp/config.json", runtimeConfig }),
-      createDaemon: () => ({
-        start: async () => {
-          throw startupError;
-        },
-      }),
+      resolveRuntimeTarget: async () => ({ configPath: "/tmp/config.json", runtimeConfig, createTransport }),
+      createDaemon,
       startupFailureReporter: { report },
     });
 
@@ -43,6 +48,7 @@ describe("createRunDaemonUseCase", () => {
     });
     expect(report).toHaveBeenCalledOnce();
     expect(report).toHaveBeenCalledWith({ runtimeConfig, error: startupError });
+    expect(createDaemon).toHaveBeenCalledWith(runtimeConfig, { createTransport });
   });
 });
 
