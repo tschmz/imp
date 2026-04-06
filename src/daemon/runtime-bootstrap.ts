@@ -3,6 +3,7 @@ import { createFileLogger } from "../logging/file-logger.js";
 import type { Logger } from "../logging/types.js";
 import {
   createBuiltInToolRegistry,
+  type WorkingDirectoryState,
   createPiAgentEngine,
 } from "../runtime/create-pi-agent-engine.js";
 import { createOAuthApiKeyResolver } from "../runtime/create-oauth-api-key-resolver.js";
@@ -27,7 +28,7 @@ export interface BootstrappedRuntime {
 export interface RuntimeBootstrapDependencies {
   engine?: AgentEngine;
   toolRegistry?: ToolRegistry;
-  createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
+  createBuiltInToolRegistry?: (workingDirectory: string | WorkingDirectoryState) => ToolRegistry;
   createLogger?: (path: string, level: DaemonConfig["logging"]["level"]) => Logger;
   createConversationStore?: (paths: RuntimePaths) => ConversationStore;
 }

@@ -53,6 +53,7 @@ export function createHandleIncomingMessage(
       await dependencies.conversationStore.put({
         state: {
           ...conversation.state,
+          ...(response.workingDirectory ? { workingDirectory: response.workingDirectory } : {}),
           updatedAt: respondedAt,
         },
         messages: [

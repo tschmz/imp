@@ -353,7 +353,8 @@ describe("createPiAgentEngine", () => {
         }) as never,
       readTextFile: async () => "unused context",
       createBuiltInToolRegistry: (workingDirectory) => {
-        capturedWorkingDirectory = workingDirectory;
+        capturedWorkingDirectory =
+          typeof workingDirectory === "string" ? workingDirectory : workingDirectory.get();
         return {
           list: () => [],
           get: () => undefined,
@@ -558,6 +559,53 @@ describe("createPiAgentEngine", () => {
         },
       },
       conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+  });
+
+  it("uses the persisted conversation working directory for auto-loaded AGENTS.md", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        expect(context.systemPrompt).toBe(
+          "You are concise.\n\n" +
+            '<INSTRUCTIONS from="/workspace/next/AGENTS.md">\n' +
+            "Follow the next workspace instructions.\n" +
+            "</INSTRUCTIONS>",
+        );
+        return fauxAssistantMessage("ok");
+      },
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async (path) => {
+        if (path === "/workspace/next/AGENTS.md") {
+          return "Follow the next workspace instructions.";
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        context: {
+          workingDirectory: "/workspace/start",
+        },
+      },
+      conversation: {
+        ...createConversation(),
+        state: {
+          ...createConversation().state,
+          workingDirectory: "/workspace/next",
+        },
+      },
       message: createIncomingMessage(),
     });
   });

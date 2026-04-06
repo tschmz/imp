@@ -19,7 +19,7 @@ import {
   type UserMessage,
 } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
-import type { ConversationMessage } from "../domain/conversation.js";
+import type { ConversationContext, ConversationMessage } from "../domain/conversation.js";
 import type { Logger } from "../logging/types.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
@@ -51,7 +51,7 @@ interface PiAgentEngineDependencies {
   readTextFile?: (path: string) => Promise<string>;
   getContextFileFingerprint?: (path: string) => Promise<string>;
   toolRegistry?: ToolRegistry;
-  createBuiltInToolRegistry?: (workingDirectory: string) => ToolRegistry;
+  createBuiltInToolRegistry?: (workingDirectory: string | WorkingDirectoryState) => ToolRegistry;
 }
 
 interface AgentHandle {
@@ -61,7 +61,7 @@ interface AgentHandle {
   };
 }
 
-interface WorkingDirectoryState {
+export interface WorkingDirectoryState {
   get(): string;
   set(path: string): void;
 }
@@ -85,6 +85,11 @@ export function createPiAgentEngine(
     async run(input) {
       const startedAt = Date.now();
       try {
+        const initialWorkingDirectory = resolveConversationWorkingDirectory(
+          input.agent,
+          input.conversation,
+        );
+        const workingDirectoryState = createWorkingDirectoryState(initialWorkingDirectory);
         const model = resolveModel(input.agent.model.provider, input.agent.model.modelId);
         if (!model) {
           throw new Error(
@@ -103,6 +108,7 @@ export function createPiAgentEngine(
 
         const systemPrompt = await resolveSystemPrompt({
           agent: input.agent,
+          promptWorkingDirectory: resolvePromptWorkingDirectory(input.agent, input.conversation),
           readTextFile,
           getContextFileFingerprint,
           cache: systemPromptCache,
@@ -111,7 +117,7 @@ export function createPiAgentEngine(
         });
         const toolRegistry =
           dependencies.toolRegistry ??
-          buildToolRegistry(resolveWorkingDirectory(input.agent));
+          buildToolRegistry(workingDirectoryState);
         const tools = resolveAgentTools(input.agent, toolRegistry);
         await logger?.debug("prepared agent runtime", {
           botId: input.message.botId,
@@ -175,6 +181,9 @@ export function createPiAgentEngine(
             conversation: input.message.conversation,
             text: responseText,
           },
+          ...(workingDirectoryState.get() !== initialWorkingDirectory
+            ? { workingDirectory: workingDirectoryState.get() }
+            : {}),
         };
       } catch (error) {
         await logger?.error(
@@ -218,8 +227,27 @@ export function resolveWorkingDirectory(agent: AgentDefinition): string {
   return agent.context?.workingDirectory ?? process.cwd();
 }
 
-export function createBuiltInToolRegistry(workingDirectory: string): ToolRegistry {
-  const workingDirectoryState = createWorkingDirectoryState(workingDirectory);
+function resolveConversationWorkingDirectory(
+  agent: AgentDefinition,
+  conversation: ConversationContext,
+): string {
+  return conversation.state.workingDirectory ?? resolveWorkingDirectory(agent);
+}
+
+function resolvePromptWorkingDirectory(
+  agent: AgentDefinition,
+  conversation: ConversationContext,
+): string | undefined {
+  return conversation.state.workingDirectory ?? agent.context?.workingDirectory;
+}
+
+export function createBuiltInToolRegistry(
+  workingDirectory: string | WorkingDirectoryState,
+): ToolRegistry {
+  const workingDirectoryState =
+    typeof workingDirectory === "string"
+      ? createWorkingDirectoryState(workingDirectory)
+      : workingDirectory;
 
   return createToolRegistry([
     ...createDynamicBuiltInTools(workingDirectoryState),
@@ -393,6 +421,7 @@ function createOnPayloadOverride(
 
 async function buildSystemPrompt(
   agent: AgentDefinition,
+  promptWorkingDirectory: string | undefined,
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
   const sections: string[] = [];
@@ -422,7 +451,7 @@ async function buildSystemPrompt(
     throw new Error(`Agent "${agent.id}" must define systemPrompt or systemPromptFile.`);
   }
 
-  const contextFiles = resolveContextPromptFiles(agent);
+  const contextFiles = resolveContextPromptFiles(agent, promptWorkingDirectory);
 
   for (const file of contextFiles) {
     let content: string;
@@ -459,17 +488,17 @@ function escapeInstructionAttribute(value: string): string {
 
 function resolveContextPromptFiles(
   agent: AgentDefinition,
+  promptWorkingDirectory: string | undefined,
 ): Array<{ path: string; optional: boolean }> {
   const files = (agent.context?.files ?? []).map((path) => ({ path, optional: false }));
-  const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(agent);
+  const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(promptWorkingDirectory);
   if (workingDirectoryAgentsFile && !files.some((file) => file.path === workingDirectoryAgentsFile)) {
     files.push({ path: workingDirectoryAgentsFile, optional: true });
   }
   return files;
 }
 
-function resolveWorkingDirectoryAgentsFile(agent: AgentDefinition): string | undefined {
-  const workingDirectory = agent.context?.workingDirectory;
+function resolveWorkingDirectoryAgentsFile(workingDirectory: string | undefined): string | undefined {
   if (!workingDirectory) {
     return undefined;
   }
@@ -493,6 +522,7 @@ function isFileNotFoundError(error: unknown): boolean {
 
 async function resolveSystemPrompt(options: {
   agent: AgentDefinition;
+  promptWorkingDirectory?: string;
   readTextFile: (path: string) => Promise<string>;
   getContextFileFingerprint: (path: string) => Promise<string>;
   cache: Map<string, string>;
@@ -501,6 +531,7 @@ async function resolveSystemPrompt(options: {
 }): Promise<string> {
   const cacheKey = await buildSystemPromptCacheKey(
     options.agent,
+    options.promptWorkingDirectory,
     options.getContextFileFingerprint,
     options.readTextFile,
   );
@@ -512,7 +543,11 @@ async function resolveSystemPrompt(options: {
     return cachedPrompt;
   }
 
-  const systemPrompt = await buildSystemPrompt(options.agent, options.readTextFile);
+  const systemPrompt = await buildSystemPrompt(
+    options.agent,
+    options.promptWorkingDirectory,
+    options.readTextFile,
+  );
   options.cache.set(cacheKey, systemPrompt);
   await options.logger?.debug("rebuilt system prompt", {
     agentId: options.agent.id,
@@ -529,12 +564,14 @@ async function resolveSystemPrompt(options: {
 
 async function buildSystemPromptCacheKey(
   agent: AgentDefinition,
+  promptWorkingDirectory: string | undefined,
   getContextFileFingerprint: (path: string) => Promise<string>,
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
-  const promptFiles = [agent.systemPromptFile, ...resolveContextPromptFiles(agent).map((file) => file.path)].filter(
-    (path): path is string => path !== undefined,
-  );
+  const promptFiles = [
+    agent.systemPromptFile,
+    ...resolveContextPromptFiles(agent, promptWorkingDirectory).map((file) => file.path),
+  ].filter((path): path is string => path !== undefined);
   const fileFingerprints = await Promise.all(
     promptFiles.map(async (path) => {
       try {
@@ -556,6 +593,7 @@ async function buildSystemPromptCacheKey(
     agentId: agent.id,
     systemPrompt: agent.systemPrompt,
     systemPromptFile: agent.systemPromptFile,
+    promptWorkingDirectory,
     files: fileFingerprints,
   });
 }

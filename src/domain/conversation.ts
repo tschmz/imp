@@ -16,6 +16,7 @@ export interface ConversationMessage {
 export interface ConversationState {
   conversation: ConversationRef;
   agentId: string;
+  workingDirectory?: string;
   createdAt: string;
   updatedAt: string;
   version?: number;

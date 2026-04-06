@@ -65,6 +65,51 @@ describe("createHandleIncomingMessage", () => {
     });
   });
 
+  it("persists the working directory returned by the engine for the next run", async () => {
+    const agent = createDefaultAgent();
+    const byConversation = new Map<string, Awaited<ReturnType<ConversationStore["get"]>>>();
+
+    const conversationStore: ConversationStore = {
+      get: vi.fn(async (ref) => byConversation.get(ref.externalId)),
+      put: vi.fn(async (context) => {
+        byConversation.set(context.state.conversation.externalId, context);
+      }),
+    };
+
+    const engine: AgentEngine = {
+      run: vi
+        .fn<AgentEngine["run"]>()
+        .mockResolvedValueOnce({
+          message: {
+            conversation: createIncomingMessage("1", "hello").conversation,
+            text: "reply",
+          },
+          workingDirectory: "/workspace/next",
+        })
+        .mockImplementationOnce(async ({ conversation, message }) => {
+          expect(conversation.state.workingDirectory).toBe("/workspace/next");
+          return {
+            message: {
+              conversation: message.conversation,
+              text: "reply",
+            },
+          };
+        }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore,
+      engine,
+      defaultAgentId: "default",
+    });
+
+    await service.handle(createIncomingMessage("1", "hello"));
+    await service.handle(createIncomingMessage("2", "again"));
+
+    expect(byConversation.get("42")?.state.workingDirectory).toBe("/workspace/next");
+  });
+
   it("fails when the default agent cannot be resolved", () => {
     expect(() =>
       createHandleIncomingMessage({

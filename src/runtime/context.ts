@@ -10,4 +10,5 @@ export interface AgentRunInput {
 
 export interface AgentRunResult {
   message: OutgoingMessage;
+  workingDirectory?: string;
 }
