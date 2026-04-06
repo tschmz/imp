@@ -64,6 +64,22 @@ describe("default app config helpers", () => {
     expect(config.agents[0]?.systemPrompt).toBeUndefined();
   });
 
+  it("does not add shell path config by default", () => {
+    const config = buildInitialAppConfig(process.env, {
+      instanceName: "home",
+      dataRoot: "/tmp/imp",
+      provider: "openai",
+      modelId: "gpt-5.4",
+      telegramToken: "replace-me",
+      allowedUserIds: ["1"],
+      workingDirectory: "/workspace",
+    });
+
+    expect(config.agents[0]?.context).toEqual({
+      workingDirectory: "/workspace",
+    });
+  });
+
   it("parses comma-separated values", () => {
     expect(parseCommaSeparatedValues(" 1, 2 ,,3 ")).toEqual(["1", "2", "3"]);
   });

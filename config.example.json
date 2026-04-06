@@ -30,6 +30,14 @@
       ],
       "context": {
         "workingDirectory": "/path/to/workspace",
+        "shell": {
+          "path": [
+            "/home/example/.local/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin"
+          ]
+        },
         "files": [
           "/path/to/workspace/AGENTS.md"
         ]
@@ -54,6 +62,13 @@
       ],
       "context": {
         "workingDirectory": "/path/to/ops-workspace",
+        "shell": {
+          "path": [
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin"
+          ]
+        },
         "files": [
           "/path/to/ops-workspace/AGENTS.md",
           "/path/to/ops-workspace/RUNBOOK.md"

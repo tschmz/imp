@@ -16,6 +16,11 @@ const inferenceSettingsSchema = z.object({
 const agentContextConfigSchema = z.object({
   files: z.string().min(1).array().optional(),
   workingDirectory: z.string().min(1).optional(),
+  shell: z
+    .object({
+      path: z.string().min(1).array().optional(),
+    })
+    .optional(),
 });
 
 const agentConfigSchema = z

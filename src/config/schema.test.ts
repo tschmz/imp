@@ -110,6 +110,27 @@ describe("appConfigSchema", () => {
       }),
     );
   });
+
+  it("accepts agent shell path entries in context", () => {
+    const result = appConfigSchema.safeParse(
+      createConfig({
+        id: "default",
+        systemPrompt: "You are concise.",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        context: {
+          workingDirectory: "/workspace",
+          shell: {
+            path: ["/home/tester/.local/bin", "/usr/bin", "/bin"],
+          },
+        },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
 });
 
 function createConfig(agent: Record<string, unknown>) {
