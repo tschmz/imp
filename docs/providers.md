@@ -1,7 +1,6 @@
 # Supported Providers
 
-`imp` uses the provider registry from [`@mariozechner/pi-ai`](https://www.npmjs.com/package/@mariozechner/pi-ai). The
-exact list of available providers therefore depends on the installed `pi-ai` version.
+`imp` uses the provider registry from [`@mariozechner/pi-ai`](https://www.npmjs.com/package/@mariozechner/pi-ai).
 
 The current installation includes these built-in providers and credential methods:
 
@@ -23,7 +22,7 @@ The current installation includes these built-in providers and credential method
 | `minimax-cn`             | `MINIMAX_CN_API_KEY`                                                                                                                                                                                                                                                                                                          |
 | `mistral`                | `MISTRAL_API_KEY`                                                                                                                                                                                                                                                                                                             |
 | `openai`                 | `OPENAI_API_KEY`                                                                                                                                                                                                                                                                                                              |
-| `openai-codex`           | OpenAI Codex OAuth credentials. Create `auth.json` with `npx @mariozechner/pi-ai login openai-codex`.                                                                                                                                                                                                                       |
+| `openai-codex`           | OpenAI Codex OAuth credentials. Create `auth.json` with `npx @mariozechner/pi-ai login openai-codex`.                                                                                                                                                                                                                         |
 | `opencode`               | `OPENCODE_API_KEY`                                                                                                                                                                                                                                                                                                            |
 | `opencode-go`            | `OPENCODE_API_KEY`                                                                                                                                                                                                                                                                                                            |
 | `openrouter`             | `OPENROUTER_API_KEY`                                                                                                                                                                                                                                                                                                          |
