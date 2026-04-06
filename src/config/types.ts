@@ -1,4 +1,4 @@
-import type { AgentContextConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
+import type { AgentPromptConfig, AgentWorkspaceConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
 
 export interface InstanceConfig {
@@ -22,12 +22,11 @@ export type ModelConfig = ModelRef;
 export interface AgentConfig {
   id: string;
   name?: string;
-  systemPrompt?: string;
-  systemPromptFile?: string;
+  prompt: AgentPromptConfig;
   model?: ModelConfig;
   authFile?: string;
   inference?: InferenceSettings;
-  context?: AgentContextConfig;
+  workspace?: AgentWorkspaceConfig;
   tools?: string[];
 }
 

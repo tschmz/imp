@@ -33,14 +33,17 @@ describe("promptForInitialAppConfig", () => {
 
     expect(result.installService).toBe(true);
     expect(result.config.paths.dataRoot).toBe("/tmp/state-home/imp");
-    expect(result.config.agents[0]?.context).toEqual({
-      workingDirectory: "/workspace",
-      shell: {
-        path: ["/custom/bin", "/usr/bin", "/bin"],
-      },
-      files: ["/workspace/AGENTS.md", "/workspace/RULES.md"],
+    expect(result.config.agents[0]?.workspace).toEqual({
+      cwd: "/workspace",
+      shellPath: ["/custom/bin", "/usr/bin", "/bin"],
     });
-    expect(result.config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
+    expect(result.config.agents[0]?.prompt).toEqual({
+      base: {
+        file: "/tmp/state-home/imp/SYSTEM.md",
+      },
+      instructions: [{ file: "/workspace/AGENTS.md" }],
+      references: [{ file: "/workspace/RULES.md" }],
+    });
     expect(result.config.bots[0]?.access.allowedUserIds).toEqual(["1", "2"]);
     if (process.platform === "linux") {
       expect(result.serviceEnvironment).toEqual({
@@ -50,6 +53,31 @@ describe("promptForInitialAppConfig", () => {
     } else {
       expect(result.serviceEnvironment).toBeUndefined();
     }
+    expect(confirm).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        message: "Load AGENTS.md from that workspace as project instructions?",
+        default: true,
+      }),
+    );
+    expect(input).toHaveBeenNthCalledWith(
+      6,
+      expect.objectContaining({
+        message: "Workspace directory for the agent (optional)",
+      }),
+    );
+    expect(input).toHaveBeenNthCalledWith(
+      7,
+      expect.objectContaining({
+        message: "Additional reference files for the prompt (comma-separated, optional)",
+      }),
+    );
+    expect(input).toHaveBeenNthCalledWith(
+      8,
+      expect.objectContaining({
+        message: "Workspace shell PATH for the bash tool (colon-separated, optional)",
+      }),
+    );
     expect(confirm).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
@@ -83,7 +111,9 @@ describe("promptForInitialAppConfig", () => {
     });
 
     expect(result.installService).toBe(false);
-    expect(result.config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
+    expect(result.config.agents[0]?.prompt.base).toEqual({
+      file: "/tmp/state-home/imp/SYSTEM.md",
+    });
   });
 
   it("lists the expected environment variables for the openai provider", () => {

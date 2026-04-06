@@ -16,7 +16,11 @@ describe("createRuntimeEntries", () => {
         {
           id: "default",
           name: "Default",
-          systemPrompt: "You are concise.",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
           model: {
             provider: "openai",
             modelId: "gpt-5.3",

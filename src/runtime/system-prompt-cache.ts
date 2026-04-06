@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { AgentDefinition } from "../domain/agent.js";
+import type { AgentDefinition, PromptSource } from "../domain/agent.js";
 
 export interface CacheStrategy<Value> {
   get(key: string): Value | undefined;
@@ -67,8 +67,9 @@ export class SystemPromptCache {
 
     return JSON.stringify({
       agentId: input.agent.id,
-      systemPrompt: input.agent.systemPrompt,
-      systemPromptFile: input.agent.systemPromptFile,
+      prompt: serializePromptSource(input.agent.prompt.base),
+      instructions: (input.agent.prompt.instructions ?? []).map(serializePromptSource),
+      references: (input.agent.prompt.references ?? []).map(serializePromptSource),
       promptWorkingDirectory: input.promptWorkingDirectory,
       files: fileFingerprints,
     });
@@ -88,4 +89,12 @@ export class SystemPromptCache {
 
     this.#latestCacheKeyByAgentId.set(agentId, cacheKey);
   }
+}
+
+function serializePromptSource(source: PromptSource): Record<string, string> {
+  if (source.file) {
+    return { file: source.file };
+  }
+
+  return { text: source.text ?? "" };
 }

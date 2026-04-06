@@ -39,15 +39,17 @@ describe("initAppConfig", () => {
           modelId: string;
         };
         tools?: string[];
-        context?: {
-          files?: string[];
+        workspace?: {
+          cwd?: string;
+        };
+        prompt: {
+          base: { file?: string; text?: string };
         };
         inference?: {
           maxOutputTokens?: number;
           metadata?: Record<string, unknown>;
           request?: Record<string, unknown>;
         };
-        systemPromptFile: string;
       }>;
       bots: Array<{ access: { allowedUserIds: string[] } }>;
     };
@@ -68,7 +70,7 @@ describe("initAppConfig", () => {
       "find",
       "ls",
     ]);
-    expect(config.agents[0]?.context).toBeUndefined();
+    expect(config.agents[0]?.workspace).toBeUndefined();
     expect(config.agents[0]?.inference).toEqual({
       metadata: {
         app: "imp",
@@ -77,7 +79,9 @@ describe("initAppConfig", () => {
         store: true,
       },
     });
-    expect(config.agents[0]?.systemPromptFile).toBe(join(root, "state-home", "imp", "SYSTEM.md"));
+    expect(config.agents[0]?.prompt.base).toEqual({
+      file: join(root, "state-home", "imp", "SYSTEM.md"),
+    });
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
 
     const fileMode = (await stat(configPath)).mode & 0o777;
@@ -182,7 +186,7 @@ describe("initAppConfig", () => {
       modelId: "gpt-5.4",
       telegramToken: "replace-me",
       allowedUserIds: [],
-      systemPromptFile: promptPath,
+      promptBaseFile: promptPath,
     });
 
     await initAppConfig({ configPath, config });
@@ -215,14 +219,14 @@ describe("initAppConfig", () => {
       telegramToken: "123:abc",
       allowedUserIds: ["1", "2"],
       workingDirectory: join(root, "workspace"),
-      contextFiles: [join(root, "workspace", "AGENTS.md")],
-      systemPromptFile: join(root, "SYSTEM.md"),
+      instructionFiles: [join(root, "workspace", "AGENTS.md")],
+      promptBaseFile: join(root, "SYSTEM.md"),
     });
 
     await initAppConfig({ configPath, config });
 
     await expect(readFile(configPath, "utf8")).resolves.toContain('"authFile"');
-    await expect(readFile(configPath, "utf8")).resolves.toContain('"systemPromptFile"');
+    await expect(readFile(configPath, "utf8")).resolves.toContain('"prompt"');
   });
 });
 

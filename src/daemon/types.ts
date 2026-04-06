@@ -1,4 +1,4 @@
-import type { AgentContextConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
+import type { AgentPromptConfig, AgentWorkspaceConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
 import type { TransportType } from "../transports/registry.js";
 
@@ -46,11 +46,10 @@ export interface Daemon {
 export interface ConfiguredAgent {
   id: string;
   name?: string;
-  systemPrompt?: string;
-  systemPromptFile?: string;
+  prompt: AgentPromptConfig;
   model?: ModelRef;
   authFile?: string;
   inference?: InferenceSettings;
-  context?: AgentContextConfig;
+  workspace?: AgentWorkspaceConfig;
   tools?: string[];
 }

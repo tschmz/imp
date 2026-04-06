@@ -28,21 +28,25 @@
         "find",
         "ls"
       ],
-      "context": {
-        "workingDirectory": "/path/to/workspace",
-        "shell": {
-          "path": [
-            "/home/example/.local/bin",
-            "/usr/local/bin",
-            "/usr/bin",
-            "/bin"
-          ]
+      "prompt": {
+        "base": {
+          "file": "/var/lib/imp/SYSTEM.md"
         },
-        "files": [
-          "/path/to/workspace/AGENTS.md"
+        "instructions": [
+          {
+            "file": "/path/to/workspace/AGENTS.md"
+          }
         ]
       },
-      "systemPromptFile": "/var/lib/imp/SYSTEM.md"
+      "workspace": {
+        "cwd": "/path/to/workspace",
+        "shellPath": [
+          "/home/example/.local/bin",
+          "/usr/local/bin",
+          "/usr/bin",
+          "/bin"
+        ]
+      }
     },
     {
       "id": "ops",
@@ -60,18 +64,27 @@
         "find",
         "ls"
       ],
-      "context": {
-        "workingDirectory": "/path/to/ops-workspace",
-        "shell": {
-          "path": [
-            "/usr/local/bin",
-            "/usr/bin",
-            "/bin"
-          ]
+      "prompt": {
+        "base": {
+          "text": "You are a concise operations assistant focused on diagnostics, runbooks, and safe remediation steps."
         },
-        "files": [
-          "/path/to/ops-workspace/AGENTS.md",
-          "/path/to/ops-workspace/RUNBOOK.md"
+        "instructions": [
+          {
+            "file": "/path/to/ops-workspace/AGENTS.md"
+          }
+        ],
+        "references": [
+          {
+            "file": "/path/to/ops-workspace/RUNBOOK.md"
+          }
+        ]
+      },
+      "workspace": {
+        "cwd": "/path/to/ops-workspace",
+        "shellPath": [
+          "/usr/local/bin",
+          "/usr/bin",
+          "/bin"
         ]
       },
       "inference": {
@@ -88,8 +101,7 @@
             "verbosity": "low"
           }
         }
-      },
-      "systemPrompt": "You are a concise operations assistant focused on diagnostics, runbooks, and safe remediation steps."
+      }
     }
   ],
   "bots": [

@@ -1,5 +1,5 @@
 import { dirname, isAbsolute, resolve } from "node:path";
-import type { AgentContextConfig } from "../domain/agent.js";
+import type { AgentPromptConfig, AgentWorkspaceConfig, PromptSource } from "../domain/agent.js";
 import type { DaemonConfig } from "../daemon/types.js";
 import { normalizeRuntimeBotConfig } from "../transports/registry.js";
 import type { AppConfig } from "./types.js";
@@ -19,11 +19,9 @@ export function resolveRuntimeConfig(appConfig: AppConfig, configPath: string): 
     },
     agents: appConfig.agents.map((agent) => ({
       ...agent,
-      ...(agent.systemPromptFile
-        ? { systemPromptFile: resolveConfigPath(agent.systemPromptFile, configDir) }
-        : {}),
+      prompt: resolveAgentPrompt(agent.prompt, configDir),
       ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, configDir) } : {}),
-      ...(agent.context ? { context: resolveAgentContext(agent.context, configDir) } : {}),
+      ...(agent.workspace ? { workspace: resolveAgentWorkspace(agent.workspace, configDir) } : {}),
     })),
     activeBots: enabledBots.map((bot) =>
       normalizeRuntimeBotConfig(bot, {
@@ -38,18 +36,35 @@ function resolveConfigPath(path: string, configDir: string): string {
   return isAbsolute(path) ? path : resolve(configDir, path);
 }
 
-function resolveAgentContext(context: AgentContextConfig, configDir: string): AgentContextConfig {
+function resolveAgentPrompt(prompt: AgentPromptConfig, configDir: string): AgentPromptConfig {
   return {
-    ...context,
-    ...(context.workingDirectory
+    base: resolvePromptSource(prompt.base, configDir),
+    ...(prompt.instructions
       ? {
-          workingDirectory: resolveConfigPath(context.workingDirectory, configDir),
+          instructions: prompt.instructions.map((source) => resolvePromptSource(source, configDir)),
         }
       : {}),
-    ...(context.files
+    ...(prompt.references
       ? {
-          files: context.files.map((path) => resolveConfigPath(path, configDir)),
+          references: prompt.references.map((source) => resolvePromptSource(source, configDir)),
         }
       : {}),
   };
+}
+
+function resolveAgentWorkspace(workspace: AgentWorkspaceConfig, configDir: string): AgentWorkspaceConfig {
+  return {
+    ...workspace,
+    ...(workspace.cwd ? { cwd: resolveConfigPath(workspace.cwd, configDir) } : {}),
+  };
+}
+
+function resolvePromptSource(source: PromptSource, configDir: string): PromptSource {
+  if (source.file) {
+    return {
+      file: resolveConfigPath(source.file, configDir),
+    };
+  }
+
+  return source;
 }

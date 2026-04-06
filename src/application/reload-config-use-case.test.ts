@@ -98,7 +98,11 @@ function createValidAppConfig(): AppConfig {
     agents: [
       {
         id: "default",
-        systemPrompt: "prompt",
+        prompt: {
+          base: {
+            text: "prompt",
+          },
+        },
         model: {
           provider: "openai",
           modelId: "gpt-5",

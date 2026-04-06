@@ -393,9 +393,9 @@ describe("createPiAgentEngine", () => {
     await engine.run({
       agent: {
         ...createAgent(),
-        context: {
-          ...createAgent().context,
-          workingDirectory: "/workspace/project",
+        workspace: {
+          ...createAgent().workspace,
+          cwd: "/workspace/project",
         },
         tools: ["read", "bash"],
       },
@@ -457,11 +457,9 @@ describe("createPiAgentEngine", () => {
 
     const registry = createBuiltInToolRegistry(root, {
       ...createAgent(),
-      context: {
-        ...createAgent().context,
-        shell: {
-          path: ["/custom/bin", "/usr/bin", "/bin"],
-        },
+      workspace: {
+        ...createAgent().workspace,
+        shellPath: ["/custom/bin", "/usr/bin", "/bin"],
       },
     });
     const bash = registry.get("bash");
@@ -595,12 +593,18 @@ describe("createPiAgentEngine", () => {
 
     await expect(
       engine.run({
-        agent: createAgent(),
+        agent: {
+          ...createAgent(),
+          prompt: {
+            ...createAgent().prompt,
+            instructions: [{ file: "/workspace/RULES.md" }],
+          },
+        },
         conversation: createConversation(),
         message: createIncomingMessage(),
       }),
     ).rejects.toThrow(
-      'Failed to read context file for agent "default": /workspace/AGENTS.md (ENOENT)',
+      'Failed to read instruction file for agent "default": /workspace/RULES.md (ENOENT)',
     );
   });
 
@@ -643,9 +647,12 @@ describe("createPiAgentEngine", () => {
     await engine.run({
       agent: {
         ...createAgent(),
-        context: {
-          workingDirectory: "/workspace/project",
-          files: ["/workspace/RULES.md"],
+        prompt: {
+          ...createAgent().prompt,
+          instructions: [{ file: "/workspace/RULES.md" }],
+        },
+        workspace: {
+          cwd: "/workspace/project",
         },
       },
       conversation: createConversation(),
@@ -686,9 +693,12 @@ describe("createPiAgentEngine", () => {
     await engine.run({
       agent: {
         ...createAgent(),
-        context: {
-          workingDirectory: "/workspace/project",
-          files: ["/workspace/RULES.md"],
+        prompt: {
+          ...createAgent().prompt,
+          instructions: [{ file: "/workspace/RULES.md" }],
+        },
+        workspace: {
+          cwd: "/workspace/project",
         },
       },
       conversation: createConversation(),
@@ -728,8 +738,13 @@ describe("createPiAgentEngine", () => {
     await engine.run({
       agent: {
         ...createAgent(),
-        context: {
-          workingDirectory: "/workspace/start",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        workspace: {
+          cwd: "/workspace/start",
         },
       },
       conversation: {
@@ -770,8 +785,13 @@ describe("createPiAgentEngine", () => {
     await engine.run({
       agent: {
         ...createAgent(),
-        context: {
-          workingDirectory: "/workspace/project",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        workspace: {
+          cwd: "/workspace/project",
         },
       },
       conversation: createConversation(),
@@ -779,7 +799,7 @@ describe("createPiAgentEngine", () => {
     });
   });
 
-  it("does not duplicate AGENTS.md when it is already configured as a context file", async () => {
+  it("does not duplicate AGENTS.md when it is already configured as an instruction file", async () => {
     const registration = registerFauxProvider({
       provider: "faux",
       models: [{ id: "faux-1", name: "Faux 1" }],
@@ -820,9 +840,12 @@ describe("createPiAgentEngine", () => {
     await engine.run({
       agent: {
         ...createAgent(),
-        context: {
-          workingDirectory: "/workspace/project",
-          files: ["/workspace/project/AGENTS.md"],
+        prompt: {
+          ...createAgent().prompt,
+          instructions: [{ file: "/workspace/project/AGENTS.md" }],
+        },
+        workspace: {
+          cwd: "/workspace/project",
         },
       },
       conversation: createConversation(),
@@ -832,7 +855,7 @@ describe("createPiAgentEngine", () => {
     expect(readTextFile).toHaveBeenCalledTimes(1);
   });
 
-  it("loads the system prompt from systemPromptFile when configured", async () => {
+  it("loads the base prompt from prompt.base.file when configured", async () => {
     const registration = registerFauxProvider({
       provider: "faux",
       models: [{ id: "faux-1", name: "Faux 1" }],
@@ -868,7 +891,10 @@ describe("createPiAgentEngine", () => {
     const result = await engine.run({
       agent: {
         ...createAgent(),
-        systemPromptFile: "/workspace/prompts/default.md",
+        prompt: {
+          ...createAgent().prompt,
+          base: { file: "/workspace/prompts/default.md" },
+        },
       },
       conversation: createConversation(),
       message: createIncomingMessage(),
@@ -877,7 +903,7 @@ describe("createPiAgentEngine", () => {
     expect(result.message.text).toBe("ok");
   });
 
-  it("fails clearly when the configured system prompt file cannot be read", async () => {
+  it("fails clearly when the configured base prompt file cannot be read", async () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
@@ -901,17 +927,20 @@ describe("createPiAgentEngine", () => {
       engine.run({
         agent: {
           ...createAgent(),
-          systemPromptFile: "/workspace/prompts/default.md",
+          prompt: {
+            ...createAgent().prompt,
+            base: { file: "/workspace/prompts/default.md" },
+          },
         },
         conversation: createConversation(),
         message: createIncomingMessage(),
       }),
     ).rejects.toThrow(
-      'Failed to read system prompt file for agent "default": /workspace/prompts/default.md (ENOENT)',
+      'Failed to read base prompt for agent "default": /workspace/prompts/default.md (ENOENT)',
     );
   });
 
-  it("fails clearly when the configured system prompt file is empty", async () => {
+  it("fails clearly when the configured base prompt file is empty", async () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
@@ -935,13 +964,16 @@ describe("createPiAgentEngine", () => {
       engine.run({
         agent: {
           ...createAgent(),
-          systemPromptFile: "/workspace/prompts/default.md",
+          prompt: {
+            ...createAgent().prompt,
+            base: { file: "/workspace/prompts/default.md" },
+          },
         },
         conversation: createConversation(),
         message: createIncomingMessage(),
       }),
     ).rejects.toThrow(
-      'System prompt file for agent "default" is empty: /workspace/prompts/default.md',
+      'Configured base prompt file for agent "default" is empty: /workspace/prompts/default.md',
     );
   });
 
@@ -1044,7 +1076,7 @@ describe("createPiAgentEngine", () => {
     ]);
   });
 
-  it("fails clearly when an agent defines neither systemPrompt nor systemPromptFile", async () => {
+  it("fails clearly when an agent defines neither base prompt text nor file", async () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
@@ -1059,8 +1091,10 @@ describe("createPiAgentEngine", () => {
 
     const agentWithoutPrompt: AgentDefinition = {
       ...createAgent(),
-      systemPrompt: undefined,
-      systemPromptFile: undefined,
+      prompt: {
+        ...createAgent().prompt,
+        base: {},
+      },
     };
 
     await expect(
@@ -1069,7 +1103,7 @@ describe("createPiAgentEngine", () => {
         conversation: createConversation(),
         message: createIncomingMessage(),
       }),
-    ).rejects.toThrow('Agent "default" must define systemPrompt or systemPromptFile.');
+    ).rejects.toThrow('Configured base prompt for agent "default" must define text or file.');
   });
 });
 
@@ -1077,13 +1111,15 @@ function createAgent(): AgentDefinition {
   return {
     id: "default",
     name: "Default",
-    systemPrompt: "You are concise.",
+    prompt: {
+      base: {
+        text: "You are concise.",
+      },
+      instructions: [{ file: "/workspace/AGENTS.md" }],
+    },
     model: {
       provider: "faux",
       modelId: "faux-1",
-    },
-    context: {
-      files: ["/workspace/AGENTS.md"],
     },
     tools: [],
     extensions: [],

@@ -4,12 +4,20 @@ export interface InferenceSettings {
   request?: Record<string, unknown>;
 }
 
-export interface AgentContextConfig {
-  files?: string[];
-  workingDirectory?: string;
-  shell?: {
-    path?: string[];
-  };
+export interface PromptSource {
+  text?: string;
+  file?: string;
+}
+
+export interface AgentPromptConfig {
+  base: PromptSource;
+  instructions?: PromptSource[];
+  references?: PromptSource[];
+}
+
+export interface AgentWorkspaceConfig {
+  cwd?: string;
+  shellPath?: string[];
 }
 
 export interface ModelRef {
@@ -20,12 +28,11 @@ export interface ModelRef {
 export interface AgentDefinition {
   id: string;
   name: string;
-  systemPrompt?: string;
-  systemPromptFile?: string;
+  prompt: AgentPromptConfig;
   model: ModelRef;
   authFile?: string;
   inference?: InferenceSettings;
-  context?: AgentContextConfig;
+  workspace?: AgentWorkspaceConfig;
   tools: string[];
   extensions: string[];
 }

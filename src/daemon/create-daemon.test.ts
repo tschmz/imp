@@ -109,7 +109,11 @@ describe("createDaemon", () => {
         agents: [
           {
             id: "default",
-            systemPrompt: "You are configured from json.",
+            prompt: {
+              base: {
+                text: "You are configured from json.",
+              },
+            },
             model: {
               provider: "openai",
               modelId: "gpt-5.4",
@@ -133,7 +137,11 @@ describe("createDaemon", () => {
     expect(runInputs).toHaveLength(1);
     expect(runInputs[0]?.agent).toMatchObject({
       id: "default",
-      systemPrompt: "You are configured from json.",
+      prompt: {
+        base: {
+          text: "You are configured from json.",
+        },
+      },
       model: {
         provider: "openai",
         modelId: "gpt-5.4",
@@ -142,7 +150,7 @@ describe("createDaemon", () => {
     });
   });
 
-  it("accepts configured agents that define systemPromptFile instead of systemPrompt", async () => {
+  it("accepts configured agents that define a file-backed base prompt", async () => {
     const root = await createTempDir();
     const botConfig = createBotConfig(root);
     const runInputs: AgentRunInput[] = [];
@@ -164,7 +172,11 @@ describe("createDaemon", () => {
         agents: [
           {
             id: "default",
-            systemPromptFile: "/workspace/prompts/default.md",
+            prompt: {
+              base: {
+                file: "/workspace/prompts/default.md",
+              },
+            },
             model: {
               provider: "openai",
               modelId: "gpt-5.4",
@@ -188,14 +200,18 @@ describe("createDaemon", () => {
     expect(runInputs).toHaveLength(1);
     expect(runInputs[0]?.agent).toMatchObject({
       id: "default",
-      systemPromptFile: "/workspace/prompts/default.md",
+      prompt: {
+        base: {
+          file: "/workspace/prompts/default.md",
+        },
+      },
       model: {
         provider: "openai",
         modelId: "gpt-5.4",
       },
       tools: ["read"],
     });
-    expect(runInputs[0]?.agent.systemPrompt).toBeUndefined();
+    expect(runInputs[0]?.agent.prompt.base.text).toBeUndefined();
   });
 
   it("fails startup when an agent references an unknown tool", async () => {
@@ -209,7 +225,11 @@ describe("createDaemon", () => {
         agents: [
           {
             id: "default",
-            systemPrompt: "You are configured from json.",
+            prompt: {
+              base: {
+                text: "You are configured from json.",
+              },
+            },
             model: {
               provider: "openai",
               modelId: "gpt-5.4",
@@ -237,6 +257,36 @@ describe("createDaemon", () => {
     expect(startTransport).not.toHaveBeenCalled();
   });
 
+  it("fails fast when an agent does not define a usable base prompt", async () => {
+    const root = await createTempDir();
+    const botConfig = createBotConfig(root);
+
+    expect(() =>
+      createDaemon(
+        {
+          ...createConfig(botConfig),
+          agents: [
+            {
+              id: "default",
+              prompt: {
+                base: {},
+              },
+              model: {
+                provider: "openai",
+                modelId: "gpt-5.4",
+              },
+            },
+          ],
+        },
+        {
+          createTransport: () => ({
+            start: vi.fn(),
+          }),
+        },
+      ),
+    ).toThrow('Configured agent "default" must define prompt.base.text or prompt.base.file.');
+  });
+
   it("starts all enabled bots with isolated runtime state", async () => {
     const root = await createTempDir();
     const privateBot = createBotConfig(root);
@@ -255,7 +305,11 @@ describe("createDaemon", () => {
         agents: [
           {
             id: "default",
-            systemPrompt: "You are concise.",
+            prompt: {
+              base: {
+                text: "You are concise.",
+              },
+            },
             model: {
               provider: "test",
               modelId: "stub",
@@ -263,7 +317,11 @@ describe("createDaemon", () => {
           },
           {
             id: "ops",
-            systemPrompt: "You are ops.",
+            prompt: {
+              base: {
+                text: "You are ops.",
+              },
+            },
             model: {
               provider: "test",
               modelId: "stub",
@@ -402,7 +460,11 @@ describe("createDaemon", () => {
         agents: [
           {
             id: "default",
-            systemPrompt: "You are concise.",
+            prompt: {
+              base: {
+                text: "You are concise.",
+              },
+            },
             model: {
               provider: "test",
               modelId: "stub",
@@ -410,7 +472,11 @@ describe("createDaemon", () => {
           },
           {
             id: "ops",
-            systemPrompt: "You are ops.",
+            prompt: {
+              base: {
+                text: "You are ops.",
+              },
+            },
             model: {
               provider: "test",
               modelId: "stub",
@@ -494,7 +560,11 @@ function createConfig(botConfig: DaemonConfig["activeBots"][number]): DaemonConf
     agents: [
       {
         id: "default",
-        systemPrompt: "You are concise.",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
         model: {
           provider: "test",
           modelId: "stub",
@@ -508,7 +578,11 @@ function createDefaultAgent(): AgentDefinition {
   return {
     id: "default",
     name: "Default",
-    systemPrompt: "You are concise.",
+    prompt: {
+      base: {
+        text: "You are concise.",
+      },
+    },
     model: {
       provider: "test",
       modelId: "stub",

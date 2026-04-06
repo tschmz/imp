@@ -40,7 +40,7 @@ imp init --defaults
 ```
 
 Both variants create a starter `SYSTEM.md` under the configured `dataRoot` and wire the
-default agent to that `systemPromptFile`.
+default agent to that `prompt.base.file`.
 Interactive setup can also store an optional per-agent shell `PATH` for the `bash` tool without
 polluting the service-wide environment.
 
@@ -91,8 +91,8 @@ Each bot can be routed to a default agent. Each agent can define:
 
 - a model provider and model ID
 - tool access
-- a working directory and context files
-- a system prompt or system prompt file
+- a workspace with working directory and shell PATH
+- a prompt with a base prompt, instructions, and references
 - provider-specific inference settings
 
 ## Configuration

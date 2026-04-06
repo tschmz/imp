@@ -61,6 +61,11 @@ function createRuntimeConfig(): DaemonConfig {
     agents: [
       {
         id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
       },
     ],
     activeBots: [

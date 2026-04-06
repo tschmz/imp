@@ -28,7 +28,11 @@ export function createDefaultAgent(id = "default"): AgentDefinition {
   return {
     id,
     name: id === "default" ? "Default" : id,
-    systemPrompt: "You are concise.",
+    prompt: {
+      base: {
+        text: "You are concise.",
+      },
+    },
     model: {
       provider: "test",
       modelId: "stub",

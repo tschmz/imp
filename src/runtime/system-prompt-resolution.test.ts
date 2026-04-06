@@ -35,8 +35,10 @@ function createAgent(): AgentDefinition {
     id: "default",
     name: "Default",
     model: { provider: "faux", modelId: "faux-1" },
-    systemPrompt: "You are concise.",
-    context: { files: ["/workspace/AGENTS.md"] },
+    prompt: {
+      base: { text: "You are concise." },
+      instructions: [{ file: "/workspace/AGENTS.md" }],
+    },
     tools: [],
     extensions: [],
   };

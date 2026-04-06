@@ -90,6 +90,7 @@ function validateAgentRegistry(
   createBuiltInRegistry: (workingDirectory: string, agent?: AgentDefinition) => ToolRegistry,
 ): void {
   for (const agent of agentRegistry.list()) {
+    validateAgentPrompt(agent);
     const registry = toolRegistry ?? createBuiltInRegistry(resolveWorkingDirectory(agent), agent);
     resolveAgentTools(agent, registry);
   }
@@ -97,11 +98,7 @@ function validateAgentRegistry(
 
 function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[] {
   return configuredAgents.map((configuredAgent) => {
-    if (!configuredAgent.systemPrompt && !configuredAgent.systemPromptFile) {
-      throw new Error(
-        `Configured agent "${configuredAgent.id}" must define systemPrompt or systemPromptFile.`,
-      );
-    }
+    validatePromptBase(configuredAgent.id, configuredAgent.prompt.base);
 
     if (!configuredAgent.model) {
       throw new Error(`Configured agent "${configuredAgent.id}" must define model.`);
@@ -110,16 +107,34 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
     return {
       id: configuredAgent.id,
       name: configuredAgent.name ?? configuredAgent.id,
-      ...(configuredAgent.systemPrompt ? { systemPrompt: configuredAgent.systemPrompt } : {}),
-      ...(configuredAgent.systemPromptFile
-        ? { systemPromptFile: configuredAgent.systemPromptFile }
-        : {}),
+      prompt: configuredAgent.prompt,
       model: configuredAgent.model,
       ...(configuredAgent.authFile ? { authFile: configuredAgent.authFile } : {}),
       ...(configuredAgent.inference ? { inference: configuredAgent.inference } : {}),
-      ...(configuredAgent.context ? { context: configuredAgent.context } : {}),
+      ...(configuredAgent.workspace ? { workspace: configuredAgent.workspace } : {}),
       tools: configuredAgent.tools ?? [],
       extensions: [],
     };
   });
+}
+
+function validateAgentPrompt(agent: AgentDefinition): void {
+  validatePromptBase(agent.id, agent.prompt.base);
+}
+
+function validatePromptBase(
+  agentId: string,
+  basePrompt: {
+    text?: string;
+    file?: string;
+  },
+): void {
+  const hasText = typeof basePrompt.text === "string" && basePrompt.text.trim().length > 0;
+  const hasFile = typeof basePrompt.file === "string" && basePrompt.file.trim().length > 0;
+
+  if (hasText || hasFile) {
+    return;
+  }
+
+  throw new Error(`Configured agent "${agentId}" must define prompt.base.text or prompt.base.file.`);
 }

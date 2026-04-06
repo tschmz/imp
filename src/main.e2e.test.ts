@@ -21,11 +21,12 @@ afterEach(async () => {
 });
 
 beforeAll(async () => {
-  await execFileAsync("npm", ["run", "build"], {
+  await execFileAsync(process.execPath, ["./node_modules/typescript/bin/tsc", "-p", "tsconfig.json"], {
     cwd: projectRoot,
     env: process.env,
   });
-});
+  chmodSync(join(projectRoot, "dist", "main.js"), 0o755);
+}, 30_000);
 
 describe("imp CLI e2e", () => {
   it("shows help output when no command is given", async () => {
@@ -193,7 +194,7 @@ describe("imp CLI e2e", () => {
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
-      agents: Array<{ id: string; systemPromptFile: string }>;
+      agents: Array<{ id: string; prompt: { base: { file?: string } } }>;
       bots: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
@@ -207,7 +208,7 @@ describe("imp CLI e2e", () => {
     }
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
-    expect(config.agents[0]?.systemPromptFile).toBe(promptPath);
+    expect(config.agents[0]?.prompt.base.file).toBe(promptPath);
     expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
     await expect(readFile(promptPath, "utf8")).resolves.toContain(
       "You are a local coding and operations assistant running through a local Imp daemon.",
@@ -305,7 +306,11 @@ describe("imp CLI e2e", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
         },
       ],
       bots: [
@@ -355,7 +360,11 @@ describe("imp CLI e2e", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
         },
       ],
       bots: [
@@ -401,7 +410,11 @@ describe("imp CLI e2e", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
         },
       ],
       bots: [
@@ -694,8 +707,11 @@ describe("imp CLI e2e", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPrompt:
-            "You are a concise and pragmatic assistant running through a local daemon.",
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
         },
       ],
       bots: [
@@ -760,8 +776,11 @@ describe("imp CLI e2e", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPrompt:
-            "You are a concise and pragmatic assistant running through a local daemon.",
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
         },
       ],
       bots: [
@@ -810,8 +829,11 @@ describe("imp CLI e2e", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPrompt:
-            "You are a concise and pragmatic assistant running through a local daemon.",
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
         },
       ],
       bots: [
@@ -870,8 +892,11 @@ describe("imp CLI e2e", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPrompt:
-            "You are a concise and pragmatic assistant running through a local daemon.",
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
         },
       ],
       bots: [
@@ -937,8 +962,11 @@ describe("imp CLI e2e", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPrompt:
-            "You are a concise and pragmatic assistant running through a local daemon.",
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
         },
       ],
       bots: [

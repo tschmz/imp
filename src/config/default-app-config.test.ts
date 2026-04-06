@@ -9,13 +9,12 @@ import {
 } from "./default-app-config.js";
 
 describe("default app config helpers", () => {
-  it("uses a system prompt file by default", () => {
+  it("uses a base prompt file by default", () => {
     const config = createDefaultAppConfig({
       XDG_STATE_HOME: "/tmp/state-home",
     });
 
-    expect(config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
-    expect(config.agents[0]?.systemPrompt).toBeUndefined();
+    expect(config.agents[0]?.prompt.base).toEqual({ file: "/tmp/state-home/imp/SYSTEM.md" });
   });
 
   it("adds authFile for OAuth-capable providers", () => {
@@ -44,7 +43,7 @@ describe("default app config helpers", () => {
     expect(config.agents[0]?.authFile).toBeUndefined();
   });
 
-  it("builds context and prompt file overrides", () => {
+  it("builds workspace and prompt overrides", () => {
     const config = buildInitialAppConfig(process.env, {
       instanceName: "home",
       dataRoot: "/tmp/imp",
@@ -53,20 +52,21 @@ describe("default app config helpers", () => {
       telegramToken: "replace-me",
       allowedUserIds: ["1"],
       workingDirectory: "/workspace",
-      contextFiles: [join("/workspace", "AGENTS.md"), "/workspace/RUNBOOK.md"],
+      instructionFiles: [join("/workspace", "AGENTS.md")],
+      referenceFiles: ["/workspace/RUNBOOK.md"],
       shellPath: ["/usr/local/bin", "/usr/bin", "/bin"],
-      systemPromptFile: "/tmp/imp/SYSTEM.md",
+      promptBaseFile: "/tmp/imp/SYSTEM.md",
     });
 
-    expect(config.agents[0]?.context).toEqual({
-      workingDirectory: "/workspace",
-      shell: {
-        path: ["/usr/local/bin", "/usr/bin", "/bin"],
-      },
-      files: ["/workspace/AGENTS.md", "/workspace/RUNBOOK.md"],
+    expect(config.agents[0]?.workspace).toEqual({
+      cwd: "/workspace",
+      shellPath: ["/usr/local/bin", "/usr/bin", "/bin"],
     });
-    expect(config.agents[0]?.systemPromptFile).toBe("/tmp/imp/SYSTEM.md");
-    expect(config.agents[0]?.systemPrompt).toBeUndefined();
+    expect(config.agents[0]?.prompt).toEqual({
+      base: { file: "/tmp/imp/SYSTEM.md" },
+      instructions: [{ file: "/workspace/AGENTS.md" }],
+      references: [{ file: "/workspace/RUNBOOK.md" }],
+    });
   });
 
   it("does not add shell path config by default", () => {
@@ -80,8 +80,8 @@ describe("default app config helpers", () => {
       workingDirectory: "/workspace",
     });
 
-    expect(config.agents[0]?.context).toEqual({
-      workingDirectory: "/workspace",
+    expect(config.agents[0]?.workspace).toEqual({
+      cwd: "/workspace",
     });
   });
 

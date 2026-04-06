@@ -40,7 +40,11 @@ function createAgent(): AgentDefinition {
     id: "default",
     name: "Default",
     model: { provider: "faux", modelId: "faux-1" },
-    systemPrompt: "You are concise.",
+    prompt: {
+      base: {
+        text: "You are concise.",
+      },
+    },
     tools: [],
     extensions: [],
   };

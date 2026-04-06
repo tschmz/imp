@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { AgentDefinition } from "../domain/agent.js";
+import type { AgentDefinition, PromptSource } from "../domain/agent.js";
 import type { SystemPromptCache } from "./system-prompt-cache.js";
 
 export interface SystemPromptResolutionOptions {
@@ -18,9 +18,8 @@ export async function resolveSystemPrompt(
   options: SystemPromptResolutionOptions,
 ): Promise<SystemPromptResolutionResult> {
   const promptFiles = [
-    options.agent.systemPromptFile,
-    ...resolveContextPromptFiles(options.agent, options.promptWorkingDirectory).map((file) => file.path),
-  ].filter((path): path is string => path !== undefined);
+    ...resolvePromptFileSources(options.agent, options.promptWorkingDirectory).map((source) => source.path),
+  ];
 
   const cacheKey = await options.cache.buildCacheKey({
     agent: options.agent,
@@ -57,76 +56,74 @@ export async function buildSystemPrompt(
 ): Promise<string> {
   const sections: string[] = [];
 
-  if (agent.systemPromptFile) {
-    let content: string;
-    try {
-      content = await readTextFile(agent.systemPromptFile);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to read system prompt file for agent "${agent.id}": ${agent.systemPromptFile} (${detail})`,
-      );
-    }
-
-    const trimmedContent = content.trim();
-    if (!trimmedContent) {
-      throw new Error(
-        `System prompt file for agent "${agent.id}" is empty: ${agent.systemPromptFile}`,
-      );
-    }
-
-    sections.push(trimmedContent);
-  } else if (agent.systemPrompt) {
-    sections.push(agent.systemPrompt);
-  } else {
-    throw new Error(`Agent "${agent.id}" must define systemPrompt or systemPromptFile.`);
+  const basePrompt = await resolvePromptSourceContent(agent, agent.prompt.base, readTextFile, {
+    kind: "base prompt",
+  });
+  if (!basePrompt) {
+    throw new Error(`Configured base prompt for agent "${agent.id}" must define text or file.`);
   }
+  sections.push(basePrompt);
 
-  const contextFiles = resolveContextPromptFiles(agent, promptWorkingDirectory);
-
-  for (const file of contextFiles) {
-    let content: string;
-    try {
-      content = await readTextFile(file.path);
-    } catch (error) {
-      if (file.optional && isFileNotFoundError(error)) {
-        continue;
-      }
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to read context file for agent "${agent.id}": ${file.path} (${detail})`,
-      );
-    }
-
-    const trimmedContent = content.trim();
-    if (!trimmedContent) {
+  for (const source of resolveInstructionSources(agent, promptWorkingDirectory)) {
+    const content = await resolvePromptSourceContent(agent, source.source, readTextFile, {
+      kind: "instruction file",
+      optional: source.optional,
+    });
+    if (!content) {
       continue;
     }
 
-    sections.push(formatContextInstructions(file.path, trimmedContent));
+    sections.push(formatPromptSection("INSTRUCTIONS", describePromptSource(source.source), content));
+  }
+
+  for (const source of agent.prompt.references ?? []) {
+    const content = await resolvePromptSourceContent(agent, source, readTextFile, {
+      kind: "reference file",
+    });
+    if (!content) {
+      continue;
+    }
+
+    sections.push(formatPromptSection("REFERENCE", describePromptSource(source), content));
   }
 
   return sections.join("\n\n");
 }
 
-function formatContextInstructions(path: string, content: string): string {
-  return `<INSTRUCTIONS from="${escapeInstructionAttribute(path)}">\n\n${content}\n</INSTRUCTIONS>`;
+function formatPromptSection(tagName: "INSTRUCTIONS" | "REFERENCE", source: string, content: string): string {
+  return `<${tagName} from="${escapeInstructionAttribute(source)}">\n\n${content}\n</${tagName}>`;
 }
 
 function escapeInstructionAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
-export function resolveContextPromptFiles(
+export function resolveInstructionSources(
+  agent: AgentDefinition,
+  promptWorkingDirectory: string | undefined,
+): Array<{ source: PromptSource; optional: boolean }> {
+  const sources = (agent.prompt.instructions ?? []).map((source) => ({ source, optional: false }));
+  const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(promptWorkingDirectory);
+  if (
+    workingDirectoryAgentsFile &&
+    !sources.some((entry) => entry.source.file === workingDirectoryAgentsFile)
+  ) {
+    sources.push({ source: { file: workingDirectoryAgentsFile }, optional: true });
+  }
+  return sources;
+}
+
+function resolvePromptFileSources(
   agent: AgentDefinition,
   promptWorkingDirectory: string | undefined,
 ): Array<{ path: string; optional: boolean }> {
-  const files = (agent.context?.files ?? []).map((path) => ({ path, optional: false }));
-  const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(promptWorkingDirectory);
-  if (workingDirectoryAgentsFile && !files.some((file) => file.path === workingDirectoryAgentsFile)) {
-    files.push({ path: workingDirectoryAgentsFile, optional: true });
-  }
-  return files;
+  return [
+    ...extractFileSources([agent.prompt.base]),
+    ...extractFileSources((agent.prompt.references ?? [])),
+    ...resolveInstructionSources(agent, promptWorkingDirectory)
+      .filter((entry) => entry.source.file)
+      .map((entry) => ({ path: entry.source.file!, optional: entry.optional })),
+  ];
 }
 
 function resolveWorkingDirectoryAgentsFile(workingDirectory: string | undefined): string | undefined {
@@ -135,6 +132,59 @@ function resolveWorkingDirectoryAgentsFile(workingDirectory: string | undefined)
   }
 
   return join(workingDirectory, "AGENTS.md");
+}
+
+async function resolvePromptSourceContent(
+  agent: AgentDefinition,
+  source: PromptSource,
+  readTextFile: (path: string) => Promise<string>,
+  options: { kind: string; optional?: boolean },
+): Promise<string | undefined> {
+  if (source.text !== undefined) {
+    const trimmedContent = source.text.trim();
+    if (!trimmedContent) {
+      throw new Error(`Configured ${options.kind} for agent "${agent.id}" is empty.`);
+    }
+
+    return trimmedContent;
+  }
+
+  let content: string;
+  if (!source.file) {
+    throw new Error(`Configured ${options.kind} for agent "${agent.id}" must define text or file.`);
+  }
+  try {
+    content = await readTextFile(source.file);
+  } catch (error) {
+    if (options.optional && isFileNotFoundError(error)) {
+      return undefined;
+    }
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to read ${options.kind} for agent "${agent.id}": ${source.file} (${detail})`,
+    );
+  }
+
+  const trimmedContent = content.trim();
+  if (!trimmedContent) {
+    if (options.kind === "base prompt") {
+      throw new Error(`Configured base prompt file for agent "${agent.id}" is empty: ${source.file}`);
+    }
+
+    return undefined;
+  }
+
+  return trimmedContent;
+}
+
+function extractFileSources(sources: PromptSource[]): Array<{ path: string; optional: boolean }> {
+  return sources
+    .filter((source): source is PromptSource & { file: string } => typeof source.file === "string")
+    .map((source) => ({ path: source.file, optional: false }));
+}
+
+function describePromptSource(source: PromptSource): string {
+  return source.file ?? "inline";
 }
 
 function isFileNotFoundError(error: unknown): boolean {

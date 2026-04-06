@@ -20,10 +20,11 @@ export async function initAppConfig(options: {
   const config = appConfigSchema.parse(options.config ?? createDefaultAppConfig(env));
   const defaultAgent = config.agents.find((agent) => agent.id === config.defaults.agentId);
 
-  if (defaultAgent?.systemPromptFile) {
+  const basePromptFile = defaultAgent?.prompt.base.file;
+  if (basePromptFile) {
     await writeManagedFile({
-      path: defaultAgent.systemPromptFile,
-      resourceLabel: "System prompt file",
+      path: basePromptFile,
+      resourceLabel: "Base prompt file",
       content: `${DEFAULT_AGENT_SYSTEM_PROMPT}\n`,
       force: options.force,
       now: options.now,

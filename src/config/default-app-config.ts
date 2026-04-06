@@ -16,9 +16,10 @@ export interface InitialConfigAnswers {
   telegramToken: string;
   allowedUserIds: string[];
   workingDirectory?: string;
-  contextFiles?: string[];
+  instructionFiles?: string[];
+  referenceFiles?: string[];
   shellPath?: string[];
-  systemPromptFile?: string;
+  promptBaseFile?: string;
 }
 
 export function createDefaultAppConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -31,7 +32,7 @@ export function createDefaultAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     modelId: "gpt-5.4",
     telegramToken: "replace-me",
     allowedUserIds: [],
-    systemPromptFile: getDefaultAgentSystemPromptFilePath(dataRoot),
+    promptBaseFile: getDefaultAgentSystemPromptFilePath(dataRoot),
   });
 }
 
@@ -39,7 +40,8 @@ export function buildInitialAppConfig(
   _env: NodeJS.ProcessEnv,
   answers: InitialConfigAnswers,
 ): AppConfig {
-  const context = buildAgentContext(answers);
+  const prompt = buildAgentPrompt(answers);
+  const workspace = buildAgentWorkspace(answers);
   const usesOAuth = Boolean(getOAuthProvider(answers.provider));
 
   return {
@@ -62,9 +64,10 @@ export function buildInitialAppConfig(
           provider: answers.provider,
           modelId: answers.modelId,
         },
+        prompt,
         ...(usesOAuth ? { authFile: join(answers.dataRoot, "auth.json") } : {}),
         tools: [...defaultTools],
-        ...(context ? { context } : {}),
+        ...(workspace ? { workspace } : {}),
         inference: {
           metadata: {
             app: "imp",
@@ -73,8 +76,6 @@ export function buildInitialAppConfig(
             store: true,
           },
         },
-        systemPromptFile:
-          answers.systemPromptFile ?? getDefaultAgentSystemPromptFilePath(answers.dataRoot),
       },
     ],
     bots: [
@@ -131,18 +132,37 @@ export function validateTelegramUserIds(raw: string): true | string {
   return "Telegram user IDs must contain digits only.";
 }
 
-function buildAgentContext(
+function buildAgentPrompt(answers: InitialConfigAnswers): AppConfig["agents"][number]["prompt"] {
+  const instructionFiles = answers.instructionFiles?.filter((value) => value.length > 0) ?? [];
+  const referenceFiles = answers.referenceFiles?.filter((value) => value.length > 0) ?? [];
+
+  return {
+    base: {
+      file: answers.promptBaseFile ?? getDefaultAgentSystemPromptFilePath(answers.dataRoot),
+    },
+    ...(instructionFiles.length > 0
+      ? {
+          instructions: instructionFiles.map((file) => ({ file })),
+        }
+      : {}),
+    ...(referenceFiles.length > 0
+      ? {
+          references: referenceFiles.map((file) => ({ file })),
+        }
+      : {}),
+  };
+}
+
+function buildAgentWorkspace(
   answers: InitialConfigAnswers,
-): AppConfig["agents"][number]["context"] | undefined {
-  const files = answers.contextFiles?.filter((value) => value.length > 0) ?? [];
+): AppConfig["agents"][number]["workspace"] | undefined {
   const shellPath = answers.shellPath?.filter((value) => value.length > 0) ?? [];
-  if (!answers.workingDirectory && files.length === 0 && shellPath.length === 0) {
+  if (!answers.workingDirectory && shellPath.length === 0) {
     return undefined;
   }
 
   return {
-    ...(answers.workingDirectory ? { workingDirectory: answers.workingDirectory } : {}),
-    ...(shellPath.length > 0 ? { shell: { path: shellPath } } : {}),
-    ...(files.length > 0 ? { files } : {}),
+    ...(answers.workingDirectory ? { cwd: answers.workingDirectory } : {}),
+    ...(shellPath.length > 0 ? { shellPath } : {}),
   };
 }

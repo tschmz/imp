@@ -90,25 +90,25 @@ export async function promptForInitialAppConfig(
   });
 
   const workingDirectory = await dependencies.input({
-    message: "Agent working directory (optional)",
+    message: "Workspace directory for the agent (optional)",
     default: "",
   });
 
   const includeAgentsFile =
     workingDirectory.length > 0
       ? await dependencies.confirm({
-          message: "Add AGENTS.md from the working directory?",
+          message: "Load AGENTS.md from that workspace as project instructions?",
           default: true,
         })
       : false;
 
   const extraContextFilesRaw = await dependencies.input({
-    message: "Additional context files (comma-separated, optional)",
+    message: "Additional reference files for the prompt (comma-separated, optional)",
     default: "",
   });
 
   const shellPathRaw = await dependencies.input({
-    message: "Shell PATH for bash tool (colon-separated, optional)",
+    message: "Workspace shell PATH for the bash tool (colon-separated, optional)",
     default: "",
   });
 
@@ -134,12 +134,12 @@ export async function promptForInitialAppConfig(
       telegramToken,
       allowedUserIds: parseCommaSeparatedValues(allowedUserIdsRaw),
       ...(workingDirectory.length > 0 ? { workingDirectory } : {}),
-      contextFiles: [
+      instructionFiles: [
         ...(includeAgentsFile ? [join(workingDirectory, "AGENTS.md")] : []),
-        ...parseCommaSeparatedValues(extraContextFilesRaw),
       ],
+      referenceFiles: parseCommaSeparatedValues(extraContextFilesRaw),
       shellPath: parsePathEntries(shellPathRaw),
-      systemPromptFile: getDefaultAgentSystemPromptFilePath(dataRoot),
+      promptBaseFile: getDefaultAgentSystemPromptFilePath(dataRoot),
     }),
     installService,
     ...(serviceEnvironment ? { serviceEnvironment } : {}),

@@ -14,45 +14,46 @@ const inferenceSettingsSchema = z.object({
   request: z.record(z.string(), z.unknown()).optional(),
 });
 
-const agentContextConfigSchema = z.object({
-  files: z.string().min(1).array().optional(),
-  workingDirectory: z.string().min(1).optional(),
-  shell: z
-    .object({
-      path: z.string().min(1).array().optional(),
-    })
-    .optional(),
+const promptSourceSchema = z
+  .object({
+    text: z.string().min(1).optional(),
+    file: z.string().min(1).optional(),
+  })
+  .superRefine((source, ctx) => {
+    const hasText = typeof source.text === "string";
+    const hasFile = typeof source.file === "string";
+
+    if (hasText === hasFile) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Specify exactly one of text or file.",
+      });
+    }
+  });
+
+const agentPromptConfigSchema = z.object({
+  base: promptSourceSchema,
+  instructions: promptSourceSchema.array().optional(),
+  references: promptSourceSchema.array().optional(),
+});
+
+const agentWorkspaceConfigSchema = z.object({
+  cwd: z.string().min(1).optional(),
+  shellPath: z.string().min(1).array().optional(),
 });
 
 const agentConfigSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1).optional(),
-    systemPrompt: z.string().min(1).optional(),
-    systemPromptFile: z.string().min(1).optional(),
+    prompt: agentPromptConfigSchema,
     model: modelConfigSchema.optional(),
     authFile: z.string().min(1).optional(),
     inference: inferenceSettingsSchema.optional(),
-    context: agentContextConfigSchema.optional(),
+    workspace: agentWorkspaceConfigSchema.optional(),
     tools: z.string().min(1).array().optional(),
   })
   .superRefine((agent, ctx) => {
-    if (agent.systemPrompt && agent.systemPromptFile) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["systemPromptFile"],
-        message: "Specify either systemPrompt or systemPromptFile, not both.",
-      });
-    }
-
-    if (!agent.systemPrompt && !agent.systemPromptFile) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["systemPrompt"],
-        message: "Specify either systemPrompt or systemPromptFile.",
-      });
-    }
-
     if (!agent.model) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

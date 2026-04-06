@@ -6,7 +6,11 @@ describe("appConfigSchema", () => {
     const result = appConfigSchema.safeParse(
       createConfig({
         id: "default",
-        systemPrompt: "You are concise.",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
@@ -32,7 +36,11 @@ describe("appConfigSchema", () => {
     const result = appConfigSchema.safeParse(
       createConfig({
         id: "default",
-        systemPrompt: "You are concise.",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
         authFile: "/tmp/auth.json",
       }),
     );
@@ -54,7 +62,11 @@ describe("appConfigSchema", () => {
     const result = appConfigSchema.safeParse(
       createConfig({
         id: "default",
-        systemPrompt: "You are concise.",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
         model: {
           provider: "openai-codex",
           modelId: "gpt-5.4",
@@ -84,8 +96,8 @@ describe("appConfigSchema", () => {
 
     expect(result.error.issues).toContainEqual(
       expect.objectContaining({
-        path: ["agents", 0, "systemPrompt"],
-        message: "Specify either systemPrompt or systemPromptFile.",
+        path: ["agents", 0, "prompt"],
+        message: "Invalid input: expected object, received undefined",
       }),
     );
   });
@@ -94,7 +106,11 @@ describe("appConfigSchema", () => {
     const result = appConfigSchema.safeParse(
       createConfig({
         id: "default",
-        systemPrompt: "You are concise.",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
       }),
     );
 
@@ -111,20 +127,22 @@ describe("appConfigSchema", () => {
     );
   });
 
-  it("accepts agent shell path entries in context", () => {
+  it("accepts agent shell path entries in workspace", () => {
     const result = appConfigSchema.safeParse(
       createConfig({
         id: "default",
-        systemPrompt: "You are concise.",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
         },
-        context: {
-          workingDirectory: "/workspace",
-          shell: {
-            path: ["/home/tester/.local/bin", "/usr/bin", "/bin"],
-          },
+        workspace: {
+          cwd: "/workspace",
+          shellPath: ["/home/tester/.local/bin", "/usr/bin", "/bin"],
         },
       }),
     );

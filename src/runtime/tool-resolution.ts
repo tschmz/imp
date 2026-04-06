@@ -12,7 +12,7 @@ export interface WorkingDirectoryState {
 }
 
 export function resolveWorkingDirectory(agent: AgentDefinition): string {
-  return agent.context?.workingDirectory ?? process.cwd();
+  return agent.workspace?.cwd ?? process.cwd();
 }
 
 export function createWorkingDirectoryState(initialWorkingDirectory: string): WorkingDirectoryState {
@@ -74,7 +74,7 @@ function createBaseBuiltInTools(workingDirectory: string, agent?: AgentDefinitio
 }
 
 function resolveBuiltInToolOptions(agent?: AgentDefinition): ToolsOptions | undefined {
-  const shellPath = agent?.context?.shell?.path;
+  const shellPath = agent?.workspace?.shellPath;
   if (!shellPath || shellPath.length === 0) {
     return undefined;
   }

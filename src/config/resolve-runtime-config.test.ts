@@ -25,7 +25,11 @@ describe("resolveRuntimeConfig", () => {
             },
           },
           tools: ["read"],
-          systemPrompt: "You are the configured default agent.",
+          prompt: {
+            base: {
+              text: "You are the configured default agent.",
+            },
+          },
         },
       ],
       bots: [
@@ -66,7 +70,11 @@ describe("resolveRuntimeConfig", () => {
           },
         },
         tools: ["read"],
-        systemPrompt: "You are the configured default agent.",
+        prompt: {
+          base: {
+            text: "You are the configured default agent.",
+          },
+        },
       },
     ]);
     expect(result.activeBots).toEqual([
@@ -112,7 +120,7 @@ describe("resolveRuntimeConfig", () => {
     expect(result.activeBots[0]?.defaultAgentId).toBe("default-agent");
   });
 
-  it("resolves relative context file paths and system prompt files against the config directory", () => {
+  it("resolves relative prompt and workspace paths against the config directory", () => {
     const appConfig = createAppConfig({
       agents: [
         {
@@ -121,10 +129,15 @@ describe("resolveRuntimeConfig", () => {
             provider: "openai",
             modelId: "gpt-5.4",
           },
-          systemPromptFile: "./prompts/default.md",
-          context: {
-            workingDirectory: "./workspace",
-            files: ["./AGENTS.md", "/opt/shared/README.md"],
+          prompt: {
+            base: {
+              file: "./prompts/default.md",
+            },
+            instructions: [{ file: "./AGENTS.md" }],
+            references: [{ file: "/opt/shared/README.md" }],
+          },
+          workspace: {
+            cwd: "./workspace",
           },
           tools: ["read", "bash"],
         },
@@ -144,10 +157,13 @@ describe("resolveRuntimeConfig", () => {
 
     const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
-    expect(result.agents[0]?.systemPromptFile).toBe("/etc/imp/prompts/default.md");
-    expect(result.agents[0]?.context).toEqual({
-      workingDirectory: "/etc/imp/workspace",
-      files: ["/etc/imp/AGENTS.md", "/opt/shared/README.md"],
+    expect(result.agents[0]?.prompt).toEqual({
+      base: { file: "/etc/imp/prompts/default.md" },
+      instructions: [{ file: "/etc/imp/AGENTS.md" }],
+      references: [{ file: "/opt/shared/README.md" }],
+    });
+    expect(result.agents[0]?.workspace).toEqual({
+      cwd: "/etc/imp/workspace",
     });
     expect(result.agents[0]?.tools).toEqual(["read", "bash"]);
   });
@@ -162,7 +178,11 @@ describe("resolveRuntimeConfig", () => {
             modelId: "gpt-5.4",
           },
           authFile: "./auth.json",
-          systemPrompt: "You are concise.",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
         },
       ],
       bots: [
@@ -318,7 +338,11 @@ describe("resolveRuntimeConfig", () => {
               provider: "openai",
               modelId: "gpt-5.4",
             },
-            systemPrompt: "You are concise.",
+            prompt: {
+              base: {
+                text: "You are concise.",
+              },
+            },
           },
           {
             id: "default",
@@ -326,7 +350,11 @@ describe("resolveRuntimeConfig", () => {
               provider: "openai",
               modelId: "gpt-5.4",
             },
-            systemPrompt: "You are also concise.",
+            prompt: {
+              base: {
+                text: "You are also concise.",
+              },
+            },
           },
         ],
         bots: [
@@ -414,7 +442,11 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
           },
         },
         tools: [],
-        systemPrompt: "You are concise.",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
       },
     ],
     bots: overrides.bots ?? [],

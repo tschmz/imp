@@ -69,15 +69,25 @@ export function renderAgentMessage(
     availableAgentIds: string[];
   },
 ): string {
+  const basePrompt = "file" in agent.prompt.base ? agent.prompt.base.file : "inline";
+  const instructionSources = (agent.prompt.instructions ?? []).map((source) =>
+    "file" in source ? source.file : "inline",
+  );
+  const referenceSources = (agent.prompt.references ?? []).map((source) =>
+    "file" in source ? source.file : "inline",
+  );
+
   return [
     "Agent details:",
     `Current: ${options.currentAgentId}`,
     `Name: ${agent.name}`,
     `Provider: ${agent.model.provider}`,
     `Model: ${agent.model.modelId}`,
-    `System prompt file: ${agent.systemPromptFile ?? "inline"}`,
+    `Base prompt: ${basePrompt}`,
     `Auth file: ${agent.authFile ?? "not set"}`,
-    `Context files: ${agent.context?.files?.join(", ") ?? "none"}`,
+    `Instructions: ${instructionSources.length > 0 ? instructionSources.join(", ") : "none"}`,
+    `References: ${referenceSources.length > 0 ? referenceSources.join(", ") : "none"}`,
+    `Workspace: ${agent.workspace?.cwd ?? "not set"}`,
     `Tools: ${agent.tools.length > 0 ? agent.tools.join(", ") : "none"}`,
     `Available: ${options.availableAgentIds.join(", ")}`,
   ].join("\n");
