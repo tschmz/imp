@@ -14,10 +14,11 @@ export const statusCommandHandler: InboundCommandHandler = {
       dependencies.conversationStore.get(message.conversation),
       dependencies.conversationStore.listBackups(message.conversation),
     ]);
+    const agent = conversation ? dependencies.agentRegistry.get(conversation.state.agentId) : undefined;
 
     return {
       conversation: message.conversation,
-      text: renderStatusMessage(conversation, backups),
+      text: renderStatusMessage(conversation, backups, agent),
     };
   },
 };

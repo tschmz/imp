@@ -2,9 +2,17 @@ import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
 import type { ConversationBackupSummary } from "../../storage/types.js";
 
+function resolveDisplayedWorkingDirectory(
+  conversation: ConversationContext | undefined,
+  agent: AgentDefinition | undefined,
+): string {
+  return conversation?.state.workingDirectory ?? agent?.workspace?.cwd ?? "not set";
+}
+
 export function renderStatusMessage(
   conversation: ConversationContext | undefined,
   backups: ConversationBackupSummary[],
+  agent: AgentDefinition | undefined,
 ): string {
   if (!conversation) {
     return [
@@ -23,7 +31,7 @@ export function renderStatusMessage(
     `Messages: ${conversation.messages.length}`,
     `Created: ${conversation.state.createdAt}`,
     `Updated: ${conversation.state.updatedAt}`,
-    `Working directory: ${conversation.state.workingDirectory ?? "not set"}`,
+    `Working directory: ${resolveDisplayedWorkingDirectory(conversation, agent)}`,
     `Sessions in history: ${backups.length}`,
   ].join("\n");
 }
@@ -31,11 +39,12 @@ export function renderStatusMessage(
 export function renderHistoryMessage(
   conversation: ConversationContext | undefined,
   backups: ConversationBackupSummary[],
+  agent: AgentDefinition | undefined,
 ): string {
   const lines = [
     "Session history:",
     conversation
-      ? `Active: ${conversation.state.title ?? "untitled"} with ${conversation.messages.length} messages, updated ${conversation.state.updatedAt}`
+      ? `Active: ${conversation.state.title ?? "untitled"} with ${conversation.messages.length} messages, updated ${conversation.state.updatedAt}, working directory ${resolveDisplayedWorkingDirectory(conversation, agent)}`
       : "Active: no session",
   ];
 
