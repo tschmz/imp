@@ -38,19 +38,49 @@ export const linuxSystemdUserAdapter: ServicePlatformAdapter = {
     await options.installer.run("systemctl", ["--user", "daemon-reload"]);
     await options.installer.run("systemctl", ["--user", "enable", "--now", `${options.plan.serviceName}.service`]);
     await options.installer.run("systemctl", ["--user", "restart", `${options.plan.serviceName}.service`]);
+    return {
+      operation: "install",
+      platform: "linux-systemd-user",
+      serviceName: options.plan.serviceName,
+      definitionPath: options.definitionPath,
+    };
   },
   async uninstall(context: ServiceRuntimeContext) {
     await runIgnoringFailure(context.installer, "systemctl", ["--user", "disable", "--now", `${context.serviceName}.service`]);
     await context.installer.run("systemctl", ["--user", "daemon-reload"]);
+    return {
+      operation: "uninstall",
+      platform: "linux-systemd-user",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+    };
   },
   async start(context: ServiceRuntimeContext) {
     await context.installer.run("systemctl", ["--user", "start", `${context.serviceName}.service`]);
+    return {
+      operation: "start",
+      platform: "linux-systemd-user",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+    };
   },
   async stop(context: ServiceRuntimeContext) {
     await context.installer.run("systemctl", ["--user", "stop", `${context.serviceName}.service`]);
+    return {
+      operation: "stop",
+      platform: "linux-systemd-user",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+    };
   },
   async restart(context: ServiceRuntimeContext) {
     await context.installer.run("systemctl", ["--user", "restart", `${context.serviceName}.service`]);
+    return {
+      operation: "restart",
+      platform: "linux-systemd-user",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+    };
   },
   async status(context: ServiceRuntimeContext) {
     if (!context.installer.runAndCapture) {
@@ -63,7 +93,13 @@ export const linuxSystemdUserAdapter: ServicePlatformAdapter = {
       "--no-pager",
       `${context.serviceName}.service`,
     ]);
-    return joinCommandOutput(result.stdout, result.stderr);
+    return {
+      operation: "status",
+      platform: "linux-systemd-user",
+      serviceName: context.serviceName,
+      definitionPath: context.definitionPath,
+      statusOutput: joinCommandOutput(result.stdout, result.stderr),
+    };
   },
 };
 

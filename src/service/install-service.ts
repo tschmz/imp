@@ -11,12 +11,12 @@ import {
   createSystemServiceInstaller,
   type ServiceInstaller,
 } from "./service-installer.js";
+import type { ServiceOperationResult } from "./service-operation-result.js";
 
 export type { ServiceInstaller };
 
 export interface ServiceInstallResult {
-  platform: ServicePlatform;
-  definitionPath: string;
+  operation: ServiceOperationResult;
   environmentPath?: string;
   plan: ServiceInstallPlan;
 }
@@ -76,7 +76,7 @@ export async function installService(options: {
   });
 
   const installer = options.installer ?? createSystemServiceInstaller();
-  await platformAdapter.install({
+  const operation = await platformAdapter.install({
     installer,
     definitionPath,
     plan,
@@ -84,8 +84,7 @@ export async function installService(options: {
   });
 
   return {
-    platform: plan.platform,
-    definitionPath,
+    operation,
     environmentPath,
     plan,
   };

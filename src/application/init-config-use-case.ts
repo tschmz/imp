@@ -30,7 +30,7 @@ export function createInitConfigUseCase(): (options: {
         force,
         serviceEnvironment: initSetup.serviceEnvironment,
       });
-      console.log(`Installed ${result.platform} service at ${result.definitionPath}`);
+      console.log(`Installed ${result.operation.platform} service at ${result.operation.definitionPath}`);
     }
   };
 }

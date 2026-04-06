@@ -1,61 +1,62 @@
-import type { ServicePlatform } from "./install-plan.js";
+import { createServiceInstallPlan } from "./install-plan.js";
 import { getServicePlatformAdapter } from "./platforms/get-service-platform-adapter.js";
+import type { ServiceOperationResult } from "./service-operation-result.js";
 import {
   createSystemServiceInstaller,
   type ServiceInstaller,
 } from "./service-installer.js";
+import { resolveServiceDefinitionPath } from "./install-service.js";
 import { assertServiceDefinitionExists } from "./uninstall-service.js";
 
 type ManageServiceOptions = {
-  platform: ServicePlatform;
-  definitionPath: string;
-  serviceName: string;
-  serviceLabel: string;
+  configPath: string;
+  platform?: NodeJS.Platform;
+  homeDir?: string;
   uid?: number;
   installer?: ServiceInstaller;
 };
 
-type NonStatusServiceOperation = "start" | "stop" | "restart";
-
-type ServiceOperation = NonStatusServiceOperation | "status";
-
 function runServiceOperation(
-  operation: "status",
+  operation: "status" | "start" | "stop" | "restart",
   options: ManageServiceOptions,
-): Promise<string>;
-function runServiceOperation(
-  operation: NonStatusServiceOperation,
-  options: ManageServiceOptions,
-): Promise<void>;
+): Promise<ServiceOperationResult>;
 async function runServiceOperation(
-  operation: ServiceOperation,
+  operation: "status" | "start" | "stop" | "restart",
   options: ManageServiceOptions,
-): Promise<void | string> {
-  const definitionPath = await assertServiceDefinitionExists(options.definitionPath);
+): Promise<ServiceOperationResult> {
+  const plan = createServiceInstallPlan({ configPath: options.configPath, platform: options.platform });
+  const definitionPath = await assertServiceDefinitionExists(
+    resolveServiceDefinitionPath({
+      platform: plan.platform,
+      homeDir: options.homeDir,
+      serviceName: plan.serviceName,
+      serviceLabel: plan.serviceLabel,
+    }),
+  );
   const installer = options.installer ?? createSystemServiceInstaller();
-  const adapter = getServicePlatformAdapter(options.platform);
+  const adapter = getServicePlatformAdapter(plan.platform);
 
   return adapter[operation]({
     installer,
     definitionPath,
-    serviceName: options.serviceName,
-    serviceLabel: options.serviceLabel,
+    serviceName: plan.serviceName,
+    serviceLabel: plan.serviceLabel,
     uid: options.uid,
   });
 }
 
-export async function startService(options: ManageServiceOptions): Promise<void> {
-  await runServiceOperation("start", options);
+export async function startService(options: ManageServiceOptions): Promise<ServiceOperationResult> {
+  return runServiceOperation("start", options);
 }
 
-export async function stopService(options: ManageServiceOptions): Promise<void> {
-  await runServiceOperation("stop", options);
+export async function stopService(options: ManageServiceOptions): Promise<ServiceOperationResult> {
+  return runServiceOperation("stop", options);
 }
 
-export async function restartService(options: ManageServiceOptions): Promise<void> {
-  await runServiceOperation("restart", options);
+export async function restartService(options: ManageServiceOptions): Promise<ServiceOperationResult> {
+  return runServiceOperation("restart", options);
 }
 
-export async function statusService(options: ManageServiceOptions): Promise<string> {
+export async function statusService(options: ManageServiceOptions): Promise<ServiceOperationResult> {
   return runServiceOperation("status", options);
 }
