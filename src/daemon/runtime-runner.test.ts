@@ -92,6 +92,65 @@ describe("createRuntimeEntries", () => {
     );
     expect(runtime.engine.run).not.toHaveBeenCalled();
   });
+
+  it("resolves the active session for non-priority commands before handling", async () => {
+    const runtime = createRuntime();
+    const transport = createCapturingTransport();
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([
+        {
+          id: "default",
+          name: "Default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.3",
+          },
+          tools: [],
+          extensions: [],
+        },
+      ]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+    await transport.handler.handle(
+      createEvent({
+        botId: "private-telegram",
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+        },
+        messageId: "100",
+        correlationId: "corr-100",
+        userId: "7",
+        text: "/rename renamed",
+        command: "rename",
+        commandArgs: "renamed",
+        receivedAt: "2026-04-07T12:00:00.000Z",
+      }),
+    );
+
+    expect(runtime.conversationStore.ensureActive).toHaveBeenCalledWith(
+      {
+        transport: "telegram",
+        externalId: "42",
+      },
+      {
+        agentId: "default",
+        now: "2026-04-07T12:00:00.000Z",
+      },
+    );
+    expect(runtime.conversationStore.get).toHaveBeenCalledWith({
+      transport: "telegram",
+      externalId: "42",
+      sessionId: "session-1",
+    });
+  });
 });
 
 function createCapturingTransport(): {
