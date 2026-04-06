@@ -147,8 +147,8 @@ function appendPathEntries(
   delimiter: string,
 ): string {
   const mergedEntries = [
-    ...splitPathEntries(currentPath, delimiter),
     ...additionalEntries,
+    ...splitPathEntries(currentPath, delimiter),
   ];
 
   return [...new Set(mergedEntries)].join(delimiter);

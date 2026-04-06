@@ -451,7 +451,7 @@ describe("createPiAgentEngine", () => {
     expect(secondListingText).toContain("from-second.txt");
   });
 
-  it("appends the agent shell PATH for bash tool execution", async () => {
+  it("prepends the agent shell PATH for bash tool execution", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-shell-path-"));
     tempDirs.push(root);
 
@@ -475,10 +475,7 @@ describe("createPiAgentEngine", () => {
 
     const outputEntries = output.split(":");
 
-    expect(outputEntries).toEqual(
-      expect.arrayContaining(["/usr/bin", "/bin", "/custom/bin"]),
-    );
-    expect(outputEntries.indexOf("/custom/bin")).toBeLessThan(outputEntries.indexOf("/bin"));
+    expect(outputEntries.slice(0, 3)).toEqual(["/custom/bin", "/usr/bin", "/bin"]);
   });
 
   it("preserves the existing Windows PATH key and delimiter when merging shell path entries", () => {
@@ -493,7 +490,7 @@ describe("createPiAgentEngine", () => {
     });
 
     expect(merged.Path).toBe(
-      "C:\\Windows\\System32;C:\\Program Files\\Git\\bin;C:\\project\\node_modules\\.bin",
+      "C:\\project\\node_modules\\.bin;C:\\Windows\\System32;C:\\Program Files\\Git\\bin",
     );
     expect(merged.PATH).toBeUndefined();
     expect(merged.PATHEXT).toBe(".EXE;.CMD");
@@ -512,9 +509,22 @@ describe("createPiAgentEngine", () => {
     });
 
     expect(merged).toEqual({
-      Path: "C:\\Windows\\System32;C:\\project\\node_modules\\.bin",
+      Path: "C:\\project\\node_modules\\.bin;C:\\Windows\\System32",
       HOME: "C:\\Users\\thomas",
     });
+  });
+
+  it("deduplicates shell PATH entries while keeping configured entries first", () => {
+    const env = {
+      PATH: "/usr/bin:/bin",
+    };
+
+    const merged = mergeShellPathEntries(env, ["/custom/bin", "/usr/bin"], {
+      platform: "linux",
+      delimiter: ":",
+    });
+
+    expect(merged.PATH).toBe("/custom/bin:/usr/bin:/bin");
   });
 
   it("creates a POSIX PATH entry even when a differently cased key exists", () => {
