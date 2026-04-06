@@ -9,6 +9,10 @@ function resolveDisplayedWorkingDirectory(
   return conversation?.state.workingDirectory ?? agent?.workspace?.cwd ?? "not set";
 }
 
+function renderSessionLabel(title: string | undefined, sessionId: string): string {
+  return `${title ?? "untitled"} (${sessionId})`;
+}
+
 export function renderStatusMessage(
   conversation: ConversationContext | undefined,
   backups: ConversationBackupSummary[],
@@ -56,7 +60,7 @@ export function renderHistoryMessage(
   lines.push("Previous sessions:");
   for (const [index, backup] of backups.entries()) {
     lines.push(
-      `${index + 1}. ${backup.updatedAt} | ${backup.messageCount} messages | agent ${backup.agentId}`,
+      `${index + 1}. ${renderSessionLabel(backup.title, backup.sessionId)} | ${backup.updatedAt} | ${backup.messageCount} messages | agent ${backup.agentId}`,
     );
   }
   lines.push("Use /restore <n> to switch to one of these sessions.");

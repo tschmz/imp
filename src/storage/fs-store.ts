@@ -228,6 +228,7 @@ function toBackupSummary(snapshot: ConversationContext): ConversationBackupSumma
   return {
     id: sessionId,
     sessionId,
+    ...(snapshot.state.title ? { title: snapshot.state.title } : {}),
     createdAt: snapshot.state.createdAt,
     updatedAt: snapshot.state.updatedAt,
     agentId: snapshot.state.agentId,

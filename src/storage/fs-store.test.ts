@@ -112,6 +112,7 @@ describe("createFsConversationStore", () => {
     await store.put({
       state: {
         ...first.state,
+        title: "Earlier session",
         updatedAt: "2026-04-05T00:02:00.000Z",
       },
       messages: [
@@ -135,6 +136,7 @@ describe("createFsConversationStore", () => {
       {
         id: first.state.conversation.sessionId!,
         sessionId: first.state.conversation.sessionId!,
+        title: "Earlier session",
         createdAt: "2026-04-05T00:00:00.000Z",
         updatedAt: "2026-04-05T00:02:00.000Z",
         agentId: "default",
@@ -155,6 +157,7 @@ describe("createFsConversationStore", () => {
     await store.put({
       state: {
         ...first.state,
+        title: "Older",
         workingDirectory: "/workspace/app",
         updatedAt: "2026-04-05T00:01:00.000Z",
       },
@@ -196,6 +199,7 @@ describe("createFsConversationStore", () => {
     await expect(store.get(createChatRef())).resolves.toEqual({
       state: {
         ...first.state,
+        title: "Older",
         workingDirectory: "/workspace/app",
         updatedAt: "2026-04-05T00:01:00.000Z",
         version: 2,
@@ -212,6 +216,7 @@ describe("createFsConversationStore", () => {
     await expect(store.listBackups(createChatRef())).resolves.toMatchObject([
       {
         id: current.state.conversation.sessionId!,
+        title: "Current",
         updatedAt: "2026-04-05T00:05:00.000Z",
         messageCount: 1,
       },

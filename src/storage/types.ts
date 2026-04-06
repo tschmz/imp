@@ -3,6 +3,7 @@ import type { ChatRef, ConversationContext, ConversationRef } from "../domain/co
 export interface ConversationBackupSummary {
   id: string;
   sessionId: string;
+  title?: string;
   createdAt: string;
   updatedAt: string;
   agentId: string;
