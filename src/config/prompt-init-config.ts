@@ -6,6 +6,7 @@ import {
   createDefaultAppConfig,
   getSuggestedModelId,
   parseCommaSeparatedValues,
+  parsePathEntries,
   validateTelegramUserIds,
 } from "./default-app-config.js";
 import type { AppConfig } from "./types.js";
@@ -106,6 +107,11 @@ export async function promptForInitialAppConfig(
     default: "",
   });
 
+  const shellPathRaw = await dependencies.input({
+    message: "Shell PATH for bash tool (colon-separated, optional)",
+    default: "",
+  });
+
   const installService =
     process.platform === "win32"
       ? false
@@ -132,6 +138,7 @@ export async function promptForInitialAppConfig(
         ...(includeAgentsFile ? [join(workingDirectory, "AGENTS.md")] : []),
         ...parseCommaSeparatedValues(extraContextFilesRaw),
       ],
+      shellPath: parsePathEntries(shellPathRaw),
       systemPromptFile: getDefaultAgentSystemPromptFilePath(dataRoot),
     }),
     installService,

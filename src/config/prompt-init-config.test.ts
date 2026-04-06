@@ -16,6 +16,7 @@ describe("promptForInitialAppConfig", () => {
       .mockResolvedValueOnce("1, 2")
       .mockResolvedValueOnce("/workspace")
       .mockResolvedValueOnce("/workspace/RULES.md")
+      .mockResolvedValueOnce("/custom/bin:/usr/bin:/bin")
       .mockResolvedValueOnce("sk-test")
       .mockResolvedValueOnce("IMP_DEBUG=true");
     const confirm = vi
@@ -34,6 +35,9 @@ describe("promptForInitialAppConfig", () => {
     expect(result.config.paths.dataRoot).toBe("/tmp/state-home/imp");
     expect(result.config.agents[0]?.context).toEqual({
       workingDirectory: "/workspace",
+      shell: {
+        path: ["/custom/bin", "/usr/bin", "/bin"],
+      },
       files: ["/workspace/AGENTS.md", "/workspace/RULES.md"],
     });
     expect(result.config.agents[0]?.systemPromptFile).toBe("/tmp/state-home/imp/SYSTEM.md");
@@ -65,6 +69,7 @@ describe("promptForInitialAppConfig", () => {
       .mockResolvedValueOnce("")
       .mockResolvedValueOnce("")
       .mockResolvedValueOnce("");
+    input.mockResolvedValueOnce("");
     const confirm = vi
       .fn()
       .mockResolvedValueOnce(false)

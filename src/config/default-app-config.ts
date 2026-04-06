@@ -17,6 +17,7 @@ export interface InitialConfigAnswers {
   allowedUserIds: string[];
   workingDirectory?: string;
   contextFiles?: string[];
+  shellPath?: string[];
   systemPromptFile?: string;
 }
 
@@ -114,6 +115,13 @@ export function parseCommaSeparatedValues(raw: string): string[] {
     .filter((value) => value.length > 0);
 }
 
+export function parsePathEntries(raw: string): string[] {
+  return raw
+    .split(":")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
 export function validateTelegramUserIds(raw: string): true | string {
   const values = parseCommaSeparatedValues(raw);
   if (values.every((value) => /^\d+$/.test(value))) {
@@ -127,12 +135,14 @@ function buildAgentContext(
   answers: InitialConfigAnswers,
 ): AppConfig["agents"][number]["context"] | undefined {
   const files = answers.contextFiles?.filter((value) => value.length > 0) ?? [];
-  if (!answers.workingDirectory && files.length === 0) {
+  const shellPath = answers.shellPath?.filter((value) => value.length > 0) ?? [];
+  if (!answers.workingDirectory && files.length === 0 && shellPath.length === 0) {
     return undefined;
   }
 
   return {
     ...(answers.workingDirectory ? { workingDirectory: answers.workingDirectory } : {}),
+    ...(shellPath.length > 0 ? { shell: { path: shellPath } } : {}),
     ...(files.length > 0 ? { files } : {}),
   };
 }

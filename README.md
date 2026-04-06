@@ -41,6 +41,8 @@ imp init --defaults
 
 Both variants create a starter `SYSTEM.md` under the configured `dataRoot` and wire the
 default agent to that `systemPromptFile`.
+Interactive setup can also store an optional per-agent shell `PATH` for the `bash` tool without
+polluting the service-wide environment.
 
 You can also inspect
 [`config.example.json`](./config.example.json) for a more complete example.
