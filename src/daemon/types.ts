@@ -1,12 +1,19 @@
 import type { AgentContextConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
+import type { TransportType } from "../transports/registry.js";
 
-export interface TelegramBotRuntimeConfig {
+interface BaseTransportRuntimeConfig {
   id: string;
+  type: TransportType;
+}
+
+export interface TelegramBotRuntimeConfig extends BaseTransportRuntimeConfig {
   type: "telegram";
   token: string;
   allowedUserIds: string[];
 }
+
+export type TransportBotRuntimeConfig = TelegramBotRuntimeConfig;
 
 export interface RuntimePaths {
   dataRoot: string;
@@ -18,10 +25,10 @@ export interface RuntimePaths {
   runtimeStatePath: string;
 }
 
-export interface ActiveBotRuntimeConfig extends TelegramBotRuntimeConfig {
+export type ActiveBotRuntimeConfig = TransportBotRuntimeConfig & {
   defaultAgentId: string;
   paths: RuntimePaths;
-}
+};
 
 export interface DaemonConfig {
   configPath: string;

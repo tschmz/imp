@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
+import { transportConfigSchemas } from "../transports/registry.js";
 
 const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
 const modelConfigSchema = z.object({
@@ -83,25 +84,7 @@ const agentConfigSchema = z
     }
   });
 
-const telegramBotSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("telegram"),
-  enabled: z.boolean(),
-  token: z.string().min(1),
-  access: z.object({
-    allowedUserIds: z
-      .string()
-      .array()
-      .refine((values) => values.every((value) => /^\d+$/.test(value)), {
-        message: "Telegram user IDs must contain digits only.",
-      }),
-  }),
-  routing: z
-    .object({
-      defaultAgentId: z.string().min(1).optional(),
-    })
-    .optional(),
-});
+const botConfigSchema = z.discriminatedUnion("type", [transportConfigSchemas.telegram]);
 
 export const appConfigSchema = z.object({
   instance: z.object({
@@ -119,7 +102,7 @@ export const appConfigSchema = z.object({
     agentId: z.string().min(1),
   }),
   agents: agentConfigSchema.array().min(1),
-  bots: telegramBotSchema.array().min(1),
+  bots: botConfigSchema.array().min(1),
 }).superRefine((config, ctx) => {
   const agentIds = new Set<string>();
   const knownAgentIds = new Set<string>();

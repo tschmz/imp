@@ -5,16 +5,11 @@ import type { DaemonConfig } from "../daemon/types.js";
 import type { Logger } from "../logging/types.js";
 import { createServiceInstallPlan } from "../service/install-plan.js";
 import { resolveServiceDefinitionPath } from "../service/install-service.js";
-import { createTelegramTransport } from "../transports/telegram/telegram-transport.js";
+import { createTransport } from "../transports/registry.js";
 import type { Transport, TransportFactory } from "../transports/types.js";
 
 export const createRuntimeTransportFactory: TransportFactory<DaemonConfig["activeBots"][number], Logger> =
-  (botConfig, logger): Transport => {
-    if (botConfig.type === "telegram") {
-      return createTelegramTransport(botConfig, undefined, logger);
-    }
-    throw new Error(`Unsupported bot transport: ${botConfig.type}`);
-  };
+  (botConfig, logger): Transport => createTransport(botConfig.type, botConfig, logger);
 
 export async function resolveRuntimeTarget(options: { cliConfigPath?: string } = {}): Promise<{
   configPath: string;
