@@ -76,6 +76,18 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("--config <path>");
   });
 
+  it("shows help output for config set", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const { stdout } = await runCli(["config", "set", "--help"], env);
+
+    expect(stdout).toContain("Usage: imp config set");
+    expect(stdout).toContain("<keyPath>");
+    expect(stdout).toContain("<value>");
+    expect(stdout).toContain("--config <path>");
+  });
+
   it("shows help output for service install", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
@@ -226,6 +238,88 @@ describe("imp CLI e2e", () => {
     expect(stdout).toBe('{\n  "allowedUserIds": []\n}\n');
   });
 
+  it("updates a discovered config value through `imp config set` using array id navigation", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+
+    await runCli(["init", "--defaults"], env);
+
+    const { stdout } = await runCli(["config", "set", "bots.private-telegram.enabled", "false"], env);
+    const config = JSON.parse(await readFile(configPath, "utf8")) as {
+      bots: Array<{ id: string; enabled: boolean }>;
+    };
+
+    expect(stdout).toBe(`Updated config ${configPath}: bots.private-telegram.enabled\n`);
+    expect(config.bots.find((bot) => bot.id === "private-telegram")?.enabled).toBe(false);
+  });
+
+  it("updates a discovered config value through `imp config set` using a plain string value", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+
+    await runCli(["init", "--defaults"], env);
+
+    const { stdout } = await runCli(["config", "set", "instance.name", "custom-instance"], env);
+    const config = JSON.parse(await readFile(configPath, "utf8")) as {
+      instance: { name: string };
+    };
+
+    expect(stdout).toBe(`Updated config ${configPath}: instance.name\n`);
+    expect(config.instance.name).toBe("custom-instance");
+  });
+
+  it("updates an explicit config path through `imp config set --config` using numeric array navigation", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "custom", "imp.json");
+
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "custom-instance",
+      },
+      paths: {
+        dataRoot: join(root, "state-home", "imp"),
+      },
+      logging: {
+        level: "warn",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          systemPrompt: "You are a concise and pragmatic assistant running through a local daemon.",
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "test-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const { stdout } = await runCli(["config", "set", "--config", configPath, "bots.0.enabled", "false"], env);
+    const config = JSON.parse(await readFile(configPath, "utf8")) as {
+      bots: Array<{ enabled: boolean }>;
+    };
+
+    expect(stdout).toBe(`Updated config ${configPath}: bots.0.enabled\n`);
+    expect(config.bots[0]?.enabled).toBe(false);
+  });
+
   it("validates an explicit config path through `imp config validate --config`", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
@@ -336,6 +430,16 @@ describe("imp CLI e2e", () => {
     });
   });
 
+  it("fails clearly when `imp config set --config` targets a missing file", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "missing", "imp.json");
+
+    await expect(runCli(["config", "set", "--config", configPath, "instance.name", "custom"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(`Config file not found: ${configPath}`),
+    });
+  });
+
   it("fails with the existing invalid-config error for `imp config validate`", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
@@ -362,6 +466,30 @@ describe("imp CLI e2e", () => {
     await expect(runCli(["config", "get", "instance.name"], env)).rejects.toMatchObject({
       stderr: expect.stringContaining(`Invalid config file ${configPath}`),
     });
+  });
+
+  it("fails clearly when `imp config set` cannot find the requested key", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    await runCli(["init", "--defaults"], env);
+
+    await expect(runCli(["config", "set", "bots.private-telegram.missing", "false"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining("Config key not found: bots.private-telegram.missing"),
+    });
+  });
+
+  it("fails clearly when `imp config set` would make the config invalid", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const before = await runCli(["init", "--defaults"], env).then(async () => readFile(configPath, "utf8"));
+
+    await expect(runCli(["config", "set", "defaults.agentId", "missing-agent"], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining(`Updated config would be invalid: ${configPath}`),
+    });
+
+    await expect(readFile(configPath, "utf8")).resolves.toBe(before);
   });
 
   it("fails clearly when `imp config get` cannot find the requested key", async () => {

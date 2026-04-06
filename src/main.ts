@@ -2,6 +2,7 @@
 import { createCli } from "./cli/create-cli.js";
 import { createInitConfigUseCase } from "./application/init-config-use-case.js";
 import { createGetConfigValueUseCase } from "./application/get-config-value-use-case.js";
+import { createSetConfigValueUseCase } from "./application/set-config-value-use-case.js";
 import { createRunDaemonUseCase, type RunDaemonOutcome } from "./application/run-daemon-use-case.js";
 import { createServiceUseCases } from "./application/service-use-cases.js";
 import { createValidateConfigUseCase } from "./application/validate-config-use-case.js";
@@ -21,6 +22,7 @@ async function main(): Promise<void> {
     viewLogs: createViewLogsUseCase(),
     validateConfig: validateConfigUseCase,
     getConfigValue: createGetConfigValueUseCase(),
+    setConfigValue: createSetConfigValueUseCase(),
     initConfig: createInitConfigUseCase(),
     installService: serviceUseCases.installService,
     uninstallService: serviceUseCases.uninstallService,

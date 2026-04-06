@@ -6,6 +6,7 @@ export interface CliDependencies {
   viewLogs: (options: { configPath?: string; botId?: string; follow: boolean; lines: number }) => Promise<void>;
   validateConfig: (options: { configPath?: string }) => Promise<void>;
   getConfigValue: (options: { configPath?: string; keyPath: string }) => Promise<void>;
+  setConfigValue: (options: { configPath?: string; keyPath: string; value: string }) => Promise<void>;
   initConfig: (options: {
     configPath?: string;
     force: boolean;
@@ -87,6 +88,22 @@ export function createCli(dependencies: CliDependencies): Command {
         keyPath,
       });
     });
+
+  configCommand
+    .command("set")
+    .description("Update a value in a discovered or explicit config file")
+    .argument("<keyPath>", "Dot-separated config key path")
+    .argument("<value>", "JSON literal/object/array or plain string value")
+    .option("-c, --config <path>", "Path to the config file")
+    .action(
+      async function action(this: Command, keyPath: string, value: string, options: { config?: string }) {
+        await dependencies.setConfigValue({
+          configPath: options.config,
+          keyPath,
+          value,
+        });
+      },
+    );
 
   configCommand
     .command("validate")
