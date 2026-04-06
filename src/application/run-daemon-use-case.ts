@@ -1,21 +1,18 @@
 import { createDaemon } from "../daemon/create-daemon.js";
 import type { DaemonConfig } from "../daemon/types.js";
+import { AgentExecutionError, AppResult, ConfigError, asAppError } from "../domain/errors.js";
 import { resolveRuntimeTarget } from "./runtime-target.js";
 
-export type RunDaemonOutcome = RunDaemonSuccessOutcome | RunDaemonStartupFailureOutcome;
+export type RunDaemonResult = AppResult<RunDaemonSuccess, RunDaemonError>;
 
-export interface RunDaemonSuccessOutcome {
+export interface RunDaemonSuccess {
   status: "started";
 }
 
-export interface RunDaemonStartupFailureOutcome {
-  status: "startup_failed";
-  error: unknown;
-  failedBotIds: string[];
-}
+export type RunDaemonError = ConfigError | AgentExecutionError;
 
 export interface DaemonStartupFailureReporter {
-  report(options: { runtimeConfig: DaemonConfig; error: unknown }): Promise<void>;
+  report(options: { runtimeConfig: DaemonConfig; error: RunDaemonError }): Promise<void>;
 }
 
 interface RunDaemonUseCaseDependencies {
@@ -26,7 +23,7 @@ interface RunDaemonUseCaseDependencies {
 
 export function createRunDaemonUseCase(
   dependencies: Partial<RunDaemonUseCaseDependencies> = {},
-): (options: { configPath?: string }) => Promise<RunDaemonOutcome> {
+): (options: { configPath?: string }) => Promise<RunDaemonResult> {
   const deps: RunDaemonUseCaseDependencies = {
     resolveRuntimeTarget,
     createDaemon,
@@ -39,18 +36,37 @@ export function createRunDaemonUseCase(
   };
 
   return async ({ configPath }) => {
-    const { runtimeConfig } = await deps.resolveRuntimeTarget({ cliConfigPath: configPath });
+    let runtimeConfig: DaemonConfig;
+
+    try {
+      const resolved = await deps.resolveRuntimeTarget({ cliConfigPath: configPath });
+      runtimeConfig = resolved.runtimeConfig;
+    } catch (error) {
+      return {
+        ok: false,
+        error: new ConfigError("Failed to resolve runtime configuration.", {
+          cause: error,
+          details: { configPath: configPath ?? null },
+        }),
+      };
+    }
+
     const daemon = deps.createDaemon(runtimeConfig);
 
     try {
       await daemon.start();
-      return { status: "started" };
+      return { ok: true, value: { status: "started" } };
     } catch (error) {
-      await deps.startupFailureReporter.report({ runtimeConfig, error });
+      const startupError = new AgentExecutionError("Failed to start daemon.", {
+        cause: asAppError(error),
+        details: {
+          failedBotIds: runtimeConfig.activeBots.map((bot) => bot.id),
+        },
+      });
+      await deps.startupFailureReporter.report({ runtimeConfig, error: startupError });
       return {
-        status: "startup_failed",
-        error,
-        failedBotIds: runtimeConfig.activeBots.map((bot) => bot.id),
+        ok: false,
+        error: startupError,
       };
     }
   };

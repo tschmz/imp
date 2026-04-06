@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DaemonConfig } from "../daemon/types.js";
+import { AgentExecutionError } from "../domain/errors.js";
 import { createRunDaemonUseCase } from "./run-daemon-use-case.js";
 
 describe("createRunDaemonUseCase", () => {
@@ -15,7 +16,7 @@ describe("createRunDaemonUseCase", () => {
 
     const outcome = await useCase({ configPath: "/tmp/config.json" });
 
-    expect(outcome).toEqual({ status: "started" });
+    expect(outcome).toEqual({ ok: true, value: { status: "started" } });
     expect(start).toHaveBeenCalledOnce();
     expect(report).not.toHaveBeenCalled();
   });
@@ -36,13 +37,14 @@ describe("createRunDaemonUseCase", () => {
 
     const outcome = await useCase({ configPath: "/tmp/config.json" });
 
-    expect(outcome).toEqual({
-      status: "startup_failed",
-      error: startupError,
-      failedBotIds: ["bot-1"],
-    });
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) {
+      throw new Error("Expected error outcome");
+    }
+    expect(outcome.error).toBeInstanceOf(AgentExecutionError);
+    expect(outcome.error.details).toEqual({ failedBotIds: ["bot-1"] });
     expect(report).toHaveBeenCalledOnce();
-    expect(report).toHaveBeenCalledWith({ runtimeConfig, error: startupError });
+    expect(report).toHaveBeenCalledWith({ runtimeConfig, error: outcome.error });
   });
 });
 

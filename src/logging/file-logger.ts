@@ -1,4 +1,5 @@
 import { appendFile } from "node:fs/promises";
+import { asAppError } from "../domain/errors.js";
 import type { LogFields, Logger, LogLevel } from "./types.js";
 
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
@@ -31,14 +32,17 @@ export function createFileLogger(path: string, level: LogLevel = "info"): Logger
         return;
       }
 
-      await writeLogLine(path, "ERROR", message, fields);
-      if (error !== undefined) {
-        await writeLogLine(path, "ERROR", formatError(error), fields);
+      const appError = error === undefined ? undefined : asAppError(error);
+      const errorFields = appError ? { ...(fields ?? {}), errorCode: appError.code } : fields;
+
+      await writeLogLine(path, "ERROR", message, errorFields);
+      if (appError !== undefined) {
+        await writeLogLine(path, "ERROR", formatError(appError), errorFields);
       }
 
-      console.error(formatConsoleLog(message, fields));
-      if (error !== undefined) {
-        console.error(error);
+      console.error(formatConsoleLog(message, errorFields));
+      if (appError !== undefined) {
+        console.error(appError);
       }
     },
   };
@@ -64,12 +68,8 @@ async function writeLogLine(
   await appendFile(path, `${JSON.stringify(payload)}\n`, "utf8");
 }
 
-function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.stack ?? `${error.name}: ${error.message}`;
-  }
-
-  return String(error);
+function formatError(error: Error): string {
+  return error.stack ?? `${error.name}: ${error.message}`;
 }
 
 function formatConsoleLog(message: string, fields?: LogFields): string {

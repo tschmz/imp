@@ -11,6 +11,7 @@ export interface LogFields {
   backupId?: string;
   durationMs?: number;
   errorType?: string;
+  errorCode?: string;
 }
 
 export interface Logger {
