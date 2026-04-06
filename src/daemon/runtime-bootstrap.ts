@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import type { AgentDefinition } from "../domain/agent.js";
 import { createFileLogger } from "../logging/file-logger.js";
 import type { Logger } from "../logging/types.js";
 import {
@@ -28,7 +29,10 @@ export interface BootstrappedRuntime {
 export interface RuntimeBootstrapDependencies {
   engine?: AgentEngine;
   toolRegistry?: ToolRegistry;
-  createBuiltInToolRegistry?: (workingDirectory: string | WorkingDirectoryState) => ToolRegistry;
+  createBuiltInToolRegistry?: (
+    workingDirectory: string | WorkingDirectoryState,
+    agent?: AgentDefinition,
+  ) => ToolRegistry;
   createLogger?: (path: string, level: DaemonConfig["logging"]["level"]) => Logger;
   createConversationStore?: (paths: RuntimePaths) => ConversationStore;
 }

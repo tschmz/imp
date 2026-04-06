@@ -445,6 +445,33 @@ describe("createPiAgentEngine", () => {
     expect(secondListingText).toContain("from-second.txt");
   });
 
+  it("uses the agent shell PATH for bash tool execution", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-shell-path-"));
+    tempDirs.push(root);
+
+    const registry = createBuiltInToolRegistry(root, {
+      ...createAgent(),
+      context: {
+        ...createAgent().context,
+        shell: {
+          path: ["/custom/bin", "/usr/bin", "/bin"],
+        },
+      },
+    });
+    const bash = registry.get("bash");
+
+    expect(bash).toBeDefined();
+
+    const result = await bash!.execute("1", {
+      command: "printf '%s' \"$PATH\"",
+    });
+    const output = result.content
+      .flatMap((item) => (item.type === "text" ? [item.text] : []))
+      .join("\n");
+
+    expect(output).toContain("/custom/bin:/usr/bin:/bin");
+  });
+
   it("rejects cd when the target is not a directory", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-working-directory-"));
     tempDirs.push(root);

@@ -78,10 +78,10 @@ export function createDaemon(
 function validateAgentRegistry(
   agentRegistry: ReturnType<typeof createAgentRegistry>,
   toolRegistry: ToolRegistry | undefined,
-  createBuiltInRegistry: (workingDirectory: string) => ToolRegistry,
+  createBuiltInRegistry: (workingDirectory: string, agent?: AgentDefinition) => ToolRegistry,
 ): void {
   for (const agent of agentRegistry.list()) {
-    const registry = toolRegistry ?? createBuiltInRegistry(resolveWorkingDirectory(agent));
+    const registry = toolRegistry ?? createBuiltInRegistry(resolveWorkingDirectory(agent), agent);
     resolveAgentTools(agent, registry);
   }
 }

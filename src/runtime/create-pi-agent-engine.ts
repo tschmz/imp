@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { Agent, type AgentMessage, type AgentOptions } from "@mariozechner/pi-agent-core";
 import {
   createCodingTools,
+  type ToolsOptions,
   createFindTool,
   createGrepTool,
   createLsTool,
@@ -51,7 +52,10 @@ interface PiAgentEngineDependencies {
   readTextFile?: (path: string) => Promise<string>;
   getContextFileFingerprint?: (path: string) => Promise<string>;
   toolRegistry?: ToolRegistry;
-  createBuiltInToolRegistry?: (workingDirectory: string | WorkingDirectoryState) => ToolRegistry;
+  createBuiltInToolRegistry?: (
+    workingDirectory: string | WorkingDirectoryState,
+    agent?: AgentDefinition,
+  ) => ToolRegistry;
 }
 
 interface AgentHandle {
@@ -117,7 +121,7 @@ export function createPiAgentEngine(
         });
         const toolRegistry =
           dependencies.toolRegistry ??
-          buildToolRegistry(workingDirectoryState);
+          buildToolRegistry(workingDirectoryState, input.agent);
         const tools = resolveAgentTools(input.agent, toolRegistry);
         await logger?.debug("prepared agent runtime", {
           botId: input.message.botId,
@@ -243,6 +247,7 @@ function resolvePromptWorkingDirectory(
 
 export function createBuiltInToolRegistry(
   workingDirectory: string | WorkingDirectoryState,
+  agent?: AgentDefinition,
 ): ToolRegistry {
   const workingDirectoryState =
     typeof workingDirectory === "string"
@@ -250,7 +255,7 @@ export function createBuiltInToolRegistry(
       : workingDirectory;
 
   return createToolRegistry([
-    ...createDynamicBuiltInTools(workingDirectoryState),
+    ...createDynamicBuiltInTools(workingDirectoryState, agent),
     createGetWorkingDirectoryTool(workingDirectoryState),
     createSetWorkingDirectoryTool(workingDirectoryState),
   ]);
@@ -269,11 +274,14 @@ function createWorkingDirectoryState(initialWorkingDirectory: string): WorkingDi
   };
 }
 
-function createDynamicBuiltInTools(workingDirectoryState: WorkingDirectoryState): ToolDefinition[] {
-  return createBaseBuiltInTools(workingDirectoryState.get()).map((tool) => ({
+function createDynamicBuiltInTools(
+  workingDirectoryState: WorkingDirectoryState,
+  agent?: AgentDefinition,
+): ToolDefinition[] {
+  return createBaseBuiltInTools(workingDirectoryState.get(), agent).map((tool) => ({
     ...tool,
     async execute(toolCallId, params, signal, onUpdate) {
-      const delegatedTool = createBaseBuiltInTools(workingDirectoryState.get()).find(
+      const delegatedTool = createBaseBuiltInTools(workingDirectoryState.get(), agent).find(
         (candidate) => candidate.name === tool.name,
       );
       if (!delegatedTool) {
@@ -285,13 +293,34 @@ function createDynamicBuiltInTools(workingDirectoryState: WorkingDirectoryState)
   }));
 }
 
-function createBaseBuiltInTools(workingDirectory: string): ToolDefinition[] {
+function createBaseBuiltInTools(workingDirectory: string, agent?: AgentDefinition): ToolDefinition[] {
+  const toolOptions = resolveBuiltInToolOptions(agent);
   return [
-    ...createCodingTools(workingDirectory),
+    ...createCodingTools(workingDirectory, toolOptions),
     createGrepTool(workingDirectory),
     createFindTool(workingDirectory),
     createLsTool(workingDirectory),
   ];
+}
+
+function resolveBuiltInToolOptions(agent?: AgentDefinition): ToolsOptions | undefined {
+  const shellPath = agent?.context?.shell?.path;
+  if (!shellPath || shellPath.length === 0) {
+    return undefined;
+  }
+
+  return {
+    bash: {
+      spawnHook: ({ command, cwd, env }) => ({
+        command,
+        cwd,
+        env: {
+          ...env,
+          PATH: shellPath.join(":"),
+        },
+      }),
+    },
+  };
 }
 
 function createGetWorkingDirectoryTool(workingDirectoryState: WorkingDirectoryState): ToolDefinition {
