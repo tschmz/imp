@@ -1,6 +1,10 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const helpCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "help",
+    description: "Show available commands",
+  },
   canHandle(command) {
     return command === "help";
   },

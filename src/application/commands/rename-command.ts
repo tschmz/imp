@@ -3,6 +3,11 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 import { normalizeCommandArgument } from "./utils.js";
 
 export const renameCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "rename",
+    description: "Rename with /rename <title>",
+    usage: "/rename <title>",
+  },
   canHandle(command) {
     return command === "rename";
   },

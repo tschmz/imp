@@ -1,73 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { Bot, GrammyError } from "grammy";
+import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessageCommand } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
 import { renderTelegramMessages } from "./render-telegram-message.js";
-
-const telegramCommands = [
-  {
-    command: "help",
-    description: "Show available commands",
-  },
-  {
-    command: "whoami",
-    description: "Show bot and user IDs",
-  },
-  {
-    command: "new",
-    description: "Start a fresh conversation",
-  },
-  {
-    command: "rename",
-    description: "Rename with /rename <title>",
-  },
-  {
-    command: "clear",
-    description: "Clear the active conversation",
-  },
-  {
-    command: "status",
-    description: "Show current conversation status",
-  },
-  {
-    command: "history",
-    description: "List restore points",
-  },
-  {
-    command: "restore",
-    description: "Restore a backup with /restore <n>",
-  },
-  {
-    command: "export",
-    description: "Export the current conversation",
-  },
-  {
-    command: "ping",
-    description: "Check bot responsiveness",
-  },
-  {
-    command: "config",
-    description: "Show runtime config details",
-  },
-  {
-    command: "agent",
-    description: "Show or switch the current agent",
-  },
-  {
-    command: "logs",
-    description: "Show recent bot log lines",
-  },
-  {
-    command: "reload",
-    description: "Restart after this reply to reload config",
-  },
-  {
-    command: "restart",
-    description: "Restart after this reply",
-  },
-] as const;
 
 interface TelegramBotAdapter {
   api: {
@@ -279,7 +217,7 @@ async function registerTelegramCommands(
   config: TelegramBotRuntimeConfig,
 ): Promise<void> {
   try {
-    await bot.api.setMyCommands(telegramCommands);
+    await bot.api.setMyCommands(inboundCommandMenu);
   } catch (error) {
     if (error instanceof GrammyError) {
       throw new Error(
@@ -301,23 +239,7 @@ function parseTelegramCommand(
   }
 
   const command = match.groups.command.toLowerCase() as IncomingMessageCommand;
-  if (
-    command !== "new" &&
-    command !== "help" &&
-    command !== "whoami" &&
-    command !== "rename" &&
-    command !== "clear" &&
-    command !== "status" &&
-    command !== "history" &&
-    command !== "restore" &&
-    command !== "export" &&
-    command !== "ping" &&
-    command !== "config" &&
-    command !== "agent" &&
-    command !== "logs" &&
-    command !== "reload" &&
-    command !== "restart"
-  ) {
+  if (!inboundCommandNames.has(command)) {
     return undefined;
   }
 

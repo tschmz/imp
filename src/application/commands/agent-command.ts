@@ -4,6 +4,11 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 import { normalizeCommandArgument } from "./utils.js";
 
 export const agentCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "agent",
+    description: "Show or switch the current agent",
+    usage: "/agent [id]",
+  },
   canHandle(command) {
     return command === "agent";
   },

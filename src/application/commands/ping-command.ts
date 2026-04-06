@@ -1,6 +1,10 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const pingCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "ping",
+    description: "Check bot responsiveness",
+  },
   canHandle(command) {
     return command === "ping";
   },

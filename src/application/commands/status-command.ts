@@ -2,6 +2,10 @@ import { renderStatusMessage } from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const statusCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "status",
+    description: "Show current conversation status",
+  },
   canHandle(command) {
     return command === "status";
   },

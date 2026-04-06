@@ -15,6 +15,10 @@ async function readAppConfigSummary(
 }
 
 export const configCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "config",
+    description: "Show runtime config details",
+  },
   canHandle(command) {
     return command === "config";
   },

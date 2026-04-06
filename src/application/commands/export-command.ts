@@ -2,6 +2,10 @@ import { renderConversationExport } from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const exportCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "export",
+    description: "Export the current conversation",
+  },
   canHandle(command) {
     return command === "export";
   },

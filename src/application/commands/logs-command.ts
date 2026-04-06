@@ -2,6 +2,11 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 import { parsePositiveIntegerArgument } from "./utils.js";
 
 export const logsCommandHandler: InboundCommandHandler = {
+  metadata: {
+    name: "logs",
+    description: "Show recent bot log lines",
+    usage: "/logs [lines]",
+  },
   canHandle(command) {
     return command === "logs";
   },

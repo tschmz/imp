@@ -1,6 +1,6 @@
 import type { AgentRegistry } from "../../agents/registry.js";
 import { loadAppConfig } from "../../config/load-app-config.js";
-import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
+import type { IncomingMessage, IncomingMessageCommand, OutgoingMessage } from "../../domain/message.js";
 import type { LogLevel, Logger } from "../../logging/types.js";
 import { readRecentLogLines } from "../../logging/view-logs.js";
 import type { AgentEngine } from "../../runtime/types.js";
@@ -34,7 +34,14 @@ export interface InboundCommandContext {
   logger?: Logger;
 }
 
+export interface InboundCommandMetadata {
+  name: IncomingMessageCommand;
+  description: string;
+  usage?: string;
+}
+
 export interface InboundCommandHandler {
+  metadata: InboundCommandMetadata;
   canHandle(command: IncomingMessage["command"]): boolean;
   handle(context: InboundCommandContext): Promise<OutgoingMessage | undefined>;
 }
