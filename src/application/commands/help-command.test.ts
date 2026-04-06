@@ -13,6 +13,8 @@ describe("helpCommandHandler", () => {
 
     expect(helpCommandHandler.canHandle("help")).toBe(true);
     expect(response?.text).toContain("/help Show this help message.");
+    expect(response?.text).toContain("/new Start a fresh session.");
+    expect(response?.text).toContain("/restore <n> Switch to session number <n> from /history.");
     expect(response?.text).toContain("/logs Show recent daemon log lines for this bot.");
   });
 });

@@ -168,6 +168,88 @@ describe("createTelegramTransport", () => {
     expect(capturedMessage?.commandArgs).toBe("2");
   });
 
+  it("detects Telegram commands from bot_command entities", async () => {
+    const bot = createFakeBot();
+    let capturedMessage: IncomingMessage | undefined;
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedMessage = event.message;
+      }),
+    });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 99,
+        text: "/restore@test_bot 2",
+        entities: [{ type: "bot_command", offset: 0, length: 17 }],
+      },
+    });
+
+    expect(capturedMessage?.command).toBe("restore");
+    expect(capturedMessage?.commandArgs).toBe("2");
+  });
+
+  it("does not block later telegram updates while a prior handler call is still running", async () => {
+    const bot = createFakeBot();
+    const logger = createMockLogger();
+    const starts: string[] = [];
+    let releaseFirst: (() => void) | undefined;
+    const handler = {
+      handle: vi.fn(async (event) => {
+        starts.push(event.message.messageId);
+        if (event.message.messageId === "99") {
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+        }
+      }),
+    };
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      logger,
+    );
+
+    await transport.start(handler);
+
+    const first = bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "long run" },
+    });
+    await Promise.resolve();
+
+    const second = bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 100, text: "/new" },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(starts).toEqual(["99", "100"]);
+
+    releaseFirst?.();
+    await Promise.all([first, second]);
+  });
+
   it("ignores commands addressed to a different Telegram bot username", async () => {
     const bot = createFakeBot();
     let capturedMessage: IncomingMessage | undefined;
@@ -303,6 +385,75 @@ describe("createTelegramTransport", () => {
     );
   });
 
+  it("logs terminal telegram processing failures without leaking unhandled rejections", async () => {
+    const bot = createFakeBot();
+    const logger = createMockLogger();
+    const handler = {
+      handle: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    };
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (error: unknown) => {
+      unhandledRejections.push(error);
+    };
+
+    bot.reply.mockRejectedValueOnce(new Error("reply failed"));
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      logger,
+    );
+
+    process.on("unhandledRejection", onUnhandledRejection);
+    try {
+      await transport.start(handler);
+      await bot.emitTextMessage({
+        chat: { id: 42, type: "private" },
+        from: { id: 7 },
+        message: { message_id: 99, text: "ping" },
+      });
+      await waitForAsync(
+        () =>
+          ((logger.error as unknown as { mock?: { calls: unknown[][] } }).mock?.calls.length ?? 0) === 2,
+      );
+    } finally {
+      process.off("unhandledRejection", onUnhandledRejection);
+    }
+
+    expect(unhandledRejections).toEqual([]);
+    expect(logger.error).toHaveBeenNthCalledWith(
+      1,
+      "failed to process telegram message",
+      expect.objectContaining({
+        botId: "private-telegram",
+        transport: "telegram",
+        conversationId: "42",
+        messageId: "99",
+        errorType: "Error",
+      }),
+      expect.objectContaining({ message: "boom" }),
+    );
+    expect(logger.error).toHaveBeenNthCalledWith(
+      2,
+      "telegram message processing terminated after an unhandled failure",
+      expect.objectContaining({
+        botId: "private-telegram",
+        transport: "telegram",
+        conversationId: "42",
+        messageId: "99",
+        errorType: "Error",
+      }),
+      expect.objectContaining({ message: "reply failed" }),
+    );
+  });
+
   it("keeps sending typing status while a reply is still being generated", async () => {
     vi.useFakeTimers();
     try {
@@ -339,6 +490,7 @@ describe("createTelegramTransport", () => {
       });
 
       await Promise.resolve();
+      await Promise.resolve();
       expect(bot.api.sendChatAction).toHaveBeenCalledTimes(1);
       expect(bot.api.sendChatAction).toHaveBeenLastCalledWith(42, "typing");
 
@@ -365,6 +517,18 @@ function createMockLogger(): Logger {
   };
 }
 
+async function waitForAsync(predicate: () => boolean, attempts = 20): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+
+    await Promise.resolve();
+  }
+
+  throw new Error("condition was not met in time");
+}
+
 function createFakeBot(): {
   api: {
     getMe(): Promise<{ username: string }>;
@@ -375,7 +539,11 @@ function createFakeBot(): {
     filter: "message:text",
     handler: (ctx: {
       chat?: { id: number; type: string };
-      message?: { message_id: number; text: string };
+      message?: {
+        entities?: Array<{ type: string; offset: number; length: number }>;
+        message_id: number;
+        text: string;
+      };
       from?: { id: number };
       reply(
         text: string,
@@ -390,7 +558,11 @@ function createFakeBot(): {
   emitTextMessage(input: {
     chat: { id: number; type: string };
     from: { id: number };
-    message: { message_id: number; text: string };
+    message: {
+      entities?: Array<{ type: string; offset: number; length: number }>;
+      message_id: number;
+      text: string;
+    };
   }): Promise<void>;
   reply: ReturnType<
     typeof vi.fn<(text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }) => Promise<void>>
@@ -399,7 +571,11 @@ function createFakeBot(): {
   let onTextMessage:
     | ((ctx: {
         chat?: { id: number; type: string };
-        message?: { message_id: number; text: string };
+        message?: {
+          entities?: Array<{ type: string; offset: number; length: number }>;
+          message_id: number;
+          text: string;
+        };
         from?: { id: number };
         reply(
           text: string,

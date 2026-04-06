@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { parseInboundCommand } from "./commands/parse-inbound-command.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createMessageProcessor } from "./message-processor.js";
 
@@ -33,8 +34,7 @@ describe("createMessageProcessor", () => {
     const second = processor.handle(createEvent(createIncomingMessage("2", "42")));
     const third = processor.handle(createEvent(createIncomingMessage("3", "99")));
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await tick();
 
     expect(starts).toEqual(["1", "3"]);
     expect(maxActive).toBe(2);
@@ -49,6 +49,303 @@ describe("createMessageProcessor", () => {
 
     releases.get("2")?.();
     await Promise.all([first, second]);
+  });
+
+  it("lets /new run immediately and routes later messages to a new session queue", async () => {
+    const starts: string[] = [];
+    const releases = new Map<string, () => void>();
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(`${message.messageId}:${"sessionId" in message.conversation ? message.conversation.sessionId : "chat"}`);
+        if (!message.command) {
+          await new Promise<void>((resolve) => {
+            releases.set(message.messageId, resolve);
+          });
+        }
+
+        return {
+          conversation: {
+            transport: message.conversation.transport,
+            externalId: message.conversation.externalId,
+          },
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    let activeSessionId = "session-1";
+    const processor = createMessageProcessor({
+      handler,
+      prepareEvent: (event) => {
+        if (event.message.command === "new") {
+          activeSessionId = "session-2";
+          return event;
+        }
+
+        return {
+          ...event,
+          message: {
+            ...event.message,
+            conversation: {
+              ...event.message.conversation,
+              sessionId: activeSessionId,
+            },
+          },
+        };
+      },
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
+    await tick();
+    const reset = processor.handle(
+      createEvent({
+        ...createIncomingMessage("2", "42"),
+        text: "/new",
+        command: "new",
+      }),
+    );
+    const third = processor.handle(createEvent(createIncomingMessage("3", "42")));
+
+    await tick();
+    await tick();
+
+    expect(starts).toEqual(["1:session-1", "2:chat", "3:session-2"]);
+
+    releases.get("3")?.();
+    await third;
+
+    releases.get("1")?.();
+    await Promise.all([first, reset]);
+  });
+
+  it("lets /new bypass the active session queue even when command metadata is missing", async () => {
+    const starts: string[] = [];
+    const releases = new Map<string, () => void>();
+    const priorityCommands = new Set(["new", "restore"] as const);
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(
+          `${message.messageId}:${message.command ?? ("sessionId" in message.conversation ? message.conversation.sessionId : "chat")}`,
+        );
+        if (!message.command) {
+          await new Promise<void>((resolve) => {
+            releases.set(message.messageId, resolve);
+          });
+        }
+
+        return {
+          conversation: {
+            transport: message.conversation.transport,
+            externalId: message.conversation.externalId,
+          },
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    let activeSessionId = "session-1";
+    const processor = createMessageProcessor({
+      handler,
+      prepareEvent: (event) => {
+        const command = event.message.command
+          ? { command: event.message.command, ...(event.message.commandArgs ? { commandArgs: event.message.commandArgs } : {}) }
+          : parseInboundCommand(event.message.text, {
+              allowedCommands: priorityCommands,
+            });
+        if (command) {
+          if (command.command === "new") {
+            activeSessionId = "session-2";
+          }
+
+          return {
+            ...event,
+            message: {
+              ...event.message,
+              ...command,
+            },
+          };
+        }
+
+        return {
+          ...event,
+          message: {
+            ...event.message,
+            conversation: {
+              ...event.message.conversation,
+              sessionId: activeSessionId,
+            },
+          },
+        };
+      },
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
+    await tick();
+    const reset = processor.handle(
+      createEvent({
+        ...createIncomingMessage("2", "42"),
+        text: "/new",
+      }),
+    );
+    const third = processor.handle(createEvent(createIncomingMessage("3", "42")));
+
+    await tick();
+    await tick();
+
+    expect(starts).toEqual(["1:session-1", "2:new", "3:session-2"]);
+
+    releases.get("3")?.();
+    await third;
+
+    releases.get("1")?.();
+    await Promise.all([first, reset]);
+  });
+
+  it("lets /restore bypass the active session queue even when command metadata is missing", async () => {
+    const starts: string[] = [];
+    const releases = new Map<string, () => void>();
+    const priorityCommands = new Set(["new", "restore"] as const);
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(
+          `${message.messageId}:${message.command ?? ("sessionId" in message.conversation ? message.conversation.sessionId : "chat")}`,
+        );
+        if (!message.command) {
+          await new Promise<void>((resolve) => {
+            releases.set(message.messageId, resolve);
+          });
+        }
+
+        return {
+          conversation: {
+            transport: message.conversation.transport,
+            externalId: message.conversation.externalId,
+          },
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    let activeSessionId = "session-1";
+    const processor = createMessageProcessor({
+      handler,
+      prepareEvent: (event) => {
+        const command = event.message.command
+          ? { command: event.message.command, ...(event.message.commandArgs ? { commandArgs: event.message.commandArgs } : {}) }
+          : parseInboundCommand(event.message.text, {
+              allowedCommands: priorityCommands,
+            });
+        if (command) {
+          if (command.command === "restore") {
+            activeSessionId = "session-restored";
+          }
+
+          return {
+            ...event,
+            message: {
+              ...event.message,
+              ...command,
+            },
+          };
+        }
+
+        return {
+          ...event,
+          message: {
+            ...event.message,
+            conversation: {
+              ...event.message.conversation,
+              sessionId: activeSessionId,
+            },
+          },
+        };
+      },
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
+    await tick();
+    const restore = processor.handle(
+      createEvent({
+        ...createIncomingMessage("2", "42"),
+        text: "/restore 1",
+      }),
+    );
+    const third = processor.handle(createEvent(createIncomingMessage("3", "42")));
+
+    await tick();
+    await tick();
+
+    expect(starts).toEqual(["1:session-1", "2:restore", "3:session-restored"]);
+
+    releases.get("3")?.();
+    await third;
+
+    releases.get("1")?.();
+    await Promise.all([first, restore]);
+  });
+
+  it("keeps mutating slash commands serialized with the active session queue", async () => {
+    const starts: string[] = [];
+    const releases = new Map<string, () => void>();
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(
+          `${message.messageId}:${message.command ?? ("sessionId" in message.conversation ? message.conversation.sessionId : "chat")}`,
+        );
+        if (message.messageId !== "3") {
+          await new Promise<void>((resolve) => {
+            releases.set(message.messageId, resolve);
+          });
+        }
+
+        return {
+          conversation: message.conversation,
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    const processor = createMessageProcessor({
+      handler,
+      maxParallel: 2,
+      prepareEvent: (event) => ({
+        ...event,
+        message: {
+          ...event.message,
+          conversation: {
+            ...event.message.conversation,
+            sessionId: "session-1",
+          },
+        },
+      }),
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
+    await tick();
+    const rename = processor.handle(
+      createEvent({
+        ...createIncomingMessage("2", "42"),
+        text: "/rename renamed",
+        command: "rename",
+        commandArgs: "renamed",
+      }),
+    );
+    const third = processor.handle(createEvent(createIncomingMessage("3", "42")));
+
+    await tick();
+    await tick();
+
+    expect(starts).toEqual(["1:session-1"]);
+
+    releases.get("1")?.();
+    await tick();
+    expect(starts).toEqual(["1:session-1", "2:rename"]);
+
+    releases.get("2")?.();
+    await tick();
+    expect(starts).toEqual(["1:session-1", "2:rename", "3:session-1"]);
+
+    await Promise.all([first, rename, third]);
   });
 
   it("retries through central hooks before surfacing a terminal error response", async () => {

@@ -1,7 +1,8 @@
-import type { ConversationContext, ConversationRef } from "../domain/conversation.js";
+import type { ChatRef, ConversationContext, ConversationRef } from "../domain/conversation.js";
 
 export interface ConversationBackupSummary {
   id: string;
+  sessionId: string;
   createdAt: string;
   updatedAt: string;
   agentId: string;
@@ -10,9 +11,10 @@ export interface ConversationBackupSummary {
 }
 
 export interface ConversationStore {
-  get(ref: ConversationRef): Promise<ConversationContext | undefined>;
+  get(ref: ChatRef | ConversationRef): Promise<ConversationContext | undefined>;
   put(context: ConversationContext): Promise<void>;
-  listBackups(ref: ConversationRef): Promise<ConversationBackupSummary[]>;
-  restore(ref: ConversationRef, backupId: string, options?: { now?: Date }): Promise<boolean>;
-  reset(ref: ConversationRef, options?: { now?: Date }): Promise<void>;
+  listBackups(ref: ChatRef): Promise<ConversationBackupSummary[]>;
+  restore(ref: ChatRef, backupId: string, options?: { now?: Date }): Promise<boolean>;
+  ensureActive(ref: ChatRef, options: { agentId: string; now: string }): Promise<ConversationContext>;
+  create(ref: ChatRef, options: { agentId: string; now: string }): Promise<ConversationContext>;
 }

@@ -36,7 +36,7 @@ export const renameCommandHandler: InboundCommandHandler = {
     });
     return {
       conversation: message.conversation,
-      text: `Renamed the current conversation to "${title}".`,
+      text: `Renamed the active session to "${title}".`,
     };
   },
 };

@@ -8,23 +8,23 @@ export function renderStatusMessage(
 ): string {
   if (!conversation) {
     return [
-      "No active conversation.",
-      `Restore points available: ${backups.length}`,
-      backups.length > 0 ? "Use /history to inspect them or /restore <n> to recover one." : "",
+      "No active session.",
+      `Sessions in history: ${backups.length}`,
+      backups.length > 0 ? "Use /history to inspect them or /restore <n> to switch to one." : "",
     ]
       .filter(Boolean)
       .join("\n");
   }
 
   return [
-    "Current conversation:",
+    "Active session:",
     `Title: ${conversation.state.title ?? "not set"}`,
     `Agent: ${conversation.state.agentId}`,
     `Messages: ${conversation.messages.length}`,
     `Created: ${conversation.state.createdAt}`,
     `Updated: ${conversation.state.updatedAt}`,
     `Working directory: ${conversation.state.workingDirectory ?? "not set"}`,
-    `Restore points available: ${backups.length}`,
+    `Sessions in history: ${backups.length}`,
   ].join("\n");
 }
 
@@ -33,33 +33,35 @@ export function renderHistoryMessage(
   backups: ConversationBackupSummary[],
 ): string {
   const lines = [
-    "Conversation history:",
+    "Session history:",
     conversation
-      ? `Current: ${conversation.state.title ?? "untitled"} with ${conversation.messages.length} messages, updated ${conversation.state.updatedAt}`
-      : "Current: no active conversation",
+      ? `Active: ${conversation.state.title ?? "untitled"} with ${conversation.messages.length} messages, updated ${conversation.state.updatedAt}`
+      : "Active: no session",
   ];
 
   if (backups.length === 0) {
-    lines.push("Backups: none");
+    lines.push("Previous sessions: none");
     return lines.join("\n");
   }
 
-  lines.push("Backups:");
+  lines.push("Previous sessions:");
   for (const [index, backup] of backups.entries()) {
     lines.push(
       `${index + 1}. ${backup.updatedAt} | ${backup.messageCount} messages | agent ${backup.agentId}`,
     );
   }
-  lines.push("Use /restore <n> to restore one of these backups.");
+  lines.push("Use /restore <n> to switch to one of these sessions.");
   return lines.join("\n");
 }
 
 export function renderRestoreUsage(backupCount: number): string {
   if (backupCount === 0) {
-    return "No restore points are available yet. Use /new first, then /history to inspect backups.";
+    return "No previous sessions are available yet. Use /new to start another session, then /history to inspect earlier ones.";
   }
 
-  return ["Usage: /restore <n>", "Choose a numbered restore point from /history.", "Example: /restore 1"].join("\n");
+  return ["Usage: /restore <n>", "Choose a numbered session from /history.", "Example: /restore 1"].join(
+    "\n",
+  );
 }
 
 export function renderAgentMessage(

@@ -1,6 +1,10 @@
-export interface ConversationRef {
+export interface ChatRef {
   transport: string;
   externalId: string;
+}
+
+export interface ConversationRef extends ChatRef {
+  sessionId?: string;
 }
 
 export type ConversationMessageRole = "user" | "assistant" | "system";

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Bot, GrammyError } from "grammy";
+import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessageCommand } from "../../domain/message.js";
@@ -28,6 +29,11 @@ interface TelegramMessageContext {
     type: string;
   };
   message?: {
+    entities?: Array<{
+      type: string;
+      offset: number;
+      length: number;
+    }>;
     message_id: number;
     text: string;
   };
@@ -105,6 +111,8 @@ export function createTelegramTransport(
 
         const startedAt = Date.now();
         const correlationId = randomUUID();
+        const chatId = String(ctx.chat.id);
+        const telegramMessageId = String(ctx.message.message_id);
         const safeContext = {
           chat: ctx.chat,
           message: ctx.message,
@@ -116,25 +124,33 @@ export function createTelegramTransport(
           correlationId,
           safeContext,
           bot,
-          parseTelegramCommand(text, profile.username),
+          parseTelegramCommand(ctx.message, profile.username),
           logger,
         );
         await logger?.debug("received telegram message", {
           botId: config.id,
           transport: "telegram",
-          conversationId: String(ctx.chat.id),
-          messageId: String(ctx.message.message_id),
+          conversationId: chatId,
+          messageId: telegramMessageId,
           correlationId,
         });
-        await handler.handle(event);
-        await logger?.debug("processed telegram message", {
-          botId: config.id,
-          transport: "telegram",
-          conversationId: String(ctx.chat.id),
-          messageId: String(ctx.message.message_id),
-          correlationId,
-          durationMs: Date.now() - startedAt,
-        });
+        detachTelegramEventProcessing(
+          processTelegramEvent(handler, event, {
+            logger,
+            botId: config.id,
+            conversationId: chatId,
+            messageId: telegramMessageId,
+            correlationId,
+            startedAt,
+          }),
+          {
+            logger,
+            botId: config.id,
+            conversationId: chatId,
+            messageId: telegramMessageId,
+            correlationId,
+          },
+        );
       });
 
       await bot.start();
@@ -143,6 +159,161 @@ export function createTelegramTransport(
       bot.stop();
     },
   };
+}
+
+async function processTelegramEvent(
+  handler: TransportHandler,
+  event: TransportInboundEvent,
+  options: {
+    logger?: Logger;
+    botId: string;
+    conversationId: string;
+    messageId: string;
+    correlationId: string;
+    startedAt: number;
+  },
+): Promise<void> {
+  try {
+    await handler.handle(event);
+    await options.logger?.debug("processed telegram message", {
+      botId: options.botId,
+      transport: "telegram",
+      conversationId: options.conversationId,
+      messageId: options.messageId,
+      correlationId: options.correlationId,
+      durationMs: Date.now() - options.startedAt,
+    });
+  } catch (error) {
+    await logTelegramProcessingFailure(
+      options.logger,
+      {
+        botId: options.botId,
+        conversationId: options.conversationId,
+        messageId: options.messageId,
+        correlationId: options.correlationId,
+        errorType: error instanceof Error ? error.name : typeof error,
+      },
+      error,
+    );
+
+    try {
+      await event.deliverError?.(error);
+    } catch (deliverErrorFailure) {
+      await logTelegramTerminalFailure(
+        options.logger,
+        {
+          botId: options.botId,
+          conversationId: options.conversationId,
+          messageId: options.messageId,
+          correlationId: options.correlationId,
+          errorType:
+            deliverErrorFailure instanceof Error ? deliverErrorFailure.name : typeof deliverErrorFailure,
+        },
+        deliverErrorFailure,
+      );
+    }
+  }
+}
+
+function detachTelegramEventProcessing(
+  operation: Promise<void>,
+  options: {
+    logger?: Logger;
+    botId: string;
+    conversationId: string;
+    messageId: string;
+    correlationId: string;
+  },
+): void {
+  void Promise.resolve()
+    .then(async () => {
+      await operation;
+    })
+    .catch(async (error) => {
+      await logTelegramTerminalFailure(
+        options.logger,
+        {
+          botId: options.botId,
+          conversationId: options.conversationId,
+          messageId: options.messageId,
+          correlationId: options.correlationId,
+          errorType: error instanceof Error ? error.name : typeof error,
+        },
+        error,
+      );
+    });
+}
+
+async function logTelegramProcessingFailure(
+  logger: Logger | undefined,
+  fields: {
+    botId: string;
+    conversationId: string;
+    messageId: string;
+    correlationId: string;
+    errorType: string;
+  },
+  error: unknown,
+): Promise<void> {
+  await safelyLogTelegramError(
+    logger,
+    "failed to process telegram message",
+    {
+      botId: fields.botId,
+      transport: "telegram",
+      conversationId: fields.conversationId,
+      messageId: fields.messageId,
+      correlationId: fields.correlationId,
+      errorType: fields.errorType,
+    },
+    error,
+  );
+}
+
+async function logTelegramTerminalFailure(
+  logger: Logger | undefined,
+  fields: {
+    botId: string;
+    conversationId: string;
+    messageId: string;
+    correlationId: string;
+    errorType: string;
+  },
+  error: unknown,
+): Promise<void> {
+  await safelyLogTelegramError(
+    logger,
+    "telegram message processing terminated after an unhandled failure",
+    {
+      botId: fields.botId,
+      transport: "telegram",
+      conversationId: fields.conversationId,
+      messageId: fields.messageId,
+      correlationId: fields.correlationId,
+      errorType: fields.errorType,
+    },
+    error,
+  );
+}
+
+async function safelyLogTelegramError(
+  logger: Logger | undefined,
+  message: string,
+  fields: {
+    botId: string;
+    transport: "telegram";
+    conversationId: string;
+    messageId: string;
+    correlationId: string;
+    errorType: string;
+  },
+  error: unknown,
+): Promise<void> {
+  try {
+    await logger?.error(message, fields, error);
+  } catch {
+    // Detached processing must never leak secondary logging failures.
+  }
 }
 
 function createTelegramInboundEvent(
@@ -230,31 +401,14 @@ async function registerTelegramCommands(
 }
 
 function parseTelegramCommand(
-  text: string,
+  message: Required<Pick<TelegramMessageContext, "message">>["message"],
   botUsername?: string,
 ): { command: IncomingMessageCommand; commandArgs?: string } | undefined {
-  const match = /^\/(?<command>[a-z0-9_]+)(?:@(?<target>[a-z0-9_]+))?(?:\s|$)/i.exec(text);
-  if (!match?.groups) {
-    return undefined;
-  }
-
-  const parsedCommand = match.groups.command.toLowerCase();
-  const command = (parsedCommand === "start" ? "new" : parsedCommand) as IncomingMessageCommand;
-  if (!inboundCommandNames.has(command)) {
-    return undefined;
-  }
-
-  if (
-    match.groups.target &&
-    (!botUsername || match.groups.target.toLowerCase() !== botUsername.toLowerCase())
-  ) {
-    return undefined;
-  }
-
-  return {
-    command,
-    commandArgs: text.slice(match[0].length).trim() || undefined,
-  };
+  return parseInboundCommand(message.text, {
+    botUsername,
+    entities: message.entities,
+    allowedCommands: inboundCommandNames,
+  });
 }
 
 function startTypingStatus(bot: TelegramBotAdapter, chatId: number): () => void {

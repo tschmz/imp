@@ -8,10 +8,10 @@ import {
 } from "./test-helpers.js";
 
 describe("agentCommandHandler", () => {
-  it("switches the active conversation agent", async () => {
+  it("switches the active session agent", async () => {
     const store = createMutableConversationStore({
       state: {
-        conversation: { transport: "telegram", externalId: "42" },
+        conversation: { transport: "telegram", externalId: "42", sessionId: "session-1" },
         agentId: "default",
         createdAt: "2026-04-05T00:00:00.000Z",
         updatedAt: "2026-04-05T00:00:00.000Z",
@@ -27,7 +27,7 @@ describe("agentCommandHandler", () => {
     const response = await agentCommandHandler.handle(context);
 
     expect(agentCommandHandler.canHandle("agent")).toBe(true);
-    expect(response?.text).toContain('Switched the current conversation to agent "ops".');
+    expect(response?.text).toContain('Switched the active session to agent "ops".');
     const next = await store.get(context.message.conversation);
     expect(next?.state.agentId).toBe("ops");
   });

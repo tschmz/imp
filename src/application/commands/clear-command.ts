@@ -3,7 +3,7 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 export const clearCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "clear",
-    description: "Clear the active conversation",
+    description: "Clear the active session",
   },
   canHandle(command) {
     return command === "clear";
@@ -13,7 +13,7 @@ export const clearCommandHandler: InboundCommandHandler = {
     if (!existing) {
       return {
         conversation: message.conversation,
-        text: "There is no active conversation to clear.",
+        text: "There is no active session to clear.",
       };
     }
 
@@ -30,7 +30,7 @@ export const clearCommandHandler: InboundCommandHandler = {
     });
     return {
       conversation: message.conversation,
-      text: "Cleared the active conversation. The current agent and title were preserved.",
+      text: "Cleared the active session. The current agent and title were preserved.",
     };
   },
 };

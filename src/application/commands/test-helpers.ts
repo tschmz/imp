@@ -1,5 +1,6 @@
 import { createAgentRegistry } from "../../agents/registry.js";
 import type { AgentDefinition } from "../../domain/agent.js";
+import type { ConversationContext } from "../../domain/conversation.js";
 import type { IncomingMessage } from "../../domain/message.js";
 import type { ConversationStore } from "../../storage/types.js";
 import type { HandleIncomingMessageDependencies, InboundCommandContext } from "./types.js";
@@ -52,7 +53,32 @@ export function createDependencies(
       put: async () => {},
       listBackups: async () => [],
       restore: async () => false,
-      reset: async () => {},
+      ensureActive: async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      }),
+      create: async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      }),
     },
     engine: { run: async () => ({ message: { conversation: createIncomingMessage("help").conversation, text: "ok" } }) },
     defaultAgentId: "default",
@@ -86,6 +112,7 @@ export function createMutableConversationStore(
   initial?: Awaited<ReturnType<ConversationStore["get"]>>,
 ): ConversationStore {
   let current = initial;
+  let counter = 0;
 
   return {
     get: async () => current,
@@ -94,8 +121,29 @@ export function createMutableConversationStore(
     },
     listBackups: async () => [],
     restore: async () => false,
-    reset: async () => {
-      current = undefined;
+    ensureActive: async () => {
+      if (!current) {
+        throw new Error("no active conversation");
+      }
+
+      return current;
+    },
+    create: async (ref, options) => {
+      counter += 1;
+      current = {
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: `session-${counter}`,
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      } satisfies ConversationContext;
+      return current;
     },
   };
 }

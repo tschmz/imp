@@ -1,22 +1,18 @@
-import { createConversationContext } from "./conversation-context.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const newCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "new",
-    description: "Start a fresh conversation",
+    description: "Start a fresh session",
   },
   canHandle(command) {
     return command === "new";
   },
   async handle({ message, dependencies, logger }: InboundCommandContext) {
-    await dependencies.conversationStore.reset(message.conversation);
-    await createConversationContext(
-      message,
-      dependencies.defaultAgentId,
-      dependencies.conversationStore,
-      logger,
-    );
+    await dependencies.conversationStore.create(message.conversation, {
+      agentId: dependencies.defaultAgentId,
+      now: message.receivedAt,
+    });
     await logger?.debug("reset conversation via inbound command", {
       botId: message.botId,
       transport: message.conversation.transport,
@@ -29,7 +25,7 @@ export const newCommandHandler: InboundCommandHandler = {
 
     return {
       conversation: message.conversation,
-      text: "Started a fresh conversation. The previous conversation was backed up.",
+      text: "Started a fresh session. Your previous session is still available in /history.",
     };
   },
 };

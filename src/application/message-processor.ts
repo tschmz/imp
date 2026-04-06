@@ -13,6 +13,7 @@ export interface MessageProcessorDependencies {
   retryDelayMs?: (attempt: number, event: TransportInboundEvent) => number | Promise<number>;
   onError?: (error: unknown, attempt: number, event: TransportInboundEvent) => Promise<void> | void;
   onRetry?: (error: unknown, attempt: number, event: TransportInboundEvent) => Promise<void> | void;
+  prepareEvent?: (event: TransportInboundEvent) => Promise<TransportInboundEvent> | TransportInboundEvent;
   afterDeliveryAction?: (
     action: OutgoingMessageDeliveryAction,
     event: TransportInboundEvent,
@@ -29,9 +30,17 @@ export function createMessageProcessor(
 
   return {
     async handle(event: TransportInboundEvent): Promise<void> {
-      await enqueueByConversation(event, async () => {
+      const preparedEvent = await dependencies.prepareEvent?.(event) ?? event;
+      if (shouldBypassConversationQueue(preparedEvent.message)) {
         await semaphore.withPermit(async () => {
-          await processEvent(event, dependencies);
+          await processEvent(preparedEvent, dependencies);
+        });
+        return;
+      }
+
+      await enqueueByConversation(preparedEvent, async () => {
+        await semaphore.withPermit(async () => {
+          await processEvent(preparedEvent, dependencies);
         });
       });
     },
@@ -41,7 +50,10 @@ export function createMessageProcessor(
     event: TransportInboundEvent,
     operation: () => Promise<void>,
   ): Promise<void> {
-    const key = `${event.message.conversation.transport}/${event.message.conversation.externalId}`;
+    const key =
+      "sessionId" in event.message.conversation && event.message.conversation.sessionId
+        ? `${event.message.conversation.transport}/${event.message.conversation.externalId}/${event.message.conversation.sessionId}`
+        : `${event.message.conversation.transport}/${event.message.conversation.externalId}`;
     const previous = conversationQueues.get(key) ?? Promise.resolve();
     let release: (() => void) | undefined;
     const current = new Promise<void>((resolve) => {
@@ -61,6 +73,12 @@ export function createMessageProcessor(
       }
     }
   }
+}
+
+const sessionSwitchCommands = new Set<IncomingMessage["command"]>(["new", "restore"]);
+
+function shouldBypassConversationQueue(message: IncomingMessage): boolean {
+  return Boolean(message.command && sessionSwitchCommands.has(message.command));
 }
 
 async function processEvent(

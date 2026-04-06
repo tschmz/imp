@@ -4,7 +4,7 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 export const historyCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "history",
-    description: "List restore points",
+    description: "List previous sessions",
   },
   canHandle(command) {
     return command === "history";

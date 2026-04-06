@@ -6,7 +6,7 @@ import { normalizeCommandArgument } from "./utils.js";
 export const agentCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "agent",
-    description: "Show or switch the current agent",
+    description: "Show or switch the active agent",
     usage: "/agent [id]",
   },
   canHandle(command) {
@@ -62,7 +62,7 @@ export const agentCommandHandler: InboundCommandHandler = {
     return {
       conversation: message.conversation,
       text: [
-        `Switched the current conversation to agent "${requestedAgent.id}".`,
+        `Switched the active session to agent "${requestedAgent.id}".`,
         "",
         renderAgentMessage(requestedAgent, {
           currentAgentId: requestedAgent.id,

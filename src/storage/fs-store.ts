@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { createTimestampedBackupPath } from "../files/backup.js";
 import type {
+  ChatRef,
   ConversationMessage,
   ConversationContext,
   ConversationRef,
@@ -10,13 +11,14 @@ import type { RuntimePaths } from "../daemon/types.js";
 import type { ConversationBackupSummary, ConversationStore } from "./types.js";
 
 const conversationWriteQueues = new Map<string, Promise<void>>();
+const legacySessionId = "legacy";
 // The critical section is intentionally short: read latest snapshot, compute next state, atomically rename.
 // A short-lived lock file guards that section across processes while the in-memory queue serializes writers locally.
 const lockTtlMs = 30_000;
 const lockRetryDelayMs = 25;
 const lockRetryCount = 400;
 
-function getConversationDir(conversationsDir: string, ref: ConversationRef): string {
+function getChatDir(conversationsDir: string, ref: ChatRef): string {
   return join(
     conversationsDir,
     sanitizePathSegment(ref.transport),
@@ -24,30 +26,54 @@ function getConversationDir(conversationsDir: string, ref: ConversationRef): str
   );
 }
 
-function getConversationSnapshotPath(conversationsDir: string, ref: ConversationRef): string {
-  return join(getConversationDir(conversationsDir, ref), "conversation.json");
+function getSessionsDir(conversationsDir: string, ref: ChatRef): string {
+  return join(getChatDir(conversationsDir, ref), "sessions");
 }
 
-function getConversationLockPath(conversationsDir: string, ref: ConversationRef): string {
-  return join(getConversationDir(conversationsDir, ref), "conversation.lock");
+function getSessionDir(conversationsDir: string, ref: ConversationRef): string {
+  const sessionId = requireSessionId(ref);
+  return join(getSessionsDir(conversationsDir, ref), sanitizePathSegment(sessionId));
+}
+
+function getSessionSnapshotPath(conversationsDir: string, ref: ConversationRef): string {
+  return join(getSessionDir(conversationsDir, ref), "conversation.json");
+}
+
+function getActiveSessionPath(conversationsDir: string, ref: ChatRef): string {
+  return join(getChatDir(conversationsDir, ref), "active.json");
+}
+
+function getConversationLockPath(conversationsDir: string, ref: ChatRef): string {
+  return join(getChatDir(conversationsDir, ref), "conversation.lock");
 }
 
 export function createFsConversationStore(paths: RuntimePaths): ConversationStore {
   return {
     async get(ref) {
-      return readConversationSnapshot(paths.conversationsDir, ref);
+      if ("sessionId" in ref) {
+        return readSessionSnapshot(ref, paths.conversationsDir);
+      }
+
+      return withConversationWriteQueue(ref, async () =>
+        withConversationLock(paths.conversationsDir, ref, async () => {
+          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
+          const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
+          if (!activeRef) {
+            return undefined;
+          }
+
+          return readSessionSnapshot(activeRef, paths.conversationsDir);
+        }),
+      );
     },
     async put(context) {
       await withConversationWriteQueue(context.state.conversation, async () => {
         await withConversationLock(paths.conversationsDir, context.state.conversation, async () => {
-          const snapshotPath = getConversationSnapshotPath(
+          const snapshotPath = getSessionSnapshotPath(
             paths.conversationsDir,
             context.state.conversation,
           );
-          const current = await readConversationSnapshot(
-            paths.conversationsDir,
-            context.state.conversation,
-          );
+          const current = await readSessionSnapshot(context.state.conversation, paths.conversationsDir);
           const nextSnapshot = resolveNextSnapshot(normalizeSnapshot(context), current);
           const tempPath = `${snapshotPath}.${process.pid}.tmp`;
 
@@ -58,78 +84,77 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
       });
     },
     async listBackups(ref) {
-      return readConversationBackups(paths.conversationsDir, ref);
-    },
-    async restore(ref, backupId, options) {
       return withConversationWriteQueue(ref, async () =>
         withConversationLock(paths.conversationsDir, ref, async () => {
-          const current = await readConversationSnapshot(paths.conversationsDir, ref);
-          const backup = await readConversationBackup(paths.conversationsDir, ref, backupId);
-          if (!backup) {
+          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
+          const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
+          return readInactiveSessions(paths.conversationsDir, ref, activeRef?.sessionId);
+        }),
+      );
+    },
+    async restore(ref, backupId) {
+      return withConversationWriteQueue(ref, async () =>
+        withConversationLock(paths.conversationsDir, ref, async () => {
+          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
+          const summaries = await readInactiveSessions(paths.conversationsDir, ref);
+          const selected = summaries.find((summary) => summary.id === backupId);
+          if (!selected) {
             return false;
           }
 
-          const snapshotPath = getConversationSnapshotPath(paths.conversationsDir, ref);
-          const tempPath = `${snapshotPath}.${process.pid}.tmp`;
-          if (current) {
-            const currentBackupPath = createTimestampedBackupPath(
-              snapshotPath,
-              options?.now ?? new Date(),
-            );
-            await writeConversationBackup(currentBackupPath, current);
-          }
-          const normalized = normalizeSnapshot({
-            ...backup,
-            state: {
-              ...backup.state,
-              conversation: ref,
-            },
+          await writeActiveConversationRef(paths.conversationsDir, {
+            transport: ref.transport,
+            externalId: ref.externalId,
+            sessionId: selected.sessionId,
           });
-
-          await mkdir(dirname(snapshotPath), { recursive: true });
-          await writeFile(tempPath, JSON.stringify(normalized, null, 2));
-          await rename(tempPath, snapshotPath);
           return true;
         }),
       );
     },
-    async reset(ref, options) {
-      const existing = await readConversationSnapshot(paths.conversationsDir, ref);
-      if (!existing) {
-        return;
-      }
+    async create(ref, options) {
+      return withConversationWriteQueue(ref, async () =>
+        withConversationLock(paths.conversationsDir, ref, async () => {
+          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
+          const context = createEmptyConversationContext(ref, options);
 
-      await withConversationWriteQueue(ref, async () => {
-        await withConversationLock(paths.conversationsDir, ref, async () => {
-          const snapshot = await readConversationSnapshot(paths.conversationsDir, ref);
-          if (!snapshot) {
-            return;
+          await writeConversationSnapshot(paths.conversationsDir, context);
+          await writeActiveConversationRef(paths.conversationsDir, context.state.conversation);
+          return context;
+        }),
+      );
+    },
+    async ensureActive(ref, options) {
+      return withConversationWriteQueue(ref, async () =>
+        withConversationLock(paths.conversationsDir, ref, async () => {
+          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
+          const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
+          if (activeRef) {
+            const existing = await readSessionSnapshot(activeRef, paths.conversationsDir);
+            if (existing) {
+              return existing;
+            }
           }
 
-          const conversationDir = getConversationDir(paths.conversationsDir, ref);
-          const snapshotPath = getConversationSnapshotPath(paths.conversationsDir, ref);
-          const backupPath = createTimestampedBackupPath(
-            snapshotPath,
-            options?.now ?? new Date(),
-          );
-
-          await writeConversationBackup(backupPath, snapshot);
-          await removeActiveConversationFiles(conversationDir);
-        });
-      });
+          const created = createEmptyConversationContext(ref, options);
+          await writeConversationSnapshot(paths.conversationsDir, created);
+          await writeActiveConversationRef(paths.conversationsDir, created.state.conversation);
+          return created;
+        }),
+      );
     },
   };
 }
 
-async function readConversationBackups(
+async function readInactiveSessions(
   conversationsDir: string,
-  ref: ConversationRef,
+  ref: ChatRef,
+  activeSessionId?: string,
 ): Promise<ConversationBackupSummary[]> {
-  const conversationDir = getConversationDir(conversationsDir, ref);
+  const sessionsDir = getSessionsDir(conversationsDir, ref);
   let entries;
 
   try {
-    entries = await readdir(conversationDir, { withFileTypes: true });
+    entries = await readdir(sessionsDir, { withFileTypes: true });
   } catch (error) {
     if (isMissingFile(error)) {
       return [];
@@ -137,59 +162,90 @@ async function readConversationBackups(
     throw error;
   }
 
-  const backupIds = entries
-    .filter((entry) => entry.isFile() && isConversationBackupFile(entry.name))
-    .map((entry) => entry.name)
-    .sort((left, right) => right.localeCompare(left));
-
   const backups = await Promise.all(
-    backupIds.map(async (backupId) => {
-      const snapshot = await readConversationBackup(conversationsDir, ref, backupId);
-      if (!snapshot) {
-        return undefined;
-      }
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const sessionId = entry.name;
+        if (activeSessionId && sessionId === activeSessionId) {
+          return undefined;
+        }
 
-      return {
-        id: backupId,
-        createdAt: snapshot.state.createdAt,
-        updatedAt: snapshot.state.updatedAt,
-        agentId: snapshot.state.agentId,
-        messageCount: snapshot.messages.length,
-        ...(snapshot.state.workingDirectory
-          ? { workingDirectory: snapshot.state.workingDirectory }
-          : {}),
-      } satisfies ConversationBackupSummary;
-    }),
+        const snapshot = await readSessionSnapshot(pathsafeRef(ref, sessionId), conversationsDir);
+        return snapshot ? toBackupSummary(snapshot) : undefined;
+      }),
   );
 
-  return backups.filter((backup): backup is ConversationBackupSummary => backup !== undefined);
+  return backups
+    .filter((backup): backup is ConversationBackupSummary => backup !== undefined)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
-async function readConversationSnapshot(
+function createEmptyConversationContext(
+  ref: ChatRef,
+  options: { agentId: string; now: string },
+): ConversationContext {
+  const conversation: ConversationRef = {
+    transport: ref.transport,
+    externalId: ref.externalId,
+    sessionId: randomUUID(),
+  };
+
+  return normalizeSnapshot({
+    state: {
+      conversation,
+      agentId: options.agentId,
+      createdAt: options.now,
+      updatedAt: options.now,
+      version: 1,
+    },
+    messages: [],
+  });
+}
+
+async function writeConversationSnapshot(
   conversationsDir: string,
+  context: ConversationContext,
+): Promise<void> {
+  const snapshotPath = getSessionSnapshotPath(conversationsDir, context.state.conversation);
+  const tempPath = `${snapshotPath}.${process.pid}.tmp`;
+
+  await mkdir(dirname(snapshotPath), { recursive: true });
+  await writeFile(tempPath, JSON.stringify(context, null, 2));
+  await rename(tempPath, snapshotPath);
+}
+
+function pathsafeRef(ref: ChatRef, sessionId: string): ConversationRef {
+  return {
+    transport: ref.transport,
+    externalId: ref.externalId,
+    sessionId,
+  };
+}
+
+function toBackupSummary(snapshot: ConversationContext): ConversationBackupSummary {
+  const sessionId = snapshot.state.conversation.sessionId ?? legacySessionId;
+  return {
+    id: sessionId,
+    sessionId,
+    createdAt: snapshot.state.createdAt,
+    updatedAt: snapshot.state.updatedAt,
+    agentId: snapshot.state.agentId,
+    messageCount: snapshot.messages.length,
+    ...(snapshot.state.workingDirectory
+      ? { workingDirectory: snapshot.state.workingDirectory }
+      : {}),
+  };
+}
+
+async function readSessionSnapshot(
   ref: ConversationRef,
+  conversationsDir: string,
 ): Promise<ConversationContext | undefined> {
-  const snapshotPath = getConversationSnapshotPath(conversationsDir, ref);
+  const snapshotPath = getSessionSnapshotPath(conversationsDir, ref);
+
   try {
     const raw = await readFile(snapshotPath, "utf8");
-    return normalizeSnapshot(JSON.parse(raw) as ConversationContext);
-  } catch (error: unknown) {
-    if (isMissingFile(error)) {
-      return readLegacyConversation(conversationsDir, ref);
-    }
-    throw error;
-  }
-}
-
-async function readConversationBackup(
-  conversationsDir: string,
-  ref: ConversationRef,
-  backupId: string,
-): Promise<ConversationContext | undefined> {
-  const backupPath = join(getConversationDir(conversationsDir, ref), backupId);
-
-  try {
-    const raw = await readFile(backupPath, "utf8");
     return normalizeSnapshot(JSON.parse(raw) as ConversationContext);
   } catch (error: unknown) {
     if (isMissingFile(error)) {
@@ -199,18 +255,117 @@ async function readConversationBackup(
   }
 }
 
-async function readLegacyConversation(
+async function readActiveConversationRef(
+  conversationsDir: string,
+  ref: ChatRef,
+): Promise<ConversationRef | undefined> {
+  const activePath = getActiveSessionPath(conversationsDir, ref);
+
+  try {
+    const raw = await readFile(activePath, "utf8");
+    const parsed = JSON.parse(raw) as { sessionId?: unknown };
+    if (typeof parsed.sessionId !== "string" || parsed.sessionId.length === 0) {
+      return undefined;
+    }
+
+    return {
+      transport: ref.transport,
+      externalId: ref.externalId,
+      sessionId: parsed.sessionId,
+    };
+  } catch (error: unknown) {
+    if (isMissingFile(error)) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function writeActiveConversationRef(
   conversationsDir: string,
   ref: ConversationRef,
+): Promise<void> {
+  const activePath = getActiveSessionPath(conversationsDir, ref);
+  const tempPath = `${activePath}.${process.pid}.tmp`;
+
+  await mkdir(dirname(activePath), { recursive: true });
+  await writeFile(tempPath, `${JSON.stringify({ sessionId: ref.sessionId }, null, 2)}\n`, "utf8");
+  await rename(tempPath, activePath);
+}
+
+async function migrateLegacyConversationIfNeeded(
+  conversationsDir: string,
+  ref: ChatRef,
+): Promise<void> {
+  const activeRef = await readActiveConversationRef(conversationsDir, ref);
+  if (activeRef) {
+    return;
+  }
+
+  const legacy = await readLegacyConversation(conversationsDir, ref);
+  if (!legacy) {
+    return;
+  }
+
+  const migratedRef: ConversationRef = {
+    transport: ref.transport,
+    externalId: ref.externalId,
+    sessionId: legacySessionId,
+  };
+  const migrated: ConversationContext = normalizeSnapshot({
+    ...legacy,
+    state: {
+      ...legacy.state,
+      conversation: migratedRef,
+    },
+  });
+  const snapshotPath = getSessionSnapshotPath(conversationsDir, migratedRef);
+  const tempPath = `${snapshotPath}.${process.pid}.tmp`;
+
+  await mkdir(dirname(snapshotPath), { recursive: true });
+  await writeFile(tempPath, JSON.stringify(migrated, null, 2));
+  await rename(tempPath, snapshotPath);
+  await writeActiveConversationRef(conversationsDir, migratedRef);
+}
+
+async function readLegacyConversation(
+  conversationsDir: string,
+  ref: ChatRef,
 ): Promise<ConversationContext | undefined> {
-  const statePath = join(getConversationDir(conversationsDir, ref), "meta.json");
+  const snapshotPath = join(getChatDir(conversationsDir, ref), "conversation.json");
+  try {
+    const raw = await readFile(snapshotPath, "utf8");
+    return normalizeSnapshot(JSON.parse(raw) as ConversationContext);
+  } catch (error: unknown) {
+    if (!isMissingFile(error)) {
+      throw error;
+    }
+  }
+
+  const statePath = join(getChatDir(conversationsDir, ref), "meta.json");
 
   try {
     const raw = await readFile(statePath, "utf8");
-    const state = JSON.parse(raw) as ConversationContext["state"];
+    const state = JSON.parse(raw) as Omit<ConversationContext["state"], "conversation"> & {
+      conversation?: unknown;
+    };
     const messages = await readLegacyMessages(conversationsDir, ref);
     return normalizeSnapshot({
-      state,
+      state: {
+        conversation: {
+          transport: ref.transport,
+          externalId: ref.externalId,
+          sessionId: legacySessionId,
+        },
+        agentId: state.agentId,
+        ...(typeof state.title === "string" ? { title: state.title } : {}),
+        ...(typeof state.workingDirectory === "string"
+          ? { workingDirectory: state.workingDirectory }
+          : {}),
+        createdAt: state.createdAt,
+        updatedAt: state.updatedAt,
+        version: state.version,
+      },
       messages,
     });
   } catch (error: unknown) {
@@ -224,9 +379,9 @@ async function readLegacyConversation(
 
 async function readLegacyMessages(
   conversationsDir: string,
-  ref: ConversationRef,
+  ref: ChatRef,
 ): Promise<ConversationMessage[]> {
-  const path = join(getConversationDir(conversationsDir, ref), "messages.json");
+  const path = join(getChatDir(conversationsDir, ref), "messages.json");
 
   try {
     const raw = await readFile(path, "utf8");
@@ -238,46 +393,6 @@ async function readLegacyMessages(
 
     throw error;
   }
-}
-
-async function writeConversationBackup(
-  backupPath: string,
-  snapshot: ConversationContext,
-): Promise<void> {
-  await mkdir(dirname(backupPath), { recursive: true });
-  const backupFile = await open(backupPath, "wx", 0o600);
-
-  try {
-    await backupFile.writeFile(JSON.stringify(snapshot, null, 2), { encoding: "utf8" });
-    await backupFile.chmod(0o600);
-  } finally {
-    await backupFile.close();
-  }
-}
-
-async function removeActiveConversationFiles(conversationDir: string): Promise<void> {
-  let entries;
-  try {
-    entries = await readdir(conversationDir, { withFileTypes: true });
-  } catch (error) {
-    if (isMissingFile(error)) {
-      return;
-    }
-    throw error;
-  }
-
-  await Promise.all(
-    entries.map(async (entry) => {
-      if (entry.name.endsWith(".bak") || entry.name === "conversation.lock") {
-        return;
-      }
-
-      await rm(join(conversationDir, entry.name), {
-        recursive: entry.isDirectory(),
-        force: true,
-      });
-    }),
-  );
 }
 
 function normalizeSnapshot(snapshot: ConversationContext): ConversationContext {
@@ -297,7 +412,7 @@ function resolveNextSnapshot(
   const incomingVersion = getSnapshotVersion(incoming);
 
   if (!current) {
-    if (incomingVersion !== 0) {
+    if (incomingVersion !== 0 && incomingVersion !== 1) {
       throw new Error("Conversation write conflict: version mismatch");
     }
 
@@ -305,7 +420,7 @@ function resolveNextSnapshot(
       ...incoming,
       state: {
         ...incoming.state,
-        version: 1,
+        version: incomingVersion === 0 ? 1 : incomingVersion,
       },
     };
   }
@@ -394,7 +509,7 @@ function pickLatestTimestamp(left: string, right: string): string {
 }
 
 async function withConversationWriteQueue<T>(
-  ref: ConversationRef,
+  ref: ChatRef | ConversationRef,
   action: () => Promise<T>,
 ): Promise<T> {
   const queueKey = getConversationKey(ref);
@@ -420,7 +535,7 @@ async function withConversationWriteQueue<T>(
 
 async function withConversationLock<T>(
   conversationsDir: string,
-  ref: ConversationRef,
+  ref: ChatRef,
   action: () => Promise<T>,
 ): Promise<T> {
   const lockPath = getConversationLockPath(conversationsDir, ref);
@@ -508,38 +623,34 @@ function parseLockExpiry(raw: string): number | undefined {
   }
 }
 
-function isConversationBackupFile(name: string): boolean {
-  return /^conversation\.json\..+\.bak$/i.test(name);
-}
-
 async function delay(ms: number): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
-function getConversationKey(ref: ConversationRef): string {
-  return `${ref.transport}/${ref.externalId}`;
+function getConversationKey(ref: ChatRef | ConversationRef): string {
+  return "sessionId" in ref
+    ? `${ref.transport}/${ref.externalId}/${ref.sessionId}`
+    : `${ref.transport}/${ref.externalId}`;
 }
 
 function isMissingFile(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ENOENT"
-  );
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
 function isAlreadyExistsError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "EEXIST"
-  );
+  return typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST";
 }
 
 function sanitizePathSegment(value: string): string {
   return value.replaceAll("/", "_");
+}
+
+function requireSessionId(ref: ConversationRef): string {
+  if (!ref.sessionId) {
+    throw new Error("Conversation sessionId is required");
+  }
+
+  return ref.sessionId;
 }

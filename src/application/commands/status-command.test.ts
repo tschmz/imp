@@ -3,14 +3,14 @@ import { statusCommandHandler } from "./status-command.js";
 import { createCommandContext, createDependencies, createIncomingMessage } from "./test-helpers.js";
 
 describe("statusCommandHandler", () => {
-  it("renders current state and backups", async () => {
+  it("renders active session state and history count", async () => {
     const context = createCommandContext({
       message: createIncomingMessage("status"),
       dependencies: createDependencies({
         conversationStore: {
           get: async () => ({
             state: {
-              conversation: { transport: "telegram", externalId: "42" },
+              conversation: { transport: "telegram", externalId: "42", sessionId: "session-1" },
               agentId: "default",
               createdAt: "2026-04-05T00:00:00.000Z",
               updatedAt: "2026-04-05T00:01:00.000Z",
@@ -22,6 +22,7 @@ describe("statusCommandHandler", () => {
           listBackups: async () => [
             {
               id: "backup-1",
+              sessionId: "backup-1",
               createdAt: "2026-04-05T00:00:00.000Z",
               updatedAt: "2026-04-05T00:03:00.000Z",
               agentId: "default",
@@ -29,7 +30,12 @@ describe("statusCommandHandler", () => {
             },
           ],
           restore: async () => false,
-          reset: async () => {},
+          ensureActive: async () => {
+            throw new Error("not used");
+          },
+          create: async () => {
+            throw new Error("not used");
+          },
         },
       }),
     });
@@ -37,7 +43,7 @@ describe("statusCommandHandler", () => {
     const response = await statusCommandHandler.handle(context);
 
     expect(statusCommandHandler.canHandle("status")).toBe(true);
-    expect(response?.text).toContain("Current conversation:");
-    expect(response?.text).toContain("Restore points available: 1");
+    expect(response?.text).toContain("Active session:");
+    expect(response?.text).toContain("Sessions in history: 1");
   });
 });

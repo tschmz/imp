@@ -31,20 +31,11 @@ export async function createConversationContext(
   conversationStore: ConversationStore,
   logger?: Logger,
 ): Promise<ConversationContext> {
-  const createdState: ConversationState = {
-    conversation: message.conversation,
+  const createdContext = await conversationStore.create(message.conversation, {
     agentId: defaultAgentId,
-    createdAt: message.receivedAt,
-    updatedAt: message.receivedAt,
-    version: 0,
-  };
-
-  const createdContext: ConversationContext = {
-    state: createdState,
-    messages: [],
-  };
-
-  await conversationStore.put(createdContext);
+    now: message.receivedAt,
+  });
+  const createdState: ConversationState = createdContext.state;
   await logger?.debug("created new conversation", {
     botId: message.botId,
     transport: message.conversation.transport,
@@ -55,9 +46,6 @@ export async function createConversationContext(
   });
   return {
     ...createdContext,
-    state: {
-      ...createdState,
-      version: 1,
-    },
+    state: createdState,
   };
 }

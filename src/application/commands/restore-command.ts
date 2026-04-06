@@ -5,7 +5,7 @@ import { pickRestoreBackup } from "./utils.js";
 export const restoreCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "restore",
-    description: "Restore a backup with /restore <n>",
+    description: "Switch to a session from /history",
     usage: "/restore <n>",
   },
   canHandle(command) {
@@ -25,7 +25,7 @@ export const restoreCommandHandler: InboundCommandHandler = {
     if (!restored) {
       return {
         conversation: message.conversation,
-        text: "That restore point is no longer available. Run /history and try again.",
+        text: "That session is no longer available. Run /history and try again.",
       };
     }
 
@@ -42,8 +42,7 @@ export const restoreCommandHandler: InboundCommandHandler = {
     return {
       conversation: message.conversation,
       text: [
-        `Restored backup ${backups.indexOf(selectedBackup) + 1}.`,
-        "The previously active conversation was backed up before the restore.",
+        `Switched to session ${backups.indexOf(selectedBackup) + 1} from /history.`,
         `Agent: ${selectedBackup.agentId}`,
         `Messages: ${selectedBackup.messageCount}`,
         `Updated: ${selectedBackup.updatedAt}`,

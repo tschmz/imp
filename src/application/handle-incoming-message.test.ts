@@ -14,7 +14,32 @@ describe("createHandleIncomingMessage", () => {
       put: vi.fn(async () => {}),
       listBackups: vi.fn(async () => []),
       restore: vi.fn(async () => false),
-      reset: vi.fn(async () => {}),
+      ensureActive: vi.fn(async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+      create: vi.fn(async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
     };
 
     const engine: AgentEngine = {
@@ -42,13 +67,58 @@ describe("createHandleIncomingMessage", () => {
     const byConversation = new Map<string, Awaited<ReturnType<ConversationStore["get"]>>>();
 
     const conversationStore: ConversationStore = {
-      get: vi.fn(async (ref) => byConversation.get(ref.externalId)),
+      get: vi.fn(async (ref) =>
+        "sessionId" in ref
+          ? byConversation.get(`${ref.externalId}:${ref.sessionId}`)
+          : [...byConversation.values()][0],
+      ),
       put: vi.fn(async (context) => {
-        byConversation.set(context.state.conversation.externalId, context);
+        byConversation.set(
+          `${context.state.conversation.externalId}:${context.state.conversation.sessionId}`,
+          context,
+        );
       }),
       listBackups: vi.fn(async () => []),
       restore: vi.fn(async () => false),
-      reset: vi.fn(async () => {}),
+      ensureActive: vi.fn(async (ref, options) => {
+        const existing = [...byConversation.values()][0];
+        if (existing) {
+          return existing;
+        }
+
+        const context = {
+          state: {
+            conversation: {
+              ...ref,
+              sessionId: "session-1",
+            },
+            agentId: options.agentId,
+            createdAt: options.now,
+            updatedAt: options.now,
+            version: 1,
+          },
+          messages: [],
+        };
+        byConversation.set(`${ref.externalId}:session-1`, context);
+        return context;
+      }),
+      create: vi.fn(async (ref, options) => {
+        const context = {
+          state: {
+            conversation: {
+              ...ref,
+              sessionId: "session-1",
+            },
+            agentId: options.agentId,
+            createdAt: options.now,
+            updatedAt: options.now,
+            version: 1,
+          },
+          messages: [],
+        };
+        byConversation.set(`${ref.externalId}:session-1`, context);
+        return context;
+      }),
     };
 
     const engine: AgentEngine = {
@@ -83,7 +153,8 @@ describe("createHandleIncomingMessage", () => {
           put: vi.fn(),
           listBackups: vi.fn(),
           restore: vi.fn(),
-          reset: vi.fn(),
+          ensureActive: vi.fn(),
+          create: vi.fn(),
         },
         engine: {
           run: vi.fn(),

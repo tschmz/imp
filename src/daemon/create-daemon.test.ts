@@ -79,7 +79,14 @@ describe("createDaemon", () => {
 
     const persistedConversation = JSON.parse(
       await readFile(
-        join(botConfig.paths.conversationsDir, "telegram", "42", "conversation.json"),
+        join(
+          botConfig.paths.conversationsDir,
+          "telegram",
+          "42",
+          "sessions",
+          runInputs[1]!.conversation.state.conversation.sessionId!,
+          "conversation.json",
+        ),
         "utf8",
       ),
     ) as { messages: unknown[] };

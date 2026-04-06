@@ -4,7 +4,7 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 export const statusCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "status",
-    description: "Show current conversation status",
+    description: "Show active session status",
   },
   canHandle(command) {
     return command === "status";

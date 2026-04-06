@@ -1,3 +1,4 @@
+import { parseInboundCommand } from "../application/commands/parse-inbound-command.js";
 import { createHandleIncomingMessage } from "../application/handle-incoming-message.js";
 import { createMessageProcessor } from "../application/message-processor.js";
 import { createAgentRegistry } from "../agents/registry.js";
@@ -21,6 +22,8 @@ export function createRuntimeEntries(
   runtimes: BootstrappedRuntime[],
   dependencies: RuntimeRunnerDependencies,
 ): RuntimeEntry[] {
+  const priorityCommands = new Set(["new", "restore"] as const);
+
   return runtimes.map((runtime) => {
     const handleIncomingMessage = createHandleIncomingMessage({
       agentRegistry: dependencies.agentRegistry,
@@ -40,6 +43,40 @@ export function createRuntimeEntries(
     const messageProcessor = createMessageProcessor({
       handler: handleIncomingMessage,
       logger: runtime.logger,
+      prepareEvent: async (event) => {
+        if (event.message.command) {
+          return event;
+        }
+
+        const command = parseInboundCommand(event.message.text, {
+          allowedCommands: priorityCommands,
+        });
+        if (command) {
+          return {
+            ...event,
+            message: {
+              ...event.message,
+              ...command,
+            },
+          };
+        }
+
+        const conversation = await runtime.conversationStore.ensureActive(
+          event.message.conversation,
+          {
+            agentId: runtime.botConfig.defaultAgentId,
+            now: event.message.receivedAt,
+          },
+        );
+
+        return {
+          ...event,
+          message: {
+            ...event.message,
+            conversation: conversation.state.conversation,
+          },
+        };
+      },
       afterDeliveryAction: dependencies.requestControlAction,
     });
     let transport: Transport | undefined;
