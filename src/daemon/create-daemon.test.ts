@@ -433,7 +433,9 @@ describe("createDaemon", () => {
     await expect(daemon.start()).rejects.toThrow("ops boom");
 
     expect(startedBotIds.sort()).toEqual(["ops-telegram", "private-telegram"]);
-    expect(stoppingBotIds.sort()).toEqual(["ops-telegram", "private-telegram"]);
+    await vi.waitFor(() => {
+      expect(stoppingBotIds.sort()).toEqual(["ops-telegram", "private-telegram"]);
+    });
     await expect(access(privateBot.paths.runtimeStatePath)).rejects.toThrow();
     await expect(access(opsBot.paths.runtimeStatePath)).rejects.toThrow();
   });

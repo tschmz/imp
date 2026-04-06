@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { stat } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { Agent, type AgentMessage, type AgentOptions } from "@mariozechner/pi-agent-core";
 import {
   createCodingTools,
@@ -308,16 +309,19 @@ async function buildSystemPrompt(
     throw new Error(`Agent "${agent.id}" must define systemPrompt or systemPromptFile.`);
   }
 
-  const contextFiles = agent.context?.files ?? [];
+  const contextFiles = resolveContextPromptFiles(agent);
 
-  for (const path of contextFiles) {
+  for (const file of contextFiles) {
     let content: string;
     try {
-      content = await readTextFile(path);
+      content = await readTextFile(file.path);
     } catch (error) {
+      if (file.optional && isFileNotFoundError(error)) {
+        continue;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Failed to read context file for agent "${agent.id}": ${path} (${detail})`,
+        `Failed to read context file for agent "${agent.id}": ${file.path} (${detail})`,
       );
     }
 
@@ -326,7 +330,7 @@ async function buildSystemPrompt(
       continue;
     }
 
-    sections.push(formatContextInstructions(path, trimmedContent));
+    sections.push(formatContextInstructions(file.path, trimmedContent));
   }
 
   return sections.join("\n\n");
@@ -338,6 +342,40 @@ function formatContextInstructions(path: string, content: string): string {
 
 function escapeInstructionAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+}
+
+function resolveContextPromptFiles(
+  agent: AgentDefinition,
+): Array<{ path: string; optional: boolean }> {
+  const files = (agent.context?.files ?? []).map((path) => ({ path, optional: false }));
+  const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(agent);
+  if (workingDirectoryAgentsFile && !files.some((file) => file.path === workingDirectoryAgentsFile)) {
+    files.push({ path: workingDirectoryAgentsFile, optional: true });
+  }
+  return files;
+}
+
+function resolveWorkingDirectoryAgentsFile(agent: AgentDefinition): string | undefined {
+  const workingDirectory = agent.context?.workingDirectory;
+  if (!workingDirectory) {
+    return undefined;
+  }
+
+  return join(workingDirectory, "AGENTS.md");
+}
+
+function isFileNotFoundError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const code = "code" in error ? error.code : undefined;
+  if (code === "ENOENT") {
+    return true;
+  }
+
+  const message = "message" in error ? error.message : undefined;
+  return typeof message === "string" && message.includes("ENOENT");
 }
 
 async function resolveSystemPrompt(options: {
@@ -381,7 +419,7 @@ async function buildSystemPromptCacheKey(
   getContextFileFingerprint: (path: string) => Promise<string>,
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
-  const promptFiles = [agent.systemPromptFile, ...(agent.context?.files ?? [])].filter(
+  const promptFiles = [agent.systemPromptFile, ...resolveContextPromptFiles(agent).map((file) => file.path)].filter(
     (path): path is string => path !== undefined,
   );
   const fileFingerprints = await Promise.all(

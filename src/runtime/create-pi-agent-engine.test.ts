@@ -443,6 +443,144 @@ describe("createPiAgentEngine", () => {
     );
   });
 
+  it("appends AGENTS.md from the working directory after configured context files", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        expect(context.systemPrompt).toBe(
+          "You are concise.\n\n" +
+            '<INSTRUCTIONS from="/workspace/RULES.md">\n' +
+            "Follow the explicit rules.\n" +
+            "</INSTRUCTIONS>\n\n" +
+            '<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n' +
+            "Follow the workspace instructions.\n" +
+            "</INSTRUCTIONS>",
+        );
+        return fauxAssistantMessage("ok");
+      },
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async (path) => {
+        if (path === "/workspace/RULES.md") {
+          return "Follow the explicit rules.";
+        }
+
+        if (path === "/workspace/project/AGENTS.md") {
+          return "Follow the workspace instructions.";
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        context: {
+          workingDirectory: "/workspace/project",
+          files: ["/workspace/RULES.md"],
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+  });
+
+  it("skips an absent AGENTS.md in the working directory", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        expect(context.systemPrompt).toBe("You are concise.");
+        return fauxAssistantMessage("ok");
+      },
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async (path) => {
+        if (path === "/workspace/project/AGENTS.md") {
+          throw new Error("ENOENT");
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        context: {
+          workingDirectory: "/workspace/project",
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+  });
+
+  it("does not duplicate AGENTS.md when it is already configured as a context file", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        expect(context.systemPrompt).toBe(
+          "You are concise.\n\n" +
+            '<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n' +
+            "Follow the workspace instructions.\n" +
+            "</INSTRUCTIONS>",
+        );
+        return fauxAssistantMessage("ok");
+      },
+    ]);
+
+    const readTextFile = vi.fn(async (path: string) => {
+      if (path === "/workspace/project/AGENTS.md") {
+        return "Follow the workspace instructions.";
+      }
+
+      throw new Error(`unexpected path: ${path}`);
+    });
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile,
+      getContextFileFingerprint: async (path) => {
+        if (path === "/workspace/project/AGENTS.md") {
+          return "1:42";
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        context: {
+          workingDirectory: "/workspace/project",
+          files: ["/workspace/project/AGENTS.md"],
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(readTextFile).toHaveBeenCalledTimes(1);
+  });
+
   it("loads the system prompt from systemPromptFile when configured", async () => {
     const registration = registerFauxProvider({
       provider: "faux",
