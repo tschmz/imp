@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { Command } from "commander";
+import { Command, InvalidArgumentError } from "commander";
 
 export interface CliDependencies {
   startDaemon: (options: { configPath?: string }) => Promise<void>;
@@ -252,5 +252,9 @@ function getCliVersion(): string {
 }
 
 function parseIntegerOption(value: string): number {
+  if (!/^-?\d+$/.test(value)) {
+    throw new InvalidArgumentError("Expected an integer.");
+  }
+
   return Number.parseInt(value, 10);
 }

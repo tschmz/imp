@@ -1047,6 +1047,61 @@ describe("imp CLI e2e", () => {
     expect(stdout).toBe("two\nthree\n");
   });
 
+  it("rejects invalid `imp log --lines` values strictly", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const logFilePath = join(root, "state-home", "imp", "bots", "private-telegram", "logs", "daemon.log");
+
+    await runCli(["init", "--defaults"], env);
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "default",
+      },
+      paths: {
+        dataRoot: join(root, "state-home", "imp"),
+      },
+      logging: {
+        level: "info",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          prompt: {
+            base: {
+              text: "You are a concise and pragmatic assistant running through a local daemon.",
+            },
+          },
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "123456:valid-format-but-invalid-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+    await writeLogFile(logFilePath, ["one", "two", "three"]);
+
+    for (const value of ["2abc", "abc", "1.5", "", "   "]) {
+      await expect(runCli(["log", "--lines", value], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining("Expected an integer."),
+      });
+    }
+  }, 20_000);
+
   it("shows prefixed log lines when multiple bots are enabled", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
