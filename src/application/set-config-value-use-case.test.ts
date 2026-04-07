@@ -1,0 +1,178 @@
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createSetConfigValueUseCase } from "./set-config-value-use-case.js";
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  await Promise.all(
+    tempDirs.splice(0).map(async (path) => {
+      const { rm } = await import("node:fs/promises");
+      await rm(path, { recursive: true, force: true });
+    }),
+  );
+});
+
+describe("createSetConfigValueUseCase", () => {
+  it("updates a discovered config value using array id navigation", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+
+    await writeConfig(configPath);
+
+    await createSetConfigValueUseCase()({
+      keyPath: "bots.private-telegram.enabled",
+      value: "false",
+    });
+
+    const config = JSON.parse(await readFile(configPath, "utf8")) as { bots: Array<{ enabled: boolean }> };
+    expect(writeOutput).toHaveBeenCalledWith(`Updated config ${configPath}: bots.private-telegram.enabled`);
+    expect(config.bots[0]?.enabled).toBe(false);
+  });
+
+  it("updates a plain string value", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+
+    await writeConfig(configPath);
+
+    await createSetConfigValueUseCase()({
+      keyPath: "instance.name",
+      value: "custom-instance",
+    });
+
+    const config = JSON.parse(await readFile(configPath, "utf8")) as { instance: { name: string } };
+    expect(config.instance.name).toBe("custom-instance");
+  });
+
+  it("updates an explicit config path using numeric array navigation", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+
+    await writeConfig(configPath);
+
+    await createSetConfigValueUseCase()({
+      configPath,
+      keyPath: "bots.0.enabled",
+      value: "false",
+    });
+
+    const config = JSON.parse(await readFile(configPath, "utf8")) as { bots: Array<{ enabled: boolean }> };
+    expect(config.bots[0]?.enabled).toBe(false);
+  });
+
+  it("fails when an explicit config path is missing", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "missing", "imp.json");
+
+    await expect(
+      createSetConfigValueUseCase()({
+        configPath,
+        keyPath: "instance.name",
+        value: "custom",
+      }),
+    ).rejects.toThrow(`Config file not found: ${configPath}`);
+  });
+
+  it("fails when the existing config is invalid", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+
+    await writeRawFile(configPath, '{\n  "invalid": true\n}\n');
+
+    await expect(
+      createSetConfigValueUseCase()({
+        keyPath: "instance.name",
+        value: "custom",
+      }),
+    ).rejects.toThrow(`Invalid config file ${configPath}`);
+  });
+
+  it("fails when the requested config key is missing", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+
+    await writeConfig(configPath);
+
+    await expect(
+      createSetConfigValueUseCase()({
+        keyPath: "bots.private-telegram.missing",
+        value: "false",
+      }),
+    ).rejects.toThrow("Config key not found: bots.private-telegram.missing");
+  });
+
+  it("fails when the updated config would become invalid without modifying the file", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+
+    await writeConfig(configPath);
+    const before = await readFile(configPath, "utf8");
+
+    await expect(
+      createSetConfigValueUseCase()({
+        keyPath: "defaults.agentId",
+        value: "missing-agent",
+      }),
+    ).rejects.toThrow(`Updated config would be invalid: ${configPath}`);
+
+    await expect(readFile(configPath, "utf8")).resolves.toBe(before);
+  });
+});
+
+async function createTempDir(): Promise<string> {
+  const path = await mkdtemp(join(tmpdir(), "imp-set-config-value-test-"));
+  tempDirs.push(path);
+  return path;
+}
+
+async function writeConfig(configPath: string): Promise<void> {
+  await writeRawFile(
+    configPath,
+    `${JSON.stringify(createConfig(join(dirname(dirname(configPath)), "state-home", "imp")), null, 2)}\n`,
+  );
+}
+
+async function writeRawFile(path: string, content: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, "utf8");
+}
+
+function createConfig(dataRoot: string) {
+  return {
+    instance: { name: "default" },
+    paths: { dataRoot },
+    logging: { level: "info" },
+    defaults: { agentId: "default" },
+    agents: [
+      {
+        id: "default",
+        model: { provider: "openai", modelId: "gpt-5.4" },
+        prompt: {
+          base: {
+            text: "prompt",
+          },
+        },
+      },
+    ],
+    bots: [
+      {
+        id: "private-telegram",
+        type: "telegram",
+        enabled: true,
+        token: "token",
+        access: { allowedUserIds: [] },
+      },
+    ],
+  };
+}

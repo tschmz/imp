@@ -251,7 +251,7 @@ function getCliVersion(): string {
   return packageJson.version ?? "0.0.0";
 }
 
-function parseIntegerOption(value: string): number {
+export function parseIntegerOption(value: string): number {
   if (!/^-?\d+$/.test(value)) {
     throw new InvalidArgumentError("Expected an integer.");
   }
