@@ -1,8 +1,8 @@
 import { parseInboundCommand } from "../application/commands/parse-inbound-command.js";
+import { priorityInboundCommands } from "../application/commands/priority-inbound-commands.js";
 import { createHandleIncomingMessage } from "../application/handle-incoming-message.js";
 import { createMessageProcessor } from "../application/message-processor.js";
 import { createAgentRegistry } from "../agents/registry.js";
-import type { IncomingMessageCommand } from "../domain/message.js";
 import type { Transport, TransportFactory } from "../transports/types.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
 import type { RuntimeControlAction } from "./runtime-shutdown.js";
@@ -23,8 +23,6 @@ export function createRuntimeEntries(
   runtimes: BootstrappedRuntime[],
   dependencies: RuntimeRunnerDependencies,
 ): RuntimeEntry[] {
-  const priorityCommands = new Set<IncomingMessageCommand>(["new", "restore"]);
-
   return runtimes.map((runtime) => {
     const handleIncomingMessage = createHandleIncomingMessage({
       agentRegistry: dependencies.agentRegistry,
@@ -45,13 +43,13 @@ export function createRuntimeEntries(
       handler: handleIncomingMessage,
       logger: runtime.logger,
       prepareEvent: async (event) => {
-        if (event.message.command && priorityCommands.has(event.message.command)) {
+        if (event.message.command && priorityInboundCommands.has(event.message.command)) {
           return event;
         }
 
         if (!event.message.command) {
           const command = parseInboundCommand(event.message.text, {
-            allowedCommands: priorityCommands,
+            allowedCommands: priorityInboundCommands,
           });
           if (command) {
             return {

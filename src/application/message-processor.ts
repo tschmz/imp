@@ -2,6 +2,7 @@ import type { IncomingMessage } from "../domain/message.js";
 import type { OutgoingMessageDeliveryAction } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
 import type { TransportHandler, TransportInboundEvent } from "../transports/types.js";
+import { priorityInboundCommands } from "./commands/priority-inbound-commands.js";
 
 export interface MessageProcessorDependencies {
   handler: {
@@ -75,10 +76,8 @@ export function createMessageProcessor(
   }
 }
 
-const sessionSwitchCommands = new Set<IncomingMessage["command"]>(["new", "restore"]);
-
 function shouldBypassConversationQueue(message: IncomingMessage): boolean {
-  return Boolean(message.command && sessionSwitchCommands.has(message.command));
+  return Boolean(message.command && priorityInboundCommands.has(message.command));
 }
 
 async function processEvent(

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { parseInboundCommand } from "./commands/parse-inbound-command.js";
+import { priorityInboundCommands } from "./commands/priority-inbound-commands.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createMessageProcessor } from "./message-processor.js";
 
@@ -121,7 +122,6 @@ describe("createMessageProcessor", () => {
   it("lets /new bypass the active session queue even when command metadata is missing", async () => {
     const starts: string[] = [];
     const releases = new Map<string, () => void>();
-    const priorityCommands = new Set(["new", "restore"] as const);
     const handler = {
       handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
         starts.push(
@@ -150,7 +150,7 @@ describe("createMessageProcessor", () => {
         const command = event.message.command
           ? { command: event.message.command, ...(event.message.commandArgs ? { commandArgs: event.message.commandArgs } : {}) }
           : parseInboundCommand(event.message.text, {
-              allowedCommands: priorityCommands,
+              allowedCommands: priorityInboundCommands,
             });
         if (command) {
           if (command.command === "new") {
@@ -204,7 +204,6 @@ describe("createMessageProcessor", () => {
   it("lets /restore bypass the active session queue even when command metadata is missing", async () => {
     const starts: string[] = [];
     const releases = new Map<string, () => void>();
-    const priorityCommands = new Set(["new", "restore"] as const);
     const handler = {
       handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
         starts.push(
@@ -233,7 +232,7 @@ describe("createMessageProcessor", () => {
         const command = event.message.command
           ? { command: event.message.command, ...(event.message.commandArgs ? { commandArgs: event.message.commandArgs } : {}) }
           : parseInboundCommand(event.message.text, {
-              allowedCommands: priorityCommands,
+              allowedCommands: priorityInboundCommands,
             });
         if (command) {
           if (command.command === "restore") {
@@ -284,7 +283,7 @@ describe("createMessageProcessor", () => {
     await Promise.all([first, restore]);
   });
 
-  it("keeps mutating slash commands serialized with the active session queue", async () => {
+  it("lets rename bypass the active session queue as a lightweight session metadata change", async () => {
     const starts: string[] = [];
     const releases = new Map<string, () => void>();
     const handler = {
@@ -335,17 +334,92 @@ describe("createMessageProcessor", () => {
     await tick();
     await tick();
 
-    expect(starts).toEqual(["1:session-1"]);
+    expect(starts).toEqual(["1:session-1", "2:rename"]);
 
     releases.get("1")?.();
     await tick();
-    expect(starts).toEqual(["1:session-1", "2:rename"]);
-
-    releases.get("2")?.();
-    await tick();
     expect(starts).toEqual(["1:session-1", "2:rename", "3:session-1"]);
 
+    releases.get("2")?.();
     await Promise.all([first, rename, third]);
+  });
+
+  it("lets safe local commands bypass the active session queue", async () => {
+    const starts: string[] = [];
+    const releases = new Map<string, () => void>();
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(
+          `${message.messageId}:${message.command ?? ("sessionId" in message.conversation ? message.conversation.sessionId : "chat")}`,
+        );
+        if (!message.command) {
+          await new Promise<void>((resolve) => {
+            releases.set(message.messageId, resolve);
+          });
+        }
+
+        return {
+          conversation: {
+            transport: message.conversation.transport,
+            externalId: message.conversation.externalId,
+          },
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    const processor = createMessageProcessor({
+      handler,
+      prepareEvent: (event) => {
+        const command = event.message.command
+          ? { command: event.message.command, ...(event.message.commandArgs ? { commandArgs: event.message.commandArgs } : {}) }
+          : parseInboundCommand(event.message.text, {
+              allowedCommands: priorityInboundCommands,
+            });
+        if (command) {
+          return {
+            ...event,
+            message: {
+              ...event.message,
+              ...command,
+            },
+          };
+        }
+
+        return {
+          ...event,
+          message: {
+            ...event.message,
+            conversation: {
+              ...event.message.conversation,
+              sessionId: "session-1",
+            },
+          },
+        };
+      },
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
+    await tick();
+    const status = processor.handle(
+      createEvent({
+        ...createIncomingMessage("2", "42"),
+        text: "/status",
+      }),
+    );
+    const third = processor.handle(createEvent(createIncomingMessage("3", "42")));
+
+    await tick();
+    await tick();
+
+    expect(starts).toEqual(["1:session-1", "2:status"]);
+
+    releases.get("1")?.();
+    await tick();
+    expect(starts).toEqual(["1:session-1", "2:status", "3:session-1"]);
+
+    releases.get("3")?.();
+    await Promise.all([first, status, third]);
   });
 
   it("retries through central hooks before surfacing a terminal error response", async () => {
