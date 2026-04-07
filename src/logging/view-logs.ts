@@ -109,6 +109,7 @@ async function followLogTargets(options: {
   const signal = options.signal ?? abortController?.signal;
   const cleanup = registerFollowCleanup(abortController);
   const offsets = new Map<string, number>();
+  const watchers: AsyncIterable<{ eventType: string }>[] = [];
   const pendingWatchTasks: Promise<void>[] = [];
 
   try {
@@ -119,6 +120,7 @@ async function followLogTargets(options: {
       const watcher = options.watch(target.logFilePath, {
         signal,
       });
+      watchers.push(watcher);
 
       pendingWatchTasks.push(watchTarget(watcher, target, options, offsets));
     }
@@ -130,6 +132,7 @@ async function followLogTargets(options: {
     await waitForAbort(signal);
   } finally {
     cleanup.dispose();
+    await Promise.allSettled(watchers.map((watcher) => closeWatcher(watcher)));
     await Promise.allSettled(pendingWatchTasks);
   }
 }
@@ -218,6 +221,23 @@ function waitForAbort(signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     signal.addEventListener("abort", () => resolve(), { once: true });
   });
+}
+
+async function closeWatcher(watcher: AsyncIterable<{ eventType: string }>): Promise<void> {
+  const iterator = watcher[Symbol.asyncIterator]();
+  if (typeof iterator.return !== "function") {
+    return;
+  }
+
+  try {
+    await iterator.return();
+  } catch (error) {
+    if (isAbortError(error)) {
+      return;
+    }
+
+    throw error;
+  }
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {

@@ -136,6 +136,62 @@ describe("viewDaemonLogs", () => {
 
     expect(chunks.join("")).toBe("one\ntwo\n");
   });
+
+  it("returns cleanly after abort when a watcher only settles via return()", async () => {
+    const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram"]);
+    const abortController = new AbortController();
+    let returnCalls = 0;
+
+    const watchTask = viewDaemonLogs({
+      runtimeConfig,
+      follow: true,
+      signal: abortController.signal,
+      dependencies: {
+        async readFile() {
+          return "one\n";
+        },
+        watch() {
+          let closed = false;
+          let resolveNext: ((result: IteratorResult<{ eventType: string }>) => void) | undefined;
+
+          return {
+            [Symbol.asyncIterator]() {
+              return this;
+            },
+            async next() {
+              if (closed) {
+                return {
+                  done: true,
+                  value: undefined,
+                };
+              }
+
+              return await new Promise<IteratorResult<{ eventType: string }>>((resolve) => {
+                resolveNext = resolve;
+              });
+            },
+            async return() {
+              closed = true;
+              returnCalls += 1;
+              resolveNext?.({
+                done: true,
+                value: undefined,
+              });
+              return {
+                done: true,
+                value: undefined,
+              };
+            },
+          } satisfies AsyncIterableIterator<{ eventType: string }>;
+        },
+      },
+    });
+
+    abortController.abort();
+
+    await expect(watchTask).resolves.toBeUndefined();
+    expect(returnCalls).toBe(1);
+  });
 });
 
 describe("readRecentLogLines", () => {
