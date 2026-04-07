@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { extractTarArchive } from "../files/tar-archive.js";
+import { createTarArchive, extractTarArchive } from "../files/tar-archive.js";
 import { createBackupUseCases } from "./backup-use-cases.js";
 
 const tempDirs: string[] = [];
@@ -283,6 +283,68 @@ describe("backup use cases", () => {
     );
     await expect(readFile(join(targetRoot, "config", "oauth.json"), "utf8")).resolves.toBe("{\"token\":\"secret\"}\n");
   });
+
+  it("fails clearly when manifest.json contains invalid JSON", async () => {
+    const root = await createTempDir();
+    const archivePath = join(root, "backup.tar");
+    const targetConfigPath = join(root, "config", "config.json");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await createBackupArchive(archivePath, [
+      ["manifest.json", "{not json}\n"],
+    ]);
+
+    await expect(
+      useCases.restoreBackup({
+        inputPath: archivePath,
+        configPath: targetConfigPath,
+        force: false,
+      }),
+    ).rejects.toThrow("Invalid backup archive: invalid JSON in manifest.json");
+  });
+
+  it("fails clearly when the archived config contains invalid JSON", async () => {
+    const root = await createTempDir();
+    const archivePath = join(root, "backup.tar");
+    const targetConfigPath = join(root, "config", "config.json");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await createBackupArchive(archivePath, [
+      [
+        "manifest.json",
+        `${JSON.stringify(
+          {
+            version: 1,
+            createdAt: "2026-04-07T00:00:00.000Z",
+            scopes: ["config"],
+            source: {
+              configPath: "/source/config.json",
+              dataRoot: "/source/state",
+            },
+            config: {
+              archivePath: "config/config.json",
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      ],
+      ["config/config.json", "{not json}\n"],
+    ]);
+
+    await expect(
+      useCases.restoreBackup({
+        inputPath: archivePath,
+        configPath: targetConfigPath,
+        only: "config",
+        force: false,
+      }),
+    ).rejects.toThrow("Invalid backup archive: invalid JSON in config/config.json");
+  });
 });
 
 async function writeConfig(configPath: string, dataRoot: string): Promise<void> {
@@ -332,4 +394,15 @@ async function createTempDir(): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), "imp-backup-test-"));
   tempDirs.push(path);
   return path;
+}
+
+async function createBackupArchive(archivePath: string, files: Array<[archivePath: string, content: string]>): Promise<void> {
+  const root = await createTempDir();
+  const archiveRoot = join(root, "archive");
+
+  for (const [path, content] of files) {
+    await writeTextFile(join(archiveRoot, path), content);
+  }
+
+  await createTarArchive(archiveRoot, archivePath);
 }

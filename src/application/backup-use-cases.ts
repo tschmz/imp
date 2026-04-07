@@ -625,8 +625,7 @@ function relativeIfContained(rootPath: string, candidatePath: string): string | 
 
 async function readBackupManifest(stageRoot: string): Promise<BackupManifest> {
   const manifestPath = join(stageRoot, "manifest.json");
-  const raw = await readFile(manifestPath, "utf8");
-  const parsed = JSON.parse(raw) as Partial<BackupManifest>;
+  const parsed = await readBackupJsonFile<Partial<BackupManifest>>(manifestPath, "manifest.json");
 
   if (parsed.version !== 1 || !parsed.createdAt || !parsed.source?.configPath || !parsed.source?.dataRoot) {
     throw new Error("Invalid backup archive: malformed manifest.json");
@@ -648,8 +647,24 @@ async function readArchivedConfig(stageRoot: string, manifest: BackupManifest): 
     throw new Error("Invalid backup archive: missing config entry");
   }
 
-  const raw = await readFile(join(stageRoot, manifest.config.archivePath), "utf8");
-  return JSON.parse(raw) as AppConfig;
+  return readBackupJsonFile<AppConfig>(
+    join(stageRoot, manifest.config.archivePath),
+    manifest.config.archivePath,
+  );
+}
+
+async function readBackupJsonFile<T>(path: string, archivePath: string): Promise<T> {
+  const raw = await readFile(path, "utf8");
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(`Invalid backup archive: invalid JSON in ${archivePath}`);
+    }
+
+    throw error;
+  }
 }
 
 function assertManifestContainsRequestedScopes(manifest: BackupManifest, selection: ScopeSelection): void {
