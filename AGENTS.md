@@ -1,6 +1,7 @@
 # AGENTS.md
 
-- Commit messages must follow the Conventional Commits format, for example `feat: add status endpoint`.
+- Commit messages must follow `type: summary`, for example `feat: add status endpoint`.
+- Do not use Conventional Commit scopes in this repository, for example use `feat: add status endpoint`, not `feat(cli): add status endpoint`.
 - Before a commit that includes changes under `src/`, run `npm run check` and `npm test`, and do not commit unless both pass.
 - The project is early-stage: prefer clear CLI commands over backward-compatibility aliases or shims when the design improves.
 
