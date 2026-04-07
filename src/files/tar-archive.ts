@@ -1,4 +1,4 @@
-import { mkdir, open, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
 
 const tarBlockSize = 512;
@@ -36,6 +36,7 @@ export async function createTarArchive(sourceDir: string, outputPath: string): P
 
 export async function extractTarArchive(archivePath: string, outputDir: string): Promise<void> {
   const archive = await readFile(archivePath);
+  const directoryModes = new Map<string, number>();
   let offset = 0;
 
   while (offset < archive.byteLength) {
@@ -56,7 +57,8 @@ export async function extractTarArchive(archivePath: string, outputDir: string):
     assertArchivePath(targetPath, outputDir);
 
     if (entry.type === "directory") {
-      await mkdir(targetPath, { recursive: true, mode: entry.mode });
+      await mkdir(targetPath, { recursive: true, mode: 0o700 });
+      directoryModes.set(targetPath, normalizeExtractedDirectoryMode(entry.mode));
       continue;
     }
 
@@ -69,6 +71,12 @@ export async function extractTarArchive(archivePath: string, outputDir: string):
     const content = archive.subarray(offset, offset + entry.size);
     await writeFile(targetPath, content, { mode: entry.mode });
     offset += entryLength;
+  }
+
+  for (const [path, mode] of [...directoryModes.entries()].sort(
+    ([left], [right]) => right.length - left.length,
+  )) {
+    await chmod(path, mode);
   }
 }
 
@@ -239,6 +247,10 @@ function isZeroBlock(block: Buffer): boolean {
 function getPaddingSize(size: number): number {
   const remainder = size % tarBlockSize;
   return remainder === 0 ? 0 : tarBlockSize - remainder;
+}
+
+function normalizeExtractedDirectoryMode(mode: number): number {
+  return mode | 0o100;
 }
 
 async function writePadding(
