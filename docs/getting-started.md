@@ -4,6 +4,8 @@
 
 This guide gets you from a fresh install to a running Telegram bot.
 
+Use it for the first setup. For day-to-day operation, see [Running And Service](./running-and-service.md).
+
 ## Requirements
 
 - Node.js 20.6 or newer
@@ -50,6 +52,12 @@ The generated setup includes:
 - one default agent
 - one Telegram bot
 - one base prompt file under the data directory
+- the default built-in tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`)
+- `logging.level: "info"`
+- `inference.metadata.app: "imp"`
+- `inference.request.store: true`
+
+If the selected provider supports OAuth, `imp init` also configures an `authFile` path under the data directory.
 
 ## Start The Daemon
 
@@ -95,6 +103,7 @@ imp log --follow
 
 ## Next Steps
 
-- Read [Configuration](./configuration.md) to understand the config structure.
-- Read [Running And Service](./running-and-service.md) to keep `imp` running in the background.
+- Read [Configuration](./configuration.md) to understand the config structure and config discovery order.
+- Read [Running And Service](./running-and-service.md) to keep `imp` running in the background and handle service credentials correctly.
+- Read [Telegram Commands](./telegram.md) to see the built-in bot command surface.
 - Read [Customizing Agents](./customizing-agents.md) to tailor prompts, tools, and workspaces.

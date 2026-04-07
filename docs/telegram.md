@@ -2,22 +2,32 @@
 
 Telegram bots register their command menu automatically on startup for each configured bot.
 
+These commands are part of the built-in Telegram UX. They control sessions, diagnostics, and daemon lifecycle from chat.
+
 Current commands:
 
 - `/help` shows the available commands.
 - `/whoami` shows the current bot, chat, and user IDs.
 - `/new` starts a fresh session and keeps the previous session available in `/history`.
+- `/start` is an alias for `/new`.
 - `/rename <title>` sets a title for the active session.
-- `/clear` clears the active session.
-- `/status` shows the active session state.
+- `/reset` resets the messages in the active session while preserving its title and agent.
+- `/status` shows the active session details, including title, agent, message count, timestamps, working directory, and how many previous sessions are available.
 - `/history` lists previous sessions.
 - `/restore <n>` switches to session `n` from `/history`.
 - `/export` renders the active session transcript as plain text.
 - `/ping` returns a simple liveness response.
-- `/config` shows the current runtime/config path details for the bot.
-- `/agent` shows the current agent details, including provider, model, prompt/auth paths, context files, and available agent IDs.
+- `/config` shows runtime and config details for the current bot, including instance name, config path, data root, logging level, enabled bots, and the bot's default agent.
+- `/agent` shows the current agent details, including provider, model, base prompt, auth file, instructions, references, workspace, tools, and available agent IDs.
 - `/agent <id>` switches the active session to another configured agent and shows its details.
-- `/logs` shows recent daemon log lines for the current bot.
-- `/logs <lines>` changes how many recent log lines are shown.
+- `/logs` shows the last 20 daemon log lines for the current bot.
+- `/logs <lines>` shows that many recent daemon log lines for the current bot for this command invocation only.
+- `/whoami` shows the current bot, chat, and user IDs. This is useful when filling `access.allowedUserIds`.
 - `/reload` sends the reply first, then exits the daemon so a supervisor can restart it and reload config from disk.
 - `/restart` sends the reply first, then exits the daemon so a supervisor can restart it.
+
+Notes:
+
+- `/start` is treated as an alias for `/new`.
+- `/reload` and `/restart` are most useful when `imp` is installed under a service manager.
+- `/logs` reads the bot's daemon log file. If no log file exists yet, the command says so instead of inferring that the bot is live.

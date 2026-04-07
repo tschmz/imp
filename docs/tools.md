@@ -3,6 +3,8 @@
 `imp` exposes a small set of built-in tools. Tools are disabled by default unless they are listed in
 `agents[].tools` in the runtime config.
 
+Use [Customizing agents](./customizing-agents.md) together with this page if you want to change tool access per agent.
+
 The default config created by `imp init` enables these tools:
 
 | Tool    | Purpose                                              |
@@ -26,8 +28,10 @@ Additional built-in tools are available when configured:
 
 The `bash` tool inherits the `PATH` from the running `imp` process and prepends the
 `@mariozechner/pi-coding-agent` bin directory if it is not already present. That is the `PATH`
-used when `context.shell.path` is not set.
+used when `workspace.shellPath` is not set.
 
-If an agent sets `context.shell.path`, those entries are appended to that default `PATH` for
+If an agent sets `workspace.shellPath`, those entries are appended to that default `PATH` for
 `bash` executions only. They do not replace the existing `PATH`, and they do not affect the
 service-wide environment used by `imp` itself.
+
+That means `workspace.shellPath` is agent-local runtime configuration, while service credentials and other daemon-wide variables belong in the process environment or, on Linux services, `service.env`.

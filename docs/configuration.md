@@ -54,12 +54,15 @@ The top-level structure is:
 
 ## Config Discovery
 
-Unless you pass `--config`, `imp` searches for a config in this order:
+`imp` resolves the config file in this order:
 
-1. `IMP_CONFIG_PATH`
-2. `XDG_CONFIG_HOME/imp/config.json`
-3. `~/.config/imp/config.json`
-4. `/etc/imp/config.json`
+1. `--config /path/to/config.json`
+2. `IMP_CONFIG_PATH`
+3. `XDG_CONFIG_HOME/imp/config.json`
+4. `~/.config/imp/config.json`
+5. `/etc/imp/config.json`
+
+For operations, prefer passing `--config` explicitly when you want to avoid ambiguity.
 
 ## Agents
 
@@ -114,6 +117,34 @@ This applies to:
 - reference files
 - `authFile`
 - `workspace.cwd`
+
+## Service Environment
+
+Provider credentials and other service-only environment variables are not stored in `config.json`.
+
+When `imp` runs interactively, it uses the current process environment.
+When `imp` runs as a service, environment handling depends on the platform:
+
+- Linux systemd user services use a `service.env` file next to the config file. `imp init` can prompt for these values during interactive setup.
+- macOS launchd agents do not use `service.env`; make required environment variables available to the launchd job itself.
+
+If you change service credentials on Linux, re-run:
+
+```bash
+imp service install --force
+```
+
+## Operator Checklist
+
+When inspecting a live installation, verify at least:
+
+- which bots are `enabled`
+- each bot's `routing.defaultAgentId`
+- each agent's `model.provider` and `model.modelId`
+- each agent's `authFile`, if used
+- each agent's `prompt.base`, `prompt.instructions`, and `prompt.references`
+- each agent's `workspace.cwd` and `workspace.shellPath`, if used
+- whether required provider credentials are present in the interactive environment or, for Linux services, in `service.env`
 
 ## Updating Config Values
 

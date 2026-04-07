@@ -18,6 +18,8 @@ imp start --config /path/to/config.json
 
 This mode is useful while setting up the config, testing prompts, or watching logs locally.
 
+It is also the simplest way to verify behavior before installing a background service.
+
 ## View Logs
 
 Show recent logs:
@@ -119,11 +121,20 @@ This matters for provider credentials such as:
 - `ANTHROPIC_API_KEY`
 - `GEMINI_API_KEY`
 
-On Linux, `imp service install` manages a service environment file named `service.env` next to the config file. Re-run this command after environment changes:
+Platform behavior differs:
+
+- Linux systemd user services use a `service.env` file next to the config file.
+- macOS launchd agents do not use `service.env`; the generated plist only defines program arguments, working directory, restart behavior, and load policy. Required environment variables must be available to the launchd job itself.
+
+On Linux, `imp service install` creates or updates `service.env`. Re-run this command after environment changes:
 
 ```bash
 imp service install --force
 ```
+
+`service.env` is operational state for the installed Linux service. It is not part of `config.json`.
+
+If foreground execution works but the installed Linux service does not, compare the interactive shell environment with `service.env` before assuming a product bug.
 
 ## Operational Model
 
@@ -135,3 +146,5 @@ At runtime, `imp`:
 - persists conversation state and logs under `paths.dataRoot`
 
 If a bot is disabled in the config, it is skipped on startup.
+
+For command-level bot behavior, see [Telegram Commands](./telegram.md).
