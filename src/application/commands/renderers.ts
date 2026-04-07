@@ -2,6 +2,19 @@ import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
 import type { ConversationBackupSummary } from "../../storage/types.js";
 
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 function resolveDisplayedWorkingDirectory(
   conversation: ConversationContext | undefined,
   agent: AgentDefinition | undefined,
@@ -33,8 +46,8 @@ export function renderStatusMessage(
     `Title: ${conversation.state.title ?? "not set"}`,
     `Agent: ${conversation.state.agentId}`,
     `Messages: ${conversation.messages.length}`,
-    `Created: ${conversation.state.createdAt}`,
-    `Updated: ${conversation.state.updatedAt}`,
+    `Created: ${formatTimestamp(conversation.state.createdAt)}`,
+    `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
     `Working directory: ${resolveDisplayedWorkingDirectory(conversation, agent)}`,
     `Sessions in history: ${backups.length}`,
   ].join("\n");
@@ -45,24 +58,35 @@ export function renderHistoryMessage(
   backups: ConversationBackupSummary[],
   agent: AgentDefinition | undefined,
 ): string {
-  const lines = [
-    "Session history:",
-    conversation
-      ? `Active: ${conversation.state.title ?? "untitled"} with ${conversation.messages.length} messages, updated ${conversation.state.updatedAt}, working directory ${resolveDisplayedWorkingDirectory(conversation, agent)}`
-      : "Active: no session",
-  ];
+  const lines = ["Session history:", ""];
+
+  if (conversation) {
+    lines.push("Active session:");
+    lines.push(`- Title: ${conversation.state.title ?? "untitled"}`);
+    lines.push(`- Agent: ${conversation.state.agentId}`);
+    lines.push(`- Messages: ${conversation.messages.length}`);
+    lines.push(`- Updated: ${formatTimestamp(conversation.state.updatedAt)}`);
+    lines.push(`- Working directory: ${resolveDisplayedWorkingDirectory(conversation, agent)}`);
+  } else {
+    lines.push("Active session: none");
+  }
+
+  lines.push("");
+  lines.push("Previous sessions:");
 
   if (backups.length === 0) {
-    lines.push("Previous sessions: none");
+    lines.push("- none");
     return lines.join("\n");
   }
 
-  lines.push("Previous sessions:");
   for (const [index, backup] of backups.entries()) {
-    lines.push(
-      `${index + 1}. ${renderSessionLabel(backup.title, backup.sessionId)} | ${backup.updatedAt} | ${backup.messageCount} messages | agent ${backup.agentId}`,
-    );
+    lines.push(`${index + 1}. ${renderSessionLabel(backup.title, backup.sessionId)}`);
+    lines.push(`   Updated: ${formatTimestamp(backup.updatedAt)}`);
+    lines.push(`   Messages: ${backup.messageCount}`);
+    lines.push(`   Agent: ${backup.agentId}`);
   }
+
+  lines.push("");
   lines.push("Use /restore <n> to switch to one of these sessions.");
   return lines.join("\n");
 }
@@ -113,8 +137,8 @@ export function renderConversationExport(conversation: ConversationContext): str
     "Conversation export",
     `Title: ${conversation.state.title ?? "untitled"}`,
     `Agent: ${conversation.state.agentId}`,
-    `Created: ${conversation.state.createdAt}`,
-    `Updated: ${conversation.state.updatedAt}`,
+    `Created: ${formatTimestamp(conversation.state.createdAt)}`,
+    `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
     "",
   ];
 
