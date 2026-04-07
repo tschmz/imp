@@ -1,19 +1,24 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
+import { normalizeCommandArgument } from "./utils.js";
 
 export const newCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "new",
-    description: "Start a fresh session",
+    description: "Start a new session, optionally with /new <title>",
+    usage: "/new [title]",
   },
   canHandle(command) {
     return command === "new";
   },
   async handle({ message, dependencies, logger }: InboundCommandContext) {
+    const title = normalizeCommandArgument(message.commandArgs);
+
     await dependencies.conversationStore.create(message.conversation, {
       agentId: dependencies.defaultAgentId,
       now: message.receivedAt,
+      ...(title ? { title } : {}),
     });
-    await logger?.debug("reset conversation via inbound command", {
+    await logger?.debug("created new session via inbound command", {
       botId: message.botId,
       transport: message.conversation.transport,
       conversationId: message.conversation.externalId,
@@ -25,7 +30,9 @@ export const newCommandHandler: InboundCommandHandler = {
 
     return {
       conversation: message.conversation,
-      text: "Started a fresh session. Your previous session is still available in /history.",
+      text: title
+        ? `Started a fresh session titled "${title}". Your previous session is still available in /history.`
+        : "Started a fresh session. Your previous session is still available in /history.",
     };
   },
 };

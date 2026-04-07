@@ -8,7 +8,7 @@ export type IncomingMessageCommand =
   | "restore"
   | "whoami"
   | "rename"
-  | "clear"
+  | "reset"
   | "export"
   | "ping"
   | "config"

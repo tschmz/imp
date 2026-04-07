@@ -47,13 +47,10 @@ describe("historyCommandHandler", () => {
 
     expect(historyCommandHandler.canHandle("history")).toBe(true);
     expect(response?.text).toContain("Session history:");
-    expect(response?.text).toContain("Active session:");
-    expect(response?.text).toContain("- Title: Current work");
-    expect(response?.text).toContain("- Messages: 1");
-    expect(response?.text).toContain("1. Earlier investigation (session-1)");
-    expect(response?.text).toMatch(/ {3}Updated: .+/);
-    expect(response?.text).toContain("   Agent: ops");
-    expect(response?.text).toContain("- Working directory: not set");
+    expect(response?.text).toContain("Current:");
+    expect(response?.text).toContain("- Current work · agent default · 1 message · updated ");
+    expect(response?.text).toContain("- wd not set");
+    expect(response?.text).toContain("1. Earlier investigation · agent ops · 2 messages · ");
   });
 
   it("falls back to an untitled label for previous sessions without a title", async () => {
@@ -86,9 +83,8 @@ describe("historyCommandHandler", () => {
 
     const response = await historyCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Active session: none");
-    expect(response?.text).toContain("1. untitled (session-1)");
-    expect(response?.text).toContain("   Messages: 2");
+    expect(response?.text).toContain("Current:\n- none");
+    expect(response?.text).toContain("1. untitled · agent ops · 2 messages · ");
   });
 
   it("falls back to the agent workspace for the active session working directory", async () => {
@@ -129,8 +125,8 @@ describe("historyCommandHandler", () => {
 
     const response = await historyCommandHandler.handle(context);
 
-    expect(response?.text).toContain("- Working directory: /workspace/project");
-    expect(response?.text).toContain("Previous sessions:");
+    expect(response?.text).toContain("- wd /workspace/project");
+    expect(response?.text).toContain("Previous:");
     expect(response?.text).toContain("- none");
   });
 });

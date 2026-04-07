@@ -1,4 +1,4 @@
-import { renderRestoreUsage } from "./renderers.js";
+import { formatTimestamp, renderRestoreUsage } from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 import { pickRestoreBackup } from "./utils.js";
 
@@ -39,13 +39,15 @@ export const restoreCommandHandler: InboundCommandHandler = {
       backupId: selectedBackup.id,
       agentId: selectedBackup.agentId,
     });
+    const title = selectedBackup.title?.trim();
+
     return {
       conversation: message.conversation,
       text: [
-        `Switched to session ${backups.indexOf(selectedBackup) + 1} from /history.`,
+        `Restored session ${backups.indexOf(selectedBackup) + 1}: ${title && title.length > 0 ? title : "untitled"}`,
         `Agent: ${selectedBackup.agentId}`,
         `Messages: ${selectedBackup.messageCount}`,
-        `Updated: ${selectedBackup.updatedAt}`,
+        `Updated: ${formatTimestamp(selectedBackup.updatedAt)}`,
       ].join("\n"),
     };
   },

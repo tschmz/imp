@@ -11,4 +11,5 @@ export const priorityInboundCommands = new Set<IncomingMessageCommand>([
   "config",
   "logs",
   "rename",
+  "reset",
 ]);

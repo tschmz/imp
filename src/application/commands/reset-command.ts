@@ -1,19 +1,19 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
-export const clearCommandHandler: InboundCommandHandler = {
+export const resetCommandHandler: InboundCommandHandler = {
   metadata: {
-    name: "clear",
-    description: "Clear the active session",
+    name: "reset",
+    description: "Reset the current session messages",
   },
   canHandle(command) {
-    return command === "clear";
+    return command === "reset";
   },
   async handle({ message, dependencies }: InboundCommandContext) {
     const existing = await dependencies.conversationStore.get(message.conversation);
     if (!existing) {
       return {
         conversation: message.conversation,
-        text: "There is no active session to clear.",
+        text: "There is no active session whose messages can be reset.",
       };
     }
 
@@ -30,7 +30,7 @@ export const clearCommandHandler: InboundCommandHandler = {
     });
     return {
       conversation: message.conversation,
-      text: "Cleared the active session. The current agent and title were preserved.",
+      text: "Reset the messages in the current session. The current agent and title were preserved.",
     };
   },
 };

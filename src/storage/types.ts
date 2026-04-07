@@ -16,6 +16,6 @@ export interface ConversationStore {
   put(context: ConversationContext): Promise<void>;
   listBackups(ref: ChatRef): Promise<ConversationBackupSummary[]>;
   restore(ref: ChatRef, backupId: string, options?: { now?: Date }): Promise<boolean>;
-  ensureActive(ref: ChatRef, options: { agentId: string; now: string }): Promise<ConversationContext>;
-  create(ref: ChatRef, options: { agentId: string; now: string }): Promise<ConversationContext>;
+  ensureActive(ref: ChatRef, options: { agentId: string; now: string; title?: string }): Promise<ConversationContext>;
+  create(ref: ChatRef, options: { agentId: string; now: string; title?: string }): Promise<ConversationContext>;
 }

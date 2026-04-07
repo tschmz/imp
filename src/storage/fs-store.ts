@@ -183,7 +183,7 @@ async function readInactiveSessions(
 
 function createEmptyConversationContext(
   ref: ChatRef,
-  options: { agentId: string; now: string },
+  options: { agentId: string; now: string; title?: string },
 ): ConversationContext {
   const conversation: ConversationRef = {
     transport: ref.transport,
@@ -195,6 +195,7 @@ function createEmptyConversationContext(
     state: {
       conversation,
       agentId: options.agentId,
+      ...(typeof options.title === "string" ? { title: options.title } : {}),
       createdAt: options.now,
       updatedAt: options.now,
       version: 1,

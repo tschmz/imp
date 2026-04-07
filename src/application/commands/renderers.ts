@@ -2,7 +2,7 @@ import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
 import type { ConversationBackupSummary } from "../../storage/types.js";
 
-function formatTimestamp(value: string): string {
+export function formatTimestamp(value: string): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
@@ -22,8 +22,8 @@ function resolveDisplayedWorkingDirectory(
   return conversation?.state.workingDirectory ?? agent?.workspace?.cwd ?? "not set";
 }
 
-function renderSessionLabel(title: string | undefined, sessionId: string): string {
-  return `${title ?? "untitled"} (${sessionId})`;
+function renderHistoryEntryLabel(title: string | undefined): string {
+  return title ?? "untitled";
 }
 
 export function renderStatusMessage(
@@ -61,18 +61,18 @@ export function renderHistoryMessage(
   const lines = ["Session history:", ""];
 
   if (conversation) {
-    lines.push("Active session:");
-    lines.push(`- Title: ${conversation.state.title ?? "untitled"}`);
-    lines.push(`- Agent: ${conversation.state.agentId}`);
-    lines.push(`- Messages: ${conversation.messages.length}`);
-    lines.push(`- Updated: ${formatTimestamp(conversation.state.updatedAt)}`);
-    lines.push(`- Working directory: ${resolveDisplayedWorkingDirectory(conversation, agent)}`);
+    lines.push("Current:");
+    lines.push(
+      `- ${renderHistoryEntryLabel(conversation.state.title)} · agent ${conversation.state.agentId} · ${conversation.messages.length} message${conversation.messages.length === 1 ? "" : "s"} · updated ${formatTimestamp(conversation.state.updatedAt)}`,
+    );
+    lines.push(`- wd ${resolveDisplayedWorkingDirectory(conversation, agent)}`);
   } else {
-    lines.push("Active session: none");
+    lines.push("Current:");
+    lines.push("- none");
   }
 
   lines.push("");
-  lines.push("Previous sessions:");
+  lines.push("Previous:");
 
   if (backups.length === 0) {
     lines.push("- none");
@@ -80,14 +80,13 @@ export function renderHistoryMessage(
   }
 
   for (const [index, backup] of backups.entries()) {
-    lines.push(`${index + 1}. ${renderSessionLabel(backup.title, backup.sessionId)}`);
-    lines.push(`   Updated: ${formatTimestamp(backup.updatedAt)}`);
-    lines.push(`   Messages: ${backup.messageCount}`);
-    lines.push(`   Agent: ${backup.agentId}`);
+    lines.push(
+      `${index + 1}. ${renderHistoryEntryLabel(backup.title)} · agent ${backup.agentId} · ${backup.messageCount} message${backup.messageCount === 1 ? "" : "s"} · ${formatTimestamp(backup.updatedAt)}`,
+    );
   }
 
   lines.push("");
-  lines.push("Use /restore <n> to switch to one of these sessions.");
+  lines.push("Use /restore <n> to switch sessions.");
   return lines.join("\n");
 }
 
