@@ -24,6 +24,16 @@ export const telegramTransportConfigSchema = z.object({
       defaultAgentId: z.string().min(1).optional(),
     })
     .optional(),
+  voice: z
+    .object({
+      enabled: z.boolean(),
+      transcription: z.object({
+        provider: z.literal("openai"),
+        model: z.string().min(1),
+        language: z.string().min(1).optional(),
+      }),
+    })
+    .optional(),
 });
 
 export function normalizeTelegramRuntimeConfig(
@@ -37,6 +47,7 @@ export function normalizeTelegramRuntimeConfig(
     type: bot.type,
     token: bot.token,
     allowedUserIds: bot.access.allowedUserIds,
+    ...(bot.voice ? { voice: bot.voice } : {}),
     defaultAgentId: bot.routing?.defaultAgentId ?? options.defaultAgentId,
     paths: {
       dataRoot: options.dataRoot,

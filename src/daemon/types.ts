@@ -11,6 +11,18 @@ export interface TelegramBotRuntimeConfig extends BaseTransportRuntimeConfig {
   type: "telegram";
   token: string;
   allowedUserIds: string[];
+  voice?: TelegramVoiceRuntimeConfig;
+}
+
+export interface TelegramVoiceRuntimeConfig {
+  enabled: boolean;
+  transcription: TelegramTranscriptionRuntimeConfig;
+}
+
+export interface TelegramTranscriptionRuntimeConfig {
+  provider: "openai";
+  model: string;
+  language?: string;
 }
 
 export type TransportBotRuntimeConfig = TelegramBotRuntimeConfig;

@@ -112,6 +112,13 @@
       "token": "replace-me",
       "access": {
         "allowedUserIds": []
+      },
+      "voice": {
+        "enabled": true,
+        "transcription": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-transcribe"
+        }
       }
     },
     {

@@ -3,6 +3,7 @@ import { inboundCommandMenu } from "../../application/commands/registry.js";
 import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
+import type { VoiceTranscriber } from "./openai-voice-transcriber.js";
 
 describe("createTelegramTransport", () => {
   it("registers the new command on startup", async () => {
@@ -584,6 +585,167 @@ describe("createTelegramTransport", () => {
       vi.useRealTimers();
     }
   });
+
+  it("transcribes voice messages and shows the transcript before the agent reply", async () => {
+    const bot = createFakeBot();
+    const voiceTranscriber: VoiceTranscriber = {
+      transcribe: vi.fn(async () => ({ text: "hello from voice" })),
+    };
+    let capturedMessage: IncomingMessage | undefined;
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+        voice: {
+          enabled: true,
+          transcription: {
+            provider: "openai",
+            model: "gpt-4o-mini-transcribe",
+          },
+        },
+      },
+      bot,
+      undefined,
+      {
+        fetch: vi.fn<typeof fetch>(async () =>
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: {
+              "Content-Type": "audio/ogg",
+            },
+          }),
+        ),
+        voiceTranscriber,
+      },
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedMessage = event.message;
+        await event.runWithProcessing(async () => {
+          await event.deliver({
+            conversation: event.message.conversation,
+            text: "agent reply",
+          });
+        });
+      }),
+    });
+    await bot.emitVoiceMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 99,
+        voice: {
+          file_id: "voice-file",
+          mime_type: "audio/ogg",
+        },
+      },
+    });
+
+    expect(capturedMessage?.text).toBe("hello from voice");
+    expect(capturedMessage?.command).toBeUndefined();
+    expect(bot.api.getFile).toHaveBeenCalledWith("voice-file");
+    expect(bot.reply).toHaveBeenNthCalledWith(1, "<b>Transcript</b>\nhello from voice", {
+      parse_mode: "HTML",
+    });
+    expect(bot.reply).toHaveBeenNthCalledWith(2, "agent reply", {
+      parse_mode: "HTML",
+    });
+  });
+
+  it("replies clearly when voice messages are disabled", async () => {
+    const bot = createFakeBot();
+    const handler = {
+      handle: vi.fn(async () => {}),
+    };
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+    );
+
+    await transport.start(handler);
+    await bot.emitVoiceMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 99,
+        voice: {
+          file_id: "voice-file",
+        },
+      },
+    });
+
+    expect(handler.handle).not.toHaveBeenCalled();
+    expect(bot.reply).toHaveBeenCalledWith("Voice messages are not enabled for this bot.");
+  });
+
+  it("returns a stable reply when voice transcription fails", async () => {
+    const bot = createFakeBot();
+    const logger = createMockLogger();
+    const voiceTranscriber: VoiceTranscriber = {
+      transcribe: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    };
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+        voice: {
+          enabled: true,
+          transcription: {
+            provider: "openai",
+            model: "gpt-4o-mini-transcribe",
+          },
+        },
+      },
+      bot,
+      logger,
+      {
+        fetch: vi.fn<typeof fetch>(async () =>
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+          }),
+        ),
+        voiceTranscriber,
+      },
+    );
+
+    await transport.start({
+      handle: vi.fn(async () => {}),
+    });
+    await bot.emitVoiceMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 99,
+        voice: {
+          file_id: "voice-file",
+        },
+      },
+    });
+
+    expect(bot.reply).toHaveBeenCalledWith("Sorry, I couldn't transcribe that voice message.");
+    expect(logger.error).toHaveBeenCalledWith(
+      "failed to transcribe telegram voice message",
+      expect.objectContaining({
+        botId: "private-telegram",
+        transport: "telegram",
+        conversationId: "42",
+        messageId: "99",
+      }),
+      expect.objectContaining({ message: "boom" }),
+    );
+  });
 });
 
 function createMockLogger(): Logger {
@@ -609,17 +771,22 @@ async function waitForAsync(predicate: () => boolean, attempts = 20): Promise<vo
 function createFakeBot(): {
   api: {
     getMe(): Promise<{ username: string }>;
+    getFile(fileId: string): Promise<{ file_path?: string }>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
     setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;
   };
   on(
-    filter: "message:text",
+    filter: "message" | "message:text",
     handler: (ctx: {
       chat?: { id: number; type: string };
       message?: {
-        entities?: Array<{ type: string; offset: number; length: number }>;
         message_id: number;
-        text: string;
+        entities?: Array<{ type: string; offset: number; length: number }>;
+        text?: string;
+        voice?: {
+          file_id: string;
+          mime_type?: string;
+        };
       };
       from?: { id: number };
       reply(
@@ -641,6 +808,17 @@ function createFakeBot(): {
       text: string;
     };
   }): Promise<void>;
+  emitVoiceMessage(input: {
+    chat: { id: number; type: string };
+    from: { id: number };
+    message: {
+      message_id: number;
+      voice: {
+        file_id: string;
+        mime_type?: string;
+      };
+    };
+  }): Promise<void>;
   reply: ReturnType<
     typeof vi.fn<(text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }) => Promise<void>>
   >;
@@ -649,9 +827,13 @@ function createFakeBot(): {
     | ((ctx: {
         chat?: { id: number; type: string };
         message?: {
-          entities?: Array<{ type: string; offset: number; length: number }>;
           message_id: number;
-          text: string;
+          entities?: Array<{ type: string; offset: number; length: number }>;
+          text?: string;
+          voice?: {
+            file_id: string;
+            mime_type?: string;
+          };
         };
         from?: { id: number };
         reply(
@@ -662,6 +844,7 @@ function createFakeBot(): {
         ): Promise<unknown>;
       }) => Promise<void>)
     | undefined;
+  let onVoiceMessage = onTextMessage;
 
   const reply = vi
     .fn<(text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }) => Promise<void>>()
@@ -670,11 +853,19 @@ function createFakeBot(): {
   return {
     api: {
       getMe: vi.fn(async () => ({ username: "test_bot" })),
+      getFile: vi.fn(async () => ({ file_path: "voice/test.ogg" })),
       sendChatAction: vi.fn(async () => ({})),
       setMyCommands: vi.fn(async () => ({})),
     },
-    on(_filter, handler) {
-      onTextMessage = handler;
+    on(filter, handler) {
+      if (filter === "message:text") {
+        onTextMessage = handler;
+        return;
+      }
+
+      if (filter === "message") {
+        onVoiceMessage = handler;
+      }
     },
     async start() {},
     stop() {},
@@ -684,6 +875,16 @@ function createFakeBot(): {
       }
 
       await onTextMessage({
+        ...input,
+        reply,
+      });
+    },
+    async emitVoiceMessage(input) {
+      if (!onVoiceMessage) {
+        throw new Error("voice handler was not registered");
+      }
+
+      await onVoiceMessage({
         ...input,
         reply,
       });

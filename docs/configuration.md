@@ -102,9 +102,20 @@ Common Telegram fields:
 - `enabled`: whether the bot starts
 - `token`: Telegram bot token
 - `access.allowedUserIds`: list of allowed Telegram user IDs
+- `voice.enabled`: whether Telegram voice messages are accepted for this bot
+- `voice.transcription.provider`: STT backend, currently only `openai`
+- `voice.transcription.model`: OpenAI transcription model, for example `gpt-4o-mini-transcribe`
+- `voice.transcription.language`: optional ISO-639-1 language hint such as `en`
 - `routing.defaultAgentId`: optional per-bot agent override
 
 Only enabled bots are started. At least one bot must be enabled.
+
+Voice transcription notes:
+
+- V1 only accepts Telegram `voice` messages, not arbitrary audio uploads.
+- When enabled, voice messages are transcribed into plain text before they reach the application layer.
+- The transcript is shown in Telegram before the agent reply, but sessions remain text-centric and store the transcript text rather than the original audio.
+- OpenAI transcription requires `OPENAI_API_KEY` in the runtime environment or service environment.
 
 ## Relative Paths
 

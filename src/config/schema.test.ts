@@ -149,6 +149,44 @@ describe("appConfigSchema", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("accepts telegram voice transcription config", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "replace-me",
+          access: {
+            allowedUserIds: [],
+          },
+          voice: {
+            enabled: true,
+            transcription: {
+              provider: "openai",
+              model: "gpt-4o-mini-transcribe",
+              language: "en",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
 });
 
 function createConfig(agent: Record<string, unknown>) {

@@ -31,3 +31,5 @@ Notes:
 - `/start` is treated as an alias for `/new`.
 - `/reload` and `/restart` are most useful when `imp` is installed under a service manager.
 - `/logs` reads the bot's daemon log file. If no log file exists yet, the command says so instead of inferring that the bot is live.
+- If `bots[].voice.enabled` is configured, private Telegram voice messages are accepted, transcribed, echoed back as a `Transcript` message, and then processed like normal user text.
+- Voice transcription V1 uses OpenAI only and requires `OPENAI_API_KEY` in the daemon environment.

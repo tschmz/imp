@@ -40,12 +40,24 @@ export interface TelegramBotConfig extends BaseBotConfig {
   type: "telegram";
   token: string;
   access: TelegramAccessConfig;
+  voice?: TelegramVoiceConfig;
 }
 
 export type BotConfig = TelegramBotConfig;
 
 export interface TelegramAccessConfig {
   allowedUserIds: string[];
+}
+
+export interface TelegramVoiceConfig {
+  enabled: boolean;
+  transcription: TelegramTranscriptionConfig;
+}
+
+export interface TelegramTranscriptionConfig {
+  provider: "openai";
+  model: string;
+  language?: string;
 }
 
 export interface BotRoutingConfig {

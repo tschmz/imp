@@ -41,6 +41,14 @@ describe("resolveRuntimeConfig", () => {
           access: {
             allowedUserIds: ["42"],
           },
+          voice: {
+            enabled: true,
+            transcription: {
+              provider: "openai",
+              model: "gpt-4o-mini-transcribe",
+              language: "en",
+            },
+          },
           routing: {
             defaultAgentId: "ops-agent",
           },
@@ -83,6 +91,14 @@ describe("resolveRuntimeConfig", () => {
         type: "telegram",
         token: "telegram-token",
         allowedUserIds: ["42"],
+        voice: {
+          enabled: true,
+          transcription: {
+            provider: "openai",
+            model: "gpt-4o-mini-transcribe",
+            language: "en",
+          },
+        },
         defaultAgentId: "ops-agent",
         paths: {
           dataRoot: "/var/lib/imp",
