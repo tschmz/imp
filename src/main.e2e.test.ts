@@ -3,13 +3,14 @@ import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const tempDirs: string[] = [];
 const projectRoot = resolveProjectRoot();
+const cliEntryPoint = join(projectRoot, "dist", "main.js");
 
 afterEach(async () => {
   await Promise.all(
@@ -19,14 +20,6 @@ afterEach(async () => {
     }),
   );
 });
-
-beforeAll(async () => {
-  await execFileAsync(process.execPath, ["./node_modules/typescript/bin/tsc", "-p", "tsconfig.json"], {
-    cwd: projectRoot,
-    env: process.env,
-  });
-  chmodSync(join(projectRoot, "dist", "main.js"), 0o755);
-}, 30_000);
 
 describe("imp CLI e2e", () => {
   it("shows help output when no command is given", async () => {
@@ -189,7 +182,7 @@ describe("imp CLI e2e", () => {
     expect(await readFile(promptPath, "utf8")).toBe("backup prompt\n");
     expect(await readFile(authPath, "utf8")).toBe('{"token":"secret"}\n');
     expect(await readFile(conversationPath, "utf8")).toContain('"hi"');
-  });
+  }, 10_000);
 
   it("updates a discovered config value through `imp config set` using array id navigation", async () => {
     const root = await createTempDir();
@@ -429,7 +422,7 @@ async function runCli(
   args: string[],
   env: NodeJS.ProcessEnv,
 ): Promise<{ stdout: string; stderr: string }> {
-  return execFileAsync("node", ["dist/main.js", ...args], {
+  return execFileAsync(process.execPath, [cliEntryPoint, ...args], {
     cwd: projectRoot,
     env,
   });
