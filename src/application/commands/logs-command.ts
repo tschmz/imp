@@ -4,8 +4,10 @@ import { parsePositiveIntegerArgument } from "./utils.js";
 export const logsCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "logs",
-    description: "Show recent bot log lines",
+    description: "Show recent bot logs",
     usage: "/logs [lines]",
+    helpDescription: "Show recent daemon log lines for this bot",
+    helpGroup: "Diagnostics",
   },
   canHandle(command) {
     return command === "logs";

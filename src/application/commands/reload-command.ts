@@ -3,7 +3,9 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 export const reloadCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "reload",
-    description: "Restart after this reply to reload config",
+    description: "Reload config after this reply",
+    helpDescription: "Exit after this reply so a supervisor can reload config",
+    helpGroup: "Diagnostics",
   },
   canHandle(command) {
     return command === "reload";

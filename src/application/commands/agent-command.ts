@@ -6,8 +6,9 @@ import { normalizeCommandArgument } from "./utils.js";
 export const agentCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "agent",
-    description: "Show or switch the active agent",
+    description: "Show or change the session agent",
     usage: "/agent [id]",
+    helpGroup: "Context",
   },
   canHandle(command) {
     return command === "agent";

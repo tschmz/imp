@@ -3,7 +3,9 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 export const resetCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "reset",
-    description: "Reset the current session messages",
+    description: "Reset messages in the current session",
+    helpDescription: "Reset messages in the current session while preserving its title and agent",
+    helpGroup: "Sessions",
   },
   canHandle(command) {
     return command === "reset";

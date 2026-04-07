@@ -15,6 +15,7 @@ export function createHandleIncomingMessage(
   dependencies: HandleIncomingMessageDependencies,
 ): HandleIncomingMessage {
   const defaultAgent = dependencies.agentRegistry.get(dependencies.defaultAgentId);
+  const availableCommands = dependencies.availableCommands ?? inboundCommandHandlers;
   const loadAppConfigImpl = dependencies.loadAppConfig ?? loadAppConfig;
   const readRecentLogLinesImpl = dependencies.readRecentLogLines ?? readRecentLogLines;
 
@@ -25,11 +26,14 @@ export function createHandleIncomingMessage(
   return {
     async handle(message: IncomingMessage): Promise<OutgoingMessage> {
       if (message.command) {
-        const handler = inboundCommandHandlers.find((candidate) => candidate.canHandle(message.command));
+        const handler = availableCommands.find((candidate) => candidate.canHandle(message.command));
         if (handler) {
           const commandResponse = await handler.handle({
             message,
-            dependencies,
+            dependencies: {
+              ...dependencies,
+              availableCommands,
+            },
             logger: dependencies.logger,
             loadAppConfig: loadAppConfigImpl,
             readRecentLogLines: readRecentLogLinesImpl,

@@ -4,6 +4,8 @@ export const restartCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "restart",
     description: "Restart after this reply",
+    helpDescription: "Exit after this reply so a supervisor can restart the daemon",
+    helpGroup: "Diagnostics",
   },
   canHandle(command) {
     return command === "restart";

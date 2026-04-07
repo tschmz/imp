@@ -4,6 +4,8 @@ export const pingCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "ping",
     description: "Check bot responsiveness",
+    helpDescription: "Check whether the bot is responsive",
+    helpGroup: "Diagnostics",
   },
   canHandle(command) {
     return command === "ping";

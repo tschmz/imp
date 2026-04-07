@@ -5,8 +5,9 @@ import { normalizeCommandArgument } from "./utils.js";
 export const renameCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "rename",
-    description: "Rename with /rename <title>",
+    description: "Rename the current session",
     usage: "/rename <title>",
+    helpGroup: "Sessions",
   },
   canHandle(command) {
     return command === "rename";

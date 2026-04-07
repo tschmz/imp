@@ -5,8 +5,10 @@ import { pickRestoreBackup } from "./utils.js";
 export const restoreCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "restore",
-    description: "Switch to a session from /history",
+    description: "Restore a session from history",
     usage: "/restore <n>",
+    helpDescription: "Restore a session from /history. 1 is the most recent previous session",
+    helpGroup: "Sessions",
   },
   canHandle(command) {
     return command === "restore";

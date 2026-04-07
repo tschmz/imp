@@ -4,6 +4,8 @@ export const whoamiCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "whoami",
     description: "Show bot and user IDs",
+    helpDescription: "Show your current bot, chat, and user IDs",
+    helpGroup: "Diagnostics",
   },
   canHandle(command) {
     return command === "whoami";

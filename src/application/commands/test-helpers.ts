@@ -3,6 +3,7 @@ import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
 import type { IncomingMessage } from "../../domain/message.js";
 import type { ConversationStore } from "../../storage/types.js";
+import { inboundCommandHandlers } from "./registry.js";
 import type { HandleIncomingMessageDependencies, InboundCommandContext } from "./types.js";
 
 export function createIncomingMessage(
@@ -91,6 +92,7 @@ export function createDependencies(
       loggingLevel: "info",
       activeBotIds: ["private-telegram", "ops-telegram"],
     },
+    availableCommands: inboundCommandHandlers,
     ...overrides,
   };
 }

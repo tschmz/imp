@@ -17,7 +17,9 @@ async function readAppConfigSummary(
 export const configCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "config",
-    description: "Show runtime config details",
+    description: "Show runtime config",
+    helpDescription: "Show runtime and config details for this bot",
+    helpGroup: "Diagnostics",
   },
   canHandle(command) {
     return command === "config";

@@ -4,7 +4,8 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 export const exportCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "export",
-    description: "Export the current conversation",
+    description: "Export the current session transcript",
+    helpGroup: "Sessions",
   },
   canHandle(command) {
     return command === "export";
@@ -14,7 +15,7 @@ export const exportCommandHandler: InboundCommandHandler = {
     if (!conversation) {
       return {
         conversation: message.conversation,
-        text: "There is no active conversation to export.",
+        text: "There is no active session to export.",
       };
     }
 

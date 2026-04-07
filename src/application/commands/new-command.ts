@@ -4,8 +4,10 @@ import { normalizeCommandArgument } from "./utils.js";
 export const newCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "new",
-    description: "Start a new session, optionally with /new <title>",
+    description: "Start a new session",
     usage: "/new [title]",
+    helpDescription: "Start a new session. The previous one stays available in /history",
+    helpGroup: "Sessions",
   },
   canHandle(command) {
     return command === "new";

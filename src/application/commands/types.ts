@@ -21,6 +21,7 @@ export interface HandleIncomingMessageDependencies {
   engine: AgentEngine;
   defaultAgentId: string;
   runtimeInfo: RuntimeCommandInfo;
+  availableCommands?: ReadonlyArray<InboundCommandHandler>;
   loadAppConfig?: typeof loadAppConfig;
   readRecentLogLines?: typeof readRecentLogLines;
   logger?: Logger;
@@ -38,6 +39,8 @@ export interface InboundCommandMetadata {
   name: IncomingMessageCommand;
   description: string;
   usage?: string;
+  helpDescription?: string;
+  helpGroup?: "Sessions" | "Context" | "Diagnostics";
 }
 
 export interface InboundCommandHandler {
