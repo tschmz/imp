@@ -75,7 +75,7 @@ export function createServiceUseCases(
           force,
         });
 
-        const result = await deps.installService({ configPath: resolvedConfigPath, force: true });
+        const result = await deps.installService({ configPath: resolvedConfigPath, force });
         deps.writeOutput(`Installed ${result.operation.platform} service at ${result.operation.definitionPath}`);
       });
     },

@@ -3,6 +3,50 @@ import { ServiceOperationError } from "../service/service-error.js";
 import { createServiceUseCases } from "./service-use-cases.js";
 
 describe("createServiceUseCases", () => {
+  it("forwards the CLI force flag to service installation", async () => {
+    const discoverConfigPath = vi.fn(async () => ({
+      configPath: "/tmp/config.json",
+      checkedPaths: ["/tmp/config.json"],
+    }));
+    const createServiceInstallPlan = vi.fn(() => ({
+      platform: "linux-systemd-user" as const,
+      serviceName: "imp",
+      serviceLabel: "dev.imp",
+      configPath: "/tmp/config.json",
+      workingDirectory: "/tmp",
+      command: "/usr/bin/node",
+      args: ["/app/dist/main.js", "start", "--config", "/tmp/config.json"],
+      environmentPath: "/tmp/service.env",
+    }));
+    const resolveServiceDefinitionPath = vi.fn(() => "/tmp/imp.service");
+    const assertServiceInstallCanProceed = vi.fn(async () => "/tmp/imp.service");
+    const installService = vi.fn(async ({ force }: { force?: boolean }) => ({
+      operation: {
+        operation: "install" as const,
+        platform: "linux-systemd-user" as const,
+        serviceName: "imp",
+        definitionPath: "/tmp/imp.service",
+      },
+      plan: createServiceInstallPlan(),
+      ...(force !== undefined ? { environmentPath: "/tmp/service.env" } : {}),
+    }));
+    const writeOutput = vi.fn();
+    const useCases = createServiceUseCases({
+      discoverConfigPath,
+      createServiceInstallPlan,
+      resolveServiceDefinitionPath,
+      assertServiceInstallCanProceed,
+      installService,
+      writeOutput,
+    });
+
+    await useCases.installService({ configPath: "/tmp/config.json", dryRun: false, force: false });
+    await useCases.installService({ configPath: "/tmp/config.json", dryRun: false, force: true });
+
+    expect(installService).toHaveBeenNthCalledWith(1, { configPath: "/tmp/config.json", force: false });
+    expect(installService).toHaveBeenNthCalledWith(2, { configPath: "/tmp/config.json", force: true });
+  });
+
   it("orchestrates start with adapter-agnostic service result", async () => {
     const resolveServiceConfigPath = vi.fn(() => "/tmp/config.json");
     const startService = vi.fn(async () => ({
