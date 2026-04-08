@@ -78,6 +78,9 @@ describe("createTelegramTransport", () => {
       userId: "7",
       text: "ping",
       receivedAt: expect.any(String),
+      source: {
+        kind: "text",
+      },
     });
     expect(handler.handle).toHaveBeenCalledTimes(1);
     expect(bot.reply).toHaveBeenCalledWith("pong", {
@@ -645,6 +648,13 @@ describe("createTelegramTransport", () => {
     });
 
     expect(capturedMessage?.text).toBe("hello from voice");
+    expect(capturedMessage?.source).toEqual({
+      kind: "telegram-voice-transcript",
+      transcript: {
+        provider: "openai",
+        model: "gpt-4o-mini-transcribe",
+      },
+    });
     expect(capturedMessage?.command).toBeUndefined();
     expect(bot.api.getFile).toHaveBeenCalledWith("voice-file");
     expect(bot.reply).toHaveBeenNthCalledWith(1, "<b>Transcript</b>\nhello from voice", {

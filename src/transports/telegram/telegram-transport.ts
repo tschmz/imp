@@ -127,6 +127,9 @@ export function createTelegramTransport(
             bot,
             {
               text,
+              source: {
+                kind: "text",
+              },
               options: parseTelegramCommand(textMessage, profile.username),
             },
             logger,
@@ -192,6 +195,13 @@ export function createTelegramTransport(
               {
                 text: transcript,
                 transcript,
+                source: {
+                  kind: "telegram-voice-transcript",
+                  transcript: {
+                    provider: config.voice.transcription.provider,
+                    model: config.voice.transcription.model,
+                  },
+                },
               },
               logger,
             ),
@@ -528,6 +538,13 @@ function createTelegramInboundEvent(
   payload: {
     text: string;
     transcript?: string;
+    source?: {
+      kind: "text" | "telegram-voice-transcript";
+      transcript?: {
+        provider: string;
+        model: string;
+      };
+    };
     options?: { command: IncomingMessageCommand; commandArgs?: string };
   },
   logger?: Logger,
@@ -544,6 +561,7 @@ function createTelegramInboundEvent(
       userId: String(ctx.from.id),
       text: payload.text,
       receivedAt: new Date().toISOString(),
+      ...(payload.source ? { source: payload.source } : {}),
       ...(payload.options ? payload.options : {}),
     },
     async runWithProcessing<T>(operation: () => Promise<T>): Promise<T> {

@@ -15,6 +15,15 @@ export interface ConversationMessage {
   text: string;
   createdAt: string;
   correlationId?: string;
+  source?: ConversationMessageSource;
+}
+
+export interface ConversationMessageSource {
+  kind: "text" | "telegram-voice-transcript";
+  transcript?: {
+    provider: string;
+    model: string;
+  };
 }
 
 export interface ConversationState {

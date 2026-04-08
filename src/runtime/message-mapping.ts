@@ -7,6 +7,9 @@ import type {
 } from "@mariozechner/pi-ai";
 import type { ConversationMessage } from "../domain/conversation.js";
 
+const TRANSCRIBED_MESSAGE_PREFIX =
+  "[Transcribed from a Telegram voice message. Automatic speech recognition may contain mistakes. If the request seems unclear or inconsistent with the conversation, ask a brief clarifying question before acting on uncertain details.]\n";
+
 const EMPTY_USAGE: Usage = {
   input: 0,
   output: 0,
@@ -30,7 +33,7 @@ export function toAgentMessages(
     if (message.role === "user") {
       result.push({
         role: "user",
-        content: message.text,
+        content: renderUserMessageContent(message),
         timestamp: Date.parse(message.createdAt),
       });
       return result;
@@ -51,6 +54,14 @@ export function toAgentMessages(
 
     return result;
   }, []);
+}
+
+function renderUserMessageContent(message: ConversationMessage): string {
+  if (message.source?.kind === "telegram-voice-transcript") {
+    return `${TRANSCRIBED_MESSAGE_PREFIX}${message.text}`;
+  }
+
+  return message.text;
 }
 
 export function getAssistantText(message: AssistantMessage): string {

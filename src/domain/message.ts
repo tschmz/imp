@@ -27,8 +27,17 @@ export interface IncomingMessage {
   userId: string;
   text: string;
   receivedAt: string;
+  source?: IncomingMessageSource;
   command?: IncomingMessageCommand;
   commandArgs?: string;
+}
+
+export interface IncomingMessageSource {
+  kind: "text" | "telegram-voice-transcript";
+  transcript?: {
+    provider: string;
+    model: string;
+  };
 }
 
 export interface OutgoingMessage {
