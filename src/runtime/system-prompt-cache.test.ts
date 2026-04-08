@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
 import { InMemoryCacheStrategy, SystemPromptCache } from "./system-prompt-cache.js";
+import type { PromptTemplateContext } from "./prompt-template.js";
 
 describe("SystemPromptCache", () => {
   it("builds cache keys using file fingerprints", async () => {
@@ -14,9 +15,11 @@ describe("SystemPromptCache", () => {
       agent: createAgent(),
       promptWorkingDirectory: "/workspace/project",
       promptFiles: ["/workspace/AGENTS.md"],
+      templateContext: createTemplateContext(),
     });
 
     expect(key).toContain('"files":["/workspace/AGENTS.md:/workspace/AGENTS.md:fp"]');
+    expect(key).toContain('"bot":{"id":"private-telegram"}');
   });
 
   it("evicts prior key per agent on set", () => {
@@ -47,5 +50,36 @@ function createAgent(): AgentDefinition {
     },
     tools: [],
     extensions: [],
+  };
+}
+
+function createTemplateContext(): PromptTemplateContext {
+  return {
+    system: {
+      os: "Linux",
+      platform: "linux",
+      arch: "x64",
+      hostname: "builder",
+      username: "thomas",
+      homeDir: "/home/thomas",
+    },
+    bot: {
+      id: "private-telegram",
+    },
+    agent: {
+      id: "default",
+      model: {
+        provider: "faux",
+        modelId: "faux-1",
+      },
+      workspace: {},
+    },
+    transport: {
+      kind: "telegram",
+    },
+    imp: {
+      configPath: "/etc/imp/config.json",
+      dataRoot: "/var/lib/imp",
+    },
   };
 }

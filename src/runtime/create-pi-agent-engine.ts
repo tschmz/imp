@@ -7,6 +7,11 @@ import type { ToolRegistry } from "../tools/registry.js";
 import type { AgentHandle } from "./agent-execution.js";
 import { executeAgent } from "./agent-execution.js";
 import { defaultResolveModel, resolveModelOrThrow, type ModelResolver } from "./model-resolution.js";
+import {
+  createDefaultPromptTemplateSystemContext,
+  createPromptTemplateContext,
+  type PromptTemplateSystemContext,
+} from "./prompt-template.js";
 import { resolveSystemPrompt } from "./system-prompt-resolution.js";
 import { InMemoryCacheStrategy, SystemPromptCache } from "./system-prompt-cache.js";
 import type { AgentEngine } from "./types.js";
@@ -34,6 +39,7 @@ interface PiAgentEngineDependencies {
     workingDirectory: string | WorkingDirectoryState,
     agent?: AgentDefinition,
   ) => ToolRegistry;
+  promptTemplateSystemContext?: PromptTemplateSystemContext;
 }
 
 interface EngineLogContext {
@@ -63,6 +69,8 @@ export function createPiAgentEngine(
     dependencies.getContextFileFingerprint ?? defaultGetContextFileFingerprint;
   const buildToolRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
+  const promptTemplateSystemContext =
+    dependencies.promptTemplateSystemContext ?? createDefaultPromptTemplateSystemContext();
   const logger = dependencies.logger;
   const systemPromptCache = new SystemPromptCache({
     readTextFile,
@@ -98,6 +106,14 @@ export function createPiAgentEngine(
         const systemPromptResolution = await resolveSystemPrompt({
           agent: input.agent,
           promptWorkingDirectory,
+          templateContext: createPromptTemplateContext({
+            system: promptTemplateSystemContext,
+            agent: input.agent,
+            botId: input.message.botId,
+            transportKind: input.message.conversation.transport,
+            configPath: input.runtime?.configPath,
+            dataRoot: input.runtime?.dataRoot,
+          }),
           readTextFile,
           cache: systemPromptCache,
         });

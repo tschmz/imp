@@ -41,6 +41,46 @@ You can then add:
 
 This is the main way to adapt `imp` to a project, workspace, or operating style.
 
+## Prompt File Templates
+
+V1 prompt templating is intentionally narrow.
+
+- only file-backed `prompt.instructions` and `prompt.references` are templated
+- `prompt.base` is not templated
+- inline `text` sources are not templated
+- syntax is only `{{path.to.value}}`
+- unknown variables fail immediately with the file path in the error
+- documented variables with no runtime value render as an empty string
+- functions, loops, conditionals, defaults, and time-based variables are not supported
+
+Available variables:
+
+- `system.os`
+- `system.platform`
+- `system.arch`
+- `system.hostname`
+- `system.username`
+- `system.homeDir`
+- `bot.id`
+- `agent.id`
+- `agent.model.provider`
+- `agent.model.modelId`
+- `agent.authFile`
+- `agent.workspace.cwd`
+- `transport.kind`
+- `imp.configPath`
+- `imp.dataRoot`
+
+Example instruction file:
+
+```md
+Run on {{system.platform}} as {{system.username}}.
+Bot: {{bot.id}}
+Agent: {{agent.id}} using {{agent.model.provider}}/{{agent.model.modelId}}
+Workspace: {{agent.workspace.cwd}}
+Config: {{imp.configPath}}
+```
+
 ## Using Workspace Files
 
 A typical project-aware agent uses:

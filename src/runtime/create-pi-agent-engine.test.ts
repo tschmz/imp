@@ -150,6 +150,68 @@ describe("createPiAgentEngine", () => {
     );
   });
 
+  it("marks transcribed voice messages in model input so the agent can clarify", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        expect(context.messages).toHaveLength(3);
+        expect(context.messages[0]).toMatchObject({
+          role: "user",
+        });
+        expect(String(context.messages[0]?.content)).toContain(
+          "Transcribed from a Telegram voice message",
+        );
+        expect(String(context.messages[0]?.content)).toContain(
+          "ask a brief clarifying question",
+        );
+        expect(String(context.messages[0]?.content)).toContain(
+          "hello",
+        );
+        return fauxAssistantMessage("I may need clarification.");
+      },
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async () => "unused context",
+    });
+
+    const result = await engine.run({
+      agent: createAgent(),
+      conversation: {
+        ...createConversation(),
+        messages: [
+          {
+            id: "voice-1",
+            role: "user",
+            text: "hello",
+            createdAt: "2026-04-05T00:00:00.000Z",
+            source: {
+              kind: "telegram-voice-transcript",
+              transcript: {
+                provider: "openai",
+                model: "gpt-4o-mini-transcribe",
+              },
+            },
+          },
+          {
+            id: "voice-1:assistant",
+            role: "assistant",
+            text: "hi there",
+            createdAt: "2026-04-05T00:00:01.000Z",
+          },
+        ],
+      },
+      message: createIncomingMessage(),
+    });
+
+    expect(result.message.text).toBe("I may need clarification.");
+  });
+
   it("surfaces upstream agent errors instead of masking them as empty text", async () => {
     const registration = registerFauxProvider({
       provider: "faux",
@@ -1030,6 +1092,73 @@ describe("createPiAgentEngine", () => {
       "/workspace/AGENTS.md",
     ]);
     expect(readCalls).toEqual(["/workspace/AGENTS.md"]);
+  });
+
+  it("invalidates the cached system prompt when stable template context changes", async () => {
+    const readCalls: string[] = [];
+    const systemPrompts: string[] = [];
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      promptTemplateSystemContext: {
+        os: "Linux",
+        platform: "linux",
+        arch: "x64",
+        hostname: "builder",
+        username: "thomas",
+        homeDir: "/home/thomas",
+      },
+      getContextFileFingerprint: async () => "mtime:1:size:100",
+      readTextFile: async (path) => {
+        readCalls.push(path);
+        return "Bot {{bot.id}} in {{imp.dataRoot}}.";
+      },
+      createAgent: (options) => {
+        systemPrompts.push(options.initialState?.systemPrompt ?? "");
+        return {
+          state: {
+            messages: [fauxAssistantMessage("response")],
+          },
+          prompt: async () => {},
+        };
+      },
+    });
+
+    await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+      runtime: {
+        configPath: "/etc/imp/config.json",
+        dataRoot: "/var/lib/imp-a",
+      },
+    });
+    await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        botId: "ops-telegram",
+      },
+      runtime: {
+        configPath: "/etc/imp/config.json",
+        dataRoot: "/var/lib/imp-b",
+      },
+    });
+
+    expect(readCalls).toEqual([
+      "/workspace/AGENTS.md",
+      "/workspace/AGENTS.md",
+    ]);
+    expect(systemPrompts).toEqual([
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\nBot private-telegram in /var/lib/imp-a.\n</INSTRUCTIONS>',
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\nBot ops-telegram in /var/lib/imp-b.\n</INSTRUCTIONS>',
+    ]);
   });
 
   it("invalidates the cached system prompt when context fingerprints change", async () => {

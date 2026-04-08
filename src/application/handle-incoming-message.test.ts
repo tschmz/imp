@@ -142,6 +142,105 @@ describe("createHandleIncomingMessage", () => {
 
     expect(response.text).toBe("reply");
     expect(engine.run).toHaveBeenCalledTimes(1);
+    expect(engine.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: {
+          configPath: "/tmp/config.json",
+          dataRoot: "/tmp/data",
+        },
+      }),
+    );
+  });
+
+  it("persists the user message source in conversation history", async () => {
+    const agent = createDefaultAgent();
+    let storedContext:
+      | {
+          state: {
+            conversation: { transport: string; externalId: string; sessionId: string };
+            agentId: string;
+            createdAt: string;
+            updatedAt: string;
+            version: number;
+          };
+          messages: Array<Record<string, unknown>>;
+        }
+      | undefined;
+
+    const conversationStore: ConversationStore = {
+      get: vi.fn(async () => undefined),
+      put: vi.fn(async (context) => {
+        storedContext = context as typeof storedContext;
+      }),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      ensureActive: vi.fn(async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+      create: vi.fn(async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+    };
+
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "reply",
+        },
+      })),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore,
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    await service.handle({
+      ...createIncomingMessage("3", "transcribed text"),
+      source: {
+        kind: "telegram-voice-transcript",
+        transcript: {
+          provider: "openai",
+          model: "gpt-4o-mini-transcribe",
+        },
+      },
+    });
+
+    expect(storedContext?.messages[0]).toMatchObject({
+      role: "user",
+      text: "transcribed text",
+      source: {
+        kind: "telegram-voice-transcript",
+        transcript: {
+          provider: "openai",
+          model: "gpt-4o-mini-transcribe",
+        },
+      },
+    });
   });
 
   it("fails when the default agent cannot be resolved", () => {
@@ -212,6 +311,9 @@ function createIncomingMessage(
     userId: "7",
     text,
     receivedAt: "2026-04-05T00:00:00.000Z",
+    source: {
+      kind: "text",
+    },
     ...(command ? { command } : {}),
     ...(commandArgs ? { commandArgs } : {}),
   };

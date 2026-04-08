@@ -63,6 +63,10 @@ export function createHandleIncomingMessage(
         agent,
         conversation,
         message,
+        runtime: {
+          configPath: dependencies.runtimeInfo.configPath,
+          dataRoot: dependencies.runtimeInfo.dataRoot,
+        },
       });
       const respondedAt = new Date().toISOString();
 
@@ -96,6 +100,7 @@ function toUserConversationMessage(message: IncomingMessage) {
     text: message.text,
     createdAt: message.receivedAt,
     correlationId: message.correlationId,
+    ...(message.source ? { source: message.source } : {}),
   };
 }
 

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
+import type { PromptTemplateContext } from "./prompt-template.js";
 
 export interface CacheStrategy<Value> {
   get(key: string): Value | undefined;
@@ -33,6 +34,7 @@ export interface SystemPromptCacheKeyInput {
   agent: AgentDefinition;
   promptWorkingDirectory?: string;
   promptFiles: string[];
+  templateContext: PromptTemplateContext;
 }
 
 export class SystemPromptCache {
@@ -71,6 +73,7 @@ export class SystemPromptCache {
       instructions: (input.agent.prompt.instructions ?? []).map(serializePromptSource),
       references: (input.agent.prompt.references ?? []).map(serializePromptSource),
       promptWorkingDirectory: input.promptWorkingDirectory,
+      templateContext: input.templateContext,
       files: fileFingerprints,
     });
   }

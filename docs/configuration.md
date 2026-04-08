@@ -90,6 +90,46 @@ Important rules:
 - prompt sources must specify exactly one of `text` or `file`
 - `authFile` only works with OAuth-capable providers
 
+### Prompt File Templating V1
+
+`imp` can render a small set of template variables in prompt files, but only for file-backed entries in:
+
+- `prompt.instructions[].file`
+- `prompt.references[].file`
+
+Not templated:
+
+- `prompt.base`
+- inline `text` prompt sources
+
+Syntax is strictly `{{path.to.value}}`.
+
+Constraints:
+
+- unknown variables fail hard during prompt assembly
+- documented variables with no runtime value render as an empty string
+- only simple variable paths are supported
+- no functions, loops, conditionals, defaults, or date/time variables
+- the context is curated and stable so prompt caching stays deterministic
+
+Available variables:
+
+- `system.os`
+- `system.platform`
+- `system.arch`
+- `system.hostname`
+- `system.username`
+- `system.homeDir`
+- `bot.id`
+- `agent.id`
+- `agent.model.provider`
+- `agent.model.modelId`
+- `agent.authFile`
+- `agent.workspace.cwd`
+- `transport.kind`
+- `imp.configPath`
+- `imp.dataRoot`
+
 ## Bots
 
 Bots expose agents through transports.

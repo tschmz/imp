@@ -1,10 +1,12 @@
 import { join } from "node:path";
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
+import { renderPromptTemplate, type PromptTemplateContext } from "./prompt-template.js";
 import type { SystemPromptCache } from "./system-prompt-cache.js";
 
 export interface SystemPromptResolutionOptions {
   agent: AgentDefinition;
   promptWorkingDirectory?: string;
+  templateContext: PromptTemplateContext;
   readTextFile: (path: string) => Promise<string>;
   cache: SystemPromptCache;
 }
@@ -25,6 +27,7 @@ export async function resolveSystemPrompt(
     agent: options.agent,
     promptWorkingDirectory: options.promptWorkingDirectory,
     promptFiles,
+    templateContext: options.templateContext,
   });
 
   const cachedPrompt = options.cache.get(cacheKey);
@@ -38,6 +41,7 @@ export async function resolveSystemPrompt(
   const systemPrompt = await buildSystemPrompt(
     options.agent,
     options.promptWorkingDirectory,
+    options.templateContext,
     options.readTextFile,
   );
 
@@ -52,12 +56,15 @@ export async function resolveSystemPrompt(
 export async function buildSystemPrompt(
   agent: AgentDefinition,
   promptWorkingDirectory: string | undefined,
+  templateContext: PromptTemplateContext,
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
   const sections: string[] = [];
 
   const basePrompt = await resolvePromptSourceContent(agent, agent.prompt.base, readTextFile, {
     kind: "base prompt",
+    templateFileContent: false,
+    templateContext,
   });
   if (!basePrompt) {
     throw new Error(`Configured base prompt for agent "${agent.id}" must define text or file.`);
@@ -68,6 +75,8 @@ export async function buildSystemPrompt(
     const content = await resolvePromptSourceContent(agent, source.source, readTextFile, {
       kind: "instruction file",
       optional: source.optional,
+      templateFileContent: true,
+      templateContext,
     });
     if (!content) {
       continue;
@@ -79,6 +88,8 @@ export async function buildSystemPrompt(
   for (const source of agent.prompt.references ?? []) {
     const content = await resolvePromptSourceContent(agent, source, readTextFile, {
       kind: "reference file",
+      templateFileContent: true,
+      templateContext,
     });
     if (!content) {
       continue;
@@ -138,7 +149,12 @@ async function resolvePromptSourceContent(
   agent: AgentDefinition,
   source: PromptSource,
   readTextFile: (path: string) => Promise<string>,
-  options: { kind: string; optional?: boolean },
+  options: {
+    kind: string;
+    optional?: boolean;
+    templateFileContent: boolean;
+    templateContext: PromptTemplateContext;
+  },
 ): Promise<string | undefined> {
   if (source.text !== undefined) {
     const trimmedContent = source.text.trim();
@@ -163,6 +179,13 @@ async function resolvePromptSourceContent(
     throw new Error(
       `Failed to read ${options.kind} for agent "${agent.id}": ${source.file} (${detail})`,
     );
+  }
+
+  if (options.templateFileContent) {
+    content = renderPromptTemplate(content, {
+      filePath: source.file,
+      context: options.templateContext,
+    });
   }
 
   const trimmedContent = content.trim();
