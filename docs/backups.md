@@ -43,6 +43,10 @@ By default, backups include:
 - prompt and auth files referenced by the config
 - bot conversation stores under `paths.dataRoot`
 
+Current backup behavior does **not** include Telegram token secret files referenced via `bots[].token.file`.
+Those files stay outside the archive and must be backed up separately if you use file-based token references.
+Environment-variable-based token references also do not embed the secret value into the backup archive.
+
 If a referenced prompt or auth file is missing, backup creation fails instead of producing a partial archive.
 
 ## Restore A Backup

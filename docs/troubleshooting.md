@@ -32,6 +32,15 @@ Common causes:
 - a bot routes to a missing agent
 - a prompt source defines both `text` and `file`
 - all bots are disabled
+- a Telegram token env reference points to a variable that is not set
+- a Telegram token file reference points to a missing, unreadable, or empty file
+
+If validation fails on a token reference, check whether:
+
+- the configured environment variable exists in the current shell or service environment
+- the referenced secret file path is correct relative to the config file
+- the secret file is readable by the user running `imp`
+- the secret file contains the token rather than being empty
 
 ## Telegram Bot Does Not Respond
 
@@ -71,6 +80,22 @@ If in doubt, switch to absolute paths for:
 - `prompt.references[].file`
 - `authFile`
 - `workspace.cwd`
+
+## Prompt Templating Fails
+
+Prompt templating only applies to file-backed `prompt.instructions` and `prompt.references` entries.
+
+Common causes:
+
+- the file uses an unknown variable such as `{{agent.unknownField}}`
+- the file uses unsupported syntax such as `{{ agent.id }}` with spaces inside the braces
+- you expected templating in `prompt.base` or inline `text`, which is not supported in V1
+
+If templating fails, check:
+
+- the exact file path named in the error
+- whether the variable is one of the documented template variables
+- whether the expression uses exact `{{path.to.value}}` syntax without extra whitespace or helpers
 
 ## Need More Detail
 

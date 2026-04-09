@@ -94,7 +94,9 @@ Important rules:
 
 ## Secret References
 
-Secret-bearing config fields can be written in one of three forms:
+V1 secret references are currently supported for Telegram bot tokens via `bots[].token`.
+
+That field can be written in one of three forms:
 
 - inline string: `"token": "123456:abc"`
 - environment variable reference: `"token": { "env": "IMP_TELEGRAM_BOT_TOKEN" }`
@@ -107,7 +109,13 @@ Rules:
 - `env` names must look like normal environment variable names
 - `file` values may be absolute or relative to the config file directory
 - secret files are read as UTF-8; a single trailing newline is ignored so common `echo`-written files work
-- `imp config validate` now checks that secret references can be resolved from the current environment and filesystem
+- `imp config validate` checks that configured Telegram token references can be resolved from the current environment and filesystem
+
+Operational guidance:
+
+- prefer env or file references over inline tokens in `config.json`
+- keep secret files and the config directory readable only by the `imp` user, for example with `chmod 600` on files and `chmod 700` on the directory
+- avoid copying secret files into unrelated sync folders, support bundles, or broad filesystem backups unless that is intentional
 
 ### Prompt File Templating V1
 
@@ -129,6 +137,7 @@ Constraints:
 - documented variables with no runtime value render as an empty string
 - only simple variable paths are supported
 - no functions, loops, conditionals, defaults, or date/time variables
+- expressions with extra syntax such as whitespace inside the braces fail as unsupported template syntax
 - the context is curated and stable so prompt caching stays deterministic
 
 Available variables:
