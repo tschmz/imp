@@ -19,7 +19,7 @@ to transports such as Telegram.
 
 - Node.js 20.6 or newer
 - Credentials for at least one supported model provider
-- A Telegram bot token, or an environment variable / secret file reference for it
+- A Telegram bot token
 
 Install:
 
