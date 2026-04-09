@@ -50,7 +50,13 @@ export function createDaemon(
         }
       } catch (error) {
         await Promise.all(
-          runtimes.map(async (runtime) => cleanupRuntimeState(runtime.botConfig.paths.runtimeStatePath)),
+          runtimes.map(async (runtime) => {
+            try {
+              await runtime.engine.close?.();
+            } finally {
+              await cleanupRuntimeState(runtime.botConfig.paths.runtimeStatePath);
+            }
+          }),
         );
         throw error;
       }
@@ -112,6 +118,7 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
       ...(configuredAgent.authFile ? { authFile: configuredAgent.authFile } : {}),
       ...(configuredAgent.inference ? { inference: configuredAgent.inference } : {}),
       ...(configuredAgent.workspace ? { workspace: configuredAgent.workspace } : {}),
+      ...(configuredAgent.mcp ? { mcp: configuredAgent.mcp } : {}),
       tools: configuredAgent.tools ?? [],
       extensions: [],
     };

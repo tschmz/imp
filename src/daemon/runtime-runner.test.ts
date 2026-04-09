@@ -193,6 +193,38 @@ describe("createRuntimeEntries", () => {
       externalId: "42",
     });
   });
+
+  it("closes the runtime engine when the entry stops", async () => {
+    const runtime = createRuntime();
+    const transport = createCapturingTransport();
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([
+        {
+          id: "default",
+          name: "Default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.3",
+          },
+          tools: [],
+          extensions: [],
+        },
+      ]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+    await entries[0]?.stop();
+    await entries[0]?.stop();
+
+    expect(transport.stop).toHaveBeenCalledTimes(1);
+    expect(runtime.engine.close).toHaveBeenCalledTimes(1);
+  });
 });
 
 function createCapturingTransport(): {
@@ -292,6 +324,7 @@ function createRuntime(): BootstrappedRuntime {
           text: "reply",
         },
       })),
+      close: vi.fn(async () => undefined),
     },
   };
 }

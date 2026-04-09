@@ -443,6 +443,77 @@ describe("createDaemon", () => {
     await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
   });
 
+  it("closes bootstrapped engines when a later runtime fails during bootstrap", async () => {
+    const root = await createTempDir();
+    const privateBot = createBotConfig(root);
+    const opsBot = createBotConfig(root, {
+      id: "ops-telegram",
+      defaultAgentId: "ops",
+    });
+    const close = vi.fn(async () => {});
+    let storeCalls = 0;
+
+    const daemon = createDaemon(
+      {
+        configPath: join(root, "config.json"),
+        logging: {
+          level: "info",
+        },
+        agents: [
+          {
+            id: "default",
+            prompt: {
+              base: {
+                text: "You are concise.",
+              },
+            },
+            model: {
+              provider: "test",
+              modelId: "stub",
+            },
+          },
+          {
+            id: "ops",
+            prompt: {
+              base: {
+                text: "You are ops.",
+              },
+            },
+            model: {
+              provider: "test",
+              modelId: "stub",
+            },
+          },
+        ],
+        activeBots: [privateBot, opsBot],
+      },
+      {
+        engine: {
+          run: vi.fn(),
+          close,
+        },
+        createConversationStore: () => {
+          storeCalls += 1;
+          if (storeCalls === 2) {
+            throw new Error("store boom");
+          }
+
+          return createFsConversationStore(privateBot.paths);
+        },
+        createTransport: () => ({
+          start: vi.fn(async () => undefined),
+          stop: vi.fn(async () => undefined),
+        }),
+      },
+    );
+
+    await expect(daemon.start()).rejects.toThrow("store boom");
+
+    expect(close).toHaveBeenCalledTimes(1);
+    await expect(access(privateBot.paths.runtimeStatePath)).rejects.toThrow();
+    await expect(access(opsBot.paths.runtimeStatePath)).rejects.toThrow();
+  });
+
   it("stops all runtimes and removes all runtime state after a partial multi-bot start failure", async () => {
     const root = await createTempDir();
     const privateBot = createBotConfig(root);

@@ -1,4 +1,10 @@
-import type { AgentPromptConfig, AgentWorkspaceConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
+import type {
+  AgentMcpConfig,
+  AgentPromptConfig,
+  AgentWorkspaceConfig,
+  InferenceSettings,
+  ModelRef,
+} from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
 import type { SecretValueConfig } from "./secret-value.js";
 
@@ -20,6 +26,13 @@ export interface DefaultsConfig {
 
 export type ModelConfig = ModelRef;
 
+export interface AgentToolsConfigObject {
+  builtIn?: string[];
+  mcp?: AgentMcpConfig;
+}
+
+export type AgentToolsConfig = string[] | AgentToolsConfigObject;
+
 export interface AgentConfig {
   id: string;
   name?: string;
@@ -28,7 +41,7 @@ export interface AgentConfig {
   authFile?: string;
   inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
-  tools?: string[];
+  tools?: AgentToolsConfig;
 }
 
 interface BaseBotConfig {

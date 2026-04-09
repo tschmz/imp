@@ -20,6 +20,18 @@ export interface AgentWorkspaceConfig {
   shellPath?: string[];
 }
 
+export interface AgentMcpServerConfig {
+  id: string;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+}
+
+export interface AgentMcpConfig {
+  servers: AgentMcpServerConfig[];
+}
+
 export interface ModelRef {
   provider: string;
   modelId: string;
@@ -34,5 +46,6 @@ export interface AgentDefinition {
   inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
   tools: string[];
+  mcp?: AgentMcpConfig;
   extensions: string[];
 }

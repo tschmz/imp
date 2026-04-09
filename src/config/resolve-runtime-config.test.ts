@@ -198,6 +198,63 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.tools).toEqual(["read", "bash"]);
   });
 
+  it("resolves MCP server cwd relative to the config directory", async () => {
+    const appConfig = createAppConfig({
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          tools: {
+            builtIn: ["read"],
+            mcp: {
+              servers: [
+                {
+                  id: "echo",
+                  command: "node",
+                  args: ["./server.mjs"],
+                  cwd: "./mcp",
+                },
+              ],
+            },
+          },
+        },
+      ],
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.tools).toEqual(["read"]);
+    expect(result.agents[0]?.mcp).toEqual({
+      servers: [
+        {
+          id: "echo",
+          command: "node",
+          args: ["./server.mjs"],
+          cwd: "/etc/imp/mcp",
+        },
+      ],
+    });
+  });
+
   it("resolves a relative agent auth file path against the config directory", async () => {
     const appConfig = createAppConfig({
       agents: [

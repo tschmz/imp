@@ -362,6 +362,130 @@ describe("createPiAgentEngine", () => {
     expect(capturedTools).toEqual([tool]);
   });
 
+  it("merges resolved MCP tools into the agent runtime and reuses them across runs", async () => {
+    let capturedTools: Array<{ name: string }> | undefined;
+    const close = vi.fn(async () => {});
+    const mcpAgent = {
+      ...createAgent(),
+      tools: ["read"],
+      mcp: {
+        servers: [
+          {
+            id: "echo",
+            command: process.execPath,
+            args: ["echo"],
+          },
+        ],
+      },
+    };
+    const resolveMcpTools = vi.fn(async () => ({
+      tools: [
+        {
+          name: "echo__say",
+          label: "say",
+          description: "say something",
+          parameters: Type.Object({ text: Type.String() }),
+          async execute() {
+            return {
+              content: [{ type: "text" as const, text: "hi" }],
+              details: {},
+            };
+          },
+        },
+      ],
+      close,
+    }));
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      resolveMcpTools,
+      createAgent: (options) => {
+        capturedTools = options.initialState?.tools as Array<{ name: string }>;
+        return {
+          state: {
+            messages: [fauxAssistantMessage("tool-ready")],
+          },
+          prompt: async () => {},
+        };
+      },
+    });
+
+    await engine.run({
+      agent: mcpAgent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    await engine.run({
+      agent: mcpAgent,
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        messageId: "3",
+        correlationId: "corr-3",
+      },
+    });
+
+    expect(capturedTools?.map((tool) => tool.name)).toEqual(["read", "echo__say"]);
+    expect(resolveMcpTools).toHaveBeenCalledTimes(1);
+    expect(close).not.toHaveBeenCalled();
+
+    await engine.close?.();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes initialized MCP runtimes exactly once", async () => {
+    const close = vi.fn(async () => {});
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      resolveMcpTools: async () => ({
+        tools: [],
+        close,
+      }),
+      createAgent: () => ({
+        state: {
+          messages: [fauxAssistantMessage("ok")],
+        },
+        prompt: async () => {},
+      }),
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        mcp: {
+          servers: [
+            {
+              id: "echo",
+              command: process.execPath,
+              args: ["echo"],
+            },
+          ],
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    await engine.close?.();
+    await engine.close?.();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it("passes a dynamic api key resolver into the agent runtime", async () => {
     let capturedGetApiKey:
       | ((provider: string) => Promise<string | undefined> | string | undefined)

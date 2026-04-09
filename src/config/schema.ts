@@ -42,6 +42,54 @@ const agentWorkspaceConfigSchema = z.object({
   shellPath: z.string().min(1).array().optional(),
 });
 
+const mcpServerIdSchema = z
+  .string()
+  .min(1)
+  .regex(
+    /^[A-Za-z0-9_-]+$/,
+    "MCP server ids may only contain letters, numbers, hyphens, and underscores.",
+  );
+
+const mcpServerConfigSchema = z.object({
+  id: mcpServerIdSchema,
+  command: z.string().min(1),
+  args: z.string().min(1).array().optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  cwd: z.string().min(1).optional(),
+});
+
+const agentToolsConfigSchema = z
+  .union([
+    z.string().min(1).array(),
+    z.object({
+      builtIn: z.string().min(1).array().optional(),
+      mcp: z
+        .object({
+          servers: mcpServerConfigSchema.array().min(1),
+        })
+        .optional(),
+    }),
+  ])
+  .superRefine((tools, ctx) => {
+    if (Array.isArray(tools)) {
+      return;
+    }
+
+    const serverIds = new Set<string>();
+    for (const [index, server] of (tools.mcp?.servers ?? []).entries()) {
+      if (serverIds.has(server.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["mcp", "servers", index, "id"],
+          message: `Duplicate MCP server id "${server.id}". MCP server ids must be unique per agent.`,
+        });
+        continue;
+      }
+
+      serverIds.add(server.id);
+    }
+  });
+
 const agentConfigSchema = z
   .object({
     id: z.string().min(1),
@@ -51,7 +99,7 @@ const agentConfigSchema = z
     authFile: z.string().min(1).optional(),
     inference: inferenceSettingsSchema.optional(),
     workspace: agentWorkspaceConfigSchema.optional(),
-    tools: z.string().min(1).array().optional(),
+    tools: agentToolsConfigSchema.optional(),
   })
   .superRefine((agent, ctx) => {
     if (!agent.model) {

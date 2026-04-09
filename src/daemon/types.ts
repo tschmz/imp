@@ -1,4 +1,10 @@
-import type { AgentPromptConfig, AgentWorkspaceConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
+import type {
+  AgentMcpConfig,
+  AgentPromptConfig,
+  AgentWorkspaceConfig,
+  InferenceSettings,
+  ModelRef,
+} from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
 import type { TransportType } from "../transports/registry.js";
 
@@ -64,4 +70,5 @@ export interface ConfiguredAgent {
   inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
   tools?: string[];
+  mcp?: AgentMcpConfig;
 }

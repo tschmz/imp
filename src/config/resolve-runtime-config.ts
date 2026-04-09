@@ -1,9 +1,14 @@
 import { dirname } from "node:path";
-import type { AgentPromptConfig, AgentWorkspaceConfig, PromptSource } from "../domain/agent.js";
+import type {
+  AgentMcpConfig,
+  AgentPromptConfig,
+  AgentWorkspaceConfig,
+  PromptSource,
+} from "../domain/agent.js";
 import type { DaemonConfig } from "../daemon/types.js";
 import { normalizeRuntimeBotConfig } from "../transports/registry.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
-import type { AppConfig } from "./types.js";
+import type { AgentToolsConfig, AppConfig } from "./types.js";
 
 interface ResolveRuntimeConfigOptions {
   env?: NodeJS.ProcessEnv;
@@ -28,10 +33,14 @@ export async function resolveRuntimeConfig(
       level: appConfig.logging?.level ?? "info",
     },
     agents: appConfig.agents.map((agent) => ({
-      ...agent,
+      id: agent.id,
+      ...(agent.name ? { name: agent.name } : {}),
       prompt: resolveAgentPrompt(agent.prompt, configDir),
+      ...(agent.model ? { model: agent.model } : {}),
       ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, configDir) } : {}),
       ...(agent.workspace ? { workspace: resolveAgentWorkspace(agent.workspace, configDir) } : {}),
+      ...(agent.inference ? { inference: agent.inference } : {}),
+      ...resolveAgentTools(agent.tools, configDir),
     })),
     activeBots: await Promise.all(
       enabledBots.map(async (bot) =>
@@ -75,6 +84,35 @@ function resolveAgentWorkspace(workspace: AgentWorkspaceConfig, configDir: strin
   return {
     ...workspace,
     ...(workspace.cwd ? { cwd: resolveConfigPath(workspace.cwd, configDir) } : {}),
+  };
+}
+
+function resolveAgentTools(
+  tools: AgentToolsConfig | undefined,
+  configDir: string,
+): Pick<DaemonConfig["agents"][number], "tools" | "mcp"> {
+  if (!tools) {
+    return {};
+  }
+
+  if (Array.isArray(tools)) {
+    return {
+      tools,
+    };
+  }
+
+  return {
+    ...(tools.builtIn ? { tools: tools.builtIn } : {}),
+    ...(tools.mcp ? { mcp: resolveAgentMcpConfig(tools.mcp, configDir) } : {}),
+  };
+}
+
+function resolveAgentMcpConfig(mcp: AgentMcpConfig, configDir: string): AgentMcpConfig {
+  return {
+    servers: mcp.servers.map((server) => ({
+      ...server,
+      ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, configDir) } : {}),
+    })),
   };
 }
 

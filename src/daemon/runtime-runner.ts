@@ -118,7 +118,11 @@ export function createRuntimeEntries(
         }
 
         stopped = true;
-        await transport?.stop?.();
+        try {
+          await transport?.stop?.();
+        } finally {
+          await runtime.engine.close?.();
+        }
       },
     };
   });
