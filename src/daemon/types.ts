@@ -6,6 +6,7 @@ import type {
   ModelRef,
 } from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
+import type { SkillDefinition } from "../skills/types.js";
 import type { TransportType } from "../transports/registry.js";
 
 interface BaseTransportRuntimeConfig {
@@ -46,6 +47,8 @@ export interface RuntimePaths {
 export type ActiveBotRuntimeConfig = TransportBotRuntimeConfig & {
   defaultAgentId: string;
   paths: RuntimePaths;
+  skillCatalog: SkillDefinition[];
+  skillIssues: string[];
 };
 
 export interface DaemonConfig {

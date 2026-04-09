@@ -88,6 +88,21 @@ A typical project-aware agent uses:
 - `workspace.cwd` to point tools at the right directory
 - `prompt.instructions` to load `AGENTS.md`
 - `prompt.references` to load project-specific docs or runbooks
+- `bots[].skills.paths` to expose reusable `SKILL.md` catalogs per bot
+
+## Bot Skill Catalogs
+
+Bots can define `skills.paths` to expose reusable skills alongside the normal agent prompt.
+
+Rules:
+
+- each configured path is scanned one level deep only
+- only direct child directories containing `SKILL.md` are considered
+- `SKILL.md` frontmatter must include `name` and `description`
+- invalid files and duplicate skill names are ignored for that bot
+- selection uses only skill metadata and activates at most three skills per user turn
+- the selected `SKILL.md` contents are injected into prompt context
+- scripts, references, and assets are not executed automatically
 
 Example:
 

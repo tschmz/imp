@@ -152,6 +152,70 @@ describe("createHandleIncomingMessage", () => {
     );
   });
 
+  it("does not change runtime context when no skill catalog is configured", async () => {
+    const agent = createDefaultAgent();
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "reply",
+        },
+      })),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: createConversationStore(),
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    await service.handle(createIncomingMessage("4", "plain text"));
+
+    const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
+    expect(runInput?.runtime).toEqual({
+      configPath: "/tmp/config.json",
+      dataRoot: "/tmp/data",
+    });
+  });
+
+  it("activates at most three relevant skills", async () => {
+    const agent = createDefaultAgent();
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "reply",
+        },
+      })),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: createConversationStore(),
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+      skillCatalog: [
+        createSkill("git-commit", "Commit Git changes carefully."),
+        createSkill("git-rebase", "Rebase a Git branch safely."),
+        createSkill("git-review", "Review Git history and diffs."),
+        createSkill("git-cleanup", "Clean up Git branches."),
+      ],
+    });
+
+    await service.handle(
+      createIncomingMessage(
+        "5",
+        "Help me review git history, clean up the branch, commit the changes, and rebase safely.",
+      ),
+    );
+
+    const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
+    expect(runInput?.runtime?.activatedSkills).toHaveLength(3);
+  });
+
   it("persists the user message source in conversation history", async () => {
     const agent = createDefaultAgent();
     let storedContext:
@@ -283,6 +347,17 @@ function createDefaultAgent(): AgentDefinition {
   };
 }
 
+function createSkill(name: string, description: string) {
+  return {
+    name,
+    description,
+    directoryPath: `/skills/${name}`,
+    filePath: `/skills/${name}/SKILL.md`,
+    body: `\n${description}`,
+    content: `---\nname: ${name}\ndescription: ${description}\n---\n\n${description}`,
+  };
+}
+
 function createRuntimeInfo() {
   return {
     botId: "private-telegram",
@@ -291,6 +366,41 @@ function createRuntimeInfo() {
     logFilePath: "/tmp/private-telegram.log",
     loggingLevel: "info" as const,
     activeBotIds: ["private-telegram", "ops-telegram"],
+  };
+}
+
+function createConversationStore(): ConversationStore {
+  return {
+    get: vi.fn(async () => undefined),
+    put: vi.fn(async () => {}),
+    listBackups: vi.fn(async () => []),
+    restore: vi.fn(async () => false),
+    ensureActive: vi.fn(async (ref, options) => ({
+      state: {
+        conversation: {
+          ...ref,
+          sessionId: "session-1",
+        },
+        agentId: options.agentId,
+        createdAt: options.now,
+        updatedAt: options.now,
+        version: 1,
+      },
+      messages: [],
+    })),
+    create: vi.fn(async (ref, options) => ({
+      state: {
+        conversation: {
+          ...ref,
+          sessionId: "session-1",
+        },
+        agentId: options.agentId,
+        createdAt: options.now,
+        updatedAt: options.now,
+        version: 1,
+      },
+      messages: [],
+    })),
   };
 }
 

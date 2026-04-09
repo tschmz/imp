@@ -83,6 +83,9 @@ export function buildInitialAppConfig(
         id: defaultBotId,
         type: "telegram",
         enabled: true,
+        skills: {
+          paths: [],
+        },
         token: answers.telegramToken,
         access: {
           allowedUserIds: answers.allowedUserIds,

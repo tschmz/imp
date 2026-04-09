@@ -132,6 +132,7 @@ export function createPiAgentEngine(
             configPath: input.runtime?.configPath,
             dataRoot: input.runtime?.dataRoot,
           }),
+          activatedSkills: input.runtime?.activatedSkills,
           readTextFile,
           cache: systemPromptCache,
         });

@@ -168,6 +168,7 @@ Common Telegram fields:
 
 - `id`: unique bot ID
 - `enabled`: whether the bot starts
+- `skills.paths`: optional directories that contain direct child skill folders with `SKILL.md`
 - `token`: Telegram bot token
 - `token.env`: read the token from an environment variable
 - `token.file`: read the token from a secret file
@@ -179,6 +180,17 @@ Common Telegram fields:
 - `routing.defaultAgentId`: optional per-bot agent override
 
 Only enabled bots are started. At least one bot must be enabled.
+
+Skill discovery and activation notes:
+
+- each `skills.paths` entry is resolved relative to the config file when needed
+- `imp` scans only direct subdirectories of each configured path for `SKILL.md`
+- `SKILL.md` must have YAML frontmatter with at least `name` and `description`
+- invalid skills are ignored and logged during startup
+- duplicate skill names across configured paths are rejected and all colliding entries are ignored
+- per user turn, `imp` selects at most three skills using only skill `name` and `description`
+- if selection fails, `imp` activates no skills
+- activated skills are injected into prompt context as read-only `SKILL.md` content; scripts, references, and assets are not executed automatically
 
 Voice transcription notes:
 

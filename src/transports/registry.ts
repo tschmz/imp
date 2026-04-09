@@ -2,6 +2,7 @@ import type { ZodType } from "zod";
 import type { BotConfig } from "../config/types.js";
 import type { ActiveBotRuntimeConfig } from "../daemon/types.js";
 import type { Logger } from "../logging/types.js";
+import type { SkillDefinition } from "../skills/types.js";
 import type { Transport } from "./types.js";
 import {
   createTelegramTransportFromRuntimeConfig,
@@ -12,6 +13,8 @@ import {
 interface RuntimeNormalizationContext {
   dataRoot: string;
   defaultAgentId: string;
+  skillCatalog: SkillDefinition[];
+  skillIssues: string[];
 }
 
 interface TransportRegistryEntry<TBot extends BotConfig = BotConfig> {

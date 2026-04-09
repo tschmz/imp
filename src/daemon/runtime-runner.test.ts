@@ -265,6 +265,8 @@ function createRuntime(): BootstrappedRuntime {
       token: "123:abc",
       allowedUserIds: ["7"],
       defaultAgentId: "default",
+      skillCatalog: [],
+      skillIssues: [],
       paths: {
         dataRoot: "/tmp",
         botRoot: "/tmp/bots/private-telegram",

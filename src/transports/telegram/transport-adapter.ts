@@ -11,6 +11,11 @@ export const telegramTransportConfigSchema = z.object({
   id: z.string().min(1),
   type: z.literal("telegram"),
   enabled: z.boolean(),
+  skills: z
+    .object({
+      paths: z.string().min(1).array(),
+    })
+    .optional(),
   token: secretValueConfigSchema,
   access: z.object({
     allowedUserIds: z
@@ -39,7 +44,12 @@ export const telegramTransportConfigSchema = z.object({
 
 export function normalizeTelegramRuntimeConfig(
   bot: TelegramBotConfig,
-  options: { dataRoot: string; defaultAgentId: string },
+  options: {
+    dataRoot: string;
+    defaultAgentId: string;
+    skillCatalog: ActiveBotRuntimeConfig["skillCatalog"];
+    skillIssues: ActiveBotRuntimeConfig["skillIssues"];
+  },
 ): ActiveBotRuntimeConfig {
   if (typeof bot.token !== "string") {
     throw new Error(`Telegram bot "${bot.id}" token must be resolved before runtime normalization.`);
@@ -54,6 +64,8 @@ export function normalizeTelegramRuntimeConfig(
     allowedUserIds: bot.access.allowedUserIds,
     ...(bot.voice ? { voice: bot.voice } : {}),
     defaultAgentId: bot.routing?.defaultAgentId ?? options.defaultAgentId,
+    skillCatalog: options.skillCatalog,
+    skillIssues: options.skillIssues,
     paths: {
       dataRoot: options.dataRoot,
       botRoot,

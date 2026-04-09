@@ -6,6 +6,7 @@ import type {
   PromptSource,
 } from "../domain/agent.js";
 import type { DaemonConfig } from "../daemon/types.js";
+import { discoverSkills } from "../skills/discovery.js";
 import { normalizeRuntimeBotConfig } from "../transports/registry.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
 import type { AgentToolsConfig, AppConfig } from "./types.js";
@@ -43,8 +44,11 @@ export async function resolveRuntimeConfig(
       ...resolveAgentTools(agent.tools, configDir),
     })),
     activeBots: await Promise.all(
-      enabledBots.map(async (bot) =>
-        normalizeRuntimeBotConfig(
+      enabledBots.map(async (bot) => {
+        const skillPaths = bot.skills?.paths.map((path) => resolveConfigPath(path, configDir)) ?? [];
+        const skillCatalog = await discoverSkills(skillPaths);
+
+        return normalizeRuntimeBotConfig(
           {
             ...bot,
             token: await resolveSecretValue(bot.token, {
@@ -57,9 +61,11 @@ export async function resolveRuntimeConfig(
           {
             dataRoot: appConfig.paths.dataRoot,
             defaultAgentId: appConfig.defaults.agentId,
+            skillCatalog: skillCatalog.skills,
+            skillIssues: skillCatalog.issues,
           },
-        ),
-      ),
+        );
+      }),
     ),
   };
 }

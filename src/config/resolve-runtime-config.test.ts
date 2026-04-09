@@ -114,6 +114,8 @@ describe("resolveRuntimeConfig", () => {
           },
         },
         defaultAgentId: "ops-agent",
+        skillCatalog: [],
+        skillIssues: [],
         paths: {
           dataRoot: "/var/lib/imp",
           botRoot: "/var/lib/imp/bots/private-telegram",
@@ -125,6 +127,43 @@ describe("resolveRuntimeConfig", () => {
         },
       },
     ]);
+  });
+
+  it("discovers valid bot skills from configured paths", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config", "imp.json");
+    const skillsPath = join(root, "config", "skills");
+    await writeRawFile(
+      join(skillsPath, "commit", "SKILL.md"),
+      ["---", "name: commit", "description: Stage and commit changes.", "---", "", "Use focused commits."].join("\n"),
+    );
+
+    const appConfig = createAppConfig({
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          skills: {
+            paths: ["./skills"],
+          },
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, configPath);
+
+    expect(result.activeBots[0]?.skillCatalog).toHaveLength(1);
+    expect(result.activeBots[0]?.skillCatalog[0]).toMatchObject({
+      name: "commit",
+      description: "Stage and commit changes.",
+      filePath: join(skillsPath, "commit", "SKILL.md"),
+    });
+    expect(result.activeBots[0]?.skillIssues).toEqual([]);
   });
 
   it("uses the global default agent id when the bot has no routing override", async () => {

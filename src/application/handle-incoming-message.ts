@@ -1,6 +1,7 @@
 import { loadAppConfig } from "../config/load-app-config.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { readRecentLogLines } from "../logging/view-logs.js";
+import { selectRelevantSkills } from "../skills/selection.js";
 import { getOrCreateConversationContext } from "./commands/conversation-context.js";
 import { inboundCommandHandlers } from "./commands/registry.js";
 import type { HandleIncomingMessageDependencies } from "./commands/types.js";
@@ -66,6 +67,7 @@ export function createHandleIncomingMessage(
         runtime: {
           configPath: dependencies.runtimeInfo.configPath,
           dataRoot: dependencies.runtimeInfo.dataRoot,
+          ...(resolveActivatedSkills(message.text, dependencies)),
         },
       });
       const respondedAt = new Date().toISOString();
@@ -91,6 +93,30 @@ export function createHandleIncomingMessage(
       return response.message;
     },
   };
+}
+
+function resolveActivatedSkills(
+  userText: string,
+  dependencies: HandleIncomingMessageDependencies,
+): { activatedSkills?: NonNullable<HandleIncomingMessageDependencies["skillCatalog"]> } {
+  const skillCatalog = dependencies.skillCatalog ?? [];
+  if (skillCatalog.length === 0) {
+    return {};
+  }
+
+  try {
+    const activatedSkills = selectRelevantSkills(userText, skillCatalog, 3);
+    return activatedSkills.length > 0 ? { activatedSkills } : {};
+  } catch (error) {
+    void dependencies.logger?.error(
+      "failed to select bot skills; continuing without skill activation",
+      {
+        botId: dependencies.runtimeInfo.botId,
+      },
+      error,
+    );
+    return {};
+  }
 }
 
 function toUserConversationMessage(message: IncomingMessage) {

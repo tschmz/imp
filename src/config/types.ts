@@ -44,10 +44,15 @@ export interface AgentConfig {
   tools?: AgentToolsConfig;
 }
 
+export interface BotSkillsConfig {
+  paths: string[];
+}
+
 interface BaseBotConfig {
   id: string;
   enabled: boolean;
   routing?: BotRoutingConfig;
+  skills?: BotSkillsConfig;
 }
 
 export interface TelegramBotConfig extends BaseBotConfig {

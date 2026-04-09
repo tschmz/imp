@@ -109,6 +109,11 @@
       "id": "private-telegram",
       "type": "telegram",
       "enabled": true,
+      "skills": {
+        "paths": [
+          "/path/to/skills"
+        ]
+      },
       "token": {
         "env": "IMP_PRIVATE_TELEGRAM_BOT_TOKEN"
       },

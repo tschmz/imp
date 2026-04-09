@@ -44,6 +44,7 @@ describe("resolveSystemPrompt", () => {
       },
       "/workspace",
       createTemplateContext(),
+      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "Bot {{bot.id}} on {{system.platform}} for {{agent.model.provider}}/{{agent.model.modelId}}.";
@@ -74,6 +75,7 @@ describe("resolveSystemPrompt", () => {
         createAgent(),
         "/workspace",
         createTemplateContext(),
+        [],
         async (path) => {
           if (path === "/workspace/AGENTS.md") {
             return "Unknown {{agent.unknownField}}";
@@ -113,6 +115,7 @@ describe("resolveSystemPrompt", () => {
           dataRoot: "",
         },
       },
+      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "auth=[{{agent.authFile}}] cwd=[{{agent.workspace.cwd}}] config=[{{imp.configPath}}] data=[{{imp.dataRoot}}]";
@@ -136,6 +139,7 @@ describe("resolveSystemPrompt", () => {
         createAgent(),
         "/workspace",
         createTemplateContext(),
+        [],
         async (path) => {
           if (path === "/workspace/AGENTS.md") {
             return "Invalid {{ agent.id }}";
@@ -160,6 +164,7 @@ describe("resolveSystemPrompt", () => {
       },
       "/workspace",
       createTemplateContext(),
+      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "File {{bot.id}}";
@@ -178,6 +183,37 @@ describe("resolveSystemPrompt", () => {
         "File private-telegram\n" +
         "</INSTRUCTIONS>",
     );
+  });
+
+  it("injects activated skill contents into a dedicated context block", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { text: "You are concise." },
+        },
+      },
+      undefined,
+      createTemplateContext(),
+      [
+        {
+          name: "commit",
+          description: "Stage and commit changes.",
+          directoryPath: "/skills/commit",
+          filePath: "/skills/commit/SKILL.md",
+          body: "\nUse focused commits.",
+          content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+        },
+      ],
+      async () => {
+        throw new Error("unexpected file read");
+      },
+    );
+
+    expect(prompt).toContain("<SKILLS>");
+    expect(prompt).toContain('<SKILL name="commit" from="/skills/commit/SKILL.md">');
+    expect(prompt).toContain("name: commit");
+    expect(prompt).toContain("Use focused commits.");
   });
 });
 

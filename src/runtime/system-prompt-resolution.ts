@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
+import type { SkillDefinition } from "../skills/types.js";
 import { renderPromptTemplate, type PromptTemplateContext } from "./prompt-template.js";
 import type { SystemPromptCache } from "./system-prompt-cache.js";
 
@@ -7,6 +8,7 @@ export interface SystemPromptResolutionOptions {
   agent: AgentDefinition;
   promptWorkingDirectory?: string;
   templateContext: PromptTemplateContext;
+  activatedSkills?: SkillDefinition[];
   readTextFile: (path: string) => Promise<string>;
   cache: SystemPromptCache;
 }
@@ -28,6 +30,7 @@ export async function resolveSystemPrompt(
     promptWorkingDirectory: options.promptWorkingDirectory,
     promptFiles,
     templateContext: options.templateContext,
+    activatedSkills: options.activatedSkills,
   });
 
   const cachedPrompt = options.cache.get(cacheKey);
@@ -42,6 +45,7 @@ export async function resolveSystemPrompt(
     options.agent,
     options.promptWorkingDirectory,
     options.templateContext,
+    options.activatedSkills ?? [],
     options.readTextFile,
   );
 
@@ -57,6 +61,7 @@ export async function buildSystemPrompt(
   agent: AgentDefinition,
   promptWorkingDirectory: string | undefined,
   templateContext: PromptTemplateContext,
+  activatedSkills: SkillDefinition[],
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
   const sections: string[] = [];
@@ -98,6 +103,10 @@ export async function buildSystemPrompt(
     sections.push(formatPromptSection("REFERENCE", describePromptSource(source), content));
   }
 
+  if (activatedSkills.length > 0) {
+    sections.push(formatActivatedSkillsSection(activatedSkills));
+  }
+
   return sections.join("\n\n");
 }
 
@@ -107,6 +116,15 @@ function formatPromptSection(tagName: "INSTRUCTIONS" | "REFERENCE", source: stri
 
 function escapeInstructionAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+}
+
+function formatActivatedSkillsSection(activatedSkills: SkillDefinition[]): string {
+  return `<SKILLS>\n\n${activatedSkills
+    .map(
+      (skill) =>
+        `<SKILL name="${escapeInstructionAttribute(skill.name)}" from="${escapeInstructionAttribute(skill.filePath)}">\n\n${skill.content.trim()}\n</SKILL>`,
+    )
+    .join("\n\n")}\n</SKILLS>`;
 }
 
 export function resolveInstructionSources(
