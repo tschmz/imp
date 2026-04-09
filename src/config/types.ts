@@ -1,5 +1,6 @@
 import type { AgentPromptConfig, AgentWorkspaceConfig, InferenceSettings, ModelRef } from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
+import type { SecretValueConfig } from "./secret-value.js";
 
 export interface InstanceConfig {
   name: string;
@@ -38,7 +39,7 @@ interface BaseBotConfig {
 
 export interface TelegramBotConfig extends BaseBotConfig {
   type: "telegram";
-  token: string;
+  token: SecretValueConfig;
   access: TelegramAccessConfig;
   voice?: TelegramVoiceConfig;
 }

@@ -187,6 +187,113 @@ describe("appConfigSchema", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("accepts telegram token env references", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: {
+            env: "IMP_TELEGRAM_BOT_TOKEN",
+          },
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts telegram token file references", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: {
+            file: "./secrets/telegram.token",
+          },
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects telegram token references that set both env and file", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: {
+            env: "IMP_TELEGRAM_BOT_TOKEN",
+            file: "./secrets/telegram.token",
+          },
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["bots", 0, "token"],
+        message: "Specify exactly one of env or file.",
+      }),
+    );
+  });
 });
 
 function createConfig(agent: Record<string, unknown>) {

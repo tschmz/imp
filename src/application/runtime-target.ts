@@ -23,7 +23,7 @@ export async function resolveRuntimeTarget(options: { cliConfigPath?: string } =
 
   return {
     configPath,
-    runtimeConfig: resolveRuntimeConfig(appConfig, configPath),
+    runtimeConfig: await resolveRuntimeConfig(appConfig, configPath),
     createTransport: createRuntimeTransportFactory,
   };
 }

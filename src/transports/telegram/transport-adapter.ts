@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
+import { secretValueConfigSchema } from "../../config/secret-value.js";
 import type { TelegramBotConfig } from "../../config/types.js";
 import type { ActiveBotRuntimeConfig } from "../../daemon/types.js";
 import type { Logger } from "../../logging/types.js";
@@ -10,7 +11,7 @@ export const telegramTransportConfigSchema = z.object({
   id: z.string().min(1),
   type: z.literal("telegram"),
   enabled: z.boolean(),
-  token: z.string().min(1),
+  token: secretValueConfigSchema,
   access: z.object({
     allowedUserIds: z
       .string()
@@ -40,6 +41,10 @@ export function normalizeTelegramRuntimeConfig(
   bot: TelegramBotConfig,
   options: { dataRoot: string; defaultAgentId: string },
 ): ActiveBotRuntimeConfig {
+  if (typeof bot.token !== "string") {
+    throw new Error(`Telegram bot "${bot.id}" token must be resolved before runtime normalization.`);
+  }
+
   const botRoot = join(options.dataRoot, "bots", bot.id);
 
   return {

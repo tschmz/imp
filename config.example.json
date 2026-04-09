@@ -109,7 +109,9 @@
       "id": "private-telegram",
       "type": "telegram",
       "enabled": true,
-      "token": "replace-me",
+      "token": {
+        "env": "IMP_PRIVATE_TELEGRAM_BOT_TOKEN"
+      },
       "access": {
         "allowedUserIds": []
       },
@@ -125,7 +127,9 @@
       "id": "ops-telegram",
       "type": "telegram",
       "enabled": false,
-      "token": "replace-me-too",
+      "token": {
+        "file": "./secrets/ops-telegram.token"
+      },
       "access": {
         "allowedUserIds": []
       },

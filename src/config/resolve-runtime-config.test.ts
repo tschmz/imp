@@ -1,10 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { appConfigSchema } from "./schema.js";
 import { resolveRuntimeConfig } from "./resolve-runtime-config.js";
 import type { AppConfig } from "./types.js";
 
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirs.splice(0).map(async (path) => {
+      const { rm } = await import("node:fs/promises");
+      await rm(path, { recursive: true, force: true });
+    }),
+  );
+});
+
 describe("resolveRuntimeConfig", () => {
-  it("maps enabled telegram bots into daemon runtime config", () => {
+  it("maps enabled telegram bots into daemon runtime config", async () => {
     const appConfig = createAppConfig({
       defaults: {
         agentId: "default-agent",
@@ -56,7 +70,7 @@ describe("resolveRuntimeConfig", () => {
       ],
     });
 
-    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.configPath).toBe("/etc/imp/config.json");
     expect(result.logging).toEqual({
@@ -113,7 +127,7 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
-  it("uses the global default agent id when the bot has no routing override", () => {
+  it("uses the global default agent id when the bot has no routing override", async () => {
     const appConfig = createAppConfig({
       defaults: {
         agentId: "default-agent",
@@ -131,12 +145,12 @@ describe("resolveRuntimeConfig", () => {
       ],
     });
 
-    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.activeBots[0]?.defaultAgentId).toBe("default-agent");
   });
 
-  it("resolves relative prompt and workspace paths against the config directory", () => {
+  it("resolves relative prompt and workspace paths against the config directory", async () => {
     const appConfig = createAppConfig({
       agents: [
         {
@@ -171,7 +185,7 @@ describe("resolveRuntimeConfig", () => {
       ],
     });
 
-    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.agents[0]?.prompt).toEqual({
       base: { file: "/etc/imp/prompts/default.md" },
@@ -184,7 +198,7 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.tools).toEqual(["read", "bash"]);
   });
 
-  it("resolves a relative agent auth file path against the config directory", () => {
+  it("resolves a relative agent auth file path against the config directory", async () => {
     const appConfig = createAppConfig({
       agents: [
         {
@@ -214,12 +228,12 @@ describe("resolveRuntimeConfig", () => {
       ],
     });
 
-    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.agents[0]?.authFile).toBe("/etc/imp/auth.json");
   });
 
-  it("fails when no bot is enabled", () => {
+  it("fails when no bot is enabled", async () => {
     const appConfig = createAppConfig({
       bots: [
         {
@@ -234,12 +248,12 @@ describe("resolveRuntimeConfig", () => {
       ],
     });
 
-    expect(() => resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).toThrowError(
+    await expect(resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).rejects.toThrowError(
       "Config must enable at least one bot.",
     );
   });
 
-  it("keeps more than one enabled bot", () => {
+  it("keeps more than one enabled bot", async () => {
     const appConfig = createAppConfig({
       bots: [
         {
@@ -263,7 +277,7 @@ describe("resolveRuntimeConfig", () => {
       ],
     });
 
-    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.activeBots.map((bot) => bot.id)).toEqual([
       "private-telegram",
@@ -271,7 +285,7 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
-  it("defaults logging level to info when logging config is omitted", () => {
+  it("defaults logging level to info when logging config is omitted", async () => {
     const appConfig = createAppConfig({
       logging: undefined,
       bots: [
@@ -287,9 +301,84 @@ describe("resolveRuntimeConfig", () => {
       ],
     });
 
-    const result = resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
     expect(result.logging.level).toBe("info");
+  });
+
+  it("resolves telegram token env references", async () => {
+    const appConfig = createAppConfig({
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: {
+            env: "IMP_TELEGRAM_BOT_TOKEN",
+          },
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json", {
+      env: {
+        IMP_TELEGRAM_BOT_TOKEN: "telegram-from-env",
+      },
+    });
+
+    expect(result.activeBots[0]?.token).toBe("telegram-from-env");
+  });
+
+  it("resolves telegram token file references relative to the config file", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config", "imp.json");
+    const secretPath = join(root, "config", "secrets", "telegram.token");
+    await writeRawFile(secretPath, "telegram-from-file\n");
+
+    const appConfig = createAppConfig({
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: {
+            file: "./secrets/telegram.token",
+          },
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, configPath);
+
+    expect(result.activeBots[0]?.token).toBe("telegram-from-file");
+  });
+
+  it("fails when a telegram token env reference is missing", async () => {
+    const appConfig = createAppConfig({
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: {
+            env: "IMP_TELEGRAM_BOT_TOKEN",
+          },
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    await expect(resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).rejects.toThrowError(
+      "bots.private-telegram.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
+    );
   });
 
   it("rejects defaults.agentId when it does not reference a configured agent", () => {
@@ -489,4 +578,15 @@ function expectSchemaIssue(
   for (const part of messageParts) {
     expect(issue?.message).toContain(part);
   }
+}
+
+async function createTempDir(): Promise<string> {
+  const path = await mkdtemp(join(tmpdir(), "imp-resolve-runtime-config-test-"));
+  tempDirs.push(path);
+  return path;
+}
+
+async function writeRawFile(path: string, content: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, "utf8");
 }

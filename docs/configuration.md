@@ -43,7 +43,9 @@ The top-level structure is:
       "id": "private-telegram",
       "type": "telegram",
       "enabled": true,
-      "token": "replace-me",
+      "token": {
+        "env": "IMP_TELEGRAM_BOT_TOKEN"
+      },
       "access": {
         "allowedUserIds": ["123456789"]
       }
@@ -89,6 +91,23 @@ Important rules:
 - `defaults.agentId` must point to an existing agent
 - prompt sources must specify exactly one of `text` or `file`
 - `authFile` only works with OAuth-capable providers
+
+## Secret References
+
+Secret-bearing config fields can be written in one of three forms:
+
+- inline string: `"token": "123456:abc"`
+- environment variable reference: `"token": { "env": "IMP_TELEGRAM_BOT_TOKEN" }`
+- secret file reference: `"token": { "file": "./secrets/telegram.token" }`
+
+Rules:
+
+- string values keep the existing behavior for current configs
+- secret references must specify exactly one of `env` or `file`
+- `env` names must look like normal environment variable names
+- `file` values may be absolute or relative to the config file directory
+- secret files are read as UTF-8; a single trailing newline is ignored so common `echo`-written files work
+- `imp config validate` now checks that secret references can be resolved from the current environment and filesystem
 
 ### Prompt File Templating V1
 
@@ -141,6 +160,8 @@ Common Telegram fields:
 - `id`: unique bot ID
 - `enabled`: whether the bot starts
 - `token`: Telegram bot token
+- `token.env`: read the token from an environment variable
+- `token.file`: read the token from a secret file
 - `access.allowedUserIds`: list of allowed Telegram user IDs
 - `voice.enabled`: whether Telegram voice messages are accepted for this bot
 - `voice.transcription.provider`: STT backend, currently only `openai`
@@ -167,11 +188,13 @@ This applies to:
 - instruction files
 - reference files
 - `authFile`
+- secret reference files such as `bots[].token.file`
 - `workspace.cwd`
 
 ## Service Environment
 
 Provider credentials and other service-only environment variables are not stored in `config.json`.
+Telegram bot tokens may stay inline for compatibility, but environment-variable or secret-file references are the preferred operational pattern.
 
 When `imp` runs interactively, it uses the current process environment.
 When `imp` runs as a service, environment handling depends on the platform:
@@ -196,6 +219,7 @@ When inspecting a live installation, verify at least:
 - each agent's `prompt.base`, `prompt.instructions`, and `prompt.references`
 - each agent's `workspace.cwd` and `workspace.shellPath`, if used
 - whether required provider credentials are present in the interactive environment or, for Linux services, in `service.env`
+- whether each bot token resolves from its inline value, environment variable, or secret file as intended
 
 ## Updating Config Values
 

@@ -79,7 +79,7 @@ export async function promptForInitialAppConfig(
 
   const telegramToken = await dependencies.input({
     message: "Telegram bot token",
-    default: defaultBot.token,
+    default: typeof defaultBot.token === "string" ? defaultBot.token : "",
     validate: requireNonEmpty("Telegram bot token is required."),
   });
 
