@@ -1,8 +1,9 @@
 import { Agent, type AgentMessage, type AgentOptions } from "@mariozechner/pi-agent-core";
 import type { Api as AiApi, AssistantMessage, Model } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
+import type { ConversationEvent } from "../domain/conversation.js";
 import type { ToolDefinition } from "../tools/types.js";
-import { getAssistantText, toAgentMessages } from "./message-mapping.js";
+import { getAssistantText, toAgentMessages, toConversationEvents } from "./message-mapping.js";
 import type { WorkingDirectoryState } from "./tool-resolution.js";
 
 export interface AgentHandle {
@@ -31,6 +32,8 @@ export interface ExecuteAgentOptions {
     transport: string;
     externalId: string;
   };
+  parentMessageId: string;
+  correlationId: string;
 }
 
 export interface ExecuteAgentResult {
@@ -41,6 +44,7 @@ export interface ExecuteAgentResult {
     };
     text: string;
   };
+  conversationEvents: ConversationEvent[];
   workingDirectory?: string;
 }
 
@@ -50,6 +54,7 @@ export function defaultCreateAgent(options: AgentOptions): AgentHandle {
 
 export async function executeAgent(options: ExecuteAgentOptions): Promise<ExecuteAgentResult> {
   const createAgent = options.createAgent ?? defaultCreateAgent;
+  const initialMessages = toAgentMessages(options.conversationMessages, options.model);
 
   const agent = createAgent({
     initialState: {
@@ -57,7 +62,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       model: options.model,
       thinkingLevel: "off",
       tools: options.tools,
-      messages: toAgentMessages(options.conversationMessages, options.model),
+      messages: initialMessages,
     },
     ...(options.getApiKey
       ? {
@@ -94,6 +99,10 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       conversation: options.conversation,
       text: responseText,
     },
+    conversationEvents: toConversationEvents(agent.state.messages.slice(initialMessages.length), {
+      parentMessageId: options.parentMessageId,
+      correlationId: options.correlationId,
+    }),
     ...(options.workingDirectoryState.get() !== options.initialWorkingDirectory
       ? { workingDirectory: options.workingDirectoryState.get() }
       : {}),

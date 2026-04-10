@@ -71,6 +71,74 @@ describe("createFsConversationStore", () => {
     });
   });
 
+  it("persists and reloads tool call and tool result events", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const created = await store.create(createChatRef(), {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const next: ConversationContext = {
+      state: {
+        ...created.state,
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+      messages: [
+        {
+          kind: "message",
+          id: "msg-1",
+          role: "user",
+          text: "hello",
+          createdAt: "2026-04-05T00:01:00.000Z",
+        },
+        {
+          kind: "tool-call",
+          id: "msg-1:tool-call:1",
+          createdAt: "2026-04-05T00:01:01.000Z",
+          text: "Inspecting the config.",
+          toolCalls: [
+            {
+              id: "tool-1",
+              name: "read_file",
+              arguments: {
+                path: "config.json",
+              },
+            },
+          ],
+        },
+        {
+          kind: "tool-result",
+          id: "msg-1:tool-result:1",
+          createdAt: "2026-04-05T00:01:02.000Z",
+          toolCallId: "tool-1",
+          toolName: "read_file",
+          content: [{ type: "text", text: "{\"ok\":true}" }],
+          details: {
+            path: "config.json",
+          },
+          isError: false,
+        },
+        {
+          kind: "message",
+          id: "msg-1:assistant",
+          role: "assistant",
+          text: "The config looks valid.",
+          createdAt: "2026-04-05T00:01:03.000Z",
+        },
+      ],
+    };
+
+    await store.put(next);
+
+    await expect(store.get(created.state.conversation)).resolves.toEqual({
+      ...next,
+      state: {
+        ...next.state,
+        version: 2,
+      },
+    });
+  });
+
   it("sanitizes path segments before writing session snapshots to disk", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
@@ -254,6 +322,77 @@ describe("createFsConversationStore", () => {
 
     expect(current?.state.conversation.sessionId).toBe("legacy");
     await expect(store.listBackups(chatRef)).resolves.toEqual([]);
+  });
+
+  it("loads session snapshots written before tool event support", async () => {
+    const root = await createTempDir();
+    const ref = {
+      ...createChatRef(),
+      sessionId: "session-1",
+    };
+    const snapshotPath = join(
+      root,
+      "conversations",
+      "telegram",
+      "42",
+      "sessions",
+      "session-1",
+      "conversation.json",
+    );
+    await (await import("node:fs/promises")).mkdir(dirname(snapshotPath), { recursive: true });
+    await writeFile(
+      snapshotPath,
+      JSON.stringify({
+        state: {
+          conversation: ref,
+          agentId: "default",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:01:00.000Z",
+          version: 1,
+        },
+        messages: [
+          {
+            id: "legacy-1",
+            role: "user",
+            text: "hello",
+            createdAt: "2026-04-05T00:00:00.000Z",
+          },
+          {
+            id: "legacy-1:assistant",
+            role: "assistant",
+            text: "hi there",
+            createdAt: "2026-04-05T00:00:01.000Z",
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const store = createFsConversationStore(createRuntimePaths(root));
+
+    await expect(store.get(ref)).resolves.toEqual({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+        version: 1,
+      },
+      messages: [
+        {
+          id: "legacy-1",
+          role: "user",
+          text: "hello",
+          createdAt: "2026-04-05T00:00:00.000Z",
+        },
+        {
+          id: "legacy-1:assistant",
+          role: "assistant",
+          text: "hi there",
+          createdAt: "2026-04-05T00:00:01.000Z",
+        },
+      ],
+    });
   });
 });
 

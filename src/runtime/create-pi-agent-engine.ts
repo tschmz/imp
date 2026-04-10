@@ -170,6 +170,8 @@ export function createPiAgentEngine(
           workingDirectoryState,
           initialWorkingDirectory,
           conversation: input.message.conversation,
+          parentMessageId: input.message.messageId,
+          correlationId: input.message.correlationId,
         });
         await logPipelineEvent(logger, context, { step: "agent-execution", status: "completed" });
 

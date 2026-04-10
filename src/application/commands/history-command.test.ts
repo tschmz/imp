@@ -48,9 +48,9 @@ describe("historyCommandHandler", () => {
     expect(historyCommandHandler.canHandle("history")).toBe(true);
     expect(response?.text).toContain("Session history:");
     expect(response?.text).toContain("Current:");
-    expect(response?.text).toContain("- Current work · agent default · 1 message · updated ");
+    expect(response?.text).toContain("- Current work · agent default · 1 entry · updated ");
     expect(response?.text).toContain("- wd not set");
-    expect(response?.text).toContain("1. Earlier investigation · agent ops · 2 messages · ");
+    expect(response?.text).toContain("1. Earlier investigation · agent ops · 2 entries · ");
   });
 
   it("falls back to an untitled label for previous sessions without a title", async () => {
@@ -84,7 +84,7 @@ describe("historyCommandHandler", () => {
     const response = await historyCommandHandler.handle(context);
 
     expect(response?.text).toContain("Current:\n- none");
-    expect(response?.text).toContain("1. untitled · agent ops · 2 messages · ");
+    expect(response?.text).toContain("1. untitled · agent ops · 2 entries · ");
   });
 
   it("falls back to the agent workspace for the active session working directory", async () => {

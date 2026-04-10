@@ -82,7 +82,15 @@ export function createDependencies(
         messages: [],
       }),
     },
-    engine: { run: async () => ({ message: { conversation: createIncomingMessage("help").conversation, text: "ok" } }) },
+    engine: {
+      run: async () => ({
+        message: {
+          conversation: createIncomingMessage("help").conversation,
+          text: "ok",
+        },
+        conversationEvents: [],
+      }),
+    },
     defaultAgentId: "default",
     runtimeInfo: {
       botId: "private-telegram",

@@ -35,12 +35,7 @@ describe("createDaemon", () => {
     const engine: AgentEngine = {
       run: vi.fn(async (input) => {
         runInputs.push(input);
-        return {
-          message: {
-            conversation: input.message.conversation,
-            text: `reply:${runInputs.length}`,
-          },
-        };
+        return createAgentRunResult(input.message, `reply:${runInputs.length}`);
       }),
     };
 
@@ -62,6 +57,7 @@ describe("createDaemon", () => {
     expect(runInputs[0].conversation.messages).toEqual([]);
     expect(runInputs[1].conversation.messages).toEqual([
       {
+        kind: "message",
         id: "1",
         role: "user",
         text: "hello",
@@ -69,10 +65,11 @@ describe("createDaemon", () => {
         correlationId: "corr-1",
       },
       {
+        kind: "message",
         id: "1:assistant",
         role: "assistant",
         text: "reply:1",
-        createdAt: expect.any(String),
+        createdAt: "2026-04-05T00:00:01.000Z",
         correlationId: "corr-1",
       },
     ]);
@@ -101,12 +98,7 @@ describe("createDaemon", () => {
     const engine: AgentEngine = {
       run: vi.fn(async (input) => {
         runInputs.push(input);
-        return {
-          message: {
-            conversation: input.message.conversation,
-            text: "configured",
-          },
-        };
+        return createAgentRunResult(input.message, "configured");
       }),
     };
 
@@ -164,12 +156,7 @@ describe("createDaemon", () => {
     const engine: AgentEngine = {
       run: vi.fn(async (input) => {
         runInputs.push(input);
-        return {
-          message: {
-            conversation: input.message.conversation,
-            text: "configured",
-          },
-        };
+        return createAgentRunResult(input.message, "configured");
       }),
     };
 
@@ -339,12 +326,7 @@ describe("createDaemon", () => {
       },
       {
         engine: {
-          run: vi.fn(async (input) => ({
-            message: {
-              conversation: input.message.conversation,
-              text: input.agent.id,
-            },
-          })),
+          run: vi.fn(async (input) => createAgentRunResult(input.message, input.agent.id)),
         },
         createTransport: (config) => ({
           async start(handler: TransportHandler) {
@@ -669,6 +651,25 @@ function createDefaultAgent(): AgentDefinition {
     },
     tools: [],
     extensions: [],
+  };
+}
+
+function createAgentRunResult(message: IncomingMessage, text: string) {
+  return {
+    message: {
+      conversation: message.conversation,
+      text,
+    },
+    conversationEvents: [
+      {
+        kind: "message" as const,
+        id: `${message.messageId}:assistant`,
+        role: "assistant" as const,
+        text,
+        createdAt: "2026-04-05T00:00:01.000Z",
+        correlationId: message.correlationId,
+      },
+    ],
   };
 }
 

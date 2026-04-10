@@ -83,7 +83,7 @@ describe("createPiAgentEngine", () => {
       message: createIncomingMessage(),
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       message: {
         conversation: {
           transport: "telegram",
@@ -91,6 +91,97 @@ describe("createPiAgentEngine", () => {
         },
         text: "You said hello.",
       },
+      conversationEvents: [
+        {
+          kind: "message",
+          id: "2:assistant",
+          role: "assistant",
+          text: "You said hello.",
+          correlationId: "corr-2",
+        },
+      ],
+    });
+  });
+
+  it("reconstructs stored tool calls and tool results into the next model run", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        expect(context.messages).toHaveLength(5);
+        expect(context.messages[0]).toMatchObject({
+          role: "user",
+          content: "hello",
+        });
+        expect(context.messages[1]).toMatchObject({
+          role: "assistant",
+          content: [{ type: "text", text: "hi there" }],
+        });
+        expect(context.messages[2]).toMatchObject({
+          role: "assistant",
+          content: [
+            { type: "text", text: "Checking the repo." },
+            { type: "toolCall", id: "tool-1", name: "read_file", arguments: { path: "README.md" } },
+          ],
+        });
+        expect(context.messages[3]).toMatchObject({
+          role: "toolResult",
+          toolCallId: "tool-1",
+          toolName: "read_file",
+          content: [{ type: "text", text: "README contents" }],
+          details: { path: "README.md" },
+          isError: false,
+        });
+        expect(context.messages[4]).toMatchObject({
+          role: "user",
+          content: [{ type: "text", text: "what did I just say?" }],
+        });
+        return fauxAssistantMessage("You said hello.");
+      },
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async () => "unused context",
+    });
+
+    await engine.run({
+      agent: createAgent(),
+      conversation: {
+        ...createConversation(),
+        messages: [
+          ...createConversation().messages,
+          {
+            kind: "tool-call",
+            id: "1:tool-call:1",
+            createdAt: "2026-04-05T00:00:01.500Z",
+            text: "Checking the repo.",
+            toolCalls: [
+              {
+                id: "tool-1",
+                name: "read_file",
+                arguments: {
+                  path: "README.md",
+                },
+              },
+            ],
+          },
+          {
+            kind: "tool-result",
+            id: "1:tool-result:1",
+            createdAt: "2026-04-05T00:00:01.800Z",
+            toolCallId: "tool-1",
+            toolName: "read_file",
+            content: [{ type: "text", text: "README contents" }],
+            details: { path: "README.md" },
+            isError: false,
+          },
+        ],
+      },
+      message: createIncomingMessage(),
     });
   });
 

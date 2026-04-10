@@ -373,6 +373,7 @@ function createRuntime(): BootstrappedRuntime {
           },
           text: "reply",
         },
+        conversationEvents: [],
       })),
       close: vi.fn(async () => undefined),
     },

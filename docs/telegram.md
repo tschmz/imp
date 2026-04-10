@@ -13,9 +13,9 @@ Current commands:
 - `/rename <title>` sets a title for the active session.
 - `/reset` resets the messages in the active session while preserving its title and agent.
 - `/status` shows the active session details, including title, agent, message count, timestamps, working directory, and how many previous sessions are available.
-- `/history` lists previous sessions.
+- `/history` lists previous sessions and their transcript entry counts.
 - `/restore <n>` switches to session `n` from `/history`.
-- `/export` renders the active session transcript as plain text.
+- `/export` renders the active session transcript as plain text, including tool calls and tool results.
 - `/ping` returns a simple liveness response.
 - `/config` shows runtime and config details for the current bot, including instance name, config path, data root, logging level, enabled bots, and the bot's default agent.
 - `/agent` shows the current agent details, including provider, model, base prompt, auth file, instructions, references, workspace, tools, and available agent IDs.

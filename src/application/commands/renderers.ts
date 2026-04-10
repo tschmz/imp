@@ -45,7 +45,7 @@ export function renderStatusMessage(
     "Active session:",
     `Title: ${conversation.state.title ?? "not set"}`,
     `Agent: ${conversation.state.agentId}`,
-    `Messages: ${conversation.messages.length}`,
+    `Entries: ${conversation.messages.length}`,
     `Created: ${formatTimestamp(conversation.state.createdAt)}`,
     `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
     `Working directory: ${resolveDisplayedWorkingDirectory(conversation, agent)}`,
@@ -63,7 +63,7 @@ export function renderHistoryMessage(
   if (conversation) {
     lines.push("Current:");
     lines.push(
-      `- ${renderHistoryEntryLabel(conversation.state.title)} · agent ${conversation.state.agentId} · ${conversation.messages.length} message${conversation.messages.length === 1 ? "" : "s"} · updated ${formatTimestamp(conversation.state.updatedAt)}`,
+      `- ${renderHistoryEntryLabel(conversation.state.title)} · agent ${conversation.state.agentId} · ${conversation.messages.length} entr${conversation.messages.length === 1 ? "y" : "ies"} · updated ${formatTimestamp(conversation.state.updatedAt)}`,
     );
     lines.push(`- wd ${resolveDisplayedWorkingDirectory(conversation, agent)}`);
   } else {
@@ -81,7 +81,7 @@ export function renderHistoryMessage(
 
   for (const [index, backup] of backups.entries()) {
     lines.push(
-      `${index + 1}. ${renderHistoryEntryLabel(backup.title)} · agent ${backup.agentId} · ${backup.messageCount} message${backup.messageCount === 1 ? "" : "s"} · ${formatTimestamp(backup.updatedAt)}`,
+      `${index + 1}. ${renderHistoryEntryLabel(backup.title)} · agent ${backup.agentId} · ${backup.messageCount} entr${backup.messageCount === 1 ? "y" : "ies"} · ${formatTimestamp(backup.updatedAt)}`,
     );
   }
 
@@ -147,6 +147,44 @@ export function renderConversationExport(conversation: ConversationContext): str
   }
 
   for (const message of conversation.messages) {
+    if (message.kind === "tool-call") {
+      lines.push(
+        `[${message.createdAt}] tool-call ${message.toolCalls.map((toolCall) => toolCall.name).join(", ")}`,
+      );
+      if (message.text) {
+        lines.push(message.text);
+      }
+      for (const toolCall of message.toolCalls) {
+        lines.push(`id: ${toolCall.id}`);
+        lines.push(`args: ${JSON.stringify(toolCall.arguments)}`);
+      }
+      lines.push("");
+      continue;
+    }
+
+    if (message.kind === "tool-result") {
+      lines.push(
+        `[${message.createdAt}] tool-result ${message.toolName} (${message.isError ? "error" : "ok"})`,
+      );
+      lines.push(`toolCallId: ${message.toolCallId}`);
+      if (message.content.length > 0) {
+        lines.push(
+          message.content
+            .map((content) =>
+              content.type === "text"
+                ? content.text
+                : `[image ${content.mimeType}, ${content.data.length} bytes base64]`,
+            )
+            .join("\n"),
+        );
+      }
+      if (message.details !== undefined) {
+        lines.push(`details: ${JSON.stringify(message.details)}`);
+      }
+      lines.push("");
+      continue;
+    }
+
     lines.push(`[${message.createdAt}] ${message.role}`);
     lines.push(message.text);
     lines.push("");

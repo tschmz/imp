@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
+import type { ConversationEvent } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { AgentEngine } from "../runtime/types.js";
 import type { SkillSelector } from "../skills/selection.js";
@@ -123,12 +124,7 @@ describe("createHandleIncomingMessage", () => {
     };
 
     const engine: AgentEngine = {
-      run: vi.fn(async ({ message }) => ({
-        message: {
-          conversation: message.conversation,
-          text: "reply",
-        },
-      })),
+      run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
     };
 
     const service = createHandleIncomingMessage({
@@ -156,12 +152,7 @@ describe("createHandleIncomingMessage", () => {
   it("does not change runtime context when no skill catalog is configured", async () => {
     const agent = createDefaultAgent();
     const engine: AgentEngine = {
-      run: vi.fn(async ({ message }) => ({
-        message: {
-          conversation: message.conversation,
-          text: "reply",
-        },
-      })),
+      run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
     };
 
     const service = createHandleIncomingMessage({
@@ -184,12 +175,7 @@ describe("createHandleIncomingMessage", () => {
   it("activates at most three relevant skills", async () => {
     const agent = createDefaultAgent();
     const engine: AgentEngine = {
-      run: vi.fn(async ({ message }) => ({
-        message: {
-          conversation: message.conversation,
-          text: "reply",
-        },
-      })),
+      run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
     };
     const skillSelector: SkillSelector = {
       selectRelevantSkills: vi.fn(async ({ catalog }) => catalog.slice(0, 3)),
@@ -237,12 +223,7 @@ describe("createHandleIncomingMessage", () => {
   it("falls back to no activated skills when selection fails", async () => {
     const agent = createDefaultAgent();
     const engine: AgentEngine = {
-      run: vi.fn(async ({ message }) => ({
-        message: {
-          conversation: message.conversation,
-          text: "reply",
-        },
-      })),
+      run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
     };
     const logger = {
       debug: vi.fn(async () => undefined),
@@ -335,12 +316,7 @@ describe("createHandleIncomingMessage", () => {
     };
 
     const engine: AgentEngine = {
-      run: vi.fn(async ({ message }) => ({
-        message: {
-          conversation: message.conversation,
-          text: "reply",
-        },
-      })),
+      run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
     };
 
     const service = createHandleIncomingMessage({
@@ -363,6 +339,7 @@ describe("createHandleIncomingMessage", () => {
     });
 
     expect(storedContext?.messages[0]).toMatchObject({
+      kind: "message",
       role: "user",
       text: "transcribed text",
       source: {
@@ -373,6 +350,153 @@ describe("createHandleIncomingMessage", () => {
         },
       },
     });
+    expect(storedContext?.messages[1]).toMatchObject({
+      kind: "message",
+      role: "assistant",
+      text: "reply",
+    });
+  });
+
+  it("persists tool call and tool result events from the agent run", async () => {
+    const agent = createDefaultAgent();
+    let storedContext:
+      | {
+          messages: Array<Record<string, unknown>>;
+        }
+      | undefined;
+
+    const conversationStore: ConversationStore = {
+      get: vi.fn(async () => undefined),
+      put: vi.fn(async (context) => {
+        storedContext = context as typeof storedContext;
+      }),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      ensureActive: vi.fn(async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+      create: vi.fn(async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+    };
+
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message }) => {
+        const conversationEvents = [
+          {
+            kind: "tool-call",
+            id: `${message.messageId}:tool-call:1`,
+            createdAt: "2026-04-05T00:00:01.000Z",
+            correlationId: message.correlationId,
+            text: "Inspecting the repo.",
+            toolCalls: [
+              {
+                id: "tool-1",
+                name: "read_file",
+                arguments: {
+                  path: "README.md",
+                },
+              },
+            ],
+          },
+          {
+            kind: "tool-result",
+            id: `${message.messageId}:tool-result:1`,
+            createdAt: "2026-04-05T00:00:02.000Z",
+            correlationId: message.correlationId,
+            toolCallId: "tool-1",
+            toolName: "read_file",
+            content: [{ type: "text", text: "README contents" }],
+            details: {
+              path: "README.md",
+            },
+            isError: false,
+          },
+          {
+            kind: "message",
+            id: `${message.messageId}:assistant`,
+            role: "assistant",
+            text: "All set.",
+            createdAt: "2026-04-05T00:00:03.000Z",
+            correlationId: message.correlationId,
+          },
+        ] satisfies ConversationEvent[];
+
+        return {
+          message: {
+            conversation: message.conversation,
+            text: "All set.",
+          },
+          conversationEvents,
+        };
+      }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore,
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    await service.handle(createIncomingMessage("7", "check the readme"));
+
+    expect(storedContext?.messages).toMatchObject([
+      {
+        kind: "message",
+        id: "7",
+        role: "user",
+        text: "check the readme",
+      },
+      {
+        kind: "tool-call",
+        id: "7:tool-call:1",
+        text: "Inspecting the repo.",
+        toolCalls: [
+          {
+            id: "tool-1",
+            name: "read_file",
+            arguments: {
+              path: "README.md",
+            },
+          },
+        ],
+      },
+      {
+        kind: "tool-result",
+        id: "7:tool-result:1",
+        toolCallId: "tool-1",
+        toolName: "read_file",
+        content: [{ type: "text", text: "README contents" }],
+      },
+      {
+        kind: "message",
+        id: "7:assistant",
+        role: "assistant",
+        text: "All set.",
+      },
+    ]);
   });
 
   it("fails when the default agent cannot be resolved", () => {
@@ -471,6 +595,25 @@ function createConversationStore(): ConversationStore {
       },
       messages: [],
     })),
+  };
+}
+
+function createAgentRunResult(message: IncomingMessage, text: string) {
+  return {
+    message: {
+      conversation: message.conversation,
+      text,
+    },
+    conversationEvents: [
+      {
+        kind: "message" as const,
+        id: `${message.messageId}:assistant`,
+        role: "assistant" as const,
+        text,
+        createdAt: "2026-04-05T00:00:01.000Z",
+        correlationId: message.correlationId,
+      },
+    ],
   };
 }
 

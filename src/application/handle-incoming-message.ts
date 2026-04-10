@@ -81,12 +81,7 @@ export function createHandleIncomingMessage(
         messages: [
           ...conversation.messages,
           toUserConversationMessage(message),
-          toAssistantConversationMessage(
-            response.message,
-            message.messageId,
-            respondedAt,
-            message.correlationId,
-          ),
+          ...response.conversationEvents,
         ],
       });
 
@@ -148,26 +143,12 @@ async function resolveActivatedSkills(
 
 function toUserConversationMessage(message: IncomingMessage) {
   return {
+    kind: "message" as const,
     id: message.messageId,
     role: "user" as const,
     text: message.text,
     createdAt: message.receivedAt,
     correlationId: message.correlationId,
     ...(message.source ? { source: message.source } : {}),
-  };
-}
-
-function toAssistantConversationMessage(
-  message: OutgoingMessage,
-  parentMessageId: string,
-  createdAt: string,
-  correlationId: string,
-) {
-  return {
-    id: `${parentMessageId}:assistant`,
-    role: "assistant" as const,
-    text: message.text,
-    createdAt,
-    correlationId,
   };
 }

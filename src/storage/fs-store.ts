@@ -3,8 +3,9 @@ import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/p
 import { dirname, join } from "node:path";
 import type {
   ChatRef,
-  ConversationMessage,
   ConversationContext,
+  ConversationEvent,
+  ConversationMessage,
   ConversationRef,
 } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
@@ -382,7 +383,7 @@ async function readLegacyConversation(
 async function readLegacyMessages(
   conversationsDir: string,
   ref: ChatRef,
-): Promise<ConversationMessage[]> {
+): Promise<ConversationEvent[]> {
   const path = join(getChatDir(conversationsDir, ref), "messages.json");
 
   try {
@@ -404,6 +405,7 @@ function normalizeSnapshot(snapshot: ConversationContext): ConversationContext {
       ...snapshot.state,
       version: snapshot.state.version ?? 0,
     },
+    messages: snapshot.messages.map((message) => normalizeConversationEvent(message)),
   };
 }
 
@@ -464,9 +466,9 @@ function getSnapshotVersion(snapshot: ConversationContext): number {
 }
 
 function mergeConversationMessages(
-  currentMessages: ConversationMessage[],
-  incomingMessages: ConversationMessage[],
-): ConversationMessage[] {
+  currentMessages: ConversationEvent[],
+  incomingMessages: ConversationEvent[],
+): ConversationEvent[] {
   const mergedMessages = [...currentMessages];
   const currentMessagesById = new Map(currentMessages.map((message) => [message.id, message]));
 
@@ -486,14 +488,29 @@ function mergeConversationMessages(
   return mergedMessages;
 }
 
-function areMessagesEqual(left: ConversationMessage, right: ConversationMessage): boolean {
-  return (
-    left.id === right.id &&
-    left.role === right.role &&
-    left.text === right.text &&
-    left.createdAt === right.createdAt &&
-    left.correlationId === right.correlationId
-  );
+function areMessagesEqual(left: ConversationEvent, right: ConversationEvent): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function normalizeConversationEvent(message: ConversationEvent): ConversationEvent {
+  if ("kind" in message && message.kind === "tool-call") {
+    return {
+      ...message,
+      toolCalls: message.toolCalls.map((toolCall) => ({
+        ...toolCall,
+        arguments: toolCall.arguments ?? {},
+      })),
+    };
+  }
+
+  if ("kind" in message && message.kind === "tool-result") {
+    return {
+      ...message,
+      content: message.content ?? [],
+    };
+  }
+
+  return message;
 }
 
 function pickLatestTimestamp(left: string, right: string): string {
