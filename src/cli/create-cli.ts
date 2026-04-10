@@ -57,7 +57,7 @@ export function createCli(dependencies: CliDependencies): Command {
     .option("-c, --config <path>", "Path to the config file")
     .option("-b, --bot <id>", "Show logs for a specific bot ID")
     .option("-f, --follow", "Follow appended log lines")
-    .option("-n, --lines <count>", "Number of recent lines to show", parseIntegerOption, 50)
+    .option("-n, --lines <count>", "Number of recent lines to show", parsePositiveIntegerOption, 50)
     .action(
       async function action(
         this: Command,
@@ -257,4 +257,14 @@ export function parseIntegerOption(value: string): number {
   }
 
   return Number.parseInt(value, 10);
+}
+
+export function parsePositiveIntegerOption(value: string): number {
+  const parsed = parseIntegerOption(value);
+
+  if (parsed <= 0) {
+    throw new InvalidArgumentError("Expected a positive integer.");
+  }
+
+  return parsed;
 }

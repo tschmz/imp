@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { describe, expect, it, vi } from "vitest";
-import { createCli, type CliDependencies, parseIntegerOption } from "./create-cli.js";
+import { createCli, type CliDependencies, parseIntegerOption, parsePositiveIntegerOption } from "./create-cli.js";
 
 describe("createCli", () => {
   it("exposes the documented help surface", () => {
@@ -108,6 +108,23 @@ describe("createCli", () => {
     for (const value of ["2abc", "abc", "1.5", "", "   "]) {
       expect(() => parseIntegerOption(value)).toThrow("Expected an integer.");
     }
+  });
+
+  it("rejects non-positive log line counts at CLI parse time", () => {
+    for (const value of ["0", "-1"]) {
+      expect(() => parsePositiveIntegerOption(value)).toThrow("Expected a positive integer.");
+    }
+  });
+
+  it("rejects non-positive --lines values before invoking the log use case", async () => {
+    const dependencies = createDependencies();
+    const cli = createCli(dependencies);
+    findCommand(cli, "log").exitOverride();
+
+    await expect(cli.parseAsync(["node", "imp", "log", "--lines", "-1"])).rejects.toThrow(
+      "Expected a positive integer.",
+    );
+    expect(dependencies.viewLogs).not.toHaveBeenCalled();
   });
 });
 
