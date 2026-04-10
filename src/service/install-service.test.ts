@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -161,6 +161,19 @@ describe("installService", () => {
 
     await expect(assertServiceInstallCanProceed({ definitionPath })).rejects.toThrowError(
       `Service definition already exists: ${definitionPath}\nRe-run with --force to overwrite.`,
+    );
+  });
+
+  it("refuses to overwrite an existing linux environment file without force", async () => {
+    const root = await createTempDir();
+    const definitionPath = join(root, ".config", "systemd", "user", "imp.service");
+    const environmentPath = join(root, ".config", "imp", "service.env");
+
+    await mkdir(join(root, ".config", "imp"), { recursive: true });
+    await writeFile(environmentPath, "OPENAI_API_KEY=sk-test\n", "utf8");
+
+    await expect(assertServiceInstallCanProceed({ definitionPath, environmentPath })).rejects.toThrowError(
+      `Service environment file already exists: ${environmentPath}\nRe-run with --force to overwrite.`,
     );
   });
 

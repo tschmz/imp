@@ -72,6 +72,7 @@ export function createServiceUseCases(
 
         await deps.assertServiceInstallCanProceed({
           definitionPath,
+          environmentPath: plan.environmentPath,
           force,
         });
 

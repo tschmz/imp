@@ -92,13 +92,24 @@ export async function installService(options: {
 
 export async function assertServiceInstallCanProceed(options: {
   definitionPath: string;
+  environmentPath?: string;
   force?: boolean;
 }): Promise<string> {
-  return assertManagedFileCanBeWritten({
+  const definitionPath = await assertManagedFileCanBeWritten({
     path: options.definitionPath,
     resourceLabel: "Service definition",
     force: options.force,
   });
+
+  if (options.environmentPath) {
+    await assertManagedFileCanBeWritten({
+      path: options.environmentPath,
+      resourceLabel: "Service environment file",
+      force: options.force,
+    });
+  }
+
+  return definitionPath;
 }
 
 export function resolveServiceDefinitionPath(options: {

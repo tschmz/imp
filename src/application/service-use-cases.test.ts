@@ -43,6 +43,16 @@ describe("createServiceUseCases", () => {
     await useCases.installService({ configPath: "/tmp/config.json", dryRun: false, force: false });
     await useCases.installService({ configPath: "/tmp/config.json", dryRun: false, force: true });
 
+    expect(assertServiceInstallCanProceed).toHaveBeenNthCalledWith(1, {
+      definitionPath: "/tmp/imp.service",
+      environmentPath: "/tmp/service.env",
+      force: false,
+    });
+    expect(assertServiceInstallCanProceed).toHaveBeenNthCalledWith(2, {
+      definitionPath: "/tmp/imp.service",
+      environmentPath: "/tmp/service.env",
+      force: true,
+    });
     expect(installService).toHaveBeenNthCalledWith(1, { configPath: "/tmp/config.json", force: false });
     expect(installService).toHaveBeenNthCalledWith(2, { configPath: "/tmp/config.json", force: true });
   });
