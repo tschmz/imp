@@ -1,4 +1,9 @@
-import { Agent, type AgentMessage, type AgentOptions } from "@mariozechner/pi-agent-core";
+import {
+  Agent,
+  type AgentEvent,
+  type AgentMessage,
+  type AgentOptions,
+} from "@mariozechner/pi-agent-core";
 import type { Api as AiApi, AssistantMessage, Model } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationEvent } from "../domain/conversation.js";
@@ -48,6 +53,14 @@ export interface ExecuteAgentResult {
   workingDirectory?: string;
 }
 
+interface AgentEventSubscriber {
+  (event: AgentEvent): void | Promise<void>;
+}
+
+interface EventSubscribableAgentHandle extends AgentHandle {
+  subscribe?(subscriber: AgentEventSubscriber): () => void;
+}
+
 export function defaultCreateAgent(options: AgentOptions): AgentHandle {
   return new Agent(options);
 }
@@ -72,7 +85,26 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
     ...(options.onPayload ? { onPayload: options.onPayload } : {}),
   });
 
-  await agent.prompt(options.userText);
+  const eventfulAgent = agent as EventSubscribableAgentHandle;
+  const toolEventMessages: AgentMessage[] = [];
+  const unsubscribe = eventfulAgent.subscribe?.((event) => {
+    if (event.type === "message_end") {
+      const message = event.message;
+      if (message.role === "assistant" || message.role === "toolResult") {
+        toolEventMessages.push(message);
+      }
+    }
+  });
+
+  try {
+    await agent.prompt(options.userText);
+  } finally {
+    unsubscribe?.();
+  }
+
+  const appendedMessages = toolEventMessages.length > 0
+    ? toolEventMessages
+    : agent.state.messages.slice(initialMessages.length);
 
   const assistantMessage = [...agent.state.messages]
     .reverse()
@@ -99,7 +131,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       conversation: options.conversation,
       text: responseText,
     },
-    conversationEvents: toConversationEvents(agent.state.messages.slice(initialMessages.length), {
+    conversationEvents: toConversationEvents(appendedMessages, {
       parentMessageId: options.parentMessageId,
       correlationId: options.correlationId,
     }),
