@@ -16,6 +16,61 @@ afterEach(async () => {
 });
 
 describe("loadAppConfig", () => {
+  it("accepts config files prefixed with a UTF-8 BOM", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+
+    await writeRawFile(
+      configPath,
+      `\uFEFF${JSON.stringify(
+        {
+          instance: {
+            name: "default",
+          },
+          paths: {
+            dataRoot: "/tmp/imp",
+          },
+          defaults: {
+            agentId: "default",
+          },
+          agents: [
+            {
+              id: "default",
+              model: {
+                provider: "openai",
+                modelId: "gpt-5.4",
+              },
+              prompt: {
+                base: {
+                  text: "You are concise.",
+                },
+              },
+            },
+          ],
+          bots: [
+            {
+              id: "private-telegram",
+              type: "telegram",
+              enabled: true,
+              token: "telegram-token",
+              access: {
+                allowedUserIds: [],
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await expect(loadAppConfig(configPath)).resolves.toMatchObject({
+      instance: {
+        name: "default",
+      },
+    });
+  });
+
   it("rejects malformed json with the resolved path", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");

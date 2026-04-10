@@ -21,9 +21,13 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
 
 function parseConfigJson(raw: string, absolutePath: string): unknown {
   try {
-    return JSON.parse(raw) as unknown;
+    return JSON.parse(stripUtf8Bom(raw)) as unknown;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Invalid config file ${absolutePath}\nMalformed JSON: ${message}`);
   }
+}
+
+function stripUtf8Bom(raw: string): string {
+  return raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
 }
