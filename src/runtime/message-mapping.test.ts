@@ -1,5 +1,4 @@
 import type { Model } from "@mariozechner/pi-ai";
-import { convertResponsesMessages } from "../../node_modules/@mariozechner/pi-ai/dist/providers/openai-responses-shared.js";
 import { describe, expect, it } from "vitest";
 import type { ConversationEvent } from "../domain/conversation.js";
 import { toAgentMessages } from "./message-mapping.js";
@@ -132,7 +131,7 @@ describe("toAgentMessages", () => {
     ]);
   });
 
-  it("preserves replay metadata needed by openai-responses-shared", () => {
+  it("preserves replay metadata needed for openai-responses message replay", () => {
     const messages = toAgentMessages(
       [
         {
@@ -195,34 +194,38 @@ describe("toAgentMessages", () => {
       reasoningResponsesModel,
     );
 
-    const replayPayload = convertResponsesMessages(
-      reasoningResponsesModel,
-      {
-        messages,
-      },
-      new Set(["openai"]),
-    );
-
-    expect(replayPayload).toEqual([
+    expect(messages).toEqual([
       expect.objectContaining({
-        type: "reasoning",
-        id: "rs_123",
+        role: "assistant",
+        responseId: "resp_123",
+        content: [
+          expect.objectContaining({
+            type: "thinking",
+            thinkingSignature: JSON.stringify({
+              type: "reasoning",
+              id: "rs_123",
+              summary: [],
+              encrypted_content: "enc",
+            }),
+          }),
+          expect.objectContaining({
+            type: "text",
+            text: "Checking the repo.",
+            textSignature: JSON.stringify({ v: 1, id: "msg_123", phase: "commentary" }),
+          }),
+          expect.objectContaining({
+            type: "toolCall",
+            id: "call_123|fc_123",
+            name: "read_file",
+            thoughtSignature: "sig_123",
+          }),
+        ],
       }),
       expect.objectContaining({
-        type: "message",
-        id: "msg_123",
-        phase: "commentary",
-      }),
-      expect.objectContaining({
-        type: "function_call",
-        call_id: "call_123",
-        id: "fc_123",
-        name: "read_file",
-      }),
-      expect.objectContaining({
-        type: "function_call_output",
-        call_id: "call_123",
-        output: "README contents",
+        role: "toolResult",
+        toolCallId: "call_123|fc_123",
+        toolName: "read_file",
+        content: [{ type: "text", text: "README contents" }],
       }),
     ]);
   });
