@@ -1,6 +1,5 @@
 import {
   Agent,
-  type AgentEvent,
   type AgentMessage,
   type AgentOptions,
 } from "@mariozechner/pi-agent-core";
@@ -11,12 +10,12 @@ import type { ToolDefinition } from "../tools/types.js";
 import { getAssistantText, toAgentMessages, toConversationEvents } from "./message-mapping.js";
 import type { WorkingDirectoryState } from "./tool-resolution.js";
 
-export interface AgentHandle {
-  prompt(text: string): Promise<void>;
-  state: {
-    messages: AgentMessage[];
-  };
-}
+export type AgentHandle =
+  Pick<Agent, "prompt">
+  & {
+    state: Pick<Agent["state"], "messages">;
+  }
+  & Partial<Pick<Agent, "subscribe">>;
 
 export interface ExecuteAgentOptions {
   createAgent?: (options: AgentOptions) => AgentHandle;
@@ -53,14 +52,6 @@ export interface ExecuteAgentResult {
   workingDirectory?: string;
 }
 
-interface AgentEventSubscriber {
-  (event: AgentEvent, signal?: AbortSignal): void | Promise<void>;
-}
-
-interface EventSubscribableAgentHandle extends AgentHandle {
-  subscribe?(subscriber: AgentEventSubscriber): () => void;
-}
-
 export function defaultCreateAgent(options: AgentOptions): AgentHandle {
   return new Agent(options);
 }
@@ -85,8 +76,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
     ...(options.onPayload ? { onPayload: options.onPayload } : {}),
   });
 
-  const eventfulAgent = agent as EventSubscribableAgentHandle;
-  const eventMessages = collectConversationEventMessages(eventfulAgent);
+  const eventMessages = collectConversationEventMessages(agent);
 
   try {
     await agent.prompt(options.userText);
@@ -133,7 +123,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
   };
 }
 
-function collectConversationEventMessages(agent: EventSubscribableAgentHandle): {
+function collectConversationEventMessages(agent: AgentHandle): {
   messages: AgentMessage[];
   unsubscribe?: () => void;
 } {

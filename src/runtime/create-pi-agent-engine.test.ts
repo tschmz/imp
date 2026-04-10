@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentOptions } from "@mariozechner/pi-agent-core";
+import type { Agent, AgentEvent, AgentOptions } from "@mariozechner/pi-agent-core";
 import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
@@ -275,12 +275,12 @@ describe("createPiAgentEngine", () => {
 
     const createAgentHandle = (_options: AgentOptions) => {
       void _options;
-      const subscribers: Array<(event: AgentEvent) => void | Promise<void>> = [];
+      const subscribers: Array<Parameters<Agent["subscribe"]>[0]> = [];
       return {
         state: {
           messages: [finalAssistantMessage],
         },
-        subscribe(subscriber: (event: AgentEvent) => void | Promise<void>) {
+        subscribe(subscriber: Parameters<Agent["subscribe"]>[0]) {
           subscribers.push(subscriber);
           return () => {
             const index = subscribers.indexOf(subscriber);
@@ -290,10 +290,11 @@ describe("createPiAgentEngine", () => {
           };
         },
         async prompt() {
+          const signal = new AbortController().signal;
           for (const subscriber of subscribers) {
-            await subscriber({ type: "message_end", message: toolCallAssistantMessage } as AgentEvent);
-            await subscriber({ type: "message_end", message: toolResultMessage } as AgentEvent);
-            await subscriber({ type: "message_end", message: finalAssistantMessage } as AgentEvent);
+            await subscriber({ type: "message_end", message: toolCallAssistantMessage } as AgentEvent, signal);
+            await subscriber({ type: "message_end", message: toolResultMessage } as AgentEvent, signal);
+            await subscriber({ type: "message_end", message: finalAssistantMessage } as AgentEvent, signal);
           }
         },
       };
@@ -405,12 +406,12 @@ describe("createPiAgentEngine", () => {
 
     const createAgentHandle = (_options: AgentOptions) => {
       void _options;
-      const subscribers: Array<(event: AgentEvent) => void | Promise<void>> = [];
+      const subscribers: Array<Parameters<Agent["subscribe"]>[0]> = [];
       return {
         state: {
           messages: [finalAssistantMessage],
         },
-        subscribe(subscriber: (event: AgentEvent) => void | Promise<void>) {
+        subscribe(subscriber: Parameters<Agent["subscribe"]>[0]) {
           subscribers.push(subscriber);
           return () => {
             const index = subscribers.indexOf(subscriber);
@@ -420,17 +421,18 @@ describe("createPiAgentEngine", () => {
           };
         },
         async prompt() {
+          const signal = new AbortController().signal;
           for (const subscriber of subscribers) {
             await subscriber({
               type: "turn_end",
               message: toolCallAssistantMessage,
               toolResults: [toolResultMessage],
-            } as AgentEvent);
+            } as AgentEvent, signal);
             await subscriber({
               type: "turn_end",
               message: finalAssistantMessage,
               toolResults: [],
-            } as AgentEvent);
+            } as AgentEvent, signal);
           }
         },
       };
