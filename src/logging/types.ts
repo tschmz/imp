@@ -11,6 +11,8 @@ export interface LogFields {
   backupId?: string;
   durationMs?: number;
   errorType?: string;
+  skillCount?: number;
+  skillNames?: string[];
 }
 
 export interface Logger {

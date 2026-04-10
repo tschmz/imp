@@ -1,7 +1,6 @@
 import { loadAppConfig } from "../config/load-app-config.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { readRecentLogLines } from "../logging/view-logs.js";
-import { selectRelevantSkills } from "../skills/selection.js";
 import { getOrCreateConversationContext } from "./commands/conversation-context.js";
 import { inboundCommandHandlers } from "./commands/registry.js";
 import type { HandleIncomingMessageDependencies } from "./commands/types.js";
@@ -60,6 +59,7 @@ export function createHandleIncomingMessage(
         correlationId: message.correlationId,
         agentId: agent.id,
       });
+      const activatedSkills = await resolveActivatedSkills(message, agent, dependencies);
       const response = await dependencies.engine.run({
         agent,
         conversation,
@@ -67,7 +67,7 @@ export function createHandleIncomingMessage(
         runtime: {
           configPath: dependencies.runtimeInfo.configPath,
           dataRoot: dependencies.runtimeInfo.dataRoot,
-          ...(resolveActivatedSkills(message.text, dependencies)),
+          ...(activatedSkills.length > 0 ? { activatedSkills } : {}),
         },
       });
       const respondedAt = new Date().toISOString();
@@ -95,27 +95,49 @@ export function createHandleIncomingMessage(
   };
 }
 
-function resolveActivatedSkills(
-  userText: string,
+async function resolveActivatedSkills(
+  message: IncomingMessage,
+  agent: NonNullable<ReturnType<HandleIncomingMessageDependencies["agentRegistry"]["get"]>>,
   dependencies: HandleIncomingMessageDependencies,
-): { activatedSkills?: NonNullable<HandleIncomingMessageDependencies["skillCatalog"]> } {
+): Promise<NonNullable<HandleIncomingMessageDependencies["skillCatalog"]>> {
   const skillCatalog = dependencies.skillCatalog ?? [];
-  if (skillCatalog.length === 0) {
-    return {};
+  const skillSelector = dependencies.skillSelector;
+  if (skillCatalog.length === 0 || !skillSelector) {
+    return [];
   }
 
   try {
-    const activatedSkills = selectRelevantSkills(userText, skillCatalog, 3);
-    return activatedSkills.length > 0 ? { activatedSkills } : {};
+    const activatedSkills = await skillSelector.selectRelevantSkills({
+      agent,
+      userText: message.text,
+      catalog: skillCatalog,
+      maxActivatedSkills: 3,
+    });
+    await dependencies.logger?.debug("resolved bot skills for turn", {
+      botId: message.botId,
+      transport: message.conversation.transport,
+      conversationId: message.conversation.externalId,
+      messageId: message.messageId,
+      correlationId: message.correlationId,
+      agentId: agent.id,
+      skillCount: activatedSkills.length,
+      skillNames: activatedSkills.map((skill) => skill.name),
+    });
+    return activatedSkills;
   } catch (error) {
     void dependencies.logger?.error(
       "failed to select bot skills; continuing without skill activation",
       {
-        botId: dependencies.runtimeInfo.botId,
+        botId: message.botId,
+        transport: message.conversation.transport,
+        conversationId: message.conversation.externalId,
+        messageId: message.messageId,
+        correlationId: message.correlationId,
+        agentId: agent.id,
       },
       error,
     );
-    return {};
+    return [];
   }
 }
 

@@ -23,6 +23,7 @@ export async function resolveSystemPrompt(
 ): Promise<SystemPromptResolutionResult> {
   const promptFiles = [
     ...resolvePromptFileSources(options.agent, options.promptWorkingDirectory).map((source) => source.path),
+    ...resolveActivatedSkillReferenceFiles(options.activatedSkills ?? []),
   ];
 
   const cacheKey = await options.cache.buildCacheKey({
@@ -104,7 +105,7 @@ export async function buildSystemPrompt(
   }
 
   if (activatedSkills.length > 0) {
-    sections.push(formatActivatedSkillsSection(activatedSkills));
+    sections.push(await formatActivatedSkillsSection(activatedSkills, readTextFile));
   }
 
   return sections.join("\n\n");
@@ -118,13 +119,41 @@ function escapeInstructionAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
-function formatActivatedSkillsSection(activatedSkills: SkillDefinition[]): string {
-  return `<SKILLS>\n\n${activatedSkills
-    .map(
-      (skill) =>
+async function formatActivatedSkillsSection(
+  activatedSkills: SkillDefinition[],
+  readTextFile: (path: string) => Promise<string>,
+): Promise<string> {
+  const renderedSkills = await Promise.all(
+    activatedSkills.map(async (skill) => {
+      const sections = [
         `<SKILL name="${escapeInstructionAttribute(skill.name)}" from="${escapeInstructionAttribute(skill.filePath)}">\n\n${skill.content.trim()}\n</SKILL>`,
-    )
-    .join("\n\n")}\n</SKILLS>`;
+      ];
+
+      for (const reference of skill.references) {
+        sections.push(
+          `<SKILL-REFERENCE skill="${escapeInstructionAttribute(skill.name)}" from="${escapeInstructionAttribute(reference.filePath)}">\n\n${(await readTextFile(reference.filePath)).trim()}\n</SKILL-REFERENCE>`,
+        );
+      }
+
+      if (skill.scripts.length > 0) {
+        sections.push(
+          `<SKILL-SCRIPTS skill="${escapeInstructionAttribute(skill.name)}">\n\n` +
+            "These local scripts are available for explicit use. Inspect them and run them only when needed.\n" +
+            `${skill.scripts
+              .map(
+                (script) =>
+                  `- ${script.filePath} (relative: ${script.relativePath})`,
+              )
+              .join("\n")}\n` +
+            "</SKILL-SCRIPTS>",
+        );
+      }
+
+      return sections.join("\n\n");
+    }),
+  );
+
+  return `<SKILLS>\n\n${renderedSkills.join("\n\n")}\n</SKILLS>`;
 }
 
 export function resolveInstructionSources(
@@ -161,6 +190,10 @@ function resolveWorkingDirectoryAgentsFile(workingDirectory: string | undefined)
   }
 
   return join(workingDirectory, "AGENTS.md");
+}
+
+function resolveActivatedSkillReferenceFiles(activatedSkills: SkillDefinition[]): string[] {
+  return activatedSkills.flatMap((skill) => skill.references.map((reference) => reference.filePath));
 }
 
 async function resolvePromptSourceContent(

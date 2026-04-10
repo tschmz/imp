@@ -3,6 +3,7 @@ import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { AgentEngine } from "../runtime/types.js";
+import type { SkillSelector } from "../skills/selection.js";
 import type { ConversationStore } from "../storage/types.js";
 import { createHandleIncomingMessage } from "./handle-incoming-message.js";
 
@@ -190,6 +191,14 @@ describe("createHandleIncomingMessage", () => {
         },
       })),
     };
+    const skillSelector: SkillSelector = {
+      selectRelevantSkills: vi.fn(async ({ catalog }) => catalog.slice(0, 3)),
+    };
+    const logger = {
+      debug: vi.fn(async () => undefined),
+      info: vi.fn(async () => undefined),
+      error: vi.fn(async () => undefined),
+    };
 
     const service = createHandleIncomingMessage({
       agentRegistry: createAgentRegistry([agent]),
@@ -197,12 +206,14 @@ describe("createHandleIncomingMessage", () => {
       engine,
       defaultAgentId: "default",
       runtimeInfo: createRuntimeInfo(),
+      skillSelector,
       skillCatalog: [
         createSkill("git-commit", "Commit Git changes carefully."),
         createSkill("git-rebase", "Rebase a Git branch safely."),
         createSkill("git-review", "Review Git history and diffs."),
         createSkill("git-cleanup", "Clean up Git branches."),
       ],
+      logger,
     });
 
     await service.handle(
@@ -214,6 +225,63 @@ describe("createHandleIncomingMessage", () => {
 
     const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
     expect(runInput?.runtime?.activatedSkills).toHaveLength(3);
+    expect(logger.debug).toHaveBeenCalledWith(
+      "resolved bot skills for turn",
+      expect.objectContaining({
+        skillCount: 3,
+        skillNames: ["git-commit", "git-rebase", "git-review"],
+      }),
+    );
+  });
+
+  it("falls back to no activated skills when selection fails", async () => {
+    const agent = createDefaultAgent();
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "reply",
+        },
+      })),
+    };
+    const logger = {
+      debug: vi.fn(async () => undefined),
+      info: vi.fn(async () => undefined),
+      error: vi.fn(async () => undefined),
+    };
+    const skillSelector: SkillSelector = {
+      selectRelevantSkills: vi.fn(async () => {
+        throw new Error("selection failed");
+      }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: createConversationStore(),
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+      skillSelector,
+      skillCatalog: [createSkill("git-commit", "Commit Git changes carefully.")],
+      logger,
+    });
+
+    await service.handle(createIncomingMessage("6", "Please help."));
+
+    const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
+    expect(runInput?.runtime).toEqual({
+      configPath: "/tmp/config.json",
+      dataRoot: "/tmp/data",
+    });
+    expect(logger.error).toHaveBeenCalledWith(
+      "failed to select bot skills; continuing without skill activation",
+      expect.objectContaining({
+        botId: "private-telegram",
+        messageId: "6",
+        agentId: "default",
+      }),
+      expect.any(Error),
+    );
   });
 
   it("persists the user message source in conversation history", async () => {
@@ -355,6 +423,8 @@ function createSkill(name: string, description: string) {
     filePath: `/skills/${name}/SKILL.md`,
     body: `\n${description}`,
     content: `---\nname: ${name}\ndescription: ${description}\n---\n\n${description}`,
+    references: [],
+    scripts: [],
   };
 }
 

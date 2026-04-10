@@ -38,6 +38,7 @@ export function createRuntimeEntries(
         activeBotIds: runtimes.map((entry) => entry.botConfig.id),
       },
       skillCatalog: runtime.botConfig.skillCatalog,
+      skillSelector: runtime.skillSelector,
       logger: runtime.logger,
     });
     const messageProcessor = createMessageProcessor({
@@ -98,6 +99,11 @@ export function createRuntimeEntries(
         await runtime.logger.info(`runtime dir: ${runtime.botConfig.paths.runtimeDir}`);
         await runtime.logger.info(`runtime file: ${runtime.botConfig.paths.runtimeStatePath}`);
         await runtime.logger.info(`active bot: ${runtime.botConfig.id}`);
+        await runtime.logger.info("discovered bot skills", {
+          botId: runtime.botConfig.id,
+          skillCount: runtime.botConfig.skillCatalog.length,
+          skillNames: runtime.botConfig.skillCatalog.map((skill) => skill.name),
+        });
         for (const issue of runtime.botConfig.skillIssues) {
           await runtime.logger.info(issue, { botId: runtime.botConfig.id });
         }

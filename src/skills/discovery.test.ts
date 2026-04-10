@@ -39,6 +39,8 @@ describe("discoverSkills", () => {
       description: "Stage and commit changes.",
       filePath: join(skillsRoot, "commit", "SKILL.md"),
       body: "\nUse focused commits.",
+      references: [],
+      scripts: [],
     });
   });
 
@@ -60,7 +62,7 @@ describe("discoverSkills", () => {
     const result = await discoverSkills([skillsRoot]);
 
     expect(result.skills).toEqual([]);
-    expect(result.issues.some((issue) => issue.includes('unsupported frontmatter line "name commit"'))).toBe(true);
+    expect(result.issues.some((issue) => issue.includes("invalid YAML frontmatter"))).toBe(true);
   });
 
   it("rejects invalid skill names", async () => {
@@ -149,6 +151,59 @@ describe("discoverSkills", () => {
     const result = await discoverSkills([skillsRoot]);
 
     expect(result.skills.map((skill) => skill.name)).toEqual(["direct"]);
+  });
+
+  it("accepts YAML block scalars and discovers references and scripts", async () => {
+    const root = await createTempDir();
+    const skillsRoot = join(root, "skills");
+    await writeSkillFile(
+      join(skillsRoot, "commit", "SKILL.md"),
+      [
+        "---",
+        "name: commit",
+        "description: |",
+        "  Stage and commit changes.",
+        "  Include only focused files.",
+        "---",
+        "",
+        "Use focused commits.",
+      ].join("\n"),
+    );
+    await writeSkillFile(join(skillsRoot, "commit", "references", "checklist.md"), "Checklist");
+    await writeSkillFile(join(skillsRoot, "commit", "scripts", "prepare.sh"), "#!/usr/bin/env bash");
+
+    const result = await discoverSkills([skillsRoot]);
+
+    expect(result.skills).toHaveLength(1);
+    expect(result.skills[0]).toMatchObject({
+      description: "Stage and commit changes.\nInclude only focused files.\n",
+      references: [
+        {
+          filePath: join(skillsRoot, "commit", "references", "checklist.md"),
+          relativePath: "checklist.md",
+        },
+      ],
+      scripts: [
+        {
+          filePath: join(skillsRoot, "commit", "scripts", "prepare.sh"),
+          relativePath: "prepare.sh",
+        },
+      ],
+    });
+  });
+
+  it("accepts spec-aligned description lengths up to 1024 characters", async () => {
+    const root = await createTempDir();
+    const skillsRoot = join(root, "skills");
+    await writeSkillFile(
+      join(skillsRoot, "commit", "SKILL.md"),
+      ["---", "name: commit", `description: "${"a".repeat(1024)}"`, "---", "", "Use focused commits."].join("\n"),
+    );
+
+    const result = await discoverSkills([skillsRoot]);
+
+    expect(result.issues).toEqual([]);
+    expect(result.skills).toHaveLength(1);
   });
 });
 

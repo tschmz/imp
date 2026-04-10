@@ -1,12 +1,18 @@
 import { readdir, readFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
-import { join, resolve } from "node:path";
-import type { SkillCatalog, SkillDefinition, SkillFrontmatter } from "./types.js";
+import { join, relative, resolve } from "node:path";
+import { parse as parseYaml } from "yaml";
+import type {
+  SkillCatalog,
+  SkillDefinition,
+  SkillFrontmatter,
+  SkillResourceDefinition,
+} from "./types.js";
 
 const SKILL_FILE_NAME = "SKILL.md";
 const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_SKILL_NAME_LENGTH = 64;
-const MAX_SKILL_DESCRIPTION_LENGTH = 500;
+const MAX_SKILL_DESCRIPTION_LENGTH = 1024;
 
 export async function discoverSkills(paths: string[]): Promise<SkillCatalog> {
   const issues: string[] = [];
@@ -61,6 +67,8 @@ export async function discoverSkills(paths: string[]): Promise<SkillCatalog> {
         filePath: skillFilePath,
         body: parsedSkill.body,
         content,
+        references: await discoverSkillResources(skillDirectoryPath, "references"),
+        scripts: await discoverSkillResources(skillDirectoryPath, "scripts"),
       });
     }
   }
@@ -109,16 +117,15 @@ function parseSkillFile(
       error: string;
     } {
   const normalizedContent = content.replace(/\r\n/g, "\n");
-  if (!normalizedContent.startsWith("---\n")) {
+  const frontmatterMatch = normalizedContent.replace(/^\uFEFF/, "").match(
+    /^---[ \t]*\n([\s\S]*?)\n(?:---|\.\.\.)[ \t]*(?:\n|$)/,
+  );
+  if (!frontmatterMatch) {
     return { success: false, error: "missing YAML frontmatter block" };
   }
 
-  const frontmatterEndIndex = normalizedContent.indexOf("\n---\n", 4);
-  if (frontmatterEndIndex === -1) {
-    return { success: false, error: "unterminated YAML frontmatter block" };
-  }
-
-  const frontmatter = parseSimpleYamlFrontmatter(normalizedContent.slice(4, frontmatterEndIndex));
+  const [rawFrontmatterBlock, rawFrontmatter] = frontmatterMatch;
+  const frontmatter = parseYamlFrontmatter(rawFrontmatter);
   if (!frontmatter.success) {
     return frontmatter;
   }
@@ -126,11 +133,11 @@ function parseSkillFile(
   return {
     success: true,
     frontmatter,
-    body: normalizedContent.slice(frontmatterEndIndex + "\n---\n".length),
+    body: normalizedContent.replace(/^\uFEFF/, "").slice(rawFrontmatterBlock.length),
   };
 }
 
-function parseSimpleYamlFrontmatter(
+function parseYamlFrontmatter(
   rawFrontmatter: string,
 ):
   | (SkillFrontmatter & {
@@ -140,50 +147,45 @@ function parseSimpleYamlFrontmatter(
       success: false;
       error: string;
     } {
-  const values = new Map<string, string>();
+  let parsedFrontmatter: unknown;
 
-  for (const line of rawFrontmatter.split("\n")) {
-    const trimmedLine = line.trim();
-    if (!trimmedLine || trimmedLine.startsWith("#")) {
-      continue;
-    }
+  try {
+    parsedFrontmatter = parseYaml(rawFrontmatter);
+  } catch (error) {
+    return {
+      success: false,
+      error: `invalid YAML frontmatter (${formatErrorDetail(error)})`,
+    };
+  }
 
-    const separatorIndex = trimmedLine.indexOf(":");
-    if (separatorIndex <= 0) {
-      return {
-        success: false,
-        error: `unsupported frontmatter line "${trimmedLine}"`,
-      };
-    }
+  if (!isPlainRecord(parsedFrontmatter)) {
+    return {
+      success: false,
+      error: "frontmatter must define a YAML mapping",
+    };
+  }
 
-    const key = trimmedLine.slice(0, separatorIndex).trim();
-    const rawValue = trimmedLine.slice(separatorIndex + 1).trim();
-    if (!rawValue) {
-      return {
-        success: false,
-        error: `frontmatter field "${key}" must define a string value`,
-      };
-    }
+  const name = parsedFrontmatter.name;
+  if (name !== undefined && typeof name !== "string") {
+    return {
+      success: false,
+      error: 'frontmatter field "name" must define a string value',
+    };
+  }
 
-    values.set(key, unquoteFrontmatterValue(rawValue));
+  const description = parsedFrontmatter.description;
+  if (description !== undefined && typeof description !== "string") {
+    return {
+      success: false,
+      error: 'frontmatter field "description" must define a string value',
+    };
   }
 
   return {
     success: true,
-    name: values.get("name") ?? "",
-    description: values.get("description") ?? "",
+    name: name ?? "",
+    description: description ?? "",
   };
-}
-
-function unquoteFrontmatterValue(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1).trim();
-  }
-
-  return value;
 }
 
 function validateSkillFrontmatter(frontmatter: SkillFrontmatter): string | undefined {
@@ -212,6 +214,57 @@ function validateSkillFrontmatter(frontmatter: SkillFrontmatter): string | undef
 
 function isFileNotFoundError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+async function discoverSkillResources(
+  skillDirectoryPath: string,
+  resourceDirectoryName: "references" | "scripts",
+): Promise<SkillResourceDefinition[]> {
+  const rootPath = join(skillDirectoryPath, resourceDirectoryName);
+  const discoveredResources: SkillResourceDefinition[] = [];
+
+  await walkSkillResourceDirectory(rootPath, rootPath, discoveredResources);
+
+  return discoveredResources.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+}
+
+async function walkSkillResourceDirectory(
+  rootPath: string,
+  currentPath: string,
+  discoveredResources: SkillResourceDefinition[],
+): Promise<void> {
+  let entries: Dirent<string>[];
+
+  try {
+    entries = await readdir(currentPath, { withFileTypes: true, encoding: "utf8" }) as Dirent<string>[];
+  } catch (error) {
+    if (isFileNotFoundError(error)) {
+      return;
+    }
+
+    throw error;
+  }
+
+  for (const entry of entries) {
+    const entryPath = join(currentPath, entry.name);
+    if (entry.isDirectory()) {
+      await walkSkillResourceDirectory(rootPath, entryPath, discoveredResources);
+      continue;
+    }
+
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    discoveredResources.push({
+      filePath: entryPath,
+      relativePath: relative(rootPath, entryPath).replaceAll("\\", "/"),
+    });
+  }
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function formatErrorDetail(error: unknown): string {

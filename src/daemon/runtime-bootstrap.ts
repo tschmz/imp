@@ -9,6 +9,7 @@ import {
 } from "../runtime/create-pi-agent-engine.js";
 import { createOAuthApiKeyResolver } from "../runtime/create-oauth-api-key-resolver.js";
 import type { AgentEngine } from "../runtime/types.js";
+import { createLlmSkillSelector, type SkillSelector } from "../skills/selection.js";
 import { createFsConversationStore } from "../storage/fs-store.js";
 import type { ConversationStore } from "../storage/types.js";
 import type { ToolRegistry } from "../tools/registry.js";
@@ -26,10 +27,12 @@ export interface BootstrappedRuntime {
   logger: Logger;
   conversationStore: ConversationStore;
   engine: AgentEngine;
+  skillSelector: SkillSelector;
 }
 
 export interface RuntimeBootstrapDependencies {
   engine?: AgentEngine;
+  skillSelector?: SkillSelector;
   toolRegistry?: ToolRegistry;
   createBuiltInToolRegistry?: (
     workingDirectory: string | WorkingDirectoryState,
@@ -70,14 +73,20 @@ export async function bootstrapRuntime(
       botId: botConfig.id,
     });
 
+    const getApiKey = async (provider: string, agent: AgentDefinition) =>
+      createOAuthApiKeyResolver(agent.authFile, logger)(provider);
     const engine =
       dependencies.engine ??
       createPiAgentEngine({
         logger,
-        getApiKey: (provider, agent) =>
-          createOAuthApiKeyResolver(agent.authFile, logger)(provider),
+        getApiKey,
         ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
         createBuiltInToolRegistry: createBuiltInRegistry,
+      });
+    const skillSelector =
+      dependencies.skillSelector ??
+      createLlmSkillSelector({
+        getApiKey,
       });
 
     return {
@@ -87,6 +96,7 @@ export async function bootstrapRuntime(
       logger,
       conversationStore,
       engine,
+      skillSelector,
     };
   } catch (error) {
     if (runtimeStateWritten) {

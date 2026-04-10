@@ -185,12 +185,15 @@ Skill discovery and activation notes:
 
 - each `skills.paths` entry is resolved relative to the config file when needed
 - `imp` scans only direct subdirectories of each configured path for `SKILL.md`
-- `SKILL.md` must have YAML frontmatter with at least `name` and `description`
-- invalid skills are ignored and logged during startup
+- `SKILL.md` must have valid YAML frontmatter with at least `name` and `description`
+- invalid skills are ignored and logged during startup, and discovered skill names are logged per bot
 - duplicate skill names across configured paths are rejected and all colliding entries are ignored
-- per user turn, `imp` selects at most three skills using only skill `name` and `description`
+- per user turn, `imp` asks the configured agent model to select at most three skills using only skill `name` and `description`
 - if selection fails, `imp` activates no skills
-- activated skills are injected into prompt context as read-only `SKILL.md` content; scripts, references, and assets are not executed automatically
+- activated `SKILL.md` files are injected into prompt context as read-only content
+- when a skill contains `references/`, those files are loaded into prompt context when the skill is activated
+- when a skill contains `scripts/`, those script paths are exposed to the agent as explicit local resources; they are never executed automatically
+- activated skill names are logged per turn for diagnostics
 
 Voice transcription notes:
 

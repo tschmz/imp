@@ -1,87 +1,141 @@
+import { complete, type AssistantMessage } from "@mariozechner/pi-ai";
+import type { AgentDefinition } from "../domain/agent.js";
+import { getAssistantText } from "../runtime/message-mapping.js";
+import { defaultResolveModel, resolveModelOrThrow, type ModelResolver } from "../runtime/model-resolution.js";
 import type { SkillDefinition } from "./types.js";
 
-const STOP_WORDS = new Set([
-  "a",
-  "an",
-  "and",
-  "are",
-  "for",
-  "from",
-  "help",
-  "how",
-  "i",
-  "in",
-  "is",
-  "it",
-  "me",
-  "my",
-  "of",
-  "on",
-  "or",
-  "please",
-  "the",
-  "to",
-  "use",
-  "with",
-]);
+const SKILL_SELECTION_SYSTEM_PROMPT = [
+  "Select the most relevant skills for the user's request.",
+  "Use only the provided skill names and descriptions.",
+  "Return JSON only in the format {\"skills\":[\"skill-name\"]}.",
+  "Return at most the requested number of skills.",
+  "If no skill is clearly relevant or you are unsure, return {\"skills\":[]}.",
+].join(" ");
 
-export function selectRelevantSkills(
-  userText: string,
+export interface SkillSelectionRequest {
+  agent: AgentDefinition;
+  userText: string;
+  catalog: SkillDefinition[];
+  maxActivatedSkills?: number;
+}
+
+export interface SkillSelector {
+  selectRelevantSkills(request: SkillSelectionRequest): Promise<SkillDefinition[]>;
+}
+
+interface LlmSkillSelectorDependencies {
+  resolveModel?: ModelResolver;
+  completeFn?: typeof complete;
+  getApiKey?: (
+    provider: string,
+    agent: AgentDefinition,
+  ) => Promise<string | undefined> | string | undefined;
+}
+
+export function createLlmSkillSelector(
+  dependencies: LlmSkillSelectorDependencies = {},
+): SkillSelector {
+  const resolveModel = dependencies.resolveModel ?? defaultResolveModel;
+  const completeFn = dependencies.completeFn ?? complete;
+
+  return {
+    async selectRelevantSkills(request: SkillSelectionRequest): Promise<SkillDefinition[]> {
+      const maxActivatedSkills = request.maxActivatedSkills ?? 3;
+      if (request.catalog.length === 0 || maxActivatedSkills <= 0) {
+        return [];
+      }
+
+      const model = resolveModelOrThrow(request.agent, resolveModel);
+      const apiKey = await dependencies.getApiKey?.(model.provider, request.agent);
+      const response = await completeFn(
+        model,
+        {
+          systemPrompt: SKILL_SELECTION_SYSTEM_PROMPT,
+          messages: [
+            {
+              role: "user",
+              content: JSON.stringify(
+                {
+                  userText: request.userText,
+                  maxActivatedSkills,
+                  skills: request.catalog.map((skill) => ({
+                    name: skill.name,
+                    description: skill.description,
+                  })),
+                },
+                null,
+                2,
+              ),
+              timestamp: Date.now(),
+            },
+          ],
+        },
+        {
+          temperature: 0,
+          maxTokens: 256,
+          ...(apiKey ? { apiKey } : {}),
+        },
+      );
+
+      return parseSelectedSkills(response, request.catalog, maxActivatedSkills);
+    },
+  };
+}
+
+function parseSelectedSkills(
+  response: AssistantMessage,
   catalog: SkillDefinition[],
-  maxActivatedSkills = 3,
+  maxActivatedSkills: number,
 ): SkillDefinition[] {
-  if (catalog.length === 0 || maxActivatedSkills <= 0) {
-    return [];
+  const responseText = stripCodeFences(getAssistantText(response).trim());
+  if (!responseText) {
+    throw new Error("skill selector returned an empty response");
   }
 
-  const normalizedUserText = userText.toLowerCase();
-  const userTokens = tokenize(normalizedUserText);
-  const scored = catalog
-    .map((skill) => ({
-      skill,
-      score: scoreSkill(skill, normalizedUserText, userTokens),
-    }))
-    .filter((entry) => entry.score > 0)
-    .sort((left, right) => right.score - left.score || left.skill.name.localeCompare(right.skill.name));
-
-  return scored.slice(0, maxActivatedSkills).map((entry) => entry.skill);
-}
-
-function scoreSkill(skill: SkillDefinition, normalizedUserText: string, userTokens: Set<string>): number {
-  let score = 0;
-
-  if (new RegExp(`(^|[^a-z0-9-])\\$?${escapeRegExp(skill.name)}(?=[^a-z0-9-]|$)`, "i").test(normalizedUserText)) {
-    score += 100;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(responseText);
+  } catch (error) {
+    throw new Error(`skill selector returned invalid JSON (${formatErrorDetail(error)})`);
   }
 
-  const nameTokens = skill.name.split("-").filter((token) => token.length > 0);
-  const matchedNameTokens = nameTokens.filter((token) => userTokens.has(token)).length;
-  if (matchedNameTokens === nameTokens.length && nameTokens.length > 0) {
-    score += 30;
+  if (!isPlainRecord(parsed) || !Array.isArray(parsed.skills)) {
+    throw new Error('skill selector response must be a JSON object with a "skills" array');
   }
-  score += matchedNameTokens * 8;
 
-  let matchedDescriptionTokens = 0;
-  for (const token of tokenize(skill.description)) {
-    if (userTokens.has(token)) {
-      matchedDescriptionTokens += 1;
+  const selectedNames = parsed.skills;
+  if (!selectedNames.every((value) => typeof value === "string")) {
+    throw new Error('skill selector response "skills" entries must be strings');
+  }
+
+  const selectedNameSet = new Set<string>();
+  for (const name of selectedNames) {
+    if (selectedNameSet.size >= maxActivatedSkills) {
+      break;
     }
+    selectedNameSet.add(name);
   }
 
-  score += Math.min(matchedDescriptionTokens, 12);
+  const catalogByName = new Map(catalog.map((skill) => [skill.name, skill] as const));
+  const unknownNames = [...selectedNameSet].filter((name) => !catalogByName.has(name));
+  if (unknownNames.length > 0) {
+    throw new Error(
+      `skill selector returned unknown skills: ${unknownNames.map((name) => `"${name}"`).join(", ")}`,
+    );
+  }
 
-  return score;
+  return [...selectedNameSet].map((name) => catalogByName.get(name)!);
 }
 
-function tokenize(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z0-9]+/g)
-      .filter((token) => token.length >= 3 && !STOP_WORDS.has(token)),
-  );
+function stripCodeFences(value: string): string {
+  const fencedMatch = value.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fencedMatch?.[1]?.trim() ?? value;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatErrorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

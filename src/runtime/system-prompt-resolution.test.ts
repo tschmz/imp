@@ -203,10 +203,26 @@ describe("resolveSystemPrompt", () => {
           filePath: "/skills/commit/SKILL.md",
           body: "\nUse focused commits.",
           content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+          references: [
+            {
+              filePath: "/skills/commit/references/checklist.md",
+              relativePath: "checklist.md",
+            },
+          ],
+          scripts: [
+            {
+              filePath: "/skills/commit/scripts/prepare.sh",
+              relativePath: "prepare.sh",
+            },
+          ],
         },
       ],
-      async () => {
-        throw new Error("unexpected file read");
+      async (path) => {
+        if (path === "/skills/commit/references/checklist.md") {
+          return "Review the staged files first.";
+        }
+
+        throw new Error(`unexpected file read: ${path}`);
       },
     );
 
@@ -214,6 +230,10 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toContain('<SKILL name="commit" from="/skills/commit/SKILL.md">');
     expect(prompt).toContain("name: commit");
     expect(prompt).toContain("Use focused commits.");
+    expect(prompt).toContain('<SKILL-REFERENCE skill="commit" from="/skills/commit/references/checklist.md">');
+    expect(prompt).toContain("Review the staged files first.");
+    expect(prompt).toContain('<SKILL-SCRIPTS skill="commit">');
+    expect(prompt).toContain("/skills/commit/scripts/prepare.sh");
   });
 });
 

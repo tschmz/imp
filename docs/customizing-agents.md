@@ -98,11 +98,15 @@ Rules:
 
 - each configured path is scanned one level deep only
 - only direct child directories containing `SKILL.md` are considered
-- `SKILL.md` frontmatter must include `name` and `description`
+- `SKILL.md` frontmatter must be valid YAML and include `name` and `description`
 - invalid files and duplicate skill names are ignored for that bot
+- skill discovery is logged per bot at startup
 - selection uses only skill metadata and activates at most three skills per user turn
+- if selection fails, no skills are activated for that turn
 - the selected `SKILL.md` contents are injected into prompt context
-- scripts, references, and assets are not executed automatically
+- files under `references/` are loaded into prompt context when their skill is activated
+- files under `scripts/` are exposed as local script paths for explicit inspection or execution, but are never run automatically
+- activated skill names are logged per turn
 
 Example:
 

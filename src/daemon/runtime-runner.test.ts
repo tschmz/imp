@@ -225,6 +225,54 @@ describe("createRuntimeEntries", () => {
     expect(transport.stop).toHaveBeenCalledTimes(1);
     expect(runtime.engine.close).toHaveBeenCalledTimes(1);
   });
+
+  it("logs discovered skills at runtime start", async () => {
+    const runtime = createRuntime();
+    runtime.botConfig.skillCatalog = [
+      {
+        name: "commit",
+        description: "Stage and commit changes.",
+        directoryPath: "/skills/commit",
+        filePath: "/skills/commit/SKILL.md",
+        body: "\nUse focused commits.",
+        content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+        references: [],
+        scripts: [],
+      },
+    ];
+    const transport = createCapturingTransport();
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([
+        {
+          id: "default",
+          name: "Default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.3",
+          },
+          tools: [],
+          extensions: [],
+        },
+      ]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+
+    expect(runtime.logger.info).toHaveBeenCalledWith(
+      "discovered bot skills",
+      expect.objectContaining({
+        botId: "private-telegram",
+        skillCount: 1,
+        skillNames: ["commit"],
+      }),
+    );
+  });
 });
 
 function createCapturingTransport(): {
@@ -327,6 +375,9 @@ function createRuntime(): BootstrappedRuntime {
         },
       })),
       close: vi.fn(async () => undefined),
+    },
+    skillSelector: {
+      selectRelevantSkills: vi.fn(async () => []),
     },
   };
 }

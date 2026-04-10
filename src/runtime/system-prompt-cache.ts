@@ -81,6 +81,8 @@ export class SystemPromptCache {
         description: skill.description,
         filePath: skill.filePath,
         content: skill.content,
+        references: skill.references,
+        scripts: skill.scripts,
       })),
       files: fileFingerprints,
     });
