@@ -130,28 +130,37 @@ async function processEvent(
 function createSemaphore(maxPermits: number): {
   withPermit<T>(operation: () => Promise<T>): Promise<T>;
 } {
-  let availablePermits = maxPermits;
+  let activePermits = 0;
   const waiters: Array<() => void> = [];
+
+  async function acquirePermit(): Promise<void> {
+    if (activePermits < maxPermits && waiters.length === 0) {
+      activePermits += 1;
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      waiters.push(() => {
+        activePermits += 1;
+        resolve();
+      });
+    });
+  }
+
+  function releasePermit(): void {
+    activePermits -= 1;
+    const next = waiters.shift();
+    next?.();
+  }
 
   return {
     async withPermit<T>(operation: () => Promise<T>): Promise<T> {
-      if (availablePermits === 0) {
-        await new Promise<void>((resolve) => {
-          waiters.push(resolve);
-        });
-      } else {
-        availablePermits -= 1;
-      }
+      await acquirePermit();
 
       try {
         return await operation();
       } finally {
-        const next = waiters.shift();
-        if (next) {
-          next();
-        } else {
-          availablePermits += 1;
-        }
+        releasePermit();
       }
     },
   };

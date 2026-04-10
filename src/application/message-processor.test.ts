@@ -52,6 +52,64 @@ describe("createMessageProcessor", () => {
     await Promise.all([first, second]);
   });
 
+  it("never exceeds maxParallel while handing permits to waiting conversations", async () => {
+    let active = 0;
+    let maxActive = 0;
+    const starts: string[] = [];
+    const releases = new Map<string, () => void>();
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(message.messageId);
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise<void>((resolve) => {
+          releases.set(message.messageId, resolve);
+        });
+        active -= 1;
+        return {
+          conversation: message.conversation,
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    const processor = createMessageProcessor({
+      handler,
+      maxParallel: 2,
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "101")));
+    const second = processor.handle(createEvent(createIncomingMessage("2", "102")));
+    const third = processor.handle(createEvent(createIncomingMessage("3", "103")));
+
+    await tick();
+
+    expect(starts).toEqual(["1", "2"]);
+    expect(maxActive).toBe(2);
+
+    releases.get("1")?.();
+    await tick();
+
+    expect(starts).toEqual(["1", "2", "3"]);
+    expect(maxActive).toBe(2);
+
+    const fourth = processor.handle(createEvent(createIncomingMessage("4", "104")));
+    await tick();
+
+    expect(starts).toEqual(["1", "2", "3"]);
+    expect(maxActive).toBe(2);
+
+    releases.get("2")?.();
+    await tick();
+
+    expect(starts).toEqual(["1", "2", "3", "4"]);
+    expect(maxActive).toBe(2);
+
+    releases.get("3")?.();
+    releases.get("4")?.();
+    await Promise.all([first, second, third, fourth]);
+  });
+
   it("lets /new run immediately and routes later messages to a new session queue", async () => {
     const starts: string[] = [];
     const releases = new Map<string, () => void>();
