@@ -341,7 +341,7 @@ describe("createHandleIncomingMessage", () => {
     expect(storedContext?.messages[0]).toMatchObject({
       kind: "message",
       role: "user",
-      text: "transcribed text",
+      content: "transcribed text",
       source: {
         kind: "telegram-voice-transcript",
         transcript: {
@@ -353,7 +353,7 @@ describe("createHandleIncomingMessage", () => {
     expect(storedContext?.messages[1]).toMatchObject({
       kind: "message",
       role: "assistant",
-      text: "reply",
+      content: [{ type: "text", text: "reply" }],
     });
   });
 
@@ -404,13 +404,28 @@ describe("createHandleIncomingMessage", () => {
       run: vi.fn(async ({ message }) => {
         const conversationEvents = [
           {
-            kind: "tool-call",
-            id: `${message.messageId}:tool-call:1`,
+            kind: "message",
+            id: `${message.messageId}:assistant:1`,
+            role: "assistant",
             createdAt: "2026-04-05T00:00:01.000Z",
             correlationId: message.correlationId,
-            text: "Inspecting the repo.",
-            toolCalls: [
+            timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+            api: "openai-responses",
+            provider: "openai",
+            model: "gpt-5-mini",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "toolUse",
+            content: [
+              { type: "text", text: "Inspecting the repo." },
               {
+                type: "toolCall",
                 id: "tool-1",
                 name: "read_file",
                 arguments: {
@@ -420,10 +435,12 @@ describe("createHandleIncomingMessage", () => {
             ],
           },
           {
-            kind: "tool-result",
+            kind: "message",
             id: `${message.messageId}:tool-result:1`,
+            role: "toolResult",
             createdAt: "2026-04-05T00:00:02.000Z",
             correlationId: message.correlationId,
+            timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
             toolCallId: "tool-1",
             toolName: "read_file",
             content: [{ type: "text", text: "README contents" }],
@@ -434,11 +451,24 @@ describe("createHandleIncomingMessage", () => {
           },
           {
             kind: "message",
-            id: `${message.messageId}:assistant`,
+            id: `${message.messageId}:assistant:2`,
             role: "assistant",
-            text: "All set.",
+            content: [{ type: "text", text: "All set." }],
             createdAt: "2026-04-05T00:00:03.000Z",
             correlationId: message.correlationId,
+            timestamp: Date.parse("2026-04-05T00:00:03.000Z"),
+            api: "openai-responses",
+            provider: "openai",
+            model: "gpt-5-mini",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "stop",
           },
         ] satisfies ConversationEvent[];
 
@@ -467,14 +497,16 @@ describe("createHandleIncomingMessage", () => {
         kind: "message",
         id: "7",
         role: "user",
-        text: "check the readme",
+        content: "check the readme",
       },
       {
-        kind: "tool-call",
-        id: "7:tool-call:1",
-        text: "Inspecting the repo.",
-        toolCalls: [
+        kind: "message",
+        id: "7:assistant:1",
+        role: "assistant",
+        content: [
+          { type: "text", text: "Inspecting the repo." },
           {
+            type: "toolCall",
             id: "tool-1",
             name: "read_file",
             arguments: {
@@ -484,17 +516,18 @@ describe("createHandleIncomingMessage", () => {
         ],
       },
       {
-        kind: "tool-result",
+        kind: "message",
         id: "7:tool-result:1",
+        role: "toolResult",
         toolCallId: "tool-1",
         toolName: "read_file",
         content: [{ type: "text", text: "README contents" }],
       },
       {
         kind: "message",
-        id: "7:assistant",
+        id: "7:assistant:2",
         role: "assistant",
-        text: "All set.",
+        content: [{ type: "text", text: "All set." }],
       },
     ]);
   });
@@ -609,7 +642,20 @@ function createAgentRunResult(message: IncomingMessage, text: string) {
         kind: "message" as const,
         id: `${message.messageId}:assistant`,
         role: "assistant" as const,
-        text,
+        content: [{ type: "text" as const, text }],
+        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+        api: "legacy",
+        provider: "legacy",
+        model: "legacy",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "stop" as const,
         createdAt: "2026-04-05T00:00:01.000Z",
         correlationId: message.correlationId,
       },

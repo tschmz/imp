@@ -33,7 +33,7 @@ afterEach(async () => {
 });
 
 describe("createPiAgentEngine", () => {
-  it("runs a real pi agent with persisted transcript context", async () => {
+  it("runs a real pi agent with persisted message context", async () => {
     const registration = registerFauxProvider({
       provider: "faux",
       models: [{ id: "faux-1", name: "Faux 1" }],
@@ -97,7 +97,7 @@ describe("createPiAgentEngine", () => {
           kind: "message",
           id: "2:assistant",
           role: "assistant",
-          text: "You said hello.",
+          content: [{ type: "text", text: "You said hello." }],
           correlationId: "corr-2",
         },
       ],
@@ -125,31 +125,29 @@ describe("createPiAgentEngine", () => {
           role: "assistant",
           content: [
             {
+              type: "thinking",
+              thinking: "",
+              thinkingSignature: expect.any(String),
+            },
+            {
               type: "text",
-              text:
-                "[Persisted tool transcript]\n" +
-                "Assistant used tools in a previous turn.\n" +
-                "Assistant note: Checking the repo.\n" +
-                "Tool: read_file\n" +
-                "Tool call id: tool-1\n" +
-                'Arguments: {"path":"README.md"}',
+              text: "Checking the repo.",
+            },
+            {
+              type: "toolCall",
+              id: "tool-1",
+              name: "read_file",
+              arguments: {
+                path: "README.md",
+              },
             },
           ],
         });
         expect(context.messages[3]).toMatchObject({
-          role: "assistant",
-          content: [
-            {
-              type: "text",
-              text:
-                "[Persisted tool transcript]\n" +
-                "Tool result from read_file (ok) in a previous turn.\n" +
-                "Tool call id: tool-1\n" +
-                "Output:\n" +
-                "README contents\n" +
-                'Details: {"path":"README.md"}',
-            },
-          ],
+          role: "toolResult",
+          toolCallId: "tool-1",
+          toolName: "read_file",
+          content: [{ type: "text", text: "README contents" }],
         });
         expect(context.messages[4]).toMatchObject({
           role: "user",
@@ -171,24 +169,58 @@ describe("createPiAgentEngine", () => {
         messages: [
           ...createConversation().messages,
           {
-            kind: "tool-call",
-            id: "1:tool-call:1",
+            kind: "message",
+            id: "1:assistant:2",
+            role: "assistant",
             createdAt: "2026-04-05T00:00:01.500Z",
-            text: "Checking the repo.",
-            toolCalls: [
+            timestamp: Date.parse("2026-04-05T00:00:01.500Z"),
+            api: "openai-responses",
+            provider: "openai",
+            model: "gpt-5-mini",
+            responseId: "resp_1",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "toolUse",
+            content: [
               {
+                type: "thinking",
+                thinking: "",
+                thinkingSignature: JSON.stringify({
+                  type: "reasoning",
+                  id: "rs_1",
+                  summary: [],
+                  encrypted_content: "enc",
+                }),
+                redacted: true,
+              },
+              {
+                type: "text",
+                text: "Checking the repo.",
+                textSignature: JSON.stringify({ v: 1, id: "msg_1", phase: "commentary" }),
+              },
+              {
+                type: "toolCall",
                 id: "tool-1",
                 name: "read_file",
                 arguments: {
                   path: "README.md",
                 },
+                thoughtSignature: "sig_1",
               },
             ],
           },
           {
-            kind: "tool-result",
+            kind: "message",
             id: "1:tool-result:1",
+            role: "toolResult",
             createdAt: "2026-04-05T00:00:01.800Z",
+            timestamp: Date.parse("2026-04-05T00:00:01.800Z"),
             toolCallId: "tool-1",
             toolName: "read_file",
             content: [{ type: "text", text: "README contents" }],
@@ -281,13 +313,21 @@ describe("createPiAgentEngine", () => {
 
     expect(result.conversationEvents).toEqual([
       {
-        kind: "tool-call",
-        id: "2:tool-call:1",
+        kind: "message",
+        id: "2:assistant:1",
+        role: "assistant",
         createdAt: "2026-04-05T00:00:01.000Z",
         correlationId: "corr-2",
-        text: "Running ls.",
-        toolCalls: [
+        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+        api: resolvedModel.api,
+        provider: resolvedModel.provider,
+        model: resolvedModel.id,
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        stopReason: "toolUse",
+        content: [
+          { type: "text", text: "Running ls." },
           {
+            type: "toolCall",
             id: "tool-1",
             name: "bash",
             arguments: { command: "ls" },
@@ -295,10 +335,12 @@ describe("createPiAgentEngine", () => {
         ],
       },
       {
-        kind: "tool-result",
+        kind: "message",
         id: "2:tool-result:1",
+        role: "toolResult",
         createdAt: "2026-04-05T00:00:02.000Z",
         correlationId: "corr-2",
+        timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
         toolCallId: "tool-1",
         toolName: "bash",
         content: [{ type: "text", text: "file.txt" }],
@@ -306,11 +348,17 @@ describe("createPiAgentEngine", () => {
       },
       {
         kind: "message",
-        id: "2:assistant",
+        id: "2:assistant:2",
         role: "assistant",
-        text: "Final answer",
+        content: [{ type: "text", text: "Final answer" }],
         createdAt: new Date(finalAssistantMessage.timestamp).toISOString(),
         correlationId: "corr-2",
+        timestamp: finalAssistantMessage.timestamp,
+        api: finalAssistantMessage.api,
+        provider: finalAssistantMessage.provider,
+        model: finalAssistantMessage.model,
+        usage: finalAssistantMessage.usage,
+        stopReason: finalAssistantMessage.stopReason,
       },
     ]);
   });
@@ -409,7 +457,8 @@ describe("createPiAgentEngine", () => {
           {
             id: "voice-1",
             role: "user",
-            text: "hello",
+            content: "hello",
+            timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
             createdAt: "2026-04-05T00:00:00.000Z",
             source: {
               kind: "telegram-voice-transcript",
@@ -422,7 +471,20 @@ describe("createPiAgentEngine", () => {
           {
             id: "voice-1:assistant",
             role: "assistant",
-            text: "hi there",
+            content: [{ type: "text", text: "hi there" }],
+            timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+            api: "legacy",
+            provider: "legacy",
+            model: "legacy",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "stop",
             createdAt: "2026-04-05T00:00:01.000Z",
           },
         ],
@@ -1626,13 +1688,27 @@ function createConversation(): ConversationContext {
       {
         id: "1",
         role: "user",
-        text: "hello",
+        content: "hello",
+        timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
         createdAt: "2026-04-05T00:00:00.000Z",
       },
       {
         id: "1:assistant",
         role: "assistant",
-        text: "hi there",
+        content: [{ type: "text", text: "hi there" }],
+        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+        api: "legacy",
+        provider: "legacy",
+        model: "legacy",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "stop",
         createdAt: "2026-04-05T00:00:01.000Z",
       },
     ],

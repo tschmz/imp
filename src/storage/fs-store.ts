@@ -2,11 +2,18 @@ import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
+  AssistantMessage,
+  ToolResultMessage,
+  UserMessage,
+} from "@mariozechner/pi-ai";
+import type {
   ChatRef,
+  ConversationAssistantMessage,
   ConversationContext,
   ConversationEvent,
-  ConversationMessage,
   ConversationRef,
+  ConversationToolResultMessage,
+  ConversationUserMessage,
 } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
 import type { ConversationBackupSummary, ConversationStore } from "./types.js";
@@ -18,6 +25,25 @@ const legacySessionId = "legacy";
 const lockTtlMs = 30_000;
 const lockRetryDelayMs = 25;
 const lockRetryCount = 400;
+const LEGACY_ASSISTANT_REPLAY_SOURCE = {
+  api: "legacy",
+  provider: "legacy",
+  model: "legacy",
+} as const;
+const EMPTY_USAGE: AssistantMessage["usage"] = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 0,
+  cost: {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    total: 0,
+  },
+};
 
 function getChatDir(conversationsDir: string, ref: ChatRef): string {
   return join(
@@ -388,7 +414,9 @@ async function readLegacyMessages(
 
   try {
     const raw = await readFile(path, "utf8");
-    return JSON.parse(raw) as ConversationMessage[];
+    return (JSON.parse(raw) as unknown[]).map((message) =>
+      normalizeConversationEvent(message as ConversationEvent),
+    );
   } catch (error: unknown) {
     if (isMissingFile(error)) {
       return [];
@@ -492,25 +520,304 @@ function areMessagesEqual(left: ConversationEvent, right: ConversationEvent): bo
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function normalizeConversationEvent(message: ConversationEvent): ConversationEvent {
-  if ("kind" in message && message.kind === "tool-call") {
-    return {
-      ...message,
-      toolCalls: message.toolCalls.map((toolCall) => ({
-        ...toolCall,
+function normalizeConversationEvent(message: unknown): ConversationEvent {
+  if (isLegacyToolCallEvent(message)) {
+    return normalizeLegacyToolCallEvent(message);
+  }
+
+  if (isLegacyToolResultEvent(message)) {
+    return normalizeLegacyToolResultEvent(message);
+  }
+
+  if (isLegacyUserMessage(message)) {
+    return normalizeLegacyUserMessage(message);
+  }
+
+  if (isLegacyAssistantMessage(message)) {
+    return normalizeLegacyAssistantMessage(message);
+  }
+
+  if (isConversationUserMessage(message)) {
+    return normalizeConversationUserMessage(message);
+  }
+
+  if (isConversationAssistantMessage(message)) {
+    return normalizeConversationAssistantMessage(message);
+  }
+
+  if (isConversationToolResultMessage(message)) {
+    return normalizeConversationToolResultMessage(message);
+  }
+
+  throw new Error("Unsupported conversation event shape");
+}
+
+function normalizeConversationUserMessage(
+  message: ConversationUserMessage,
+): ConversationUserMessage {
+  return {
+    ...message,
+    kind: "message",
+    content: normalizeUserContent(message.content),
+  };
+}
+
+function normalizeConversationAssistantMessage(
+  message: ConversationAssistantMessage,
+): ConversationAssistantMessage {
+  return {
+    ...message,
+    kind: "message",
+    content: message.content.map((content) =>
+      content.type === "toolCall"
+        ? {
+            ...content,
+            arguments: content.arguments ?? {},
+          }
+        : content,
+    ),
+    usage: message.usage ?? EMPTY_USAGE,
+    stopReason: message.stopReason ?? inferAssistantStopReason(message),
+    timestamp: normalizeTimestamp(message.timestamp, message.createdAt),
+    ...(message.api ? {} : LEGACY_ASSISTANT_REPLAY_SOURCE),
+    ...(message.provider ? {} : { provider: LEGACY_ASSISTANT_REPLAY_SOURCE.provider }),
+    ...(message.model ? {} : { model: LEGACY_ASSISTANT_REPLAY_SOURCE.model }),
+  };
+}
+
+function normalizeConversationToolResultMessage(
+  message: ConversationToolResultMessage,
+): ConversationToolResultMessage {
+  return {
+    ...message,
+    kind: "message",
+    content: normalizeToolResultContent(message.content),
+    timestamp: normalizeTimestamp(message.timestamp, message.createdAt),
+  };
+}
+
+function normalizeLegacyUserMessage(
+  message: {
+    id: string;
+    createdAt: string;
+    correlationId?: string;
+    role: "user";
+    text: string;
+    source?: ConversationUserMessage["source"];
+  },
+): ConversationUserMessage {
+  return {
+    kind: "message",
+    id: message.id,
+    role: "user",
+    content: message.text,
+    createdAt: message.createdAt,
+    timestamp: normalizeTimestamp(undefined, message.createdAt),
+    ...(message.correlationId ? { correlationId: message.correlationId } : {}),
+    ...(message.source ? { source: message.source } : {}),
+  };
+}
+
+function normalizeLegacyAssistantMessage(
+  message: {
+    id: string;
+    createdAt: string;
+    correlationId?: string;
+    role: "assistant";
+    text: string;
+  },
+): ConversationAssistantMessage {
+  return {
+    kind: "message",
+    id: message.id,
+    role: "assistant",
+    content: [{ type: "text", text: message.text }],
+    createdAt: message.createdAt,
+    timestamp: normalizeTimestamp(undefined, message.createdAt),
+    ...(message.correlationId ? { correlationId: message.correlationId } : {}),
+    ...LEGACY_ASSISTANT_REPLAY_SOURCE,
+    usage: EMPTY_USAGE,
+    stopReason: "stop",
+  };
+}
+
+function normalizeLegacyToolCallEvent(
+  message: {
+    kind: "tool-call";
+    id: string;
+    createdAt: string;
+    correlationId?: string;
+    text?: string;
+    toolCalls: Array<{
+      id: string;
+      name: string;
+      arguments?: Record<string, unknown>;
+    }>;
+  },
+): ConversationAssistantMessage {
+  return {
+    kind: "message",
+    id: message.id,
+    role: "assistant",
+    createdAt: message.createdAt,
+    timestamp: normalizeTimestamp(undefined, message.createdAt),
+    ...(message.correlationId ? { correlationId: message.correlationId } : {}),
+    ...LEGACY_ASSISTANT_REPLAY_SOURCE,
+    usage: EMPTY_USAGE,
+    stopReason: "toolUse",
+    content: [
+      ...(message.text ? [{ type: "text" as const, text: message.text }] : []),
+      ...message.toolCalls.map((toolCall) => ({
+        type: "toolCall" as const,
+        id: toolCall.id,
+        name: toolCall.name,
         arguments: toolCall.arguments ?? {},
       })),
-    };
+    ],
+  };
+}
+
+function normalizeLegacyToolResultEvent(
+  message: {
+    kind: "tool-result";
+    id: string;
+    createdAt: string;
+    correlationId?: string;
+    toolCallId: string;
+    toolName: string;
+    content?: ToolResultMessage["content"];
+    details?: unknown;
+    isError: boolean;
+  },
+): ConversationToolResultMessage {
+  return {
+    kind: "message",
+    id: message.id,
+    role: "toolResult",
+    createdAt: message.createdAt,
+    timestamp: normalizeTimestamp(undefined, message.createdAt),
+    ...(message.correlationId ? { correlationId: message.correlationId } : {}),
+    toolCallId: message.toolCallId,
+    toolName: message.toolName,
+    content: normalizeToolResultContent(message.content),
+    ...(message.details !== undefined ? { details: message.details } : {}),
+    isError: message.isError,
+  };
+}
+
+function normalizeUserContent(content: UserMessage["content"] | undefined): UserMessage["content"] {
+  if (content === undefined) {
+    return "";
   }
 
-  if ("kind" in message && message.kind === "tool-result") {
-    return {
-      ...message,
-      content: message.content ?? [],
-    };
+  return typeof content === "string" ? content : normalizeToolResultContent(content);
+}
+
+function normalizeToolResultContent(
+  content: ToolResultMessage["content"] | UserMessage["content"] | undefined,
+): Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> {
+  if (!Array.isArray(content)) {
+    return [];
   }
 
-  return message;
+  return content;
+}
+
+function normalizeTimestamp(timestamp: number | undefined, createdAt: string): number {
+  if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
+    return timestamp;
+  }
+
+  const parsed = Date.parse(createdAt);
+  return Number.isNaN(parsed) ? Date.now() : parsed;
+}
+
+function inferAssistantStopReason(
+  message: Pick<ConversationAssistantMessage, "content">,
+): AssistantMessage["stopReason"] {
+  return message.content.some((content) => content.type === "toolCall") ? "toolUse" : "stop";
+}
+
+function isLegacyUserMessage(
+  message: unknown,
+): message is {
+  id: string;
+  createdAt: string;
+  correlationId?: string;
+  role: "user";
+  text: string;
+  source?: ConversationUserMessage["source"];
+} {
+  return hasMessageRole(message, "user") && hasProperty(message, "text");
+}
+
+function isLegacyAssistantMessage(
+  message: unknown,
+): message is {
+  id: string;
+  createdAt: string;
+  correlationId?: string;
+  role: "assistant";
+  text: string;
+} {
+  return hasMessageRole(message, "assistant") && hasProperty(message, "text");
+}
+
+function isLegacyToolCallEvent(
+  message: unknown,
+): message is {
+  kind: "tool-call";
+  id: string;
+  createdAt: string;
+  correlationId?: string;
+  text?: string;
+  toolCalls: Array<{
+    id: string;
+    name: string;
+    arguments?: Record<string, unknown>;
+  }>;
+} {
+  return hasKind(message, "tool-call");
+}
+
+function isLegacyToolResultEvent(
+  message: unknown,
+): message is {
+  kind: "tool-result";
+  id: string;
+  createdAt: string;
+  correlationId?: string;
+  toolCallId: string;
+  toolName: string;
+  content?: ToolResultMessage["content"];
+  details?: unknown;
+  isError: boolean;
+} {
+  return hasKind(message, "tool-result");
+}
+
+function isConversationUserMessage(message: unknown): message is ConversationUserMessage {
+  return hasMessageRole(message, "user") && hasProperty(message, "content");
+}
+
+function isConversationAssistantMessage(message: unknown): message is ConversationAssistantMessage {
+  return hasMessageRole(message, "assistant") && hasProperty(message, "content");
+}
+
+function isConversationToolResultMessage(message: unknown): message is ConversationToolResultMessage {
+  return hasMessageRole(message, "toolResult") && hasProperty(message, "content");
+}
+
+function hasKind(message: unknown, kind: string): boolean {
+  return typeof message === "object" && message !== null && "kind" in message && message.kind === kind;
+}
+
+function hasMessageRole(message: unknown, role: string): boolean {
+  return typeof message === "object" && message !== null && "role" in message && message.role === role;
+}
+
+function hasProperty(message: unknown, property: string): boolean {
+  return typeof message === "object" && message !== null && property in message;
 }
 
 function pickLatestTimestamp(left: string, right: string): string {

@@ -21,7 +21,8 @@ describe("resetCommandHandler", () => {
         {
           id: "m-1",
           role: "user",
-          text: "hello",
+          content: "hello",
+          timestamp: Date.parse("2026-04-02T00:00:00.000Z"),
           createdAt: "2026-04-02T00:00:00.000Z",
         },
       ],

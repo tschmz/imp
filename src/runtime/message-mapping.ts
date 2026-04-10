@@ -8,9 +8,9 @@ import type {
   UserMessage,
 } from "@mariozechner/pi-ai";
 import type {
+  ConversationAssistantMessage,
   ConversationEvent,
-  ConversationMessage,
-  ConversationToolResultContent,
+  ConversationUserMessage,
 } from "../domain/conversation.js";
 
 const TRANSCRIBED_MESSAGE_PREFIX =
@@ -35,62 +35,40 @@ export function toAgentMessages(
   messages: ConversationEvent[],
   model: Model<AiApi>,
 ): Array<UserMessage | AssistantMessage | ToolResultMessage> {
-  return messages.reduce<Array<UserMessage | AssistantMessage | ToolResultMessage>>(
-    (result, message) => {
-      if (message.kind === "tool-call") {
-        result.push({
-          role: "assistant",
-          content: [{ type: "text", text: renderPersistedToolCallTranscript(message) }],
-          api: model.api,
-          provider: model.provider,
-          model: model.id,
-          usage: EMPTY_USAGE,
-          stopReason: "stop",
-          timestamp: Date.parse(message.createdAt),
-        });
-        return result;
-      }
+  return messages.map<UserMessage | AssistantMessage | ToolResultMessage>((message) => {
+    if (message.role === "user") {
+      return {
+        role: "user",
+        content: renderUserMessageContent(message),
+        timestamp: resolveMessageTimestamp(message),
+      };
+    }
 
-      if (message.kind === "tool-result") {
-        result.push({
-          role: "assistant",
-          content: [{ type: "text", text: renderPersistedToolResultTranscript(message) }],
-          api: model.api,
-          provider: model.provider,
-          model: model.id,
-          usage: EMPTY_USAGE,
-          stopReason: "stop",
-          timestamp: Date.parse(message.createdAt),
-        });
-        return result;
-      }
+    if (message.role === "toolResult") {
+      return {
+        role: "toolResult",
+        toolCallId: message.toolCallId,
+        toolName: message.toolName,
+        content: message.content,
+        ...(message.details !== undefined ? { details: message.details } : {}),
+        isError: message.isError,
+        timestamp: resolveMessageTimestamp(message),
+      };
+    }
 
-      if (message.role === "user") {
-        result.push({
-          role: "user",
-          content: renderUserMessageContent(message),
-          timestamp: Date.parse(message.createdAt),
-        });
-        return result;
-      }
-
-      if (message.role === "assistant") {
-        result.push({
-          role: "assistant",
-          content: [{ type: "text", text: message.text }],
-          api: model.api,
-          provider: model.provider,
-          model: model.id,
-          usage: EMPTY_USAGE,
-          stopReason: "stop",
-          timestamp: Date.parse(message.createdAt),
-        });
-      }
-
-      return result;
-    },
-    [],
-  );
+    return {
+      role: "assistant",
+      content: message.content,
+      api: message.api ?? model.api,
+      provider: message.provider ?? model.provider,
+      model: message.model ?? model.id,
+      ...(message.responseId ? { responseId: message.responseId } : {}),
+      usage: message.usage ?? EMPTY_USAGE,
+      stopReason: message.stopReason ?? inferLegacyAssistantStopReason(message),
+      ...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),
+      timestamp: resolveMessageTimestamp(message),
+    };
+  });
 }
 
 export function toConversationEvents(
@@ -100,7 +78,7 @@ export function toConversationEvents(
     correlationId: string;
   },
 ): ConversationEvent[] {
-  let toolCallIndex = 0;
+  let assistantIndex = 0;
   let toolResultIndex = 0;
 
   return messages.flatMap<ConversationEvent>((message) => {
@@ -111,13 +89,15 @@ export function toConversationEvents(
     if (message.role === "toolResult") {
       toolResultIndex += 1;
       return {
-        kind: "tool-result",
+        kind: "message",
         id: `${options.parentMessageId}:tool-result:${toolResultIndex}`,
+        role: "toolResult",
         createdAt: new Date(message.timestamp).toISOString(),
         correlationId: options.correlationId,
+        timestamp: message.timestamp,
         toolCallId: message.toolCallId,
         toolName: message.toolName,
-        content: message.content.map((content) => toConversationToolResultContent(content)),
+        content: message.content,
         ...(message.details !== undefined ? { details: message.details } : {}),
         isError: message.isError,
       };
@@ -127,61 +107,59 @@ export function toConversationEvents(
       return [];
     }
 
-    const text = getAssistantText(message);
-    const toolCalls = message.content
-      .filter((content): content is Extract<AssistantMessage["content"][number], { type: "toolCall" }> => content.type === "toolCall")
-      .map((toolCall) => ({
-        id: toolCall.id,
-        name: toolCall.name,
-        arguments: toolCall.arguments,
-      }));
-
-    if (toolCalls.length > 0) {
-      toolCallIndex += 1;
-      return {
-        kind: "tool-call",
-        id: `${options.parentMessageId}:tool-call:${toolCallIndex}`,
-        createdAt: new Date(message.timestamp).toISOString(),
-        correlationId: options.correlationId,
-        ...(text ? { text } : {}),
-        toolCalls,
-      };
-    }
-
+    assistantIndex += 1;
     return {
       kind: "message",
-      id: `${options.parentMessageId}:assistant`,
+      id:
+        assistantIndex === 1 && messages.filter((candidate) => candidate.role === "assistant").length === 1
+          ? `${options.parentMessageId}:assistant`
+          : `${options.parentMessageId}:assistant:${assistantIndex}`,
       role: "assistant",
-      text,
       createdAt: new Date(message.timestamp).toISOString(),
       correlationId: options.correlationId,
+      timestamp: message.timestamp,
+      content: message.content,
+      api: message.api,
+      provider: message.provider,
+      model: message.model,
+      ...(message.responseId ? { responseId: message.responseId } : {}),
+      usage: message.usage,
+      stopReason: message.stopReason,
+      ...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),
     };
   });
 }
 
-function toConversationToolResultContent(
-  content: ToolResultMessage["content"][number],
-): ConversationToolResultContent {
-  if (content.type === "image") {
-    return {
-      type: "image",
-      data: content.data,
-      mimeType: content.mimeType,
-    };
+function renderUserMessageContent(
+  message: ConversationUserMessage,
+): UserMessage["content"] {
+  if (message.source?.kind !== "telegram-voice-transcript") {
+    return message.content;
   }
 
-  return {
-    type: "text",
-    text: content.text,
-  };
+  if (typeof message.content === "string") {
+    return `${TRANSCRIBED_MESSAGE_PREFIX}${message.content}`;
+  }
+
+  return [
+    { type: "text", text: TRANSCRIBED_MESSAGE_PREFIX.trimEnd() },
+    ...message.content,
+  ];
 }
 
-function renderUserMessageContent(message: ConversationMessage): string {
-  if (message.source?.kind === "telegram-voice-transcript") {
-    return `${TRANSCRIBED_MESSAGE_PREFIX}${message.text}`;
+function resolveMessageTimestamp(
+  message: Pick<ConversationEvent, "createdAt"> & Partial<Pick<ConversationAssistantMessage, "timestamp">>,
+): number {
+  if (typeof message.timestamp === "number" && Number.isFinite(message.timestamp)) {
+    return message.timestamp;
   }
 
-  return message.text;
+  const parsed = Date.parse(message.createdAt);
+  return Number.isNaN(parsed) ? Date.now() : parsed;
+}
+
+function inferLegacyAssistantStopReason(message: ConversationAssistantMessage): AssistantMessage["stopReason"] {
+  return message.content.some((content) => content.type === "toolCall") ? "toolUse" : "stop";
 }
 
 export function getAssistantText(message: AssistantMessage): string {
@@ -191,49 +169,4 @@ export function getAssistantText(message: AssistantMessage): string {
     .join("\n");
 }
 
-function renderPersistedToolCallTranscript(
-  message: Extract<ConversationEvent, { kind: "tool-call" }>,
-): string {
-  const lines = ["[Persisted tool transcript]", "Assistant used tools in a previous turn."];
-
-  if (message.text) {
-    lines.push(`Assistant note: ${message.text}`);
-  }
-
-  for (const toolCall of message.toolCalls) {
-    lines.push(`Tool: ${toolCall.name}`);
-    lines.push(`Tool call id: ${toolCall.id}`);
-    lines.push(`Arguments: ${JSON.stringify(toolCall.arguments)}`);
-  }
-
-  return lines.join("\n");
-}
-
-function renderPersistedToolResultTranscript(
-  message: Extract<ConversationEvent, { kind: "tool-result" }>,
-): string {
-  const lines = [
-    "[Persisted tool transcript]",
-    `Tool result from ${message.toolName} (${message.isError ? "error" : "ok"}) in a previous turn.`,
-    `Tool call id: ${message.toolCallId}`,
-  ];
-
-  if (message.content.length > 0) {
-    lines.push("Output:");
-    lines.push(
-      message.content
-        .map((content) =>
-          content.type === "text"
-            ? content.text
-            : `[image ${content.mimeType}, ${content.data.length} bytes base64]`,
-        )
-        .join("\n"),
-    );
-  }
-
-  if (message.details !== undefined) {
-    lines.push(`Details: ${JSON.stringify(message.details)}`);
-  }
-
-  return lines.join("\n");
-}
+export { EMPTY_USAGE };

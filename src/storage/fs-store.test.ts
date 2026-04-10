@@ -52,9 +52,11 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
+          kind: "message",
           id: "msg-1",
           role: "user",
-          text: "hello",
+          content: "hello",
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
         },
       ],
@@ -71,7 +73,7 @@ describe("createFsConversationStore", () => {
     });
   });
 
-  it("persists and reloads tool call and tool result events", async () => {
+  it("persists and reloads native assistant tool history", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
     const created = await store.create(createChatRef(), {
@@ -88,16 +90,32 @@ describe("createFsConversationStore", () => {
           kind: "message",
           id: "msg-1",
           role: "user",
-          text: "hello",
+          content: "hello",
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
         },
         {
-          kind: "tool-call",
-          id: "msg-1:tool-call:1",
+          kind: "message",
+          id: "msg-1:assistant:1",
+          role: "assistant",
           createdAt: "2026-04-05T00:01:01.000Z",
-          text: "Inspecting the config.",
-          toolCalls: [
+          timestamp: Date.parse("2026-04-05T00:01:01.000Z"),
+          api: "openai-responses",
+          provider: "openai",
+          model: "gpt-5-mini",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "toolUse",
+          content: [
+            { type: "text", text: "Inspecting the config." },
             {
+              type: "toolCall",
               id: "tool-1",
               name: "read_file",
               arguments: {
@@ -107,9 +125,11 @@ describe("createFsConversationStore", () => {
           ],
         },
         {
-          kind: "tool-result",
+          kind: "message",
           id: "msg-1:tool-result:1",
+          role: "toolResult",
           createdAt: "2026-04-05T00:01:02.000Z",
+          timestamp: Date.parse("2026-04-05T00:01:02.000Z"),
           toolCallId: "tool-1",
           toolName: "read_file",
           content: [{ type: "text", text: "{\"ok\":true}" }],
@@ -120,9 +140,22 @@ describe("createFsConversationStore", () => {
         },
         {
           kind: "message",
-          id: "msg-1:assistant",
+          id: "msg-1:assistant:2",
           role: "assistant",
-          text: "The config looks valid.",
+          content: [{ type: "text", text: "The config looks valid." }],
+          timestamp: Date.parse("2026-04-05T00:01:03.000Z"),
+          api: "openai-responses",
+          provider: "openai",
+          model: "gpt-5-mini",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "stop",
           createdAt: "2026-04-05T00:01:03.000Z",
         },
       ],
@@ -187,7 +220,20 @@ describe("createFsConversationStore", () => {
         {
           id: "msg-1",
           role: "assistant",
-          text: "finished",
+          content: [{ type: "text", text: "finished" }],
+          timestamp: Date.parse("2026-04-05T00:02:00.000Z"),
+          api: "legacy",
+          provider: "legacy",
+          model: "legacy",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "stop",
           createdAt: "2026-04-05T00:02:00.000Z",
         },
       ],
@@ -231,9 +277,23 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
+          kind: "message",
           id: "msg-1",
           role: "assistant",
-          text: "older",
+          content: [{ type: "text", text: "older" }],
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
+          api: "legacy",
+          provider: "legacy",
+          model: "legacy",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "stop",
           createdAt: "2026-04-05T00:01:00.000Z",
         },
       ],
@@ -253,7 +313,20 @@ describe("createFsConversationStore", () => {
         {
           id: "msg-current",
           role: "assistant",
-          text: "newer",
+          content: [{ type: "text", text: "newer" }],
+          timestamp: Date.parse("2026-04-05T00:05:00.000Z"),
+          api: "legacy",
+          provider: "legacy",
+          model: "legacy",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "stop",
           createdAt: "2026-04-05T00:05:00.000Z",
         },
       ],
@@ -274,9 +347,23 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
+          kind: "message",
           id: "msg-1",
           role: "assistant",
-          text: "older",
+          content: [{ type: "text", text: "older" }],
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
+          api: "legacy",
+          provider: "legacy",
+          model: "legacy",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "stop",
           createdAt: "2026-04-05T00:01:00.000Z",
         },
       ],
@@ -310,7 +397,20 @@ describe("createFsConversationStore", () => {
           {
             id: "legacy-1",
             role: "assistant",
-            text: "legacy",
+            content: [{ type: "text", text: "legacy" }],
+            timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
+            api: "legacy",
+            provider: "legacy",
+            model: "legacy",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "stop",
             createdAt: "2026-04-05T00:01:00.000Z",
           },
         ],
@@ -380,16 +480,144 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
+          kind: "message",
           id: "legacy-1",
           role: "user",
-          text: "hello",
+          content: "hello",
+          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
           createdAt: "2026-04-05T00:00:00.000Z",
         },
         {
+          kind: "message",
           id: "legacy-1:assistant",
           role: "assistant",
-          text: "hi there",
+          content: [{ type: "text", text: "hi there" }],
+          timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+          api: "legacy",
+          provider: "legacy",
+          model: "legacy",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "stop",
           createdAt: "2026-04-05T00:00:01.000Z",
+        },
+      ],
+    });
+  });
+
+  it("migrates legacy tool-call and tool-result events into native replayable messages", async () => {
+    const root = await createTempDir();
+    const ref = {
+      ...createChatRef(),
+      sessionId: "session-legacy-tools",
+    };
+    const snapshotPath = join(
+      root,
+      "conversations",
+      "telegram",
+      "42",
+      "sessions",
+      "session-legacy-tools",
+      "conversation.json",
+    );
+    await (await import("node:fs/promises")).mkdir(dirname(snapshotPath), { recursive: true });
+    await writeFile(
+      snapshotPath,
+      JSON.stringify({
+        state: {
+          conversation: ref,
+          agentId: "default",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:01:00.000Z",
+          version: 1,
+        },
+        messages: [
+          {
+            kind: "tool-call",
+            id: "legacy:tool-call:1",
+            createdAt: "2026-04-05T00:00:10.000Z",
+            text: "Inspecting the config.",
+            toolCalls: [
+              {
+                id: "tool-1",
+                name: "read_file",
+                arguments: {
+                  path: "config.json",
+                },
+              },
+            ],
+          },
+          {
+            kind: "tool-result",
+            id: "legacy:tool-result:1",
+            createdAt: "2026-04-05T00:00:11.000Z",
+            toolCallId: "tool-1",
+            toolName: "read_file",
+            content: [{ type: "text", text: "{\"ok\":true}" }],
+            isError: false,
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const store = createFsConversationStore(createRuntimePaths(root));
+
+    await expect(store.get(ref)).resolves.toEqual({
+      state: {
+        conversation: ref,
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+        version: 1,
+      },
+      messages: [
+        {
+          kind: "message",
+          id: "legacy:tool-call:1",
+          role: "assistant",
+          createdAt: "2026-04-05T00:00:10.000Z",
+          timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
+          api: "legacy",
+          provider: "legacy",
+          model: "legacy",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "toolUse",
+          content: [
+            { type: "text", text: "Inspecting the config." },
+            {
+              type: "toolCall",
+              id: "tool-1",
+              name: "read_file",
+              arguments: {
+                path: "config.json",
+              },
+            },
+          ],
+        },
+        {
+          kind: "message",
+          id: "legacy:tool-result:1",
+          role: "toolResult",
+          createdAt: "2026-04-05T00:00:11.000Z",
+          timestamp: Date.parse("2026-04-05T00:00:11.000Z"),
+          toolCallId: "tool-1",
+          toolName: "read_file",
+          content: [{ type: "text", text: "{\"ok\":true}" }],
+          isError: false,
         },
       ],
     });

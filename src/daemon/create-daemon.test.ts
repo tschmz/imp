@@ -26,7 +26,7 @@ afterEach(async () => {
 });
 
 describe("createDaemon", () => {
-  it("loads persisted transcript into the next agent run", async () => {
+  it("loads persisted native history into the next agent run", async () => {
     const root = await createTempDir();
     const botConfig = createBotConfig(root);
     const config = createConfig(botConfig);
@@ -60,7 +60,8 @@ describe("createDaemon", () => {
         kind: "message",
         id: "1",
         role: "user",
-        text: "hello",
+        content: "hello",
+        timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
         createdAt: "2026-04-05T00:00:00.000Z",
         correlationId: "corr-1",
       },
@@ -68,7 +69,20 @@ describe("createDaemon", () => {
         kind: "message",
         id: "1:assistant",
         role: "assistant",
-        text: "reply:1",
+        content: [{ type: "text", text: "reply:1" }],
+        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+        api: "legacy",
+        provider: "legacy",
+        model: "legacy",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "stop",
         createdAt: "2026-04-05T00:00:01.000Z",
         correlationId: "corr-1",
       },
@@ -665,7 +679,20 @@ function createAgentRunResult(message: IncomingMessage, text: string) {
         kind: "message" as const,
         id: `${message.messageId}:assistant`,
         role: "assistant" as const,
-        text,
+        content: [{ type: "text" as const, text }],
+        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+        api: "legacy",
+        provider: "legacy",
+        model: "legacy",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "stop" as const,
         createdAt: "2026-04-05T00:00:01.000Z",
         correlationId: message.correlationId,
       },

@@ -18,7 +18,7 @@ describe("historyCommandHandler", () => {
               updatedAt: "2026-04-05T00:05:00.000Z",
               version: 1,
             },
-            messages: [{ id: "m1", role: "user", text: "hi", createdAt: "2026-04-05T00:04:00.000Z" }],
+            messages: [{ id: "m1", role: "user", content: "hi", timestamp: Date.parse("2026-04-05T00:04:00.000Z"), createdAt: "2026-04-05T00:04:00.000Z" }],
           }),
           put: async () => {},
           listBackups: async () => [
@@ -101,7 +101,7 @@ describe("historyCommandHandler", () => {
               updatedAt: "2026-04-05T00:05:00.000Z",
               version: 1,
             },
-            messages: [{ id: "m1", role: "user", text: "hi", createdAt: "2026-04-05T00:04:00.000Z" }],
+            messages: [{ id: "m1", role: "user", content: "hi", timestamp: Date.parse("2026-04-05T00:04:00.000Z"), createdAt: "2026-04-05T00:04:00.000Z" }],
           }),
           put: async () => {},
           listBackups: async () => [],

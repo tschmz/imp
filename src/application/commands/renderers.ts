@@ -1,5 +1,9 @@
 import type { AgentDefinition } from "../../domain/agent.js";
-import type { ConversationContext } from "../../domain/conversation.js";
+import type {
+  ConversationAssistantMessage,
+  ConversationContext,
+  ConversationEvent,
+} from "../../domain/conversation.js";
 import type { ConversationBackupSummary } from "../../storage/types.js";
 
 export function formatTimestamp(value: string): string {
@@ -147,36 +151,13 @@ export function renderConversationExport(conversation: ConversationContext): str
   }
 
   for (const message of conversation.messages) {
-    if (message.kind === "tool-call") {
-      lines.push(
-        `[${message.createdAt}] tool-call ${message.toolCalls.map((toolCall) => toolCall.name).join(", ")}`,
-      );
-      if (message.text) {
-        lines.push(message.text);
-      }
-      for (const toolCall of message.toolCalls) {
-        lines.push(`id: ${toolCall.id}`);
-        lines.push(`args: ${JSON.stringify(toolCall.arguments)}`);
-      }
-      lines.push("");
-      continue;
-    }
-
-    if (message.kind === "tool-result") {
+    if (message.role === "toolResult") {
       lines.push(
         `[${message.createdAt}] tool-result ${message.toolName} (${message.isError ? "error" : "ok"})`,
       );
       lines.push(`toolCallId: ${message.toolCallId}`);
       if (message.content.length > 0) {
-        lines.push(
-          message.content
-            .map((content) =>
-              content.type === "text"
-                ? content.text
-                : `[image ${content.mimeType}, ${content.data.length} bytes base64]`,
-            )
-            .join("\n"),
-        );
+        lines.push(renderImageAndTextContent(message.content));
       }
       if (message.details !== undefined) {
         lines.push(`details: ${JSON.stringify(message.details)}`);
@@ -186,9 +167,79 @@ export function renderConversationExport(conversation: ConversationContext): str
     }
 
     lines.push(`[${message.createdAt}] ${message.role}`);
-    lines.push(message.text);
+    if (message.role === "assistant") {
+      renderAssistantMessage(lines, message);
+    } else {
+      lines.push(renderUserContent(message.content));
+    }
     lines.push("");
   }
 
   return lines.join("\n").trimEnd();
+}
+
+function renderAssistantMessage(
+  lines: string[],
+  message: ConversationAssistantMessage,
+): void {
+  lines.push(`model: ${message.provider}/${message.model}`);
+  lines.push(`stopReason: ${message.stopReason}`);
+  if (message.responseId) {
+    lines.push(`responseId: ${message.responseId}`);
+  }
+
+  for (const block of message.content) {
+    if (block.type === "text") {
+      lines.push(block.text);
+      continue;
+    }
+
+    if (block.type === "thinking") {
+      if (block.thinking) {
+        lines.push(`[thinking] ${block.thinking}`);
+      } else {
+        lines.push("[thinking] preserved for replay");
+      }
+      if (block.thinkingSignature) {
+        lines.push("thinkingSignature: present");
+      }
+      continue;
+    }
+
+    lines.push(`[tool-call] ${block.name}`);
+    lines.push(`id: ${block.id}`);
+    lines.push(`args: ${JSON.stringify(block.arguments)}`);
+    if (block.thoughtSignature) {
+      lines.push("thoughtSignature: present");
+    }
+  }
+}
+
+function renderUserContent(message: ConversationEvent["content"]): string {
+  if (typeof message === "string") {
+    return message;
+  }
+
+  return message
+    .map((item) =>
+      item.type === "text"
+        ? item.text
+        : item.type === "image"
+          ? `[image ${item.mimeType}, ${item.data.length} bytes base64]`
+          : "",
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+function renderImageAndTextContent(
+  content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>,
+): string {
+  return content
+    .map((item) =>
+      item.type === "text"
+        ? item.text
+        : `[image ${item.mimeType}, ${item.data.length} bytes base64]`,
+    )
+    .join("\n");
 }

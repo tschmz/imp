@@ -1,3 +1,13 @@
+import type {
+  AssistantMessage,
+  ImageContent,
+  TextContent,
+  ThinkingContent,
+  ToolCall,
+  ToolResultMessage,
+  UserMessage,
+} from "@mariozechner/pi-ai";
+
 export interface ChatRef {
   transport: string;
   externalId: string;
@@ -7,64 +17,40 @@ export interface ConversationRef extends ChatRef {
   sessionId?: string;
 }
 
-export type ConversationMessageRole = "user" | "assistant" | "system";
-
-export interface ConversationMessage {
+export interface ConversationEventBase {
   kind?: "message";
   id: string;
-  role: ConversationMessageRole;
-  text: string;
   createdAt: string;
   correlationId?: string;
+}
+
+export interface ConversationUserMessage extends ConversationEventBase {
+  role: "user";
+  content: UserMessage["content"];
+  timestamp: number;
   source?: ConversationMessageSource;
 }
 
-export interface ConversationToolCall {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
+export interface ConversationAssistantMessage
+  extends ConversationEventBase,
+    Omit<AssistantMessage, "timestamp"> {
+  role: "assistant";
+  content: Array<TextContent | ThinkingContent | ToolCall>;
+  timestamp: number;
 }
 
-export interface ConversationToolCallEvent {
-  kind: "tool-call";
-  id: string;
-  createdAt: string;
-  correlationId?: string;
-  text?: string;
-  toolCalls: ConversationToolCall[];
-}
-
-export interface ConversationImageContent {
-  type: "image";
-  data: string;
-  mimeType: string;
-}
-
-export interface ConversationTextContent {
-  type: "text";
-  text: string;
-}
-
-export type ConversationToolResultContent =
-  | ConversationTextContent
-  | ConversationImageContent;
-
-export interface ConversationToolResultEvent {
-  kind: "tool-result";
-  id: string;
-  createdAt: string;
-  correlationId?: string;
-  toolCallId: string;
-  toolName: string;
-  content: ConversationToolResultContent[];
-  details?: unknown;
-  isError: boolean;
+export interface ConversationToolResultMessage
+  extends ConversationEventBase,
+    Omit<ToolResultMessage, "timestamp"> {
+  role: "toolResult";
+  content: Array<TextContent | ImageContent>;
+  timestamp: number;
 }
 
 export type ConversationEvent =
-  | ConversationMessage
-  | ConversationToolCallEvent
-  | ConversationToolResultEvent;
+  | ConversationUserMessage
+  | ConversationAssistantMessage
+  | ConversationToolResultMessage;
 
 export interface ConversationMessageSource {
   kind: "text" | "telegram-voice-transcript";
