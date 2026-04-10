@@ -1,3 +1,4 @@
+import type { AgentEvent, AgentOptions } from "@mariozechner/pi-agent-core";
 import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
@@ -123,17 +124,32 @@ describe("createPiAgentEngine", () => {
         expect(context.messages[2]).toMatchObject({
           role: "assistant",
           content: [
-            { type: "text", text: "Checking the repo." },
-            { type: "toolCall", id: "tool-1", name: "read_file", arguments: { path: "README.md" } },
+            {
+              type: "text",
+              text:
+                "[Persisted tool transcript]\n" +
+                "Assistant used tools in a previous turn.\n" +
+                "Assistant note: Checking the repo.\n" +
+                "Tool: read_file\n" +
+                "Tool call id: tool-1\n" +
+                'Arguments: {"path":"README.md"}',
+            },
           ],
         });
         expect(context.messages[3]).toMatchObject({
-          role: "toolResult",
-          toolCallId: "tool-1",
-          toolName: "read_file",
-          content: [{ type: "text", text: "README contents" }],
-          details: { path: "README.md" },
-          isError: false,
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text:
+                "[Persisted tool transcript]\n" +
+                "Tool result from read_file (ok) in a previous turn.\n" +
+                "Tool call id: tool-1\n" +
+                "Output:\n" +
+                "README contents\n" +
+                'Details: {"path":"README.md"}',
+            },
+          ],
         });
         expect(context.messages[4]).toMatchObject({
           role: "user",
@@ -183,6 +199,120 @@ describe("createPiAgentEngine", () => {
       },
       message: createIncomingMessage(),
     });
+  });
+
+  it("persists tool events emitted via agent subscriptions even when state.messages omits them", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([() => fauxAssistantMessage("Final answer")]);
+
+    const model = registration.getModel("faux-1");
+    expect(model).toBeDefined();
+    const resolvedModel = model!;
+
+    const toolCallAssistantMessage = {
+      role: "assistant" as const,
+      content: [
+        { type: "text" as const, text: "Running ls." },
+        {
+          type: "toolCall" as const,
+          id: "tool-1",
+          name: "bash",
+          arguments: { command: "ls" },
+        },
+      ],
+      api: resolvedModel.api,
+      provider: resolvedModel.provider,
+      model: resolvedModel.id,
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: "toolUse" as const,
+      timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+    };
+    const toolResultMessage = {
+      role: "toolResult" as const,
+      toolCallId: "tool-1",
+      toolName: "bash",
+      content: [{ type: "text" as const, text: "file.txt" }],
+      isError: false,
+      timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
+    };
+    const finalAssistantMessage = fauxAssistantMessage("Final answer");
+
+    const createAgentHandle = (_options: AgentOptions) => {
+      void _options;
+      const subscribers: Array<(event: AgentEvent) => void | Promise<void>> = [];
+      return {
+        state: {
+          messages: [finalAssistantMessage],
+        },
+        subscribe(subscriber: (event: AgentEvent) => void | Promise<void>) {
+          subscribers.push(subscriber);
+          return () => {
+            const index = subscribers.indexOf(subscriber);
+            if (index >= 0) {
+              subscribers.splice(index, 1);
+            }
+          };
+        },
+        async prompt() {
+          for (const subscriber of subscribers) {
+            await subscriber({ type: "message_end", message: toolCallAssistantMessage } as AgentEvent);
+            await subscriber({ type: "message_end", message: toolResultMessage } as AgentEvent);
+            await subscriber({ type: "message_end", message: finalAssistantMessage } as AgentEvent);
+          }
+        },
+      };
+    };
+
+    const engine = createPiAgentEngine({
+      createAgent: createAgentHandle,
+      resolveModel: () => resolvedModel,
+      readTextFile: async () => "unused context",
+    });
+
+    const result = await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(result.conversationEvents).toEqual([
+      {
+        kind: "tool-call",
+        id: "2:tool-call:1",
+        createdAt: "2026-04-05T00:00:01.000Z",
+        correlationId: "corr-2",
+        text: "Running ls.",
+        toolCalls: [
+          {
+            id: "tool-1",
+            name: "bash",
+            arguments: { command: "ls" },
+          },
+        ],
+      },
+      {
+        kind: "tool-result",
+        id: "2:tool-result:1",
+        createdAt: "2026-04-05T00:00:02.000Z",
+        correlationId: "corr-2",
+        toolCallId: "tool-1",
+        toolName: "bash",
+        content: [{ type: "text", text: "file.txt" }],
+        isError: false,
+      },
+      {
+        kind: "message",
+        id: "2:assistant",
+        role: "assistant",
+        text: "Final answer",
+        createdAt: new Date(finalAssistantMessage.timestamp).toISOString(),
+        correlationId: "corr-2",
+      },
+    ]);
   });
 
   it("fails clearly when the configured model cannot be resolved", async () => {

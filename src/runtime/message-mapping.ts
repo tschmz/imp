@@ -40,20 +40,12 @@ export function toAgentMessages(
       if (message.kind === "tool-call") {
         result.push({
           role: "assistant",
-          content: [
-            ...(message.text ? [{ type: "text" as const, text: message.text }] : []),
-            ...message.toolCalls.map((toolCall) => ({
-              type: "toolCall" as const,
-              id: toolCall.id,
-              name: toolCall.name,
-              arguments: toolCall.arguments,
-            })),
-          ],
+          content: [{ type: "text", text: renderPersistedToolCallTranscript(message) }],
           api: model.api,
           provider: model.provider,
           model: model.id,
           usage: EMPTY_USAGE,
-          stopReason: "toolUse",
+          stopReason: "stop",
           timestamp: Date.parse(message.createdAt),
         });
         return result;
@@ -61,12 +53,13 @@ export function toAgentMessages(
 
       if (message.kind === "tool-result") {
         result.push({
-          role: "toolResult",
-          toolCallId: message.toolCallId,
-          toolName: message.toolName,
-          content: message.content,
-          ...(message.details !== undefined ? { details: message.details } : {}),
-          isError: message.isError,
+          role: "assistant",
+          content: [{ type: "text", text: renderPersistedToolResultTranscript(message) }],
+          api: model.api,
+          provider: model.provider,
+          model: model.id,
+          usage: EMPTY_USAGE,
+          stopReason: "stop",
           timestamp: Date.parse(message.createdAt),
         });
         return result;
@@ -196,4 +189,51 @@ export function getAssistantText(message: AssistantMessage): string {
     .filter((content) => content.type === "text")
     .map((content) => content.text)
     .join("\n");
+}
+
+function renderPersistedToolCallTranscript(
+  message: Extract<ConversationEvent, { kind: "tool-call" }>,
+): string {
+  const lines = ["[Persisted tool transcript]", "Assistant used tools in a previous turn."];
+
+  if (message.text) {
+    lines.push(`Assistant note: ${message.text}`);
+  }
+
+  for (const toolCall of message.toolCalls) {
+    lines.push(`Tool: ${toolCall.name}`);
+    lines.push(`Tool call id: ${toolCall.id}`);
+    lines.push(`Arguments: ${JSON.stringify(toolCall.arguments)}`);
+  }
+
+  return lines.join("\n");
+}
+
+function renderPersistedToolResultTranscript(
+  message: Extract<ConversationEvent, { kind: "tool-result" }>,
+): string {
+  const lines = [
+    "[Persisted tool transcript]",
+    `Tool result from ${message.toolName} (${message.isError ? "error" : "ok"}) in a previous turn.`,
+    `Tool call id: ${message.toolCallId}`,
+  ];
+
+  if (message.content.length > 0) {
+    lines.push("Output:");
+    lines.push(
+      message.content
+        .map((content) =>
+          content.type === "text"
+            ? content.text
+            : `[image ${content.mimeType}, ${content.data.length} bytes base64]`,
+        )
+        .join("\n"),
+    );
+  }
+
+  if (message.details !== undefined) {
+    lines.push(`Details: ${JSON.stringify(message.details)}`);
+  }
+
+  return lines.join("\n");
 }
