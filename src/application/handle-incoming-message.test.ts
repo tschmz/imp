@@ -225,7 +225,7 @@ describe("createHandleIncomingMessage", () => {
 
     const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
     expect(runInput?.runtime?.activatedSkills).toHaveLength(3);
-    expect(logger.debug).toHaveBeenCalledWith(
+    expect(logger.info).toHaveBeenCalledWith(
       "resolved bot skills for turn",
       expect.objectContaining({
         skillCount: 3,

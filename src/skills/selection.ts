@@ -45,6 +45,14 @@ export function createLlmSkillSelector(
         return [];
       }
 
+      const explicitMatches = findExplicitSkillMatches(request.userText, request.catalog).slice(
+        0,
+        maxActivatedSkills,
+      );
+      if (explicitMatches.length >= maxActivatedSkills) {
+        return explicitMatches;
+      }
+
       const model = resolveModelOrThrow(request.agent, resolveModel);
       const apiKey = await dependencies.getApiKey?.(model.provider, request.agent);
       const response = await completeFn(
@@ -77,7 +85,13 @@ export function createLlmSkillSelector(
         },
       );
 
-      return parseSelectedSkills(response, request.catalog, maxActivatedSkills);
+      const modelSelectedSkills = parseSelectedSkills(
+        response,
+        request.catalog,
+        maxActivatedSkills - explicitMatches.length,
+      );
+
+      return [...explicitMatches, ...modelSelectedSkills].slice(0, maxActivatedSkills);
     },
   };
 }
@@ -138,4 +152,29 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 
 function formatErrorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function findExplicitSkillMatches(userText: string, catalog: SkillDefinition[]): SkillDefinition[] {
+  const normalizedUserText = normalizeSkillMatchingText(userText);
+  if (!normalizedUserText) {
+    return [];
+  }
+
+  return catalog.filter((skill) => {
+    const normalizedSkillName = normalizeSkillMatchingText(skill.name);
+    if (!normalizedSkillName) {
+      return false;
+    }
+
+    const boundaryMatch = new RegExp(`(^| )${escapeRegExp(normalizedSkillName)}( |$)`);
+    return boundaryMatch.test(normalizedUserText);
+  });
+}
+
+function normalizeSkillMatchingText(value: string): string {
+  return value.toLowerCase().replaceAll(/[^a-z0-9]+/g, " ").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

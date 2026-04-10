@@ -113,7 +113,7 @@ async function resolveActivatedSkills(
       catalog: skillCatalog,
       maxActivatedSkills: 3,
     });
-    await dependencies.logger?.debug("resolved bot skills for turn", {
+    const logFields = {
       botId: message.botId,
       transport: message.conversation.transport,
       conversationId: message.conversation.externalId,
@@ -122,7 +122,12 @@ async function resolveActivatedSkills(
       agentId: agent.id,
       skillCount: activatedSkills.length,
       skillNames: activatedSkills.map((skill) => skill.name),
-    });
+    };
+    if (activatedSkills.length > 0) {
+      await dependencies.logger?.info("resolved bot skills for turn", logFields);
+    } else {
+      await dependencies.logger?.debug("resolved bot skills for turn", logFields);
+    }
     return activatedSkills;
   } catch (error) {
     void dependencies.logger?.error(

@@ -23,6 +23,23 @@ describe("createLlmSkillSelector", () => {
     expect(result.map((skill) => skill.name)).toEqual(["git-review", "git-commit"]);
   });
 
+  it("activates explicitly mentioned skills before consulting the model", async () => {
+    const completeFn = vi.fn(async () => createAssistantMessage('{"skills":[]}'));
+    const selector = createLlmSkillSelector({
+      completeFn,
+    });
+
+    const result = await selector.selectRelevantSkills({
+      agent: createAgent(),
+      userText: "Use hello skill for this reply.",
+      catalog: [createSkill("hello-skill", "Say hello before answering.")],
+      maxActivatedSkills: 1,
+    });
+
+    expect(result.map((skill) => skill.name)).toEqual(["hello-skill"]);
+    expect(completeFn).not.toHaveBeenCalled();
+  });
+
   it("fails closed when the model returns an unknown skill name", async () => {
     const selector = createLlmSkillSelector({
       completeFn: vi.fn(async () => createAssistantMessage('{"skills":["unknown-skill"]}')),
