@@ -24,7 +24,7 @@ export const resetCommandHandler: InboundCommandHandler = {
         conversation: existing.state.conversation,
         agentId: existing.state.agentId,
         ...(existing.state.title ? { title: existing.state.title } : {}),
-        createdAt: message.receivedAt,
+        createdAt: existing.state.createdAt,
         updatedAt: message.receivedAt,
         version: existing.state.version,
       },
