@@ -54,7 +54,7 @@ export interface ExecuteAgentResult {
 }
 
 interface AgentEventSubscriber {
-  (event: AgentEvent): void | Promise<void>;
+  (event: AgentEvent, signal?: AbortSignal): void | Promise<void>;
 }
 
 interface EventSubscribableAgentHandle extends AgentHandle {
@@ -86,24 +86,16 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
   });
 
   const eventfulAgent = agent as EventSubscribableAgentHandle;
-  const toolEventMessages: AgentMessage[] = [];
-  const unsubscribe = eventfulAgent.subscribe?.((event) => {
-    if (event.type === "message_end") {
-      const message = event.message;
-      if (message.role === "assistant" || message.role === "toolResult") {
-        toolEventMessages.push(message);
-      }
-    }
-  });
+  const eventMessages = collectConversationEventMessages(eventfulAgent);
 
   try {
     await agent.prompt(options.userText);
   } finally {
-    unsubscribe?.();
+    eventMessages.unsubscribe?.();
   }
 
-  const appendedMessages = toolEventMessages.length > 0
-    ? toolEventMessages
+  const appendedMessages = eventMessages.messages.length > 0
+    ? eventMessages.messages
     : agent.state.messages.slice(initialMessages.length);
 
   const assistantMessage = [...agent.state.messages]
@@ -139,4 +131,67 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       ? { workingDirectory: options.workingDirectoryState.get() }
       : {}),
   };
+}
+
+function collectConversationEventMessages(agent: EventSubscribableAgentHandle): {
+  messages: AgentMessage[];
+  unsubscribe?: () => void;
+} {
+  const messages: AgentMessage[] = [];
+  const seen = new Set<string>();
+
+  const recordMessage = (message: AgentMessage) => {
+    if (message.role !== "assistant" && message.role !== "toolResult") {
+      return;
+    }
+
+    const key = getAgentMessageKey(message);
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    messages.push(message);
+  };
+
+  const unsubscribe = agent.subscribe?.((event) => {
+    if (event.type === "turn_end") {
+      recordMessage(event.message);
+      for (const toolResult of event.toolResults) {
+        recordMessage(toolResult);
+      }
+      return;
+    }
+
+    if (event.type === "message_end") {
+      recordMessage(event.message);
+    }
+  });
+
+  return { messages, unsubscribe };
+}
+
+function getAgentMessageKey(message: Extract<AgentMessage, { role: "assistant" | "toolResult" }>): string {
+  if (message.role === "toolResult") {
+    return JSON.stringify([
+      message.role,
+      message.timestamp,
+      message.toolCallId,
+      message.toolName,
+      message.isError,
+      message.content,
+      message.details ?? null,
+    ]);
+  }
+
+  return JSON.stringify([
+    message.role,
+    message.timestamp,
+    message.responseId ?? null,
+    message.provider,
+    message.model,
+    message.stopReason,
+    message.errorMessage ?? null,
+    message.content,
+  ]);
 }
