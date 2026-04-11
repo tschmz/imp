@@ -119,7 +119,11 @@ describe("createCli", () => {
   it("rejects non-positive --lines values before invoking the log use case", async () => {
     const dependencies = createDependencies();
     const cli = createCli(dependencies);
-    findCommand(cli, "log").exitOverride();
+    const logCommand = findCommand(cli, "log");
+    logCommand.exitOverride();
+    logCommand.configureOutput({
+      writeErr: vi.fn(),
+    });
 
     await expect(cli.parseAsync(["node", "imp", "log", "--lines", "-1"])).rejects.toThrow(
       "Expected a positive integer.",
