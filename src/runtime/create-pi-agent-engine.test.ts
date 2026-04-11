@@ -1,5 +1,5 @@
-import type { Agent, AgentEvent, AgentOptions } from "@mariozechner/pi-agent-core";
-import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration } from "@mariozechner/pi-ai";
+import type { Agent, AgentEvent, AgentMessage, AgentOptions } from "@mariozechner/pi-agent-core";
+import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration, type ImageContent } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -275,29 +275,14 @@ describe("createPiAgentEngine", () => {
 
     const createAgentHandle = (_options: AgentOptions) => {
       void _options;
-      const subscribers: Array<Parameters<Agent["subscribe"]>[0]> = [];
-      return {
-        state: {
-          messages: [finalAssistantMessage],
-        },
-        subscribe(subscriber: Parameters<Agent["subscribe"]>[0]) {
-          subscribers.push(subscriber);
-          return () => {
-            const index = subscribers.indexOf(subscriber);
-            if (index >= 0) {
-              subscribers.splice(index, 1);
-            }
-          };
-        },
-        async prompt() {
-          const signal = new AbortController().signal;
-          for (const subscriber of subscribers) {
-            await subscriber({ type: "message_end", message: toolCallAssistantMessage } as AgentEvent, signal);
-            await subscriber({ type: "message_end", message: toolResultMessage } as AgentEvent, signal);
-            await subscriber({ type: "message_end", message: finalAssistantMessage } as AgentEvent, signal);
-          }
-        },
-      };
+      return createAgentDouble({
+        messages: [finalAssistantMessage],
+        events: [
+          { type: "message_end", message: toolCallAssistantMessage },
+          { type: "message_end", message: toolResultMessage },
+          { type: "message_end", message: finalAssistantMessage },
+        ],
+      });
     };
 
     const engine = createPiAgentEngine({
@@ -406,36 +391,21 @@ describe("createPiAgentEngine", () => {
 
     const createAgentHandle = (_options: AgentOptions) => {
       void _options;
-      const subscribers: Array<Parameters<Agent["subscribe"]>[0]> = [];
-      return {
-        state: {
-          messages: [finalAssistantMessage],
-        },
-        subscribe(subscriber: Parameters<Agent["subscribe"]>[0]) {
-          subscribers.push(subscriber);
-          return () => {
-            const index = subscribers.indexOf(subscriber);
-            if (index >= 0) {
-              subscribers.splice(index, 1);
-            }
-          };
-        },
-        async prompt() {
-          const signal = new AbortController().signal;
-          for (const subscriber of subscribers) {
-            await subscriber({
-              type: "turn_end",
-              message: toolCallAssistantMessage,
-              toolResults: [toolResultMessage],
-            } as AgentEvent, signal);
-            await subscriber({
-              type: "turn_end",
-              message: finalAssistantMessage,
-              toolResults: [],
-            } as AgentEvent, signal);
-          }
-        },
-      };
+      return createAgentDouble({
+        messages: [finalAssistantMessage],
+        events: [
+          {
+            type: "turn_end",
+            message: toolCallAssistantMessage,
+            toolResults: [toolResultMessage],
+          },
+          {
+            type: "turn_end",
+            message: finalAssistantMessage,
+            toolResults: [],
+          },
+        ],
+      });
     };
 
     const engine = createPiAgentEngine({
@@ -676,12 +646,7 @@ describe("createPiAgentEngine", () => {
       readTextFile: async () => "unused context",
       createAgent: (options) => {
         capturedOnPayload = options.onPayload as typeof capturedOnPayload;
-        return {
-          state: {
-            messages: [fauxAssistantMessage("stored response")],
-          },
-          prompt: async () => {},
-        };
+        return createAgentDouble({ messages: [fauxAssistantMessage("stored response")] });
       },
     });
 
@@ -763,12 +728,7 @@ describe("createPiAgentEngine", () => {
       },
       createAgent: (options) => {
         capturedTools = options.initialState?.tools as unknown[];
-        return {
-          state: {
-            messages: [fauxAssistantMessage("tool-ready")],
-          },
-          prompt: async () => {},
-        };
+        return createAgentDouble({ messages: [fauxAssistantMessage("tool-ready")] });
       },
     });
 
@@ -829,12 +789,7 @@ describe("createPiAgentEngine", () => {
       resolveMcpTools,
       createAgent: (options) => {
         capturedTools = options.initialState?.tools as Array<{ name: string }>;
-        return {
-          state: {
-            messages: [fauxAssistantMessage("tool-ready")],
-          },
-          prompt: async () => {},
-        };
+        return createAgentDouble({ messages: [fauxAssistantMessage("tool-ready")] });
       },
     });
 
@@ -877,12 +832,7 @@ describe("createPiAgentEngine", () => {
         tools: [],
         close,
       }),
-      createAgent: () => ({
-        state: {
-          messages: [fauxAssistantMessage("ok")],
-        },
-        prompt: async () => {},
-      }),
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("ok")] }),
     });
 
     await engine.run({
@@ -927,12 +877,7 @@ describe("createPiAgentEngine", () => {
       readTextFile: async () => "unused context",
       createAgent: (options) => {
         capturedGetApiKey = options.getApiKey;
-        return {
-          state: {
-            messages: [fauxAssistantMessage("ok")],
-          },
-          prompt: async () => {},
-        };
+        return createAgentDouble({ messages: [fauxAssistantMessage("ok")] });
       },
     });
 
@@ -989,12 +934,7 @@ describe("createPiAgentEngine", () => {
       },
       createAgent: (options) => {
         capturedTools = options.initialState?.tools as Array<{ name: string }>;
-        return {
-          state: {
-            messages: [fauxAssistantMessage("tool-ready")],
-          },
-          prompt: async () => {},
-        };
+        return createAgentDouble({ messages: [fauxAssistantMessage("tool-ready")] });
       },
     });
 
@@ -1614,12 +1554,7 @@ describe("createPiAgentEngine", () => {
         readCalls.push(path);
         return "cached context";
       },
-      createAgent: () => ({
-        state: {
-          messages: [fauxAssistantMessage("cached response")],
-        },
-        prompt: async () => {},
-      }),
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("cached response")] }),
     });
 
     await engine.run({
@@ -1666,12 +1601,7 @@ describe("createPiAgentEngine", () => {
       },
       createAgent: (options) => {
         systemPrompts.push(options.initialState?.systemPrompt ?? "");
-        return {
-          state: {
-            messages: [fauxAssistantMessage("response")],
-          },
-          prompt: async () => {},
-        };
+        return createAgentDouble({ messages: [fauxAssistantMessage("response")] });
       },
     });
 
@@ -1731,12 +1661,7 @@ describe("createPiAgentEngine", () => {
       },
       createAgent: (options) => {
         systemPrompts.push(options.initialState?.systemPrompt ?? "");
-        return {
-          state: {
-            messages: [fauxAssistantMessage("response")],
-          },
-          prompt: async () => {},
-        };
+        return createAgentDouble({ messages: [fauxAssistantMessage("response")] });
       },
     });
 
@@ -1791,6 +1716,56 @@ describe("createPiAgentEngine", () => {
     ).rejects.toThrow('Configured base prompt for agent "default" must define text or file.');
   });
 });
+
+type AgentDouble = Pick<Agent, "prompt" | "subscribe"> & {
+  state: Pick<Agent["state"], "messages">;
+};
+
+interface AgentDoubleOptions {
+  messages?: AgentMessage[];
+  events?: AgentEvent[];
+  onPrompt?: (
+    input: AgentMessage | AgentMessage[] | string,
+    images?: ImageContent[],
+  ) => Promise<void> | void;
+}
+
+function createAgentDouble(options: AgentDoubleOptions = {}): AgentDouble {
+  const subscribers: Array<Parameters<Agent["subscribe"]>[0]> = [];
+  const messages = [...(options.messages ?? [])];
+
+  async function prompt(message: AgentMessage | AgentMessage[]): Promise<void>;
+  async function prompt(input: string, images?: ImageContent[]): Promise<void>;
+  async function prompt(
+    input: AgentMessage | AgentMessage[] | string,
+    images?: ImageContent[],
+  ): Promise<void> {
+    await options.onPrompt?.(input, images);
+
+    const signal = new AbortController().signal;
+    for (const event of options.events ?? []) {
+      for (const subscriber of subscribers) {
+        await subscriber(event, signal);
+      }
+    }
+  }
+
+  return {
+    state: {
+      messages,
+    },
+    prompt,
+    subscribe(subscriber) {
+      subscribers.push(subscriber);
+      return () => {
+        const index = subscribers.indexOf(subscriber);
+        if (index >= 0) {
+          subscribers.splice(index, 1);
+        }
+      };
+    },
+  };
+}
 
 function createAgent(): AgentDefinition {
   return {
