@@ -14,6 +14,7 @@ import {
   createPiAgentEngine,
   mergeShellPathEntries,
 } from "./create-pi-agent-engine.js";
+import { toAgentMessages } from "./message-mapping.js";
 
 const registrations: FauxProviderRegistration[] = [];
 const tempDirs: string[] = [];
@@ -349,7 +350,7 @@ describe("createPiAgentEngine", () => {
     ]);
   });
 
-  it("persists assistant and tool-result messages from turn_end events", async () => {
+  it("falls back to state messages instead of collecting turn_end aggregate data", async () => {
     const registration = registerFauxProvider({
       provider: "faux",
       models: [{ id: "faux-1", name: "Faux 1" }],
@@ -387,17 +388,27 @@ describe("createPiAgentEngine", () => {
       isError: false,
       timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
     };
+    const staleTurnEndToolResultMessage = {
+      ...toolResultMessage,
+      content: [{ type: "text" as const, text: "ignored.txt" }],
+    };
     const finalAssistantMessage = fauxAssistantMessage("Final answer");
+    const conversation = createConversation();
 
     const createAgentHandle = (_options: AgentOptions) => {
       void _options;
       return createAgentDouble({
-        messages: [finalAssistantMessage],
+        messages: [
+          ...toAgentMessages(conversation.messages, resolvedModel),
+          toolCallAssistantMessage,
+          toolResultMessage,
+          finalAssistantMessage,
+        ],
         events: [
           {
             type: "turn_end",
             message: toolCallAssistantMessage,
-            toolResults: [toolResultMessage],
+            toolResults: [staleTurnEndToolResultMessage],
           },
           {
             type: "turn_end",
@@ -416,7 +427,7 @@ describe("createPiAgentEngine", () => {
 
     const result = await engine.run({
       agent: createAgent(),
-      conversation: createConversation(),
+      conversation,
       message: createIncomingMessage(),
     });
 

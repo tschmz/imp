@@ -1,5 +1,6 @@
 import {
   Agent,
+  type AgentEvent,
   type AgentMessage,
   type AgentOptions,
 } from "@mariozechner/pi-agent-core";
@@ -16,6 +17,8 @@ export type AgentHandle =
     state: Pick<Agent["state"], "messages">;
   }
   & Partial<Pick<Agent, "subscribe">>;
+
+type ConversationMessageEvent = Extract<AgentEvent, { type: "message_end" }>;
 
 export interface ExecuteAgentOptions {
   createAgent?: (options: AgentOptions) => AgentHandle;
@@ -145,20 +148,16 @@ function collectConversationEventMessages(agent: AgentHandle): {
   };
 
   const unsubscribe = agent.subscribe?.((event) => {
-    if (event.type === "turn_end") {
-      recordMessage(event.message);
-      for (const toolResult of event.toolResults) {
-        recordMessage(toolResult);
-      }
-      return;
-    }
-
-    if (event.type === "message_end") {
+    if (isConversationMessageEvent(event)) {
       recordMessage(event.message);
     }
   });
 
   return { messages, unsubscribe };
+}
+
+function isConversationMessageEvent(event: AgentEvent): event is ConversationMessageEvent {
+  return event.type === "message_end";
 }
 
 function getAgentMessageKey(message: Extract<AgentMessage, { role: "assistant" | "toolResult" }>): string {
