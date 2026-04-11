@@ -118,8 +118,6 @@ describe("resolveRuntimeConfig", () => {
           },
         },
         defaultAgentId: "ops-agent",
-        skillCatalog: [],
-        skillIssues: [],
         paths: {
           dataRoot: "/var/lib/imp",
           botRoot: "/var/lib/imp/bots/private-telegram",
@@ -133,7 +131,7 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
-  it("discovers valid bot skills from configured paths", async () => {
+  it("discovers valid agent skills from configured paths", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config", "imp.json");
     const skillsPath = join(root, "config", "skills");
@@ -143,14 +141,37 @@ describe("resolveRuntimeConfig", () => {
     );
 
     const appConfig = createAppConfig({
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          inference: {
+            metadata: {
+              app: "imp",
+            },
+            request: {
+              store: true,
+            },
+          },
+          tools: [],
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          skills: {
+            paths: ["./skills"],
+          },
+        },
+      ],
       bots: [
         {
           id: "private-telegram",
           type: "telegram",
           enabled: true,
-          skills: {
-            paths: ["./skills"],
-          },
           token: "telegram-token",
           access: {
             allowedUserIds: [],
@@ -161,13 +182,16 @@ describe("resolveRuntimeConfig", () => {
 
     const result = await resolveRuntimeConfig(appConfig, configPath);
 
-    expect(result.activeBots[0]?.skillCatalog).toHaveLength(1);
-    expect(result.activeBots[0]?.skillCatalog[0]).toMatchObject({
+    expect(result.agents[0]?.skills).toEqual({
+      paths: [skillsPath],
+    });
+    expect(result.agents[0]?.skillCatalog).toHaveLength(1);
+    expect(result.agents[0]?.skillCatalog?.[0]).toMatchObject({
       name: "commit",
       description: "Stage and commit changes.",
       filePath: join(skillsPath, "commit", "SKILL.md"),
     });
-    expect(result.activeBots[0]?.skillIssues).toEqual([]);
+    expect(result.agents[0]?.skillIssues ?? []).toEqual([]);
   });
 
   it("uses the global default agent id when the bot has no routing override", async () => {
@@ -497,8 +521,6 @@ describe("resolveRuntimeConfig", () => {
         const typedContext = context as {
           dataRoot: string;
           defaultAgentId: string;
-          skillCatalog: [];
-          skillIssues: [];
         };
 
         return {
@@ -507,8 +529,6 @@ describe("resolveRuntimeConfig", () => {
         token: "runtime-token-not-required",
         allowedUserIds: [],
         defaultAgentId: typedContext.defaultAgentId,
-        skillCatalog: typedContext.skillCatalog,
-        skillIssues: typedContext.skillIssues,
         paths: {
           dataRoot: typedContext.dataRoot,
           botRoot: "/var/lib/imp/bots/no-token",

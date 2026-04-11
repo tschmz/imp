@@ -68,6 +68,9 @@ export function buildInitialAppConfig(
         ...(usesOAuth ? { authFile: join(answers.dataRoot, "auth.json") } : {}),
         tools: [...defaultTools],
         ...(workspace ? { workspace } : {}),
+        skills: {
+          paths: [],
+        },
         inference: {
           metadata: {
             app: "imp",
@@ -83,9 +86,6 @@ export function buildInitialAppConfig(
         id: defaultBotId,
         type: "telegram",
         enabled: true,
-        skills: {
-          paths: [],
-        },
         token: answers.telegramToken,
         access: {
           allowedUserIds: answers.allowedUserIds,

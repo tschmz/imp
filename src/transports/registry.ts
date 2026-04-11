@@ -3,15 +3,12 @@ import type { BotConfig } from "../config/types.js";
 import type { ActiveBotRuntimeConfig } from "../daemon/types.js";
 import { TransportResolutionError } from "../domain/errors.js";
 import type { Logger } from "../logging/types.js";
-import type { SkillDefinition } from "../skills/types.js";
 import type { Transport } from "./types.js";
 import { ensureBuiltInTransportsRegistered } from "./builtins.js";
 
 interface RuntimeNormalizationContext {
   dataRoot: string;
   defaultAgentId: string;
-  skillCatalog: SkillDefinition[];
-  skillIssues: string[];
 }
 
 export interface TransportRegistryEntry<TBot extends BotConfig = BotConfig> {

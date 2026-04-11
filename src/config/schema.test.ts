@@ -150,6 +150,70 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts agent skill catalogs", () => {
+    const result = appConfigSchema.safeParse(
+      createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        skills: {
+          paths: ["./skills", "/opt/imp/skills"],
+        },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects deprecated bot skill catalogs", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      bots: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          skills: {
+            paths: ["./skills"],
+          },
+          token: "replace-me",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["bots", 0],
+      }),
+    );
+  });
+
   it("accepts MCP stdio server config under agents.tools.mcp.servers", () => {
     const result = appConfigSchema.safeParse(
       createConfig({

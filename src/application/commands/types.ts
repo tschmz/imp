@@ -7,7 +7,6 @@ import type { HookRegistration, InboundMessageLifecycleHooks } from "../../plugi
 import type { AgentEngine } from "../../runtime/types.js";
 import type { ModelResolver } from "../../runtime/model-resolution.js";
 import type { SkillSelector } from "../../skills/selection.js";
-import type { SkillDefinition } from "../../skills/types.js";
 import type { ConversationStore } from "../../storage/types.js";
 
 export interface RuntimeCommandInfo {
@@ -29,7 +28,6 @@ export interface HandleIncomingMessageDependencies {
   loadAppConfig?: typeof loadAppConfig;
   readRecentLogLines?: typeof readRecentLogLines;
   resolveModel?: ModelResolver;
-  skillCatalog?: SkillDefinition[];
   skillSelector?: SkillSelector;
   inboundMessageHooks?: ReadonlyArray<HookRegistration<InboundMessageLifecycleHooks>>;
   logger?: Logger;

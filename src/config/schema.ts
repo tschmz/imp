@@ -43,6 +43,10 @@ const agentWorkspaceConfigSchema = z.object({
   shellPath: z.string().min(1).array().optional(),
 });
 
+const agentSkillsConfigSchema = z.object({
+  paths: z.string().min(1).array(),
+});
+
 const mcpServerIdSchema = z
   .string()
   .min(1)
@@ -100,6 +104,7 @@ const agentConfigSchema = z
     authFile: z.string().min(1).optional(),
     inference: inferenceSettingsSchema.optional(),
     workspace: agentWorkspaceConfigSchema.optional(),
+    skills: agentSkillsConfigSchema.optional(),
     tools: agentToolsConfigSchema.optional(),
   })
   .superRefine((agent, ctx) => {

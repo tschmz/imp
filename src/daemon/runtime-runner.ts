@@ -37,7 +37,6 @@ export function createRuntimeEntries(
         loggingLevel: runtime.loggingLevel,
         activeBotIds: runtimes.map((entry) => entry.botConfig.id),
       },
-      skillCatalog: runtime.botConfig.skillCatalog,
       skillSelector: runtime.skillSelector,
       logger: runtime.logger,
     });
@@ -99,13 +98,16 @@ export function createRuntimeEntries(
         await runtime.logger.info(`runtime dir: ${runtime.botConfig.paths.runtimeDir}`);
         await runtime.logger.info(`runtime file: ${runtime.botConfig.paths.runtimeStatePath}`);
         await runtime.logger.info(`active bot: ${runtime.botConfig.id}`);
-        await runtime.logger.info("discovered bot skills", {
-          botId: runtime.botConfig.id,
-          skillCount: runtime.botConfig.skillCatalog.length,
-          skillNames: runtime.botConfig.skillCatalog.map((skill) => skill.name),
-        });
-        for (const issue of runtime.botConfig.skillIssues) {
-          await runtime.logger.info(issue, { botId: runtime.botConfig.id });
+        for (const agent of dependencies.agentRegistry.list()) {
+          await runtime.logger.info("discovered agent skills", {
+            botId: runtime.botConfig.id,
+            agentId: agent.id,
+            skillCount: agent.skillCatalog?.length ?? 0,
+            skillNames: (agent.skillCatalog ?? []).map((skill) => skill.name),
+          });
+          for (const issue of agent.skillIssues ?? []) {
+            await runtime.logger.info(issue, { botId: runtime.botConfig.id, agentId: agent.id });
+          }
         }
         await runtime.logger.debug("starting transport for bot", {
           botId: runtime.botConfig.id,

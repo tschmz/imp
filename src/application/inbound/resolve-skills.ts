@@ -7,7 +7,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
     return;
   }
 
-  const configuredSkillCatalog = context.dependencies.skillCatalog ?? [];
+  const configuredSkillCatalog = context.agent.skillCatalog ?? [];
   const skillSelector = context.dependencies.skillSelector;
   if (!skillSelector) {
     context.activatedSkills = [];
@@ -38,7 +38,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
     }
 
     if (mergedSkillCatalog.overriddenSkillNames.length > 0) {
-      await context.dependencies.logger?.info("workspace skills override configured bot skills for turn", {
+      await context.dependencies.logger?.info("workspace skills override configured agent skills for turn", {
         botId: context.message.botId,
         transport: context.message.conversation.transport,
         conversationId: context.message.conversation.externalId,
@@ -79,15 +79,15 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
     };
 
     if (activatedSkills.length > 0) {
-      await context.dependencies.logger?.info("resolved bot skills for turn", logFields);
+      await context.dependencies.logger?.info("resolved agent skills for turn", logFields);
     } else {
-      await context.dependencies.logger?.debug("resolved bot skills for turn", logFields);
+      await context.dependencies.logger?.debug("resolved agent skills for turn", logFields);
     }
 
     context.activatedSkills = activatedSkills;
   } catch (error) {
     void context.dependencies.logger?.error(
-      "failed to resolve bot skills for turn; continuing without skill activation",
+      "failed to resolve agent skills for turn; continuing without skill activation",
       {
         botId: context.message.botId,
         transport: context.message.conversation.transport,

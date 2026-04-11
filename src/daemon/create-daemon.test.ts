@@ -619,8 +619,6 @@ function createBotConfig(
     token: "telegram-token",
     allowedUserIds: ["7"],
     defaultAgentId: "default",
-    skillCatalog: [],
-    skillIssues: [],
     paths,
     ...overrides,
   };

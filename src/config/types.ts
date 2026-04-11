@@ -33,6 +33,10 @@ export interface AgentToolsConfigObject {
 
 export type AgentToolsConfig = string[] | AgentToolsConfigObject;
 
+export interface AgentSkillsConfig {
+  paths: string[];
+}
+
 export interface AgentConfig {
   id: string;
   name?: string;
@@ -42,17 +46,13 @@ export interface AgentConfig {
   inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
   tools?: AgentToolsConfig;
-}
-
-export interface BotSkillsConfig {
-  paths: string[];
+  skills?: AgentSkillsConfig;
 }
 
 interface BaseBotConfig {
   id: string;
   enabled: boolean;
   routing?: BotRoutingConfig;
-  skills?: BotSkillsConfig;
 }
 
 export interface TelegramBotConfig extends BaseBotConfig {

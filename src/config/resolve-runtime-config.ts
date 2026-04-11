@@ -34,20 +34,28 @@ export async function resolveRuntimeConfig(
     logging: {
       level: appConfig.logging?.level ?? "info",
     },
-    agents: appConfig.agents.map((agent) => ({
-      id: agent.id,
-      ...(agent.name ? { name: agent.name } : {}),
-      prompt: resolveAgentPrompt(agent.prompt, configDir),
-      ...(agent.model ? { model: agent.model } : {}),
-      ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, configDir) } : {}),
-      ...(agent.workspace ? { workspace: resolveAgentWorkspace(agent.workspace, configDir) } : {}),
-      ...(agent.inference ? { inference: agent.inference } : {}),
-      ...resolveAgentTools(agent.tools, configDir),
-    })),
+    agents: await Promise.all(
+      appConfig.agents.map(async (agent) => {
+        const skillPaths = agent.skills?.paths.map((path) => resolveConfigPath(path, configDir)) ?? [];
+        const skillCatalog = await discoverSkills(skillPaths);
+
+        return {
+          id: agent.id,
+          ...(agent.name ? { name: agent.name } : {}),
+          prompt: resolveAgentPrompt(agent.prompt, configDir),
+          ...(agent.model ? { model: agent.model } : {}),
+          ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, configDir) } : {}),
+          ...(agent.workspace ? { workspace: resolveAgentWorkspace(agent.workspace, configDir) } : {}),
+          ...(agent.skills ? { skills: resolveAgentSkills(agent.skills, configDir) } : {}),
+          ...(agent.inference ? { inference: agent.inference } : {}),
+          ...(skillCatalog.skills.length > 0 ? { skillCatalog: skillCatalog.skills } : {}),
+          ...(skillCatalog.issues.length > 0 ? { skillIssues: skillCatalog.issues } : {}),
+          ...resolveAgentTools(agent.tools, configDir),
+        };
+      }),
+    ),
     activeBots: await Promise.all(
       enabledBots.map(async (bot) => {
-        const skillPaths = bot.skills?.paths.map((path) => resolveConfigPath(path, configDir)) ?? [];
-        const skillCatalog = await discoverSkills(skillPaths);
         const transport = getTransport(bot.type);
         if (!transport) {
           throw new Error(`Unsupported bot type: ${bot.type}`);
@@ -63,8 +71,6 @@ export async function resolveRuntimeConfig(
           {
             dataRoot: appConfig.paths.dataRoot,
             defaultAgentId: appConfig.defaults.agentId,
-            skillCatalog: skillCatalog.skills,
-            skillIssues: skillCatalog.issues,
           },
         );
       }),
@@ -116,6 +122,15 @@ function resolveAgentWorkspace(workspace: AgentWorkspaceConfig, configDir: strin
   return {
     ...workspace,
     ...(workspace.cwd ? { cwd: resolveConfigPath(workspace.cwd, configDir) } : {}),
+  };
+}
+
+function resolveAgentSkills(
+  skills: NonNullable<AppConfig["agents"][number]["skills"]>,
+  configDir: string,
+): NonNullable<AppConfig["agents"][number]["skills"]> {
+  return {
+    paths: skills.paths.map((path) => resolveConfigPath(path, configDir)),
   };
 }
 

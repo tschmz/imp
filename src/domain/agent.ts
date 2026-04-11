@@ -20,6 +20,10 @@ export interface AgentWorkspaceConfig {
   shellPath?: string[];
 }
 
+export interface AgentSkillsConfig {
+  paths: string[];
+}
+
 export interface AgentMcpServerConfig {
   id: string;
   command: string;
@@ -45,6 +49,9 @@ export interface AgentDefinition {
   authFile?: string;
   inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
+  skills?: AgentSkillsConfig;
+  skillCatalog?: import("../skills/types.js").SkillDefinition[];
+  skillIssues?: string[];
   tools: string[];
   mcp?: AgentMcpConfig;
   extensions: string[];

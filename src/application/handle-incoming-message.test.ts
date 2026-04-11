@@ -186,7 +186,15 @@ describe("createHandleIncomingMessage", () => {
   });
 
   it("activates at most three relevant skills", async () => {
-    const agent = createDefaultAgent();
+    const agent: AgentDefinition = {
+      ...createDefaultAgent(),
+      skillCatalog: [
+        createSkill("git-commit", "Commit Git changes carefully."),
+        createSkill("git-rebase", "Rebase a Git branch safely."),
+        createSkill("git-review", "Review Git history and diffs."),
+        createSkill("git-cleanup", "Clean up Git branches."),
+      ],
+    };
     const engine: AgentEngine = {
       run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
     };
@@ -206,12 +214,6 @@ describe("createHandleIncomingMessage", () => {
       defaultAgentId: "default",
       runtimeInfo: createRuntimeInfo(),
       skillSelector,
-      skillCatalog: [
-        createSkill("git-commit", "Commit Git changes carefully."),
-        createSkill("git-rebase", "Rebase a Git branch safely."),
-        createSkill("git-review", "Review Git history and diffs."),
-        createSkill("git-cleanup", "Clean up Git branches."),
-      ],
       logger,
     });
 
@@ -225,7 +227,7 @@ describe("createHandleIncomingMessage", () => {
     const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
     expect(runInput?.runtime?.activatedSkills).toHaveLength(3);
     expect(logger.info).toHaveBeenCalledWith(
-      "resolved bot skills for turn",
+      "resolved agent skills for turn",
       expect.objectContaining({
         skillCount: 3,
         skillNames: ["git-commit", "git-rebase", "git-review"],
@@ -233,7 +235,7 @@ describe("createHandleIncomingMessage", () => {
     );
   });
 
-  it("loads workspace .skills and lets them override configured bot skills", async () => {
+  it("loads workspace .skills and lets them override configured agent skills", async () => {
     const workspaceRoot = await createTempDir();
     await writeSkillFile(
       join(workspaceRoot, ".skills", "git-commit", "SKILL.md"),
@@ -252,6 +254,10 @@ describe("createHandleIncomingMessage", () => {
       workspace: {
         cwd: workspaceRoot,
       },
+      skillCatalog: [
+        createSkill("git-commit", "Configured commit flow."),
+        createSkill("git-review", "Review Git history and diffs."),
+      ],
     };
     const engine: AgentEngine = {
       run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
@@ -273,10 +279,6 @@ describe("createHandleIncomingMessage", () => {
       defaultAgentId: "default",
       runtimeInfo: createRuntimeInfo(),
       skillSelector,
-      skillCatalog: [
-        createSkill("git-commit", "Configured commit flow."),
-        createSkill("git-review", "Review Git history and diffs."),
-      ],
       logger,
     });
 
@@ -307,7 +309,7 @@ describe("createHandleIncomingMessage", () => {
       }),
     ]);
     expect(logger.info).toHaveBeenCalledWith(
-      "workspace skills override configured bot skills for turn",
+      "workspace skills override configured agent skills for turn",
       expect.objectContaining({
         workspaceDirectory: workspaceRoot,
         workspaceSkillsPath: join(workspaceRoot, ".skills"),
@@ -347,6 +349,7 @@ describe("createHandleIncomingMessage", () => {
       workspace: {
         cwd: agentWorkspaceRoot,
       },
+      skillCatalog: [createSkill("git-review", "Review Git history and diffs.")],
     };
     const engine: AgentEngine = {
       run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
@@ -390,13 +393,19 @@ describe("createHandleIncomingMessage", () => {
     await service.handle(createIncomingMessage("7", "Please commit this carefully."));
 
     const selectorRequest = vi.mocked(skillSelector.selectRelevantSkills).mock.calls[0]?.[0];
-    expect(selectorRequest?.catalog).toEqual([
-      expect.objectContaining({
-        name: "git-commit",
-        description: "Conversation workspace commit flow.",
-        filePath: join(conversationWorkspaceRoot, ".skills", "git-commit", "SKILL.md"),
-      }),
-    ]);
+    expect(selectorRequest?.catalog).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "git-commit",
+          description: "Conversation workspace commit flow.",
+          filePath: join(conversationWorkspaceRoot, ".skills", "git-commit", "SKILL.md"),
+        }),
+        expect.objectContaining({
+          name: "git-review",
+          description: "Review Git history and diffs.",
+        }),
+      ]),
+    );
   });
 
   it("does not load .skills from process.cwd() without an explicit workspace", async () => {
@@ -448,7 +457,10 @@ describe("createHandleIncomingMessage", () => {
   });
 
   it("falls back to no activated skills when selection fails", async () => {
-    const agent = createDefaultAgent();
+    const agent: AgentDefinition = {
+      ...createDefaultAgent(),
+      skillCatalog: [createSkill("git-commit", "Commit Git changes carefully.")],
+    };
     const engine: AgentEngine = {
       run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
     };
@@ -470,7 +482,6 @@ describe("createHandleIncomingMessage", () => {
       defaultAgentId: "default",
       runtimeInfo: createRuntimeInfo(),
       skillSelector,
-      skillCatalog: [createSkill("git-commit", "Commit Git changes carefully.")],
       logger,
     });
 
@@ -482,7 +493,7 @@ describe("createHandleIncomingMessage", () => {
       dataRoot: "/tmp/data",
     });
     expect(logger.error).toHaveBeenCalledWith(
-      "failed to resolve bot skills for turn; continuing without skill activation",
+      "failed to resolve agent skills for turn; continuing without skill activation",
       expect.objectContaining({
         botId: "private-telegram",
         messageId: "6",

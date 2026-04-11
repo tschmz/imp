@@ -220,7 +220,7 @@ describe("discoverSkills", () => {
 });
 
 describe("mergeSkillCatalogs", () => {
-  it("lets workspace skills override configured bot skills by name", () => {
+  it("lets workspace skills override configured agent skills by name", () => {
     const configuredSkill = createSkillDefinition("commit", "Configured commit flow.", "/configured");
     const workspaceSkill = createSkillDefinition("commit", "Workspace-specific commit flow.", "/workspace");
     const reviewSkill = createSkillDefinition("review", "Review the diff.", "/configured");

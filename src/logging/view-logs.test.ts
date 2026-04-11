@@ -230,8 +230,6 @@ function createRuntimeConfig(root: string, botIds: string[]): DaemonConfig {
       token: "token",
       allowedUserIds: [],
       defaultAgentId: "default",
-      skillCatalog: [],
-      skillIssues: [],
       paths: {
         dataRoot: root,
         botRoot: join(root, "bots", botId),

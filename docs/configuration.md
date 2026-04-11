@@ -83,6 +83,7 @@ Common fields:
 - `tools`: tools the agent may use
 - `workspace.cwd`: working directory for file and shell tools
 - `workspace.shellPath`: extra PATH entries for the `bash` tool
+- `skills.paths`: optional shared skill directories for this agent
 - `inference`: provider-specific request settings
 
 Important rules:
@@ -168,7 +169,6 @@ Common Telegram fields:
 
 - `id`: unique bot ID
 - `enabled`: whether the bot starts
-- `skills.paths`: optional shared directories that contain direct child skill folders with `SKILL.md`
 - `token`: Telegram bot token
 - `token.env`: read the token from an environment variable
 - `token.file`: read the token from a secret file
@@ -183,16 +183,16 @@ Only enabled bots are started. At least one bot must be enabled.
 
 Skill discovery and activation notes:
 
-- each `skills.paths` entry is resolved relative to the config file when needed
+- each `agents[].skills.paths` entry is resolved relative to the config file when needed
 - `imp` scans only direct subdirectories of each configured path for `SKILL.md`
 - if the active agent has an explicit working directory (`conversation.state.workingDirectory` or `agent.workspace.cwd`), `imp` also scans `<working-directory>/.skills` on each user turn
 - automatic `.skills` loading does not fall back to the daemon process working directory
 - workspace `.skills` are discovered fresh on each turn, so edits take effect without a daemon restart
 - `SKILL.md` must have valid YAML frontmatter with at least `name` and `description`
-- invalid configured skills are ignored and logged during startup, and discovered configured skill names are logged per bot
+- invalid configured skills are ignored and logged during startup, and discovered configured skill names are logged per agent
 - invalid workspace skills are ignored and logged on the affected turn
-- duplicate skill names across configured `skills.paths` are rejected and all colliding configured entries are ignored
-- when a workspace `.skills` entry has the same name as a configured bot skill, the workspace skill overrides the configured one for that turn
+- duplicate skill names across configured `agents[].skills.paths` are rejected and all colliding configured entries are ignored
+- when a workspace `.skills` entry has the same name as a configured agent skill, the workspace skill overrides the configured one for that turn
 - per user turn, `imp` asks the configured agent model to select at most three skills using only skill `name` and `description`
 - if selection fails, `imp` activates no skills
 - activated `SKILL.md` files are injected into prompt context as read-only content

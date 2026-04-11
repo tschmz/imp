@@ -213,6 +213,7 @@ export function renderAgentMessage(
     `Instructions: ${instructionSources.length > 0 ? instructionSources.join(", ") : "none"}`,
     `References: ${referenceSources.length > 0 ? referenceSources.join(", ") : "none"}`,
     `Workspace: ${agent.workspace?.cwd ?? "not set"}`,
+    `Skills: ${agent.skills?.paths.length ? agent.skills.paths.join(", ") : "none"}`,
     `Tools: ${agent.tools.length > 0 ? agent.tools.join(", ") : "none"}`,
     `Available: ${options.availableAgentIds.join(", ")}`,
   ].join("\n");

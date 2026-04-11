@@ -226,20 +226,8 @@ describe("createRuntimeEntries", () => {
     expect(runtime.engine.close).toHaveBeenCalledTimes(1);
   });
 
-  it("logs discovered skills at runtime start", async () => {
+  it("logs discovered agent skills at runtime start", async () => {
     const runtime = createRuntime();
-    runtime.botConfig.skillCatalog = [
-      {
-        name: "commit",
-        description: "Stage and commit changes.",
-        directoryPath: "/skills/commit",
-        filePath: "/skills/commit/SKILL.md",
-        body: "\nUse focused commits.",
-        content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
-        references: [],
-        scripts: [],
-      },
-    ];
     const transport = createCapturingTransport();
     const entries = createRuntimeEntries([runtime], {
       agentRegistry: createAgentRegistry([
@@ -255,6 +243,18 @@ describe("createRuntimeEntries", () => {
             provider: "openai",
             modelId: "gpt-5.3",
           },
+          skillCatalog: [
+            {
+              name: "commit",
+              description: "Stage and commit changes.",
+              directoryPath: "/skills/commit",
+              filePath: "/skills/commit/SKILL.md",
+              body: "\nUse focused commits.",
+              content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+              references: [],
+              scripts: [],
+            },
+          ],
           tools: [],
           extensions: [],
         },
@@ -265,9 +265,10 @@ describe("createRuntimeEntries", () => {
     await entries[0]?.start();
 
     expect(runtime.logger.info).toHaveBeenCalledWith(
-      "discovered bot skills",
+      "discovered agent skills",
       expect.objectContaining({
         botId: "private-telegram",
+        agentId: "default",
         skillCount: 1,
         skillNames: ["commit"],
       }),
@@ -313,8 +314,6 @@ function createRuntime(): BootstrappedRuntime {
       token: "123:abc",
       allowedUserIds: ["7"],
       defaultAgentId: "default",
-      skillCatalog: [],
-      skillIssues: [],
       paths: {
         dataRoot: "/tmp",
         botRoot: "/tmp/bots/private-telegram",

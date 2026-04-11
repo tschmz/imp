@@ -1,6 +1,7 @@
 import type {
   AgentMcpConfig,
   AgentPromptConfig,
+  AgentSkillsConfig,
   AgentWorkspaceConfig,
   InferenceSettings,
   ModelRef,
@@ -47,8 +48,6 @@ export interface RuntimePaths {
 export type ActiveBotRuntimeConfig = TransportBotRuntimeConfig & {
   defaultAgentId: string;
   paths: RuntimePaths;
-  skillCatalog: SkillDefinition[];
-  skillIssues: string[];
 };
 
 export interface DaemonConfig {
@@ -72,6 +71,9 @@ export interface ConfiguredAgent {
   authFile?: string;
   inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
+  skills?: AgentSkillsConfig;
+  skillCatalog?: SkillDefinition[];
+  skillIssues?: string[];
   tools?: string[];
   mcp?: AgentMcpConfig;
 }

@@ -75,8 +75,6 @@ function createRuntimeConfig(): DaemonConfig {
         token: "123:abc",
         allowedUserIds: [],
         defaultAgentId: "default",
-        skillCatalog: [],
-        skillIssues: [],
         paths: {
           dataRoot: "/tmp",
           botRoot: "/tmp/bot-1",
