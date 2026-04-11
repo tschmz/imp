@@ -81,22 +81,22 @@ describe("createSetConfigValueUseCase", () => {
     ).rejects.toThrow(`Config file not found: ${configPath}`);
   });
 
-  it("fails when the existing config is invalid", async () => {
+  it("fails with an input-file error when the config JSON is malformed", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
 
-    await writeRawFile(configPath, '{\n  "invalid": true\n}\n');
+    await writeRawFile(configPath, "{\n  \"invalid\": true\n");
 
     await expect(
       createSetConfigValueUseCase()({
         keyPath: "instance.name",
         value: "custom",
       }),
-    ).rejects.toThrow(`Invalid config file ${configPath}`);
+    ).rejects.toThrow(`Invalid input config file ${configPath}`);
   });
 
-  it("fails when the requested config key is missing", async () => {
+  it("fails with a key-path error when the requested config key is missing", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
@@ -108,9 +108,44 @@ describe("createSetConfigValueUseCase", () => {
         keyPath: "bots.private-telegram.missing",
         value: "false",
       }),
-    ).rejects.toThrow("Config key not found: bots.private-telegram.missing");
+    ).rejects.toThrow("Invalid target key path: bots.private-telegram.missing");
   });
 
+
+  it("allows updating a slightly inconsistent config when the mutation restores schema validity", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+
+    const config = createConfig(join(root, "state-home", "imp"));
+    config.defaults.agentId = "missing-agent";
+    await writeRawFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+    await createSetConfigValueUseCase()({
+      keyPath: "defaults.agentId",
+      value: "default",
+    });
+
+    const updated = JSON.parse(await readFile(configPath, "utf8")) as { defaults: { agentId: string } };
+    expect(updated.defaults.agentId).toBe("default");
+  });
+
+  it("shows a clear schema-violation error when the new target value is invalid", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+
+    await writeConfig(configPath);
+
+    await expect(
+      createSetConfigValueUseCase()({
+        keyPath: "agents.0.prompt.base",
+        value: "{}",
+      }),
+    ).rejects.toThrow(
+      `Config update violates schema: ${configPath}\nagents[0].prompt.base: Specify exactly one of text or file.`,
+    );
+  });
   it("fails when the updated config would become invalid without modifying the file", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
@@ -124,7 +159,7 @@ describe("createSetConfigValueUseCase", () => {
         keyPath: "defaults.agentId",
         value: "missing-agent",
       }),
-    ).rejects.toThrow(`Updated config would be invalid: ${configPath}`);
+    ).rejects.toThrow(`Config update violates schema: ${configPath}`);
 
     await expect(readFile(configPath, "utf8")).resolves.toBe(before);
   });

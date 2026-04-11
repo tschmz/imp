@@ -14,8 +14,13 @@ export function createSetConfigValueUseCase(): (options: {
     const raw = await readFile(resolvedConfigPath, "utf8");
     const parsed = parseConfigJson(raw, resolvedConfigPath);
 
-    assertExistingConfigIsValid(parsed, resolvedConfigPath);
-    setValueAtKeyPath(parsed, keyPath, parseConfigValue(value));
+    try {
+      setValueAtKeyPath(parsed, keyPath, parseConfigValue(value));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid target key path: ${keyPath}\n${message}`);
+    }
+
     assertUpdatedConfigIsValid(parsed, resolvedConfigPath);
 
     await writeFile(resolvedConfigPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
@@ -45,15 +50,7 @@ function parseConfigJson(raw: string, absolutePath: string): unknown {
     return JSON.parse(raw) as unknown;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid config file ${absolutePath}\nMalformed JSON: ${message}`);
-  }
-}
-
-function assertExistingConfigIsValid(config: unknown, configPath: string): void {
-  const result = appConfigSchema.safeParse(config);
-
-  if (!result.success) {
-    throw new Error(formatSchemaError(`Invalid config file ${configPath}`, result.error.issues));
+    throw new Error(`Invalid input config file ${absolutePath}\nMalformed JSON: ${message}`);
   }
 }
 
@@ -62,7 +59,7 @@ function assertUpdatedConfigIsValid(config: unknown, configPath: string): void {
 
   if (!result.success) {
     throw new Error(
-      formatSchemaError(`Updated config would be invalid: ${configPath}`, result.error.issues),
+      formatSchemaError(`Config update violates schema: ${configPath}`, result.error.issues),
     );
   }
 }
@@ -71,8 +68,36 @@ function formatSchemaError(
   prefix: string,
   issues: Array<{ path: PropertyKey[]; message: string }>,
 ): string {
-  const details = issues.map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`).join("\n");
+  const details = issues.map((issue) => `${formatIssuePath(issue.path)}: ${issue.message}`).join("\n");
   return `${prefix}\n${details}`;
+}
+
+function formatIssuePath(path: PropertyKey[]): string {
+  if (path.length === 0) {
+    return "<root>";
+  }
+
+  let formatted = "";
+
+  for (const segment of path) {
+    if (typeof segment === "number") {
+      formatted += `[${segment}]`;
+      continue;
+    }
+
+    if (typeof segment === "string") {
+      if (/^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(segment)) {
+        formatted += formatted.length === 0 ? segment : `.${segment}`;
+      } else {
+        formatted += `[${JSON.stringify(segment)}]`;
+      }
+      continue;
+    }
+
+    formatted += `[${String(segment)}]`;
+  }
+
+  return formatted;
 }
 
 function parseConfigValue(value: string): unknown {
