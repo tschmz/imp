@@ -9,6 +9,7 @@ import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
 import { getTransport } from "../transports/registry.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
+import type { SecretValueConfig } from "./secret-value.js";
 import type { AgentToolsConfig, AppConfig } from "./types.js";
 
 interface ResolveRuntimeConfigOptions {
@@ -52,16 +53,13 @@ export async function resolveRuntimeConfig(
           throw new Error(`Unsupported bot type: ${bot.type}`);
         }
 
+        const runtimeBotConfig = await resolveBotRuntimeSecrets(bot, configDir, {
+          env: options.env,
+          readTextFile: options.readTextFile,
+        });
+
         return transport.normalizeRuntimeConfig(
-          {
-            ...bot,
-            token: await resolveSecretValue(bot.token, {
-              configDir,
-              env: options.env,
-              readTextFile: options.readTextFile,
-              fieldLabel: `bots.${bot.id}.token`,
-            }),
-          },
+          runtimeBotConfig,
           {
             dataRoot: appConfig.paths.dataRoot,
             defaultAgentId: appConfig.defaults.agentId,
@@ -72,6 +70,30 @@ export async function resolveRuntimeConfig(
       }),
     ),
   };
+}
+
+async function resolveBotRuntimeSecrets(
+  bot: AppConfig["bots"][number],
+  configDir: string,
+  options: ResolveRuntimeConfigOptions,
+): Promise<AppConfig["bots"][number]> {
+  if (!hasTokenSecret(bot)) {
+    return bot;
+  }
+
+  return {
+    ...bot,
+    token: await resolveSecretValue(bot.token, {
+      configDir,
+      env: options.env,
+      readTextFile: options.readTextFile,
+      fieldLabel: `bots.${bot.id}.token`,
+    }),
+  };
+}
+
+function hasTokenSecret(bot: AppConfig["bots"][number]): bot is AppConfig["bots"][number] & { token: SecretValueConfig } {
+  return Object.hasOwn(bot, "token") && (bot as { token?: unknown }).token !== undefined;
 }
 
 function resolveAgentPrompt(prompt: AgentPromptConfig, configDir: string): AgentPromptConfig {
