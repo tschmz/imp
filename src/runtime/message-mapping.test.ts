@@ -265,4 +265,30 @@ describe("toAgentMessages", () => {
       }),
     ]);
   });
+
+  it("defaults missing tool result error flags to successful replay results", () => {
+    const messages = toAgentMessages(
+      [
+        {
+          kind: "message",
+          id: "1:tool-result:1",
+          role: "toolResult",
+          toolCallId: "call_123",
+          toolName: "read_file",
+          content: [{ type: "text", text: "README contents" }],
+          timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
+          createdAt: "2026-04-05T00:00:02.000Z",
+        } as ConversationEvent,
+      ],
+      reasoningResponsesModel,
+    );
+
+    expect(messages).toEqual([
+      expect.objectContaining({
+        role: "toolResult",
+        toolCallId: "call_123",
+        isError: false,
+      }),
+    ]);
+  });
 });

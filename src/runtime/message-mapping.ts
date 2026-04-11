@@ -51,7 +51,7 @@ export function toAgentMessages(
         toolName: message.toolName,
         content: message.content,
         ...(message.details !== undefined ? { details: message.details } : {}),
-        isError: message.isError,
+        isError: message.isError ?? false,
         timestamp: resolveMessageTimestamp(message),
       };
     }

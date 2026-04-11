@@ -560,7 +560,6 @@ describe("createFsConversationStore", () => {
             toolCallId: "tool-1",
             toolName: "read_file",
             content: [{ type: "text", text: "{\"ok\":true}" }],
-            isError: false,
           },
         ],
       }),

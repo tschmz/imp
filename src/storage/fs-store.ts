@@ -586,13 +586,14 @@ function normalizeConversationAssistantMessage(
 }
 
 function normalizeConversationToolResultMessage(
-  message: ConversationToolResultMessage,
+  message: ConversationToolResultMessage & { isError?: boolean },
 ): ConversationToolResultMessage {
   return {
     ...message,
     kind: "message",
     content: normalizeToolResultContent(message.content),
     timestamp: normalizeTimestamp(message.timestamp, message.createdAt),
+    isError: message.isError ?? false,
   };
 }
 
@@ -687,7 +688,7 @@ function normalizeLegacyToolResultEvent(
     toolName: string;
     content?: ToolResultMessage["content"];
     details?: unknown;
-    isError: boolean;
+    isError?: boolean;
   },
 ): ConversationToolResultMessage {
   return {
@@ -701,7 +702,7 @@ function normalizeLegacyToolResultEvent(
     toolName: message.toolName,
     content: normalizeToolResultContent(message.content),
     ...(message.details !== undefined ? { details: message.details } : {}),
-    isError: message.isError,
+    isError: message.isError ?? false,
   };
 }
 
@@ -795,7 +796,7 @@ function isLegacyToolResultEvent(
   toolName: string;
   content?: ToolResultMessage["content"];
   details?: unknown;
-  isError: boolean;
+  isError?: boolean;
 } {
   return hasKind(message, "tool-result");
 }
