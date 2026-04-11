@@ -7,7 +7,7 @@ import type {
 } from "../domain/agent.js";
 import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
-import { normalizeRuntimeBotConfig } from "../transports/registry.js";
+import { getTransport } from "../transports/registry.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
 import type { AgentToolsConfig, AppConfig } from "./types.js";
 
@@ -47,8 +47,12 @@ export async function resolveRuntimeConfig(
       enabledBots.map(async (bot) => {
         const skillPaths = bot.skills?.paths.map((path) => resolveConfigPath(path, configDir)) ?? [];
         const skillCatalog = await discoverSkills(skillPaths);
+        const transport = getTransport(bot.type);
+        if (!transport) {
+          throw new Error(`Unsupported bot type: ${bot.type}`);
+        }
 
-        return normalizeRuntimeBotConfig(
+        return transport.normalizeRuntimeConfig(
           {
             ...bot,
             token: await resolveSecretValue(bot.token, {

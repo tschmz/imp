@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import { transportConfigSchemas } from "../transports/registry.js";
+import type { AppConfig, BotConfig } from "./types.js";
+import { getTransport, listTransportTypes } from "../transports/registry.js";
 
 const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
 const modelConfigSchema = z.object({
@@ -133,9 +134,28 @@ const agentConfigSchema = z
     }
   });
 
-const botConfigSchema = z.discriminatedUnion("type", [transportConfigSchemas.telegram]);
+const transportSchemas = listTransportTypes().map((type) => {
+  const entry = getTransport(type);
+  if (!entry) {
+    throw new Error(`Unsupported bot transport: ${type}`);
+  }
 
-export const appConfigSchema = z.object({
+  return entry.configSchema as z.ZodType<BotConfig>;
+});
+
+if (transportSchemas.length === 0) {
+  throw new Error("No bot transports registered.");
+}
+
+const botConfigSchema =
+  transportSchemas.length === 1
+    ? transportSchemas[0]
+    : (z.discriminatedUnion("type", [
+        transportSchemas[0] as z.core.$ZodTypeDiscriminable,
+        ...(transportSchemas.slice(1) as z.core.$ZodTypeDiscriminable[]),
+      ]) as unknown as z.ZodType<BotConfig>);
+
+export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   instance: z.object({
     name: z.string().min(1),
   }),
