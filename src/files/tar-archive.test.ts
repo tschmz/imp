@@ -1,7 +1,7 @@
 import { mkdtemp, open, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTarArchive, extractTarArchive } from "./tar-archive.js";
 
 const tempDirs: string[] = [];
@@ -60,6 +60,70 @@ describe("tar archive", () => {
     } finally {
       await extractedHandle.close();
     }
+  });
+
+  it("extracts archives when archive reads return short chunks", async () => {
+    const root = await createTempDir();
+    const sourceDir = join(root, "source");
+    const extractDir = join(root, "extract");
+    const archivePath = join(root, "backup.tar");
+
+    await writeTextFile(join(sourceDir, "file.txt"), "hello from short reads\n");
+    await createTarArchive(sourceDir, archivePath);
+
+    const probe = await open(archivePath, "r");
+    const fileHandlePrototype = Object.getPrototypeOf(probe) as {
+      read: (...args: unknown[]) => Promise<{ bytesRead: number; buffer: Buffer }>;
+    };
+    await probe.close();
+
+    const originalRead = fileHandlePrototype.read;
+    const readSpy = vi.spyOn(fileHandlePrototype, "read").mockImplementation(function mockRead(this: unknown, ...args) {
+      if (typeof args[2] === "number" && args[2] > 1) {
+        args[2] = Math.max(1, Math.floor(args[2] / 2));
+      }
+      return originalRead.apply(this, args);
+    });
+
+    try {
+      await extractTarArchive(archivePath, extractDir);
+    } finally {
+      readSpy.mockRestore();
+    }
+
+    await expect(readFile(join(extractDir, "file.txt"), "utf8")).resolves.toBe("hello from short reads\n");
+  });
+
+  it("extracts archives when destination writes are partial", async () => {
+    const root = await createTempDir();
+    const sourceDir = join(root, "source");
+    const extractDir = join(root, "extract");
+    const archivePath = join(root, "backup.tar");
+
+    await writeTextFile(join(sourceDir, "file.txt"), "hello from short writes\n");
+    await createTarArchive(sourceDir, archivePath);
+
+    const probe = await open(archivePath, "r");
+    const fileHandlePrototype = Object.getPrototypeOf(probe) as {
+      write: (...args: unknown[]) => Promise<{ bytesWritten: number; buffer: Buffer | string }>;
+    };
+    await probe.close();
+
+    const originalWrite = fileHandlePrototype.write;
+    const writeSpy = vi.spyOn(fileHandlePrototype, "write").mockImplementation(function mockWrite(this: unknown, ...args) {
+      if (Buffer.isBuffer(args[0]) && typeof args[2] === "number" && args[2] > 1) {
+        args[2] = Math.max(1, Math.floor(args[2] / 2));
+      }
+      return originalWrite.apply(this, args);
+    });
+
+    try {
+      await extractTarArchive(archivePath, extractDir);
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    await expect(readFile(join(extractDir, "file.txt"), "utf8")).resolves.toBe("hello from short writes\n");
   });
 
   it("rejects a tar archive with an invalid header checksum", async () => {
