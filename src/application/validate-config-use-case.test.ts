@@ -22,7 +22,9 @@ describe("createValidateConfigUseCase", () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
     const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 

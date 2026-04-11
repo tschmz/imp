@@ -22,7 +22,9 @@ describe("createSetConfigValueUseCase", () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
     const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
@@ -39,7 +41,9 @@ describe("createSetConfigValueUseCase", () => {
   it("updates a plain string value", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
@@ -84,7 +88,9 @@ describe("createSetConfigValueUseCase", () => {
   it("fails with an input-file error when the config JSON is malformed", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeRawFile(configPath, "{\n  \"invalid\": true\n");
 
@@ -99,7 +105,9 @@ describe("createSetConfigValueUseCase", () => {
   it("fails with a key-path error when the requested config key is missing", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
@@ -115,7 +123,9 @@ describe("createSetConfigValueUseCase", () => {
   it("allows updating a slightly inconsistent config when the mutation restores schema validity", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     const config = createConfig(join(root, "state-home", "imp"));
     config.defaults.agentId = "missing-agent";
@@ -133,7 +143,9 @@ describe("createSetConfigValueUseCase", () => {
   it("shows a clear schema-violation error when the new target value is invalid", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
@@ -149,7 +161,9 @@ describe("createSetConfigValueUseCase", () => {
   it("fails when the updated config would become invalid without modifying the file", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
     const before = await readFile(configPath, "utf8");

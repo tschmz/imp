@@ -138,7 +138,7 @@ describe("imp CLI e2e", () => {
     await writeTextFile(authPath, '{"token":"secret"}\n');
     await writeTextFile(conversationPath, '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}\n');
 
-    const backupResult = await runCli(["backup", "create", "--output", backupPath], env);
+    const backupResult = await runCli(["backup", "create", "--config", configPath, "--output", backupPath], env);
 
     expect(backupResult.stdout).toContain(`Created backup at ${backupPath}`);
 
@@ -175,7 +175,7 @@ describe("imp CLI e2e", () => {
     await writeTextFile(authPath, '{"token":"changed"}\n');
     await writeTextFile(conversationPath, '{"messages":[]}\n');
 
-    const restoreResult = await runCli(["restore", backupPath, "--force"], env);
+    const restoreResult = await runCli(["restore", backupPath, "--config", configPath, "--force"], env);
 
     expect(restoreResult.stdout).toContain(`Restored backup from ${backupPath}`);
     expect(await readFile(configPath, "utf8")).toContain('"token": "test-token"');
@@ -191,7 +191,7 @@ describe("imp CLI e2e", () => {
 
     await runCli(["init", "--defaults"], env);
 
-    const { stdout } = await runCli(["config", "set", "bots.private-telegram.enabled", "false"], env);
+    const { stdout } = await runCli(["config", "set", "--config", configPath, "bots.private-telegram.enabled", "false"], env);
     const config = JSON.parse(await readFile(configPath, "utf8")) as {
       bots: Array<{ id: string; enabled: boolean }>;
     };
@@ -206,7 +206,9 @@ describe("imp CLI e2e", () => {
 
     await runCli(["init", "--defaults"], env);
 
-    const { stdout } = await runCli(["service", "install", "--dry-run"], env);
+    const configPath = join(root, "config-home", "imp", "config.json");
+
+    const { stdout } = await runCli(["service", "install", "--config", configPath, "--dry-run"], env);
 
     switch (process.platform) {
       case "linux":
@@ -273,7 +275,7 @@ describe("imp CLI e2e", () => {
       ],
     });
 
-    await expect(runCli(["start"], env)).rejects.toSatisfy((error: { stderr?: string }) => {
+    await expect(runCli(["start", "--config", configPath], env)).rejects.toSatisfy((error: { stderr?: string }) => {
       const stderr = error.stderr ?? "";
       return (
         stderr.includes('Invalid Telegram bot token for bot "private-telegram"') ||
@@ -343,7 +345,7 @@ describe("imp CLI e2e", () => {
     });
     await writeLogFile(logFilePath, ["one", "two", "three"]);
 
-    const { stdout } = await runCli(["log", "--lines", "2"], env);
+    const { stdout } = await runCli(["log", "--config", configPath, "--lines", "2"], env);
 
     expect(stdout).toBe("two\nthree\n");
   });
@@ -395,6 +397,7 @@ function createTestEnv(root: string): NodeJS.ProcessEnv {
     HOME: root,
     XDG_CONFIG_HOME: join(root, "config-home"),
     XDG_STATE_HOME: join(root, "state-home"),
+    IMP_CONFIG_PATH: "",
     IMP_TEST_SERVICE_LOG: join(root, "service-manager.log"),
     PATH: `${binDir}:${process.env.PATH ?? ""}`,
   };

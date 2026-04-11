@@ -22,7 +22,9 @@ describe("createGetConfigValueUseCase", () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
     const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
@@ -51,7 +53,9 @@ describe("createGetConfigValueUseCase", () => {
   it("fails clearly when the config key is missing", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
