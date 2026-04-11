@@ -1,4 +1,5 @@
 import { dirname, resolve } from "node:path";
+import { RuntimeStateError, UnsupportedPlatformError } from "../domain/errors.js";
 import { getServicePlatformAdapter } from "./platforms/get-service-platform-adapter.js";
 
 export type ServicePlatform = "linux-systemd-user" | "macos-launchd-agent" | "windows-winsw";
@@ -64,7 +65,7 @@ export function detectServicePlatform(
     case "win32":
       return "windows-winsw";
     default:
-      throw new Error(`Service installation is not supported on platform: ${platform}`);
+      throw new UnsupportedPlatformError(platform);
   }
 }
 
@@ -86,7 +87,7 @@ function resolveServiceCommandLine(options: {
   const entrypoint = argv[1];
 
   if (!entrypoint) {
-    throw new Error("Could not determine the imp CLI entrypoint for service installation.");
+    throw new RuntimeStateError("Could not determine the imp CLI entrypoint for service installation.");
   }
 
   const resolvedEntrypoint = resolve(entrypoint);
