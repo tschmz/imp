@@ -14,7 +14,19 @@ const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_SKILL_NAME_LENGTH = 64;
 const MAX_SKILL_DESCRIPTION_LENGTH = 1024;
 
-export async function discoverSkills(paths: string[]): Promise<SkillCatalog> {
+export interface DiscoverSkillsOptions {
+  ignoreMissingPaths?: boolean;
+}
+
+export interface MergeSkillCatalogsResult {
+  skills: SkillDefinition[];
+  overriddenSkillNames: string[];
+}
+
+export async function discoverSkills(
+  paths: string[],
+  options: DiscoverSkillsOptions = {},
+): Promise<SkillCatalog> {
   const issues: string[] = [];
   const discoveredSkills: SkillDefinition[] = [];
 
@@ -25,6 +37,10 @@ export async function discoverSkills(paths: string[]): Promise<SkillCatalog> {
     try {
       entries = await readdir(directoryPath, { withFileTypes: true, encoding: "utf8" }) as Dirent<string>[];
     } catch (error) {
+      if (options.ignoreMissingPaths && isFileNotFoundError(error)) {
+        continue;
+      }
+
       issues.push(`Ignored configured skill path "${directoryPath}": ${formatErrorDetail(error)}.`);
       continue;
     }
@@ -76,6 +92,32 @@ export async function discoverSkills(paths: string[]): Promise<SkillCatalog> {
   return {
     skills: rejectDuplicateSkills(discoveredSkills, issues),
     issues,
+  };
+}
+
+export function mergeSkillCatalogs(
+  baseSkills: SkillDefinition[],
+  overridingSkills: SkillDefinition[],
+): MergeSkillCatalogsResult {
+  const skills = [...baseSkills];
+  const skillIndexes = new Map(skills.map((skill, index) => [skill.name, index]));
+  const overriddenSkillNames: string[] = [];
+
+  for (const skill of overridingSkills) {
+    const existingIndex = skillIndexes.get(skill.name);
+    if (existingIndex !== undefined) {
+      skills[existingIndex] = skill;
+      overriddenSkillNames.push(skill.name);
+      continue;
+    }
+
+    skillIndexes.set(skill.name, skills.length);
+    skills.push(skill);
+  }
+
+  return {
+    skills,
+    overriddenSkillNames: overriddenSkillNames.sort((left, right) => left.localeCompare(right)),
   };
 }
 

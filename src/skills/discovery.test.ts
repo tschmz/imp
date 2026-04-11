@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { discoverSkills } from "./discovery.js";
+import { discoverSkills, mergeSkillCatalogs } from "./discovery.js";
 
 const tempDirs: string[] = [];
 
@@ -205,6 +205,31 @@ describe("discoverSkills", () => {
     expect(result.issues).toEqual([]);
     expect(result.skills).toHaveLength(1);
   });
+
+  it("can ignore missing skill roots for optional workspace catalogs", async () => {
+    const root = await createTempDir();
+    const missingSkillsRoot = join(root, ".skills");
+
+    const result = await discoverSkills([missingSkillsRoot], { ignoreMissingPaths: true });
+
+    expect(result).toEqual({
+      skills: [],
+      issues: [],
+    });
+  });
+});
+
+describe("mergeSkillCatalogs", () => {
+  it("lets workspace skills override configured bot skills by name", () => {
+    const configuredSkill = createSkillDefinition("commit", "Configured commit flow.", "/configured");
+    const workspaceSkill = createSkillDefinition("commit", "Workspace-specific commit flow.", "/workspace");
+    const reviewSkill = createSkillDefinition("review", "Review the diff.", "/configured");
+
+    const result = mergeSkillCatalogs([configuredSkill, reviewSkill], [workspaceSkill]);
+
+    expect(result.overriddenSkillNames).toEqual(["commit"]);
+    expect(result.skills).toEqual([workspaceSkill, reviewSkill]);
+  });
 });
 
 async function createTempDir(): Promise<string> {
@@ -216,4 +241,17 @@ async function createTempDir(): Promise<string> {
 async function writeSkillFile(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, content, "utf8");
+}
+
+function createSkillDefinition(name: string, description: string, rootPath: string) {
+  return {
+    name,
+    description,
+    directoryPath: join(rootPath, name),
+    filePath: join(rootPath, name, "SKILL.md"),
+    body: `\n${description}`,
+    content: `---\nname: ${name}\ndescription: ${description}\n---\n\n${description}`,
+    references: [],
+    scripts: [],
+  };
 }

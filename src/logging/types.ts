@@ -15,6 +15,9 @@ export interface LogFields {
   hookRegistrationName?: string;
   skillCount?: number;
   skillNames?: string[];
+  workspaceDirectory?: string;
+  workspaceSkillsPath?: string;
+  overriddenSkillNames?: string[];
   initialWorkingDirectory?: string;
   configuredBuiltInTools?: string[];
   resolvedBuiltInTools?: string[];

@@ -88,19 +88,26 @@ A typical project-aware agent uses:
 - `workspace.cwd` to point tools at the right directory
 - `prompt.instructions` to load `AGENTS.md`
 - `prompt.references` to load project-specific docs or runbooks
-- `bots[].skills.paths` to expose reusable `SKILL.md` catalogs per bot
+- `bots[].skills.paths` to expose reusable shared `SKILL.md` catalogs per bot
+- `workspace.cwd` or the session's current working directory to expose workspace-local skills from `.skills`
 
 ## Bot Skill Catalogs
 
-Bots can define `skills.paths` to expose reusable skills alongside the normal agent prompt.
+Bots can define `skills.paths` to expose reusable shared skills alongside the normal agent prompt.
+
+In addition, if an agent has an explicit workspace directory, `imp` also loads skills from `<working-directory>/.skills` on each user turn. The effective working directory is the session working directory when the agent has changed it, otherwise `agent.workspace.cwd`.
 
 Rules:
 
-- each configured path is scanned one level deep only
+- each configured path and workspace `.skills` directory is scanned one level deep only
 - only direct child directories containing `SKILL.md` are considered
+- automatic workspace `.skills` loading applies only to explicit working directories; it does not fall back to the daemon process working directory
+- workspace `.skills` are re-read on each turn, so changes apply without restarting `imp`
 - `SKILL.md` frontmatter must be valid YAML and include `name` and `description`
-- invalid files and duplicate skill names are ignored for that bot
-- skill discovery is logged per bot at startup
+- invalid files are ignored for that bot or turn and logged for diagnostics
+- duplicate skill names across configured `skills.paths` are ignored for that bot
+- when a workspace skill name collides with a configured bot skill, the workspace skill overrides the configured one for that turn
+- skill discovery for configured paths is logged per bot at startup
 - selection uses only skill metadata and activates at most three skills per user turn
 - if selection fails, no skills are activated for that turn
 - the selected `SKILL.md` contents are injected into prompt context

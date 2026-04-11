@@ -168,7 +168,7 @@ Common Telegram fields:
 
 - `id`: unique bot ID
 - `enabled`: whether the bot starts
-- `skills.paths`: optional directories that contain direct child skill folders with `SKILL.md`
+- `skills.paths`: optional shared directories that contain direct child skill folders with `SKILL.md`
 - `token`: Telegram bot token
 - `token.env`: read the token from an environment variable
 - `token.file`: read the token from a secret file
@@ -185,9 +185,14 @@ Skill discovery and activation notes:
 
 - each `skills.paths` entry is resolved relative to the config file when needed
 - `imp` scans only direct subdirectories of each configured path for `SKILL.md`
+- if the active agent has an explicit working directory (`conversation.state.workingDirectory` or `agent.workspace.cwd`), `imp` also scans `<working-directory>/.skills` on each user turn
+- automatic `.skills` loading does not fall back to the daemon process working directory
+- workspace `.skills` are discovered fresh on each turn, so edits take effect without a daemon restart
 - `SKILL.md` must have valid YAML frontmatter with at least `name` and `description`
-- invalid skills are ignored and logged during startup, and discovered skill names are logged per bot
-- duplicate skill names across configured paths are rejected and all colliding entries are ignored
+- invalid configured skills are ignored and logged during startup, and discovered configured skill names are logged per bot
+- invalid workspace skills are ignored and logged on the affected turn
+- duplicate skill names across configured `skills.paths` are rejected and all colliding configured entries are ignored
+- when a workspace `.skills` entry has the same name as a configured bot skill, the workspace skill overrides the configured one for that turn
 - per user turn, `imp` asks the configured agent model to select at most three skills using only skill `name` and `description`
 - if selection fails, `imp` activates no skills
 - activated `SKILL.md` files are injected into prompt context as read-only content
