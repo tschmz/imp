@@ -786,6 +786,8 @@ describe("createPiAgentEngine", () => {
           },
         },
       ],
+      initializedServerIds: ["echo"],
+      failedServerIds: [],
       close,
     }));
 
@@ -841,6 +843,8 @@ describe("createPiAgentEngine", () => {
       readTextFile: async () => "unused context",
       resolveMcpTools: async () => ({
         tools: [],
+        initializedServerIds: [],
+        failedServerIds: [],
         close,
       }),
       createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("ok")] }),
@@ -867,6 +871,82 @@ describe("createPiAgentEngine", () => {
     await engine.close?.();
 
     expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs resolved tool details during tool resolution", async () => {
+    const logger = createMockLogger();
+
+    const engine = createPiAgentEngine({
+      logger,
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      resolveMcpTools: async () => ({
+        tools: [
+          {
+            name: "tavily__tavily_search",
+            label: "tavily_search",
+            description: "search the web",
+            parameters: Type.Object({ query: Type.String() }),
+            async execute() {
+              return {
+                content: [{ type: "text" as const, text: "ok" }],
+                details: {},
+              };
+            },
+          },
+        ],
+        initializedServerIds: ["tavily"],
+        failedServerIds: [],
+        close: async () => {},
+      }),
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("ok")] }),
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        workspace: {
+          cwd: "/tmp/scryer",
+        },
+        tools: ["read", "bash"],
+        mcp: {
+          servers: [
+            {
+              id: "tavily",
+              command: process.execPath,
+              args: ["echo"],
+            },
+          ],
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(logger.debug).toHaveBeenCalledWith("agent-engine.pipeline", {
+      botId: "private-telegram",
+      transport: "telegram",
+      conversationId: "42",
+      messageId: "2",
+      correlationId: "corr-2",
+      agentId: "default",
+      step: "tool-resolution",
+      status: "completed",
+      initialWorkingDirectory: "/tmp/scryer",
+      configuredBuiltInTools: ["read", "bash"],
+      resolvedBuiltInTools: ["read", "bash"],
+      missingBuiltInTools: [],
+      configuredMcpServers: ["tavily"],
+      initializedMcpServers: ["tavily"],
+      failedMcpServers: [],
+      resolvedMcpTools: ["tavily__tavily_search"],
+      resolvedTools: ["read", "bash", "tavily__tavily_search"],
+    });
   });
 
   it("passes a dynamic api key resolver into the agent runtime", async () => {

@@ -16,6 +16,16 @@ export interface ResolveToolsStageContext extends ResolvePromptStageContext {
   tools: NonNullable<AgentRunContext["tools"]>;
   workingDirectoryState: WorkingDirectoryState;
   initialWorkingDirectory: string;
+  toolResolution: {
+    configuredBuiltInTools: string[];
+    resolvedBuiltInTools: string[];
+    missingBuiltInTools: string[];
+    configuredMcpServers: string[];
+    initializedMcpServers: string[];
+    failedMcpServers: string[];
+    resolvedMcpTools: string[];
+    resolvedTools: string[];
+  };
 }
 
 export async function resolveToolsStage(
@@ -34,13 +44,31 @@ export async function resolveToolsStage(
   const toolRegistry =
     dependencies.toolRegistry
     ?? dependencies.createBuiltInToolRegistry(workingDirectoryState, context.agent);
+  const configuredBuiltInTools = [...context.agent.tools];
   const builtInTools = resolveAgentTools(context.agent, toolRegistry);
+  const resolvedBuiltInTools = builtInTools.map((tool) => tool.name);
+  const missingBuiltInTools = configuredBuiltInTools.filter(
+    (name) => !resolvedBuiltInTools.includes(name),
+  );
   const mcpToolResolution = await dependencies.mcpToolCache.resolve(context.agent);
+  const configuredMcpServers = context.agent.mcp?.servers.map((server) => server.id) ?? [];
+  const resolvedMcpTools = mcpToolResolution.tools.map((tool) => tool.name);
+  const resolvedTools = [...resolvedBuiltInTools, ...resolvedMcpTools];
 
   return {
     ...context,
     initialWorkingDirectory,
     workingDirectoryState,
+    toolResolution: {
+      configuredBuiltInTools,
+      resolvedBuiltInTools,
+      missingBuiltInTools,
+      configuredMcpServers,
+      initializedMcpServers: mcpToolResolution.initializedServerIds,
+      failedMcpServers: mcpToolResolution.failedServerIds,
+      resolvedMcpTools,
+      resolvedTools,
+    },
     tools: [...builtInTools, ...mcpToolResolution.tools],
   };
 }

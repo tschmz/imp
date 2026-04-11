@@ -62,6 +62,8 @@ interface McpToolRuntimeDependencies {
 
 export interface ResolvedMcpTools {
   tools: ToolDefinition[];
+  initializedServerIds: string[];
+  failedServerIds: string[];
   close(): Promise<void>;
 }
 
@@ -85,6 +87,8 @@ export async function resolveMcpTools(
   const createTransport = options.createTransport ?? createDefaultTransport;
   const clients: McpClientLike[] = [];
   const tools: ToolDefinition[] = [];
+  const initializedServerIds: string[] = [];
+  const failedServerIds: string[] = [];
 
   for (const server of servers) {
     const client = createClient();
@@ -105,10 +109,12 @@ export async function resolveMcpTools(
       }
 
       clients.push(client);
+      initializedServerIds.push(server.id);
       await options.logger?.debug(
         `initialized MCP server "${server.id}" for agent "${agent.id}"`,
       );
     } catch (error) {
+      failedServerIds.push(server.id);
       await safeCloseClient(client);
       await options.logger?.error(
         `failed to initialize MCP server "${server.id}" for agent "${agent.id}"`,
@@ -120,6 +126,8 @@ export async function resolveMcpTools(
 
   return {
     tools,
+    initializedServerIds,
+    failedServerIds,
     async close() {
       await Promise.all(clients.map(async (client) => safeCloseClient(client)));
     },
@@ -137,6 +145,8 @@ function createDefaultTransport(server: StdioServerParameters): unknown {
 function createEmptyResolution(): ResolvedMcpTools {
   return {
     tools: [],
+    initializedServerIds: [],
+    failedServerIds: [],
     async close() {},
   };
 }

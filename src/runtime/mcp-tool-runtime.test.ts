@@ -20,6 +20,9 @@ describe("resolveMcpTools", () => {
       },
     }));
 
+    expect(resolution.initializedServerIds).toEqual(["echo"]);
+    expect(resolution.failedServerIds).toEqual([]);
+
     try {
       expect(resolution.tools.map((tool) => tool.name).sort()).toEqual(["echo__fail", "echo__say"]);
 
@@ -63,6 +66,8 @@ describe("resolveMcpTools", () => {
 
     try {
       expect(resolution.tools).toEqual([]);
+      expect(resolution.initializedServerIds).toEqual([]);
+      expect(resolution.failedServerIds).toEqual(["missing"]);
       expect(logger.error).toHaveBeenCalledTimes(1);
       expect(logger.error).toHaveBeenCalledWith(
         'failed to initialize MCP server "missing" for agent "default"',

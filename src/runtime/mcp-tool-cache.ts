@@ -27,6 +27,8 @@ export function createMcpToolCache(options: {
       if (!agent.mcp || agent.mcp.servers.length === 0) {
         return {
           tools: [],
+          initializedServerIds: [],
+          failedServerIds: [],
           async close() {},
         };
       }

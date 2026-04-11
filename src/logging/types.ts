@@ -15,6 +15,15 @@ export interface LogFields {
   hookRegistrationName?: string;
   skillCount?: number;
   skillNames?: string[];
+  initialWorkingDirectory?: string;
+  configuredBuiltInTools?: string[];
+  resolvedBuiltInTools?: string[];
+  missingBuiltInTools?: string[];
+  configuredMcpServers?: string[];
+  initializedMcpServers?: string[];
+  failedMcpServers?: string[];
+  resolvedMcpTools?: string[];
+  resolvedTools?: string[];
 }
 
 export interface Logger {

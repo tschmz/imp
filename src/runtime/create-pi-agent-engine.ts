@@ -65,6 +65,15 @@ interface PipelineEvent {
   cacheHit?: boolean;
   errorType?: string;
   error?: unknown;
+  initialWorkingDirectory?: string;
+  configuredBuiltInTools?: string[];
+  resolvedBuiltInTools?: string[];
+  missingBuiltInTools?: string[];
+  configuredMcpServers?: string[];
+  initializedMcpServers?: string[];
+  failedMcpServers?: string[];
+  resolvedMcpTools?: string[];
+  resolvedTools?: string[];
 }
 
 export function createPiAgentEngine(
@@ -143,7 +152,19 @@ export function createPiAgentEngine(
           createBuiltInToolRegistry: buildToolRegistry,
           mcpToolCache,
         });
-        await logPipelineEvent(logger, context, { step: "tool-resolution", status: "completed" });
+        await logPipelineEvent(logger, context, {
+          step: "tool-resolution",
+          status: "completed",
+          initialWorkingDirectory: toolContext.initialWorkingDirectory,
+          configuredBuiltInTools: toolContext.toolResolution.configuredBuiltInTools,
+          resolvedBuiltInTools: toolContext.toolResolution.resolvedBuiltInTools,
+          missingBuiltInTools: toolContext.toolResolution.missingBuiltInTools,
+          configuredMcpServers: toolContext.toolResolution.configuredMcpServers,
+          initializedMcpServers: toolContext.toolResolution.initializedMcpServers,
+          failedMcpServers: toolContext.toolResolution.failedMcpServers,
+          resolvedMcpTools: toolContext.toolResolution.resolvedMcpTools,
+          resolvedTools: toolContext.toolResolution.resolvedTools,
+        });
 
         await logPipelineEvent(logger, context, { step: "agent-execution", status: "started" });
         const executionContext = await executeAgentStage(toolContext, {
