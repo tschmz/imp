@@ -159,9 +159,122 @@ describe("statusCommandHandler", () => {
         "",
         "**Model limits**",
         "Context window: 128,000",
+        "Context usage: 0.0%",
         "Max tokens: 8,192",
       ].join("\n"),
     );
+  });
+
+  it("renders last-turn context usage from input tokens only", async () => {
+    const context = createCommandContext({
+      message: createIncomingMessage("status"),
+      dependencies: createDependencies({
+        conversationStore: {
+          get: async () => ({
+            state: baseConversationState,
+            messages: [
+              {
+                kind: "message",
+                id: "msg-1",
+                role: "assistant",
+                content: [{ type: "text", text: "hi" }],
+                createdAt: "2026-04-05T00:00:20.000Z",
+                timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
+                api: "test",
+                provider: "test",
+                model: "stub",
+                stopReason: "stop",
+                usage: {
+                  input: 11_000,
+                  output: 50_000,
+                  cacheRead: 20_000,
+                  cacheWrite: 10_000,
+                  totalTokens: 91_000,
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+                },
+              },
+            ],
+          }),
+          put: async () => {},
+          listBackups: async () => [],
+          restore: async () => false,
+          ensureActive: async () => {
+            throw new Error("not used");
+          },
+          create: async () => {
+            throw new Error("not used");
+          },
+        },
+        resolveModel: () =>
+          ({
+            id: "stub",
+            name: "Stub",
+            api: "test",
+            provider: "test",
+            baseUrl: "https://example.invalid",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 128000,
+            maxTokens: 8192,
+          }) as never,
+      }),
+    });
+
+    const response = await statusCommandHandler.handle(context);
+
+    expect(response?.text).toContain("Context usage: 8.6%");
+    expect(response?.text).not.toContain("Context usage: 71.1%");
+  });
+
+  it("renders unknown context usage when the context window is unavailable", async () => {
+    const context = createCommandContext({
+      message: createIncomingMessage("status"),
+      dependencies: createDependencies({
+        conversationStore: {
+          get: async () => ({
+            state: baseConversationState,
+            messages: [
+              {
+                kind: "message",
+                id: "msg-1",
+                role: "assistant",
+                content: [{ type: "text", text: "hi" }],
+                createdAt: "2026-04-05T00:00:20.000Z",
+                timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
+                api: "test",
+                provider: "test",
+                model: "stub",
+                stopReason: "stop",
+                usage: {
+                  input: 5,
+                  output: 3,
+                  cacheRead: 2,
+                  cacheWrite: 1,
+                  totalTokens: 11,
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+                },
+              },
+            ],
+          }),
+          put: async () => {},
+          listBackups: async () => [],
+          restore: async () => false,
+          ensureActive: async () => {
+            throw new Error("not used");
+          },
+          create: async () => {
+            throw new Error("not used");
+          },
+        },
+        resolveModel: () => undefined,
+      }),
+    });
+
+    const response = await statusCommandHandler.handle(context);
+
+    expect(response?.text).toContain("Context window: unknown");
+    expect(response?.text).toContain("Context usage: unknown");
   });
 
   it("renders zero LLM usage before assistant usage exists", async () => {
@@ -275,6 +388,7 @@ describe("statusCommandHandler", () => {
     const response = await statusCommandHandler.handle(context);
 
     expect(response?.text).toContain("Context window: 200,000");
+    expect(response?.text).toContain("Context usage: 0.0%");
     expect(response?.text).toContain("Max tokens: 100,000");
     expect(response?.text).not.toContain("123");
   });

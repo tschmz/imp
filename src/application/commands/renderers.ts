@@ -54,6 +54,14 @@ function formatCount(value: number | undefined): string {
   return value === undefined ? "unknown" : new Intl.NumberFormat("en-US").format(value);
 }
 
+function formatContextUsage(inputTokens: number, contextWindow: number | undefined): string {
+  if (contextWindow === undefined || !Number.isFinite(contextWindow) || contextWindow <= 0) {
+    return "unknown";
+  }
+
+  return `${new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format((inputTokens / contextWindow) * 100)}%`;
+}
+
 function getLastAssistantMessage(
   conversation: ConversationContext,
 ): ConversationAssistantMessage | undefined {
@@ -88,6 +96,7 @@ function renderLastLlmTurn(
     "",
     "**Model limits**",
     `Context window: ${formatCount(model?.contextWindow)}`,
+    `Context usage: ${formatContextUsage(lastAssistantMessage.usage.input, model?.contextWindow)}`,
     `Max tokens: ${formatCount(model?.maxTokens)}`,
   ];
 }
