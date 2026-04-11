@@ -1,8 +1,10 @@
-import { chmod, mkdir, open, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { chmod, mkdir, open, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
 
 const tarBlockSize = 512;
 const zeroBlock = Buffer.alloc(tarBlockSize, 0);
+const defaultReadChunkSize = 64 * 1024;
 
 interface TarEntry {
   path: string;
@@ -12,6 +14,16 @@ interface TarEntry {
   mtime: number;
 }
 
+interface ExtractTarArchiveOptions {
+  maxEntrySizeBytes?: number;
+  maxEntries?: number;
+}
+
+const defaultExtractLimits: Required<ExtractTarArchiveOptions> = {
+  maxEntrySizeBytes: 512 * 1024 * 1024,
+  maxEntries: 10_000,
+};
+
 export async function createTarArchive(sourceDir: string, outputPath: string): Promise<void> {
   const archive = await open(outputPath, "w", 0o600);
 
@@ -20,9 +32,8 @@ export async function createTarArchive(sourceDir: string, outputPath: string): P
       await archive.write(buildTarHeader(entry));
 
       if (entry.type === "file") {
-        const content = await readFile(join(sourceDir, entry.path));
-        await archive.write(content);
-        await writePadding(archive, content.byteLength);
+        const sourcePath = join(sourceDir, entry.path);
+        await writeFileContentToArchive(archive, sourcePath, entry.size);
       }
     }
 
@@ -34,43 +45,56 @@ export async function createTarArchive(sourceDir: string, outputPath: string): P
   }
 }
 
-export async function extractTarArchive(archivePath: string, outputDir: string): Promise<void> {
-  const archive = await readFile(archivePath);
+export async function extractTarArchive(
+  archivePath: string,
+  outputDir: string,
+  options: ExtractTarArchiveOptions = {},
+): Promise<void> {
+  const archive = await open(archivePath, "r");
+  const reader = new TarArchiveReader(archive);
   const directoryModes = new Map<string, number>();
-  let offset = 0;
+  const limits = { ...defaultExtractLimits, ...options };
+  let entries = 0;
 
-  while (offset < archive.byteLength) {
-    if (offset + tarBlockSize > archive.byteLength) {
-      throw new Error("Invalid backup archive: truncated tar header");
+  try {
+    while (true) {
+      const header = await reader.readBlock();
+      if (header === null) {
+        break;
+      }
+
+      if (isZeroBlock(header)) {
+        break;
+      }
+
+      entries += 1;
+      if (entries > limits.maxEntries) {
+        throw new Error(`Invalid backup archive: entry count exceeds limit (${limits.maxEntries})`);
+      }
+
+      assertHeaderChecksum(header);
+      const entry = parseTarHeader(header);
+      const targetPath = resolve(outputDir, entry.path);
+      assertArchivePath(targetPath, outputDir);
+
+      if (entry.size > limits.maxEntrySizeBytes) {
+        throw new Error(
+          `Invalid backup archive: tar entry too large for ${entry.path} (${entry.size} bytes exceeds ${limits.maxEntrySizeBytes})`,
+        );
+      }
+
+      if (entry.type === "directory") {
+        await mkdir(targetPath, { recursive: true, mode: 0o700 });
+        directoryModes.set(targetPath, normalizeExtractedDirectoryMode(entry.mode));
+        continue;
+      }
+
+      await mkdir(dirname(targetPath), { recursive: true });
+      await streamEntryContentToFile(reader, targetPath, entry);
+      await reader.skipPadding(entry.size);
     }
-
-    const header = archive.subarray(offset, offset + tarBlockSize);
-    offset += tarBlockSize;
-
-    if (isZeroBlock(header)) {
-      break;
-    }
-
-    assertHeaderChecksum(header);
-    const entry = parseTarHeader(header);
-    const targetPath = resolve(outputDir, entry.path);
-    assertArchivePath(targetPath, outputDir);
-
-    if (entry.type === "directory") {
-      await mkdir(targetPath, { recursive: true, mode: 0o700 });
-      directoryModes.set(targetPath, normalizeExtractedDirectoryMode(entry.mode));
-      continue;
-    }
-
-    await mkdir(dirname(targetPath), { recursive: true });
-    const entryLength = entry.size + getPaddingSize(entry.size);
-    if (offset + entryLength > archive.byteLength) {
-      throw new Error(`Invalid backup archive: truncated tar entry for ${entry.path}`);
-    }
-
-    const content = archive.subarray(offset, offset + entry.size);
-    await writeFile(targetPath, content, { mode: entry.mode });
-    offset += entryLength;
+  } finally {
+    await archive.close();
   }
 
   for (const [path, mode] of [...directoryModes.entries()].sort(
@@ -253,16 +277,6 @@ function normalizeExtractedDirectoryMode(mode: number): number {
   return mode | 0o100;
 }
 
-async function writePadding(
-  archive: Awaited<ReturnType<typeof open>>,
-  size: number,
-): Promise<void> {
-  const paddingSize = getPaddingSize(size);
-  if (paddingSize > 0) {
-    await archive.write(Buffer.alloc(paddingSize, 0));
-  }
-}
-
 function toTarPath(path: string): string {
   return path.split(sep).join(posix.sep);
 }
@@ -274,5 +288,96 @@ function assertArchivePath(targetPath: string, outputDir: string): void {
     !targetPath.startsWith(`${normalizedOutputDir}${sep}`)
   ) {
     throw new Error("Invalid backup archive: contains path traversal entry");
+  }
+}
+
+async function writeFileContentToArchive(
+  archive: Awaited<ReturnType<typeof open>>,
+  sourcePath: string,
+  size: number,
+): Promise<void> {
+  for await (const chunk of createReadStream(sourcePath)) {
+    await archive.write(chunk);
+  }
+
+  await writePadding(archive, size);
+}
+
+async function writePadding(
+  archive: Awaited<ReturnType<typeof open>>,
+  size: number,
+): Promise<void> {
+  const paddingSize = getPaddingSize(size);
+  if (paddingSize > 0) {
+    await archive.write(Buffer.alloc(paddingSize, 0));
+  }
+}
+
+async function streamEntryContentToFile(
+  reader: TarArchiveReader,
+  targetPath: string,
+  entry: TarEntry,
+): Promise<void> {
+  if (entry.size === 0) {
+    await writeFile(targetPath, Buffer.alloc(0), { mode: entry.mode });
+    return;
+  }
+
+  const output = await open(targetPath, "w", entry.mode);
+
+  try {
+    let remaining = entry.size;
+    while (remaining > 0) {
+      const chunkSize = Math.min(remaining, defaultReadChunkSize);
+      const chunk = await reader.readExact(chunkSize, `Invalid backup archive: truncated tar entry for ${entry.path}`);
+      await output.write(chunk);
+      remaining -= chunk.byteLength;
+    }
+  } finally {
+    await output.close();
+  }
+}
+
+class TarArchiveReader {
+  private offset = 0;
+
+  constructor(private readonly archive: Awaited<ReturnType<typeof open>>) {}
+
+  async readBlock(): Promise<Buffer | null> {
+    const block = await this.readChunk(tarBlockSize);
+    if (block.byteLength === 0) {
+      return null;
+    }
+
+    if (block.byteLength < tarBlockSize) {
+      throw new Error("Invalid backup archive: truncated tar header");
+    }
+
+    return block;
+  }
+
+  async readExact(size: number, errorMessage: string): Promise<Buffer> {
+    const chunk = await this.readChunk(size);
+    if (chunk.byteLength !== size) {
+      throw new Error(errorMessage);
+    }
+
+    return chunk;
+  }
+
+  async skipPadding(size: number): Promise<void> {
+    const paddingSize = getPaddingSize(size);
+    if (paddingSize === 0) {
+      return;
+    }
+
+    await this.readExact(paddingSize, "Invalid backup archive: truncated tar padding");
+  }
+
+  private async readChunk(size: number): Promise<Buffer> {
+    const buffer = Buffer.allocUnsafe(size);
+    const { bytesRead } = await this.archive.read(buffer, 0, size, this.offset);
+    this.offset += bytesRead;
+    return buffer.subarray(0, bytesRead);
   }
 }
