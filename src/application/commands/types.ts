@@ -4,6 +4,7 @@ import type { IncomingMessage, IncomingMessageCommand, OutgoingMessage } from ".
 import type { LogLevel, Logger } from "../../logging/types.js";
 import { readRecentLogLines } from "../../logging/view-logs.js";
 import type { AgentEngine } from "../../runtime/types.js";
+import type { ModelResolver } from "../../runtime/model-resolution.js";
 import type { SkillSelector } from "../../skills/selection.js";
 import type { SkillDefinition } from "../../skills/types.js";
 import type { ConversationStore } from "../../storage/types.js";
@@ -26,6 +27,7 @@ export interface HandleIncomingMessageDependencies {
   availableCommands?: ReadonlyArray<InboundCommandHandler>;
   loadAppConfig?: typeof loadAppConfig;
   readRecentLogLines?: typeof readRecentLogLines;
+  resolveModel?: ModelResolver;
   skillCatalog?: SkillDefinition[];
   skillSelector?: SkillSelector;
   logger?: Logger;

@@ -5,6 +5,7 @@ import type {
   ConversationContext,
   ConversationEvent,
 } from "../../domain/conversation.js";
+import type { ModelResolver } from "../../runtime/model-resolution.js";
 import type { ConversationBackupSummary } from "../../storage/types.js";
 
 export function formatTimestamp(value: string): string {
@@ -49,10 +50,47 @@ function aggregateLlmUsage(conversation: ConversationContext): Pick<Usage, "inpu
   );
 }
 
+function getLastAssistantMessage(
+  conversation: ConversationContext,
+): ConversationAssistantMessage | undefined {
+  for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
+    const message = conversation.messages[index];
+    if (message?.role === "assistant") {
+      return message;
+    }
+  }
+
+  return undefined;
+}
+
+function renderLastLlmTurn(
+  conversation: ConversationContext,
+  resolveModel: ModelResolver,
+): string[] {
+  const lastAssistantMessage = getLastAssistantMessage(conversation);
+  if (!lastAssistantMessage) {
+    return ["Last LLM turn:", "none"];
+  }
+
+  const model = resolveModel(lastAssistantMessage.provider, lastAssistantMessage.model);
+  return [
+    "Last LLM turn:",
+    `Model: ${lastAssistantMessage.provider}/${lastAssistantMessage.model}`,
+    `Context window: ${model?.contextWindow ?? "unknown"}`,
+    `Model maxTokens: ${model?.maxTokens ?? "unknown"}`,
+    `Total tokens: ${lastAssistantMessage.usage.totalTokens}`,
+    `input: ${lastAssistantMessage.usage.input}`,
+    `output: ${lastAssistantMessage.usage.output}`,
+    `cacheRead: ${lastAssistantMessage.usage.cacheRead}`,
+    `cacheWrite: ${lastAssistantMessage.usage.cacheWrite}`,
+  ];
+}
+
 export function renderStatusMessage(
   conversation: ConversationContext | undefined,
   backups: ConversationBackupSummary[],
   agent: AgentDefinition | undefined,
+  resolveModel: ModelResolver,
 ): string {
   if (!conversation) {
     return [
@@ -82,6 +120,8 @@ export function renderStatusMessage(
     `output: ${llmUsage.output}`,
     `cacheRead: ${llmUsage.cacheRead}`,
     `cacheWrite: ${llmUsage.cacheWrite}`,
+    "",
+    ...renderLastLlmTurn(conversation, resolveModel),
   ].join("\n");
 }
 

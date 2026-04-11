@@ -1,4 +1,5 @@
 import { renderStatusMessage } from "./renderers.js";
+import { defaultResolveModel } from "../../runtime/model-resolution.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const statusCommandHandler: InboundCommandHandler = {
@@ -19,7 +20,7 @@ export const statusCommandHandler: InboundCommandHandler = {
 
     return {
       conversation: message.conversation,
-      text: renderStatusMessage(conversation, backups, agent),
+      text: renderStatusMessage(conversation, backups, agent, dependencies.resolveModel ?? defaultResolveModel),
     };
   },
 };

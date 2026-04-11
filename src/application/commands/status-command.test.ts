@@ -119,6 +119,19 @@ describe("statusCommandHandler", () => {
             throw new Error("not used");
           },
         },
+        resolveModel: () =>
+          ({
+            id: "stub",
+            name: "Stub",
+            api: "test",
+            provider: "test",
+            baseUrl: "https://example.invalid",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 128000,
+            maxTokens: 8192,
+          }) as never,
       }),
     });
 
@@ -132,6 +145,19 @@ describe("statusCommandHandler", () => {
         "output: 32",
         "cacheRead: 43",
         "cacheWrite: 12",
+      ].join("\n"),
+    );
+    expect(response?.text).toContain(
+      [
+        "Last LLM turn:",
+        "Model: test/stub",
+        "Context window: 128000",
+        "Model maxTokens: 8192",
+        "Total tokens: 23",
+        "input: 11",
+        "output: 7",
+        "cacheRead: 3",
+        "cacheWrite: 2",
       ].join("\n"),
     );
   });
@@ -179,6 +205,76 @@ describe("statusCommandHandler", () => {
         "cacheWrite: 0",
       ].join("\n"),
     );
+    expect(response?.text).toContain(["Last LLM turn:", "none"].join("\n"));
+  });
+
+  it("renders model limits without using the agent max output setting", async () => {
+    const context = createCommandContext({
+      message: createIncomingMessage("status"),
+      dependencies: createDependencies({
+        conversationStore: {
+          get: async () => ({
+            state: baseConversationState,
+            messages: [
+              {
+                kind: "message",
+                id: "msg-1",
+                role: "assistant",
+                content: [{ type: "text", text: "hi" }],
+                createdAt: "2026-04-05T00:00:20.000Z",
+                timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
+                api: "test",
+                provider: "test",
+                model: "stub",
+                stopReason: "stop",
+                usage: {
+                  input: 5,
+                  output: 3,
+                  cacheRead: 2,
+                  cacheWrite: 1,
+                  totalTokens: 11,
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+                },
+              },
+            ],
+          }),
+          put: async () => {},
+          listBackups: async () => [],
+          restore: async () => false,
+          ensureActive: async () => {
+            throw new Error("not used");
+          },
+          create: async () => {
+            throw new Error("not used");
+          },
+        },
+        agentRegistry: createAgentRegistry([
+          {
+            ...createDefaultAgent(),
+            inference: { maxOutputTokens: 123 },
+          },
+        ]),
+        resolveModel: () =>
+          ({
+            id: "stub",
+            name: "Stub",
+            api: "test",
+            provider: "test",
+            baseUrl: "https://example.invalid",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 200000,
+            maxTokens: 100000,
+          }) as never,
+      }),
+    });
+
+    const response = await statusCommandHandler.handle(context);
+
+    expect(response?.text).toContain("Context window: 200000");
+    expect(response?.text).toContain("Model maxTokens: 100000");
+    expect(response?.text).not.toContain("123");
   });
 
   it("falls back to the agent workspace for the working directory", async () => {
