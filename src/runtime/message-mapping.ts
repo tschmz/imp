@@ -159,6 +159,10 @@ function resolveMessageTimestamp(
 }
 
 function inferLegacyAssistantStopReason(message: ConversationAssistantMessage): AssistantMessage["stopReason"] {
+  if (message.errorMessage !== undefined) {
+    return "error";
+  }
+
   return message.content.some((content) => content.type === "toolCall") ? "toolUse" : "stop";
 }
 

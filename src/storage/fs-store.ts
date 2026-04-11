@@ -733,8 +733,12 @@ function normalizeTimestamp(timestamp: number | undefined, createdAt: string): n
 }
 
 function inferAssistantStopReason(
-  message: Pick<ConversationAssistantMessage, "content">,
+  message: Pick<ConversationAssistantMessage, "content"> & Partial<Pick<ConversationAssistantMessage, "errorMessage">>,
 ): AssistantMessage["stopReason"] {
+  if (message.errorMessage !== undefined) {
+    return "error";
+  }
+
   return message.content.some((content) => content.type === "toolCall") ? "toolUse" : "stop";
 }
 
