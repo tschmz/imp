@@ -330,7 +330,14 @@ async function streamEntryContentToFile(
     while (remaining > 0) {
       const chunkSize = Math.min(remaining, defaultReadChunkSize);
       const chunk = await reader.readExact(chunkSize, `Invalid backup archive: truncated tar entry for ${entry.path}`);
-      await output.write(chunk);
+      let writeOffset = 0;
+      while (writeOffset < chunk.byteLength) {
+        const { bytesWritten } = await output.write(chunk, writeOffset, chunk.byteLength - writeOffset);
+        if (bytesWritten === 0) {
+          throw new Error(`Failed to extract tar entry: short write for ${entry.path}`);
+        }
+        writeOffset += bytesWritten;
+      }
       remaining -= chunk.byteLength;
     }
   } finally {
@@ -376,8 +383,24 @@ class TarArchiveReader {
 
   private async readChunk(size: number): Promise<Buffer> {
     const buffer = Buffer.allocUnsafe(size);
-    const { bytesRead } = await this.archive.read(buffer, 0, size, this.offset);
-    this.offset += bytesRead;
-    return buffer.subarray(0, bytesRead);
+    let totalBytesRead = 0;
+
+    while (totalBytesRead < size) {
+      const { bytesRead } = await this.archive.read(
+        buffer,
+        totalBytesRead,
+        size - totalBytesRead,
+        this.offset,
+      );
+
+      if (bytesRead === 0) {
+        break;
+      }
+
+      totalBytesRead += bytesRead;
+      this.offset += bytesRead;
+    }
+
+    return buffer.subarray(0, totalBytesRead);
   }
 }
