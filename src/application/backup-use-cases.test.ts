@@ -345,6 +345,92 @@ describe("backup use cases", () => {
       }),
     ).rejects.toThrow("Invalid backup archive: invalid JSON in config/config.json");
   });
+
+  it("fails restore when manifest paths contain directory traversal", async () => {
+    const root = await createTempDir();
+    const sourceConfigPath = join(root, "config", "config.json");
+    const sourceDataRoot = join(root, "state");
+    const backupPath = join(root, "backup.tar");
+    const targetDataRoot = join(root, "target-state");
+    const extractDir = join(root, "extract");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await writeConfig(sourceConfigPath, sourceDataRoot);
+    await writeTextFile(
+      join(sourceDataRoot, "bots", "private-telegram", "conversations", "telegram", "42", "conversation.json"),
+      "{\"messages\":[{\"id\":\"source\"}]}\n",
+    );
+    await useCases.createBackup({
+      configPath: sourceConfigPath,
+      outputPath: backupPath,
+      only: "conversations",
+      force: false,
+    });
+
+    await extractTarArchive(backupPath, extractDir);
+    const manifestPath = join(extractDir, "manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+      conversations: Array<{ archivePath: string; botId: string; relativeToDataRoot: string }>;
+    };
+    manifest.conversations[0]!.relativeToDataRoot = "../../escape";
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    await createTarArchive(extractDir, backupPath);
+
+    await expect(
+      useCases.restoreBackup({
+        inputPath: backupPath,
+        dataRoot: targetDataRoot,
+        only: "conversations",
+        force: true,
+      }),
+    ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
+  });
+
+  it("fails restore when manifest paths are absolute", async () => {
+    const root = await createTempDir();
+    const archivePath = join(root, "backup.tar");
+    const targetDataRoot = join(root, "target-state");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await createBackupArchive(archivePath, [
+      [
+        "manifest.json",
+        `${JSON.stringify(
+          {
+            version: 1,
+            createdAt: "2026-04-07T00:00:00.000Z",
+            scopes: ["conversations"],
+            source: {
+              configPath: "/source/config.json",
+              dataRoot: "/source/state",
+            },
+            conversations: [
+              {
+                archivePath: "/conversations/private-telegram",
+                botId: "private-telegram",
+                relativeToDataRoot: "bots/private-telegram/conversations",
+              },
+            ],
+          },
+          null,
+          2,
+        )}\n`,
+      ],
+    ]);
+
+    await expect(
+      useCases.restoreBackup({
+        inputPath: archivePath,
+        dataRoot: targetDataRoot,
+        only: "conversations",
+        force: true,
+      }),
+    ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
+  });
 });
 
 async function writeConfig(configPath: string, dataRoot: string): Promise<void> {

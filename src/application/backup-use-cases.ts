@@ -365,7 +365,7 @@ async function restoreAgentFiles(options: {
       targetConfigPath: options.targetConfigPath,
       targetDataRoot: options.targetDataRoot,
     });
-    const sourcePath = join(options.stageRoot, entry.archivePath);
+    const sourcePath = safeJoin(options.stageRoot, entry.archivePath, `manifest.agentFiles[].archivePath (${entry.agentId})`);
     const content = await readFile(sourcePath, "utf8");
 
     await writeManagedFile({
@@ -384,8 +384,16 @@ async function restoreConversationTrees(options: {
   force: boolean;
 }): Promise<void> {
   for (const entry of options.manifest.conversations ?? []) {
-    const sourcePath = join(options.stageRoot, entry.archivePath);
-    const targetPath = join(options.targetDataRoot, entry.relativeToDataRoot);
+    const sourcePath = safeJoin(
+      options.stageRoot,
+      entry.archivePath,
+      `manifest.conversations[].archivePath (${entry.botId})`,
+    );
+    const targetPath = safeJoin(
+      options.targetDataRoot,
+      entry.relativeToDataRoot,
+      `manifest.conversations[].relativeToDataRoot (${entry.botId})`,
+    );
 
     await assertDirectoryCanBeRestored({
       path: targetPath,
@@ -631,6 +639,19 @@ async function readBackupManifest(stageRoot: string): Promise<BackupManifest> {
     throw new Error("Invalid backup archive: malformed manifest.json");
   }
 
+  if (parsed.config) {
+    assertSafeManifestRelativePath(parsed.config.archivePath, "manifest.config.archivePath");
+  }
+
+  for (const [index, entry] of (parsed.agentFiles ?? []).entries()) {
+    assertSafeManifestRelativePath(entry.archivePath, `manifest.agentFiles[${index}].archivePath`);
+  }
+
+  for (const [index, entry] of (parsed.conversations ?? []).entries()) {
+    assertSafeManifestRelativePath(entry.archivePath, `manifest.conversations[${index}].archivePath`);
+    assertSafeManifestRelativePath(entry.relativeToDataRoot, `manifest.conversations[${index}].relativeToDataRoot`);
+  }
+
   return {
     version: 1,
     createdAt: parsed.createdAt,
@@ -648,9 +669,34 @@ async function readArchivedConfig(stageRoot: string, manifest: BackupManifest): 
   }
 
   return readBackupJsonFile<AppConfig>(
-    join(stageRoot, manifest.config.archivePath),
+    safeJoin(stageRoot, manifest.config.archivePath, "manifest.config.archivePath"),
     manifest.config.archivePath,
   );
+}
+
+function assertPathInside(baseDir: string, candidatePath: string, label: string): void {
+  const relativePath = relative(resolve(baseDir), resolve(candidatePath));
+  if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
+    throw new Error(`Invalid backup archive: unsafe manifest path (${label})`);
+  }
+}
+
+function safeJoin(baseDir: string, relativePath: string, label: string): string {
+  assertSafeManifestRelativePath(relativePath, label);
+  const resolved = resolve(baseDir, relativePath);
+  assertPathInside(baseDir, resolved, label);
+  return resolved;
+}
+
+function assertSafeManifestRelativePath(path: string, label: string): void {
+  if (!path || path.includes("\0") || isAbsolute(path)) {
+    throw new Error(`Invalid backup archive: unsafe manifest path (${label})`);
+  }
+
+  const segments = toPortablePath(path).split("/");
+  if (segments.some((segment) => segment === ".." || segment.length === 0)) {
+    throw new Error(`Invalid backup archive: unsafe manifest path (${label})`);
+  }
 }
 
 async function readBackupJsonFile<T>(path: string, archivePath: string): Promise<T> {
