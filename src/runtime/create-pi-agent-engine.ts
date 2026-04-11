@@ -1,29 +1,26 @@
 import { readFile, stat } from "node:fs/promises";
 import type { AgentOptions } from "@mariozechner/pi-agent-core";
 import type { AgentDefinition } from "../domain/agent.js";
-import type { ConversationContext } from "../domain/conversation.js";
 import type { Logger } from "../logging/types.js";
 import { createHookRunner } from "../plugins/hook-runner.js";
 import type { AgentEngineLifecycleHooks, HookRegistration } from "../plugins/types.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { AgentHandle } from "./agent-execution.js";
-import { executeAgent } from "./agent-execution.js";
+import { createMcpToolCache } from "./mcp-tool-cache.js";
 import { resolveMcpTools, type ResolvedMcpTools } from "./mcp-tool-runtime.js";
-import { defaultResolveModel, resolveModelOrThrow, type ModelResolver } from "./model-resolution.js";
+import { defaultResolveModel, type ModelResolver } from "./model-resolution.js";
 import {
   createDefaultPromptTemplateSystemContext,
-  createPromptTemplateContext,
   type PromptTemplateSystemContext,
 } from "./prompt-template.js";
-import { resolveSystemPrompt } from "./system-prompt-resolution.js";
+import { executeAgentStage } from "./pipeline/execute-agent-stage.js";
+import { resolveModelStage } from "./pipeline/resolve-model-stage.js";
+import { resolvePromptStage } from "./pipeline/resolve-prompt-stage.js";
+import { resolveToolsStage } from "./pipeline/resolve-tools-stage.js";
 import { InMemoryCacheStrategy, SystemPromptCache } from "./system-prompt-cache.js";
-import type { AgentEngine } from "./types.js";
+import type { AgentEngine, AgentRunContext } from "./types.js";
 import {
   createBuiltInToolRegistry,
-  createOnPayloadOverride,
-  createWorkingDirectoryState,
-  resolveAgentTools,
-  resolveWorkingDirectory,
   type WorkingDirectoryState,
 } from "./tool-resolution.js";
 
@@ -70,10 +67,6 @@ interface PipelineEvent {
   error?: unknown;
 }
 
-interface CachedMcpToolResolution {
-  promise: Promise<ResolvedMcpTools>;
-}
-
 export function createPiAgentEngine(
   dependencies: PiAgentEngineDependencies = {},
 ): AgentEngine {
@@ -92,7 +85,10 @@ export function createPiAgentEngine(
     getContextFileFingerprint,
     strategy: new InMemoryCacheStrategy<string>(),
   });
-  const mcpToolResolutionCache = new Map<string, CachedMcpToolResolution>();
+  const mcpToolCache = createMcpToolCache({
+    logger,
+    resolveMcpTools: loadMcpTools,
+  });
   const hookRunner = createHookRunner(dependencies.agentEngineHooks, { logger });
   let closed = false;
 
@@ -119,69 +115,40 @@ export function createPiAgentEngine(
           { input },
         );
 
-        const initialWorkingDirectory = resolveConversationWorkingDirectory(
-          input.agent,
-          input.conversation,
-        );
-        const promptWorkingDirectory = resolvePromptWorkingDirectory(input.agent, input.conversation);
-        const workingDirectoryState = createWorkingDirectoryState(initialWorkingDirectory);
+        const runContext: AgentRunContext = {
+          input,
+          agent: input.agent,
+          conversation: input.conversation,
+        };
 
         await logPipelineEvent(logger, context, { step: "model-resolution", status: "started" });
-        const model = resolveModelOrThrow(input.agent, resolveModel);
+        const modelContext = resolveModelStage(runContext, { resolveModel });
         await logPipelineEvent(logger, context, { step: "model-resolution", status: "completed" });
 
         await logPipelineEvent(logger, context, { step: "system-prompt-resolution", status: "started" });
-        const systemPromptResolution = await resolveSystemPrompt({
-          agent: input.agent,
-          promptWorkingDirectory,
-          templateContext: createPromptTemplateContext({
-            system: promptTemplateSystemContext,
-            agent: input.agent,
-            botId: input.message.botId,
-            transportKind: input.message.conversation.transport,
-            configPath: input.runtime?.configPath,
-            dataRoot: input.runtime?.dataRoot,
-          }),
-          activatedSkills: input.runtime?.activatedSkills,
+        const promptContext = await resolvePromptStage(modelContext, {
           readTextFile,
-          cache: systemPromptCache,
+          systemPromptCache,
+          promptTemplateSystemContext,
         });
         await logPipelineEvent(logger, context, {
           step: "system-prompt-resolution",
           status: "completed",
-          cacheHit: systemPromptResolution.cacheHit,
+          cacheHit: promptContext.systemPromptResolution.cacheHit,
         });
 
         await logPipelineEvent(logger, context, { step: "tool-resolution", status: "started" });
-        const toolRegistry =
-          dependencies.toolRegistry ??
-          buildToolRegistry(workingDirectoryState, input.agent);
-        const builtInTools = resolveAgentTools(input.agent, toolRegistry);
-        const mcpToolResolution = await getOrCreateMcpToolResolution(
-          input.agent,
-          logger,
-          loadMcpTools,
-          mcpToolResolutionCache,
-        );
-        const tools = [...builtInTools, ...mcpToolResolution.tools];
+        const toolContext = await resolveToolsStage(promptContext, {
+          toolRegistry: dependencies.toolRegistry,
+          createBuiltInToolRegistry: buildToolRegistry,
+          mcpToolCache,
+        });
         await logPipelineEvent(logger, context, { step: "tool-resolution", status: "completed" });
 
         await logPipelineEvent(logger, context, { step: "agent-execution", status: "started" });
-        const result = await executeAgent({
+        const executionContext = await executeAgentStage(toolContext, {
           createAgent: dependencies.createAgent,
           getApiKey: dependencies.getApiKey,
-          agent: input.agent,
-          model,
-          systemPrompt: systemPromptResolution.systemPrompt,
-          tools,
-          userText: input.message.text,
-          conversationMessages: input.conversation.messages,
-          onPayload: createOnPayloadOverride(input.agent),
-          workingDirectoryState,
-          initialWorkingDirectory,
-          conversation: input.message.conversation,
-          parentMessageId: input.message.messageId,
-          correlationId: input.message.correlationId,
         });
         await logPipelineEvent(logger, context, { step: "agent-execution", status: "completed" });
 
@@ -196,12 +163,12 @@ export function createPiAgentEngine(
           (hooks) => hooks.onAgentEngineRunSuccess,
           {
             input,
-            result,
+            result: executionContext.result,
             durationMs: Date.now() - startedAt,
           },
         );
 
-        return result;
+        return executionContext.result;
       } catch (error) {
         await logPipelineEvent(logger, context, {
           step: "pipeline",
@@ -228,61 +195,9 @@ export function createPiAgentEngine(
       }
 
       closed = true;
-      const resolutions = [...mcpToolResolutionCache.values()];
-      mcpToolResolutionCache.clear();
-
-      if (resolutions.length === 0) {
-        return;
-      }
-
-      await logger?.debug("closing cached MCP runtimes");
-
-      await Promise.all(
-        resolutions.map(async ({ promise }) => {
-          const resolution = await promise;
-          await resolution.close();
-        }),
-      );
-
-      await logger?.debug("closed cached MCP runtimes");
+      await mcpToolCache.close();
     },
   };
-}
-
-async function getOrCreateMcpToolResolution(
-  agent: AgentDefinition,
-  logger: Logger | undefined,
-  loadMcpTools: (
-    agent: AgentDefinition,
-    options: {
-      logger?: Logger;
-    },
-  ) => Promise<ResolvedMcpTools>,
-  cache: Map<string, CachedMcpToolResolution>,
-): Promise<ResolvedMcpTools> {
-  if (!agent.mcp || agent.mcp.servers.length === 0) {
-    return {
-      tools: [],
-      async close() {},
-    };
-  }
-
-  const cached = cache.get(agent.id);
-  if (cached) {
-    await logger?.debug(`reusing cached MCP runtime for agent "${agent.id}"`);
-    return cached.promise;
-  }
-
-  await logger?.debug(`initializing cached MCP runtime for agent "${agent.id}"`);
-  const promise = loadMcpTools(agent, { logger }).catch((error) => {
-    cache.delete(agent.id);
-    throw error;
-  });
-  cache.set(agent.id, { promise });
-
-  const resolution = await promise;
-  await logger?.debug(`cached MCP runtime ready for agent "${agent.id}"`);
-  return resolution;
 }
 
 async function logPipelineEvent(
@@ -315,20 +230,6 @@ async function defaultReadTextFile(path: string): Promise<string> {
 async function defaultGetContextFileFingerprint(path: string): Promise<string> {
   const fileStats = await stat(path);
   return `${fileStats.mtimeMs}:${fileStats.size}`;
-}
-
-function resolveConversationWorkingDirectory(
-  agent: AgentDefinition,
-  conversation: ConversationContext,
-): string {
-  return conversation.state.workingDirectory ?? resolveWorkingDirectory(agent);
-}
-
-function resolvePromptWorkingDirectory(
-  agent: AgentDefinition,
-  conversation: ConversationContext,
-): string | undefined {
-  return conversation.state.workingDirectory ?? agent.workspace?.cwd;
 }
 
 export {
