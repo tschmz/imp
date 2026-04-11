@@ -1,3 +1,4 @@
+import type { Usage } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../../domain/agent.js";
 import type {
   ConversationAssistantMessage,
@@ -30,6 +31,24 @@ function renderHistoryEntryLabel(title: string | undefined): string {
   return title ?? "untitled";
 }
 
+function aggregateLlmUsage(conversation: ConversationContext): Pick<Usage, "input" | "output" | "cacheRead" | "cacheWrite" | "totalTokens"> {
+  return conversation.messages.reduce(
+    (total, message) => {
+      if (message.role !== "assistant" || !message.usage) {
+        return total;
+      }
+
+      total.input += message.usage.input;
+      total.output += message.usage.output;
+      total.cacheRead += message.usage.cacheRead;
+      total.cacheWrite += message.usage.cacheWrite;
+      total.totalTokens += message.usage.totalTokens;
+      return total;
+    },
+    { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 },
+  );
+}
+
 export function renderStatusMessage(
   conversation: ConversationContext | undefined,
   backups: ConversationBackupSummary[],
@@ -45,6 +64,8 @@ export function renderStatusMessage(
       .join("\n");
   }
 
+  const llmUsage = aggregateLlmUsage(conversation);
+
   return [
     "Active session:",
     `Title: ${conversation.state.title ?? "not set"}`,
@@ -54,6 +75,13 @@ export function renderStatusMessage(
     `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
     `Working directory: ${resolveDisplayedWorkingDirectory(conversation, agent)}`,
     `Sessions in history: ${backups.length}`,
+    "",
+    "LLM usage:",
+    `Total tokens: ${llmUsage.totalTokens}`,
+    `input: ${llmUsage.input}`,
+    `output: ${llmUsage.output}`,
+    `cacheRead: ${llmUsage.cacheRead}`,
+    `cacheWrite: ${llmUsage.cacheWrite}`,
   ].join("\n");
 }
 
