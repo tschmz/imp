@@ -50,6 +50,10 @@ function aggregateLlmUsage(conversation: ConversationContext): Pick<Usage, "inpu
   );
 }
 
+function formatCount(value: number | undefined): string {
+  return value === undefined ? "unknown" : new Intl.NumberFormat("en-US").format(value);
+}
+
 function getLastAssistantMessage(
   conversation: ConversationContext,
 ): ConversationAssistantMessage | undefined {
@@ -69,20 +73,22 @@ function renderLastLlmTurn(
 ): string[] {
   const lastAssistantMessage = getLastAssistantMessage(conversation);
   if (!lastAssistantMessage) {
-    return ["Last LLM turn:", "none"];
+    return ["**Last LLM turn**", "No LLM turn recorded yet."];
   }
 
   const model = resolveModel(lastAssistantMessage.provider, lastAssistantMessage.model);
   return [
-    "Last LLM turn:",
+    "**Last LLM turn**",
     `Model: ${lastAssistantMessage.provider}/${lastAssistantMessage.model}`,
-    `Context window: ${model?.contextWindow ?? "unknown"}`,
-    `Model maxTokens: ${model?.maxTokens ?? "unknown"}`,
-    `Total tokens: ${lastAssistantMessage.usage.totalTokens}`,
-    `input: ${lastAssistantMessage.usage.input}`,
-    `output: ${lastAssistantMessage.usage.output}`,
-    `cacheRead: ${lastAssistantMessage.usage.cacheRead}`,
-    `cacheWrite: ${lastAssistantMessage.usage.cacheWrite}`,
+    `Total: ${formatCount(lastAssistantMessage.usage.totalTokens)}`,
+    `Input: ${formatCount(lastAssistantMessage.usage.input)}`,
+    `Output: ${formatCount(lastAssistantMessage.usage.output)}`,
+    `Cache read: ${formatCount(lastAssistantMessage.usage.cacheRead)}`,
+    `Cache write: ${formatCount(lastAssistantMessage.usage.cacheWrite)}`,
+    "",
+    "**Model limits**",
+    `Context window: ${formatCount(model?.contextWindow)}`,
+    `Max tokens: ${formatCount(model?.maxTokens)}`,
   ];
 }
 
@@ -105,21 +111,21 @@ export function renderStatusMessage(
   const llmUsage = aggregateLlmUsage(conversation);
 
   return [
-    "Active session:",
+    "**Active session**",
     `Title: ${conversation.state.title ?? "not set"}`,
     `Agent: ${conversation.state.agentId}`,
-    `Entries: ${conversation.messages.length}`,
+    `Entries: ${formatCount(conversation.messages.length)}`,
     `Created: ${formatTimestamp(conversation.state.createdAt)}`,
     `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
     `Working directory: ${resolveDisplayedWorkingDirectory(conversation, agent)}`,
-    `Sessions in history: ${backups.length}`,
+    `Sessions in history: ${formatCount(backups.length)}`,
     "",
-    "LLM usage:",
-    `Total tokens: ${llmUsage.totalTokens}`,
-    `input: ${llmUsage.input}`,
-    `output: ${llmUsage.output}`,
-    `cacheRead: ${llmUsage.cacheRead}`,
-    `cacheWrite: ${llmUsage.cacheWrite}`,
+    "**Session usage**",
+    `Total: ${formatCount(llmUsage.totalTokens)}`,
+    `Input: ${formatCount(llmUsage.input)}`,
+    `Output: ${formatCount(llmUsage.output)}`,
+    `Cache read: ${formatCount(llmUsage.cacheRead)}`,
+    `Cache write: ${formatCount(llmUsage.cacheWrite)}`,
     "",
     ...renderLastLlmTurn(conversation, resolveModel),
   ].join("\n");

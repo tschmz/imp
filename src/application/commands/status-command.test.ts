@@ -47,7 +47,7 @@ describe("statusCommandHandler", () => {
     const response = await statusCommandHandler.handle(context);
 
     expect(statusCommandHandler.canHandle("status")).toBe(true);
-    expect(response?.text).toContain("Active session:");
+    expect(response?.text).toContain("**Active session**");
     expect(response?.text).toContain("Sessions in history: 1");
   });
 
@@ -139,25 +139,27 @@ describe("statusCommandHandler", () => {
 
     expect(response?.text).toContain(
       [
-        "LLM usage:",
-        "Total tokens: 198",
-        "input: 111",
-        "output: 32",
-        "cacheRead: 43",
-        "cacheWrite: 12",
+        "**Session usage**",
+        "Total: 198",
+        "Input: 111",
+        "Output: 32",
+        "Cache read: 43",
+        "Cache write: 12",
       ].join("\n"),
     );
     expect(response?.text).toContain(
       [
-        "Last LLM turn:",
+        "**Last LLM turn**",
         "Model: test/stub",
-        "Context window: 128000",
-        "Model maxTokens: 8192",
-        "Total tokens: 23",
-        "input: 11",
-        "output: 7",
-        "cacheRead: 3",
-        "cacheWrite: 2",
+        "Total: 23",
+        "Input: 11",
+        "Output: 7",
+        "Cache read: 3",
+        "Cache write: 2",
+        "",
+        "**Model limits**",
+        "Context window: 128,000",
+        "Max tokens: 8,192",
       ].join("\n"),
     );
   });
@@ -197,15 +199,15 @@ describe("statusCommandHandler", () => {
 
     expect(response?.text).toContain(
       [
-        "LLM usage:",
-        "Total tokens: 0",
-        "input: 0",
-        "output: 0",
-        "cacheRead: 0",
-        "cacheWrite: 0",
+        "**Session usage**",
+        "Total: 0",
+        "Input: 0",
+        "Output: 0",
+        "Cache read: 0",
+        "Cache write: 0",
       ].join("\n"),
     );
-    expect(response?.text).toContain(["Last LLM turn:", "none"].join("\n"));
+    expect(response?.text).toContain(["**Last LLM turn**", "No LLM turn recorded yet."].join("\n"));
   });
 
   it("renders model limits without using the agent max output setting", async () => {
@@ -272,8 +274,8 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Context window: 200000");
-    expect(response?.text).toContain("Model maxTokens: 100000");
+    expect(response?.text).toContain("Context window: 200,000");
+    expect(response?.text).toContain("Max tokens: 100,000");
     expect(response?.text).not.toContain("123");
   });
 
