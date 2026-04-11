@@ -2,9 +2,13 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { appConfigSchema } from "./schema.js";
 import { resolveRuntimeConfig } from "./resolve-runtime-config.js";
 import type { AppConfig } from "./types.js";
+import { registerTransport } from "../transports/registry.js";
+
+type RegisterTransportEntry = Parameters<typeof registerTransport>[1];
 
 const tempDirs: string[] = [];
 
@@ -475,6 +479,62 @@ describe("resolveRuntimeConfig", () => {
     await expect(resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).rejects.toThrowError(
       "bots.private-telegram.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
     );
+  });
+
+  it("does not resolve token secrets for transports that do not define a token field", async () => {
+    const transportType = "test-notoken";
+    registerTransport(transportType, {
+      configSchema: z.object({
+        id: z.string().min(1),
+        type: z.literal(transportType),
+        enabled: z.boolean(),
+      }),
+      createTransport: () => {
+        throw new Error("Not used in this test.");
+      },
+      normalizeRuntimeConfig: (bot: unknown, context: unknown) => {
+        const typedBot = bot as { id: string; type: string };
+        const typedContext = context as {
+          dataRoot: string;
+          defaultAgentId: string;
+          skillCatalog: [];
+          skillIssues: [];
+        };
+
+        return {
+          id: typedBot.id,
+          type: typedBot.type,
+        token: "runtime-token-not-required",
+        allowedUserIds: [],
+        defaultAgentId: typedContext.defaultAgentId,
+        skillCatalog: typedContext.skillCatalog,
+        skillIssues: typedContext.skillIssues,
+        paths: {
+          dataRoot: typedContext.dataRoot,
+          botRoot: "/var/lib/imp/bots/no-token",
+          conversationsDir: "/var/lib/imp/bots/no-token/conversations",
+          logsDir: "/var/lib/imp/bots/no-token/logs",
+          logFilePath: "/var/lib/imp/bots/no-token/logs/daemon.log",
+          runtimeDir: "/var/lib/imp/bots/no-token/runtime",
+          runtimeStatePath: "/var/lib/imp/bots/no-token/runtime/daemon.json",
+        },
+      };
+      },
+    } as unknown as RegisterTransportEntry);
+
+    const appConfig = createAppConfig({
+      bots: [
+        {
+          id: "no-token",
+          type: transportType,
+          enabled: true,
+        } as unknown as AppConfig["bots"][number],
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+    expect(result.activeBots[0]?.id).toBe("no-token");
+    expect(result.activeBots[0]?.type).toBe(transportType);
   });
 
   it("rejects defaults.agentId when it does not reference a configured agent", () => {
