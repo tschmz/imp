@@ -2,9 +2,16 @@ import { loadAppConfig } from "../config/load-app-config.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { readRecentLogLines } from "../logging/view-logs.js";
 import { createHookRunner } from "../plugins/hook-runner.js";
-import { getOrCreateConversationContext } from "./commands/conversation-context.js";
 import { inboundCommandHandlers } from "./commands/registry.js";
 import type { HandleIncomingMessageDependencies } from "./commands/types.js";
+import { dispatchCommand } from "./inbound/dispatch-command.js";
+import { executeAgent } from "./inbound/execute-agent.js";
+import { persistConversation } from "./inbound/persist-conversation.js";
+import { resolveConversation } from "./inbound/resolve-conversation.js";
+import { resolveSkills } from "./inbound/resolve-skills.js";
+import { runHooksStart } from "./inbound/run-hooks-start.js";
+import { runHooksError, runHooksSuccess } from "./inbound/run-hooks-success-error.js";
+import type { InboundProcessingContext } from "./inbound/types.js";
 
 export type { HandleIncomingMessageDependencies, RuntimeCommandInfo } from "./commands/types.js";
 
@@ -29,171 +36,36 @@ export function createHandleIncomingMessage(
 
   return {
     async handle(message: IncomingMessage): Promise<OutgoingMessage> {
-      const startedAt = Date.now();
+      const context: InboundProcessingContext = {
+        message,
+        dependencies,
+        defaultAgent,
+        availableCommands,
+        loadAppConfig: loadAppConfigImpl,
+        readRecentLogLines: readRecentLogLinesImpl,
+        hookRunner,
+        startedAt: Date.now(),
+        activatedSkills: [],
+      };
 
       try {
-        await hookRunner.run(
-          "onInboundMessageStart",
-          (hooks) => hooks.onInboundMessageStart,
-          { message },
-        );
+        await runHooksStart(context);
+        await dispatchCommand(context);
+        await resolveConversation(context);
+        await resolveSkills(context);
+        await executeAgent(context);
+        await persistConversation(context);
+        await runHooksSuccess(context);
 
-        if (message.command) {
-          const handler = availableCommands.find((candidate) => candidate.canHandle(message.command));
-          if (handler) {
-            const commandResponse = await handler.handle({
-              message,
-              dependencies: {
-                ...dependencies,
-                availableCommands,
-              },
-              logger: dependencies.logger,
-              loadAppConfig: loadAppConfigImpl,
-              readRecentLogLines: readRecentLogLinesImpl,
-            });
-            if (commandResponse) {
-              await hookRunner.run(
-                "onInboundMessageSuccess",
-                (hooks) => hooks.onInboundMessageSuccess,
-                {
-                  message,
-                  response: commandResponse,
-                  durationMs: Date.now() - startedAt,
-                },
-              );
-              return commandResponse;
-            }
-          }
+        if (!context.response) {
+          throw new Error("Inbound processing completed without a response");
         }
 
-        const conversation = await getOrCreateConversationContext(
-          message,
-          defaultAgent.id,
-          dependencies.conversationStore,
-          dependencies.logger,
-        );
-        const agent = dependencies.agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
-        await dependencies.logger?.debug("resolved conversation context", {
-          botId: message.botId,
-          transport: message.conversation.transport,
-          conversationId: message.conversation.externalId,
-          messageId: message.messageId,
-          correlationId: message.correlationId,
-          agentId: agent.id,
-        });
-        const activatedSkills = await resolveActivatedSkills(message, agent, dependencies);
-        const response = await dependencies.engine.run({
-          agent,
-          conversation,
-          message,
-          runtime: {
-            configPath: dependencies.runtimeInfo.configPath,
-            dataRoot: dependencies.runtimeInfo.dataRoot,
-            ...(activatedSkills.length > 0 ? { activatedSkills } : {}),
-          },
-        });
-        const respondedAt = new Date().toISOString();
-
-        await dependencies.conversationStore.put({
-          state: {
-            ...conversation.state,
-            ...(response.workingDirectory ? { workingDirectory: response.workingDirectory } : {}),
-            updatedAt: respondedAt,
-          },
-          messages: [
-            ...conversation.messages,
-            toUserConversationMessage(message),
-            ...response.conversationEvents,
-          ],
-        });
-
-        await hookRunner.run(
-          "onInboundMessageSuccess",
-          (hooks) => hooks.onInboundMessageSuccess,
-          {
-            message,
-            response: response.message,
-            durationMs: Date.now() - startedAt,
-          },
-        );
-
-        return response.message;
+        return context.response;
       } catch (error) {
-        await hookRunner.runErrorHook(
-          "onInboundMessageError",
-          (hooks) => hooks.onInboundMessageError,
-          {
-            message,
-            error,
-            durationMs: Date.now() - startedAt,
-          },
-        );
+        await runHooksError(context, error);
         throw error;
       }
     },
-  };
-}
-
-async function resolveActivatedSkills(
-  message: IncomingMessage,
-  agent: NonNullable<ReturnType<HandleIncomingMessageDependencies["agentRegistry"]["get"]>>,
-  dependencies: HandleIncomingMessageDependencies,
-): Promise<NonNullable<HandleIncomingMessageDependencies["skillCatalog"]>> {
-  const skillCatalog = dependencies.skillCatalog ?? [];
-  const skillSelector = dependencies.skillSelector;
-  if (skillCatalog.length === 0 || !skillSelector) {
-    return [];
-  }
-
-  try {
-    const activatedSkills = await skillSelector.selectRelevantSkills({
-      agent,
-      userText: message.text,
-      catalog: skillCatalog,
-      maxActivatedSkills: 3,
-    });
-    const logFields = {
-      botId: message.botId,
-      transport: message.conversation.transport,
-      conversationId: message.conversation.externalId,
-      messageId: message.messageId,
-      correlationId: message.correlationId,
-      agentId: agent.id,
-      skillCount: activatedSkills.length,
-      skillNames: activatedSkills.map((skill) => skill.name),
-    };
-    if (activatedSkills.length > 0) {
-      await dependencies.logger?.info("resolved bot skills for turn", logFields);
-    } else {
-      await dependencies.logger?.debug("resolved bot skills for turn", logFields);
-    }
-    return activatedSkills;
-  } catch (error) {
-    void dependencies.logger?.error(
-      "failed to select bot skills; continuing without skill activation",
-      {
-        botId: message.botId,
-        transport: message.conversation.transport,
-        conversationId: message.conversation.externalId,
-        messageId: message.messageId,
-        correlationId: message.correlationId,
-        agentId: agent.id,
-      },
-      error,
-    );
-    return [];
-  }
-}
-
-function toUserConversationMessage(message: IncomingMessage) {
-  return {
-    kind: "message" as const,
-    id: message.messageId,
-    role: "user" as const,
-    content: message.text,
-    timestamp: Date.parse(message.receivedAt),
-    createdAt: message.receivedAt,
-    correlationId: message.correlationId,
-    ...(message.source ? { source: message.source } : {}),
   };
 }
