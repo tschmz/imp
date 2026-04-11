@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, open, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -31,6 +31,35 @@ describe("tar archive", () => {
 
     await expect(readFile(join(extractDir, "manifest.json"), "utf8")).resolves.toContain('"version": 1');
     await expect(readFile(join(extractDir, "nested", "prompt.md"), "utf8")).resolves.toBe("system prompt\n");
+  });
+
+  it("streams large files without loading the full content in memory", async () => {
+    const root = await createTempDir();
+    const sourceDir = join(root, "source");
+    const extractDir = join(root, "extract");
+    const archivePath = join(root, "backup.tar");
+    const largeFilePath = join(sourceDir, "large.bin");
+
+    await writeRepeatedPatternFile(largeFilePath, 110 * 1024 * 1024, 1024 * 1024);
+
+    await createTarArchive(sourceDir, archivePath);
+    await extractTarArchive(archivePath, extractDir);
+
+    const extractedStats = await stat(join(extractDir, "large.bin"));
+    expect(extractedStats.size).toBe(110 * 1024 * 1024);
+
+    const extractedHandle = await open(join(extractDir, "large.bin"), "r");
+    try {
+      const head = Buffer.alloc(16);
+      const tail = Buffer.alloc(16);
+      await extractedHandle.read(head, 0, head.length, 0);
+      await extractedHandle.read(tail, 0, tail.length, extractedStats.size - tail.length);
+
+      expect(head.toString("ascii")).toBe("0123456789abcdef");
+      expect(tail.toString("ascii")).toBe("0123456789abcdef");
+    } finally {
+      await extractedHandle.close();
+    }
   });
 
   it("rejects a tar archive with an invalid header checksum", async () => {
@@ -68,6 +97,22 @@ describe("tar archive", () => {
     );
   });
 
+  it("rejects entries larger than the configured maximum entry size", async () => {
+    const root = await createTempDir();
+    const sourceDir = join(root, "source");
+    const archivePath = join(root, "backup.tar");
+    const extractDir = join(root, "extract");
+
+    await writeTextFile(join(sourceDir, "big.txt"), "x".repeat(2048));
+    await createTarArchive(sourceDir, archivePath);
+
+    await expect(
+      extractTarArchive(archivePath, extractDir, {
+        maxEntrySizeBytes: 1024,
+      }),
+    ).rejects.toThrow("Invalid backup archive: tar entry too large for big.txt");
+  });
+
   it("extracts a file from a directory entry without execute bits", async () => {
     const root = await createTempDir();
     const archivePath = join(root, "backup.tar");
@@ -98,6 +143,29 @@ async function createTempDir(): Promise<string> {
 async function writeTextFile(path: string, content: string): Promise<void> {
   await import("node:fs/promises").then(({ mkdir }) => mkdir(dirname(path), { recursive: true }));
   await writeFile(path, content, "utf8");
+}
+
+async function writeRepeatedPatternFile(path: string, totalBytes: number, chunkBytes: number): Promise<void> {
+  await import("node:fs/promises").then(({ mkdir }) => mkdir(dirname(path), { recursive: true }));
+
+  const writer = await open(path, "w", 0o600);
+  const basePattern = Buffer.from("0123456789abcdef", "ascii");
+  const chunk = Buffer.allocUnsafe(chunkBytes);
+  for (let offset = 0; offset < chunk.length; offset += basePattern.length) {
+    basePattern.copy(chunk, offset, 0, Math.min(basePattern.length, chunk.length - offset));
+  }
+
+  try {
+    let written = 0;
+    while (written < totalBytes) {
+      const remaining = totalBytes - written;
+      const nextChunk = remaining >= chunk.length ? chunk : chunk.subarray(0, remaining);
+      await writer.write(nextChunk);
+      written += nextChunk.length;
+    }
+  } finally {
+    await writer.close();
+  }
 }
 
 function buildTarArchive(entries: Array<{ path: string; type: "file" | "directory"; mode: number; content?: string }>): Buffer {
