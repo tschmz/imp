@@ -3,6 +3,8 @@ import type { AgentOptions } from "@mariozechner/pi-agent-core";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { Logger } from "../logging/types.js";
+import { createHookRunner } from "../plugins/hook-runner.js";
+import type { AgentEngineLifecycleHooks, HookRegistration } from "../plugins/types.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { AgentHandle } from "./agent-execution.js";
 import { executeAgent } from "./agent-execution.js";
@@ -47,6 +49,7 @@ interface PiAgentEngineDependencies {
     },
   ) => Promise<ResolvedMcpTools>;
   promptTemplateSystemContext?: PromptTemplateSystemContext;
+  agentEngineHooks?: ReadonlyArray<HookRegistration<AgentEngineLifecycleHooks>>;
 }
 
 interface EngineLogContext {
@@ -90,6 +93,7 @@ export function createPiAgentEngine(
     strategy: new InMemoryCacheStrategy<string>(),
   });
   const mcpToolResolutionCache = new Map<string, CachedMcpToolResolution>();
+  const hookRunner = createHookRunner(dependencies.agentEngineHooks, { logger });
   let closed = false;
 
   return {
@@ -98,7 +102,6 @@ export function createPiAgentEngine(
         throw new Error("Agent engine is closed.");
       }
 
-      const startedAt = Date.now();
       const context: EngineLogContext = {
         botId: input.message.botId,
         transport: input.message.conversation.transport,
@@ -107,8 +110,15 @@ export function createPiAgentEngine(
         correlationId: input.message.correlationId,
         agentId: input.agent.id,
       };
+      const startedAt = Date.now();
 
       try {
+        await hookRunner.run(
+          "onAgentEngineRunStart",
+          (hooks) => hooks.onAgentEngineRunStart,
+          { input },
+        );
+
         const initialWorkingDirectory = resolveConversationWorkingDirectory(
           input.agent,
           input.conversation,
@@ -181,6 +191,16 @@ export function createPiAgentEngine(
           durationMs: Date.now() - startedAt,
         });
 
+        await hookRunner.run(
+          "onAgentEngineRunSuccess",
+          (hooks) => hooks.onAgentEngineRunSuccess,
+          {
+            input,
+            result,
+            durationMs: Date.now() - startedAt,
+          },
+        );
+
         return result;
       } catch (error) {
         await logPipelineEvent(logger, context, {
@@ -190,6 +210,15 @@ export function createPiAgentEngine(
           errorType: error instanceof Error ? error.name : typeof error,
           error,
         });
+        await hookRunner.runErrorHook(
+          "onAgentEngineRunError",
+          (hooks) => hooks.onAgentEngineRunError,
+          {
+            input,
+            error,
+            durationMs: Date.now() - startedAt,
+          },
+        );
         throw error;
       }
     },

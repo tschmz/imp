@@ -11,6 +11,8 @@ export interface LogFields {
   backupId?: string;
   durationMs?: number;
   errorType?: string;
+  hookName?: string;
+  hookRegistrationName?: string;
   skillCount?: number;
   skillNames?: string[];
 }

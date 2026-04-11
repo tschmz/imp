@@ -910,6 +910,95 @@ describe("createPiAgentEngine", () => {
     await expect(capturedGetApiKey?.("openai")).resolves.toBeUndefined();
   });
 
+  it("runs agent engine lifecycle hooks around a run", async () => {
+    const calls: string[] = [];
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("ok")] }),
+      agentEngineHooks: [
+        {
+          name: "test-hook",
+          hooks: {
+            onAgentEngineRunStart: ({ input }) => {
+              calls.push(`start:${input.message.messageId}`);
+            },
+            onAgentEngineRunSuccess: ({ input, result, durationMs }) => {
+              calls.push(`success:${input.message.messageId}:${result.message.text}:${durationMs >= 0}`);
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(
+      engine.run({
+        agent: createAgent(),
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).resolves.toMatchObject({
+      message: {
+        text: "ok",
+      },
+    });
+
+    expect(calls).toEqual(["start:2", "success:2:ok:true"]);
+  });
+
+  it("runs agent engine error hooks without masking the original failure", async () => {
+    const failure = new Error("model failed");
+    const hookFailure = new Error("hook failed");
+    const errorHook = vi.fn(async () => {
+      throw hookFailure;
+    });
+    const logger = createMockLogger();
+    const engine = createPiAgentEngine({
+      logger,
+      resolveModel: () => {
+        throw failure;
+      },
+      agentEngineHooks: [
+        {
+          name: "test-hook",
+          hooks: {
+            onAgentEngineRunError: errorHook,
+          },
+        },
+      ],
+    });
+
+    await expect(
+      engine.run({
+        agent: createAgent(),
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow(failure);
+    expect(errorHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({
+          message: expect.objectContaining({ messageId: "2" }),
+        }),
+        error: failure,
+        durationMs: expect.any(Number),
+      }),
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      "plugin hook failed",
+      expect.objectContaining({
+        hookName: "onAgentEngineRunError",
+        hookRegistrationName: "test-hook",
+      }),
+      hookFailure,
+    );
+  });
+
   it("registers built-in tools in the default runtime path", async () => {
     let capturedTools: Array<{ name: string }> | undefined;
     let capturedWorkingDirectory: string | undefined;

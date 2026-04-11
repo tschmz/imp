@@ -532,6 +532,94 @@ describe("createHandleIncomingMessage", () => {
     ]);
   });
 
+  it("runs inbound message hooks around agent processing", async () => {
+    const agent = createDefaultAgent();
+    const calls: string[] = [];
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: createConversationStore(),
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+      inboundMessageHooks: [
+        {
+          name: "test-hook",
+          hooks: {
+            onInboundMessageStart: ({ message }) => {
+              calls.push(`start:${message.messageId}`);
+            },
+            onInboundMessageSuccess: ({ message, response, durationMs }) => {
+              calls.push(`success:${message.messageId}:${response.text}:${durationMs >= 0}`);
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(service.handle(createIncomingMessage("8", "hello"))).resolves.toMatchObject({
+      text: "reply",
+    });
+
+    expect(calls).toEqual(["start:8", "success:8:reply:true"]);
+  });
+
+  it("runs inbound message error hooks without masking the original failure", async () => {
+    const agent = createDefaultAgent();
+    const failure = new Error("engine failed");
+    const hookFailure = new Error("hook failed");
+    const errorHook = vi.fn(async () => {
+      throw hookFailure;
+    });
+    const logger = {
+      debug: vi.fn(async () => {}),
+      info: vi.fn(async () => {}),
+      error: vi.fn(async () => {}),
+    };
+    const engine: AgentEngine = {
+      run: vi.fn(async () => {
+        throw failure;
+      }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: createConversationStore(),
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+      inboundMessageHooks: [
+        {
+          name: "test-hook",
+          hooks: {
+            onInboundMessageError: errorHook,
+          },
+        },
+      ],
+      logger,
+    });
+
+    await expect(service.handle(createIncomingMessage("9", "hello"))).rejects.toThrow(failure);
+    expect(errorHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.objectContaining({ messageId: "9" }),
+        error: failure,
+        durationMs: expect.any(Number),
+      }),
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      "plugin hook failed",
+      expect.objectContaining({
+        hookName: "onInboundMessageError",
+        hookRegistrationName: "test-hook",
+      }),
+      hookFailure,
+    );
+  });
+
   it("fails when the default agent cannot be resolved", () => {
     expect(() =>
       createHandleIncomingMessage({

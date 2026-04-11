@@ -1,6 +1,7 @@
 import { loadAppConfig } from "../config/load-app-config.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { readRecentLogLines } from "../logging/view-logs.js";
+import { createHookRunner } from "../plugins/hook-runner.js";
 import { getOrCreateConversationContext } from "./commands/conversation-context.js";
 import { inboundCommandHandlers } from "./commands/registry.js";
 import type { HandleIncomingMessageDependencies } from "./commands/types.js";
@@ -18,6 +19,9 @@ export function createHandleIncomingMessage(
   const availableCommands = dependencies.availableCommands ?? inboundCommandHandlers;
   const loadAppConfigImpl = dependencies.loadAppConfig ?? loadAppConfig;
   const readRecentLogLinesImpl = dependencies.readRecentLogLines ?? readRecentLogLines;
+  const hookRunner = createHookRunner(dependencies.inboundMessageHooks, {
+    logger: dependencies.logger,
+  });
 
   if (!defaultAgent) {
     throw new Error(`Unknown default agent: ${dependencies.defaultAgentId}`);
@@ -25,67 +29,107 @@ export function createHandleIncomingMessage(
 
   return {
     async handle(message: IncomingMessage): Promise<OutgoingMessage> {
-      if (message.command) {
-        const handler = availableCommands.find((candidate) => candidate.canHandle(message.command));
-        if (handler) {
-          const commandResponse = await handler.handle({
-            message,
-            dependencies: {
-              ...dependencies,
-              availableCommands,
-            },
-            logger: dependencies.logger,
-            loadAppConfig: loadAppConfigImpl,
-            readRecentLogLines: readRecentLogLinesImpl,
-          });
-          if (commandResponse) {
-            return commandResponse;
+      const startedAt = Date.now();
+
+      try {
+        await hookRunner.run(
+          "onInboundMessageStart",
+          (hooks) => hooks.onInboundMessageStart,
+          { message },
+        );
+
+        if (message.command) {
+          const handler = availableCommands.find((candidate) => candidate.canHandle(message.command));
+          if (handler) {
+            const commandResponse = await handler.handle({
+              message,
+              dependencies: {
+                ...dependencies,
+                availableCommands,
+              },
+              logger: dependencies.logger,
+              loadAppConfig: loadAppConfigImpl,
+              readRecentLogLines: readRecentLogLinesImpl,
+            });
+            if (commandResponse) {
+              await hookRunner.run(
+                "onInboundMessageSuccess",
+                (hooks) => hooks.onInboundMessageSuccess,
+                {
+                  message,
+                  response: commandResponse,
+                  durationMs: Date.now() - startedAt,
+                },
+              );
+              return commandResponse;
+            }
           }
         }
+
+        const conversation = await getOrCreateConversationContext(
+          message,
+          defaultAgent.id,
+          dependencies.conversationStore,
+          dependencies.logger,
+        );
+        const agent = dependencies.agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
+        await dependencies.logger?.debug("resolved conversation context", {
+          botId: message.botId,
+          transport: message.conversation.transport,
+          conversationId: message.conversation.externalId,
+          messageId: message.messageId,
+          correlationId: message.correlationId,
+          agentId: agent.id,
+        });
+        const activatedSkills = await resolveActivatedSkills(message, agent, dependencies);
+        const response = await dependencies.engine.run({
+          agent,
+          conversation,
+          message,
+          runtime: {
+            configPath: dependencies.runtimeInfo.configPath,
+            dataRoot: dependencies.runtimeInfo.dataRoot,
+            ...(activatedSkills.length > 0 ? { activatedSkills } : {}),
+          },
+        });
+        const respondedAt = new Date().toISOString();
+
+        await dependencies.conversationStore.put({
+          state: {
+            ...conversation.state,
+            ...(response.workingDirectory ? { workingDirectory: response.workingDirectory } : {}),
+            updatedAt: respondedAt,
+          },
+          messages: [
+            ...conversation.messages,
+            toUserConversationMessage(message),
+            ...response.conversationEvents,
+          ],
+        });
+
+        await hookRunner.run(
+          "onInboundMessageSuccess",
+          (hooks) => hooks.onInboundMessageSuccess,
+          {
+            message,
+            response: response.message,
+            durationMs: Date.now() - startedAt,
+          },
+        );
+
+        return response.message;
+      } catch (error) {
+        await hookRunner.runErrorHook(
+          "onInboundMessageError",
+          (hooks) => hooks.onInboundMessageError,
+          {
+            message,
+            error,
+            durationMs: Date.now() - startedAt,
+          },
+        );
+        throw error;
       }
-
-      const conversation = await getOrCreateConversationContext(
-        message,
-        defaultAgent.id,
-        dependencies.conversationStore,
-        dependencies.logger,
-      );
-      const agent = dependencies.agentRegistry.get(conversation.state.agentId) ?? defaultAgent;
-      await dependencies.logger?.debug("resolved conversation context", {
-        botId: message.botId,
-        transport: message.conversation.transport,
-        conversationId: message.conversation.externalId,
-        messageId: message.messageId,
-        correlationId: message.correlationId,
-        agentId: agent.id,
-      });
-      const activatedSkills = await resolveActivatedSkills(message, agent, dependencies);
-      const response = await dependencies.engine.run({
-        agent,
-        conversation,
-        message,
-        runtime: {
-          configPath: dependencies.runtimeInfo.configPath,
-          dataRoot: dependencies.runtimeInfo.dataRoot,
-          ...(activatedSkills.length > 0 ? { activatedSkills } : {}),
-        },
-      });
-      const respondedAt = new Date().toISOString();
-
-      await dependencies.conversationStore.put({
-        state: {
-          ...conversation.state,
-          ...(response.workingDirectory ? { workingDirectory: response.workingDirectory } : {}),
-          updatedAt: respondedAt,
-        },
-        messages: [
-          ...conversation.messages,
-          toUserConversationMessage(message),
-          ...response.conversationEvents,
-        ],
-      });
-
-      return response.message;
     },
   };
 }

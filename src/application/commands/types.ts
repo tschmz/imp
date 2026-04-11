@@ -3,6 +3,7 @@ import { loadAppConfig } from "../../config/load-app-config.js";
 import type { IncomingMessage, IncomingMessageCommand, OutgoingMessage } from "../../domain/message.js";
 import type { LogLevel, Logger } from "../../logging/types.js";
 import { readRecentLogLines } from "../../logging/view-logs.js";
+import type { HookRegistration, InboundMessageLifecycleHooks } from "../../plugins/types.js";
 import type { AgentEngine } from "../../runtime/types.js";
 import type { ModelResolver } from "../../runtime/model-resolution.js";
 import type { SkillSelector } from "../../skills/selection.js";
@@ -30,6 +31,7 @@ export interface HandleIncomingMessageDependencies {
   resolveModel?: ModelResolver;
   skillCatalog?: SkillDefinition[];
   skillSelector?: SkillSelector;
+  inboundMessageHooks?: ReadonlyArray<HookRegistration<InboundMessageLifecycleHooks>>;
   logger?: Logger;
 }
 
