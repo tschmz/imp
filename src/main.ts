@@ -1,15 +1,29 @@
 #!/usr/bin/env node
-import { createCli } from "./cli/create-cli.js";
-import { createInitConfigUseCase } from "./application/init-config-use-case.js";
+import { createBackupUseCases } from "./application/backup-use-cases.js";
 import { createGetConfigValueUseCase } from "./application/get-config-value-use-case.js";
-import { createSetConfigValueUseCase } from "./application/set-config-value-use-case.js";
+import { createInitConfigUseCase } from "./application/init-config-use-case.js";
 import { createReloadConfigUseCase } from "./application/reload-config-use-case.js";
 import { createRunDaemonUseCase, type RunDaemonOutcome } from "./application/run-daemon-use-case.js";
 import { createServiceUseCases } from "./application/service-use-cases.js";
+import { createSetConfigValueUseCase } from "./application/set-config-value-use-case.js";
 import { createValidateConfigUseCase } from "./application/validate-config-use-case.js";
 import { createViewLogsUseCase } from "./application/view-logs-use-case.js";
+import { createCli } from "./cli/create-cli.js";
+import {
+  ConfigurationError,
+  RuntimeStateError,
+  TransportResolutionError,
+  UnsupportedPlatformError,
+} from "./domain/errors.js";
 import { createDaemonStartupFailureReporter } from "./logging/daemon-startup-failure-reporter.js";
-import { createBackupUseCases } from "./application/backup-use-cases.js";
+
+const EXIT_CODES = {
+  unknown: 1,
+  configuration: 2,
+  unsupportedPlatform: 3,
+  transportResolution: 4,
+  runtimeState: 5,
+} as const;
 
 async function main(): Promise<void> {
   const serviceUseCases = createServiceUseCases();
@@ -51,11 +65,63 @@ function presentRunDaemonOutcome(outcome: RunDaemonOutcome): void {
     return;
   }
 
-  console.error(outcome.error instanceof Error ? outcome.error.message : outcome.error);
-  process.exitCode = 1;
+  presentCliError(outcome.error);
+}
+
+function presentCliError(error: unknown): void {
+  const normalizedError = normalizeCliError(error);
+  console.error(`${normalizedError.label}: ${normalizedError.message}`);
+  process.exitCode = normalizedError.exitCode;
+}
+
+function normalizeCliError(error: unknown): { label: string; message: string; exitCode: number } {
+  if (error instanceof ConfigurationError) {
+    return {
+      label: "Configuration error",
+      message: error.message,
+      exitCode: EXIT_CODES.configuration,
+    };
+  }
+
+  if (error instanceof UnsupportedPlatformError) {
+    return {
+      label: "Unsupported platform",
+      message: error.message,
+      exitCode: EXIT_CODES.unsupportedPlatform,
+    };
+  }
+
+  if (error instanceof TransportResolutionError) {
+    return {
+      label: "Transport resolution error",
+      message: error.message,
+      exitCode: EXIT_CODES.transportResolution,
+    };
+  }
+
+  if (error instanceof RuntimeStateError) {
+    return {
+      label: "Runtime state error",
+      message: error.message,
+      exitCode: EXIT_CODES.runtimeState,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      label: "Unexpected error",
+      message: error.message,
+      exitCode: EXIT_CODES.unknown,
+    };
+  }
+
+  return {
+    label: "Unexpected error",
+    message: String(error),
+    exitCode: EXIT_CODES.unknown,
+  };
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
+  presentCliError(error);
 });

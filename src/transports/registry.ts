@@ -1,6 +1,7 @@
 import type { ZodType } from "zod";
 import type { BotConfig } from "../config/types.js";
 import type { ActiveBotRuntimeConfig } from "../daemon/types.js";
+import { TransportResolutionError } from "../domain/errors.js";
 import type { Logger } from "../logging/types.js";
 import type { SkillDefinition } from "../skills/types.js";
 import type { Transport } from "./types.js";
@@ -46,7 +47,7 @@ export type TransportConfigSchema<TType extends TransportType> = TransportConfig
 export function createTransport(type: TransportType, config: ActiveBotRuntimeConfig, logger: Logger): Transport {
   const entry = transportRegistry[type];
   if (!entry) {
-    throw new Error(`Unsupported bot transport: ${type}`);
+    throw new TransportResolutionError(`Unsupported bot transport: ${type}`);
   }
 
   return entry.createTransport(config, logger);
@@ -58,7 +59,7 @@ export function normalizeRuntimeBotConfig(
 ): ActiveBotRuntimeConfig {
   const entry = transportRegistry[bot.type];
   if (!entry) {
-    throw new Error(`Unsupported bot type: ${bot.type}`);
+    throw new TransportResolutionError(`Unsupported bot type: ${bot.type}`);
   }
 
   return entry.normalizeRuntimeConfig(bot, context);

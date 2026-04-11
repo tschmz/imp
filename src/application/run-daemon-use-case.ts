@@ -1,4 +1,5 @@
 import { createDaemon } from "../daemon/create-daemon.js";
+import { RuntimeStateError } from "../domain/errors.js";
 import type { DaemonConfig } from "../daemon/types.js";
 import { resolveRuntimeTarget } from "./runtime-target.js";
 
@@ -51,9 +52,20 @@ export function createRunDaemonUseCase(
       await deps.startupFailureReporter.report({ runtimeConfig, error });
       return {
         status: "startup_failed",
-        error,
+        error: normalizeRunDaemonError(error),
         failedBotIds: runtimeConfig.activeBots.map((bot) => bot.id),
       };
     }
   };
+}
+
+
+function normalizeRunDaemonError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new RuntimeStateError("Daemon startup failed with a non-Error value.", {
+    cause: error,
+  });
 }

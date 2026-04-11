@@ -1,5 +1,6 @@
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
+import { ConfigurationError } from "../domain/errors.js";
 import type { Logger } from "../logging/types.js";
 import {
   createBuiltInToolRegistry,
@@ -107,7 +108,7 @@ function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[
     validatePromptBase(configuredAgent.id, configuredAgent.prompt.base);
 
     if (!configuredAgent.model) {
-      throw new Error(`Configured agent "${configuredAgent.id}" must define model.`);
+      throw new ConfigurationError(`Configured agent "${configuredAgent.id}" must define model.`);
     }
 
     return {
@@ -143,5 +144,5 @@ function validatePromptBase(
     return;
   }
 
-  throw new Error(`Configured agent "${agentId}" must define prompt.base.text or prompt.base.file.`);
+  throw new ConfigurationError(`Configured agent "${agentId}" must define prompt.base.text or prompt.base.file.`);
 }
