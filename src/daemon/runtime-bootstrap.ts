@@ -1,119 +1,51 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import type { AgentDefinition } from "../domain/agent.js";
-import { createFileLogger } from "../logging/file-logger.js";
-import type { LogLevel, Logger } from "../logging/types.js";
 import {
-  createBuiltInToolRegistry,
-  type WorkingDirectoryState,
-  createPiAgentEngine,
-} from "../runtime/create-pi-agent-engine.js";
-import { createOAuthApiKeyResolver } from "../runtime/create-oauth-api-key-resolver.js";
-import type { AgentEngine } from "../runtime/types.js";
-import { createLlmSkillSelector, type SkillSelector } from "../skills/selection.js";
-import { createFsConversationStore } from "../storage/fs-store.js";
-import type { ConversationStore } from "../storage/types.js";
-import type { ToolRegistry } from "../tools/registry.js";
+  acquireRuntimeState,
+  cleanupPreparedRuntime,
+  type PreparedRuntime,
+} from "./bootstrap/acquire-runtime-state.js";
 import {
-  assertNoRunningInstance,
-  cleanupRuntimeState,
-  writeRuntimeState,
-} from "./runtime-state.js";
-import type { ActiveBotRuntimeConfig, DaemonConfig, RuntimePaths } from "./types.js";
+  buildRuntimeComponents,
+  type BuildRuntimeComponentsDependencies,
+} from "./bootstrap/build-runtime-components.js";
+import { prepareRuntimeFilesystem } from "./bootstrap/prepare-runtime-filesystem.js";
+import type { ActiveBotRuntimeConfig, DaemonConfig } from "./types.js";
 
 export interface BootstrappedRuntime {
   botConfig: ActiveBotRuntimeConfig;
   configPath: string;
-  loggingLevel: LogLevel;
-  logger: Logger;
-  conversationStore: ConversationStore;
-  engine: AgentEngine;
-  skillSelector: SkillSelector;
+  logger: ReturnType<typeof buildRuntimeComponents>["logger"];
+  loggingLevel: ReturnType<typeof buildRuntimeComponents>["loggingLevel"];
+  conversationStore: ReturnType<typeof buildRuntimeComponents>["conversationStore"];
+  engine: ReturnType<typeof buildRuntimeComponents>["engine"];
+  skillSelector: ReturnType<typeof buildRuntimeComponents>["skillSelector"];
 }
 
-export interface RuntimeBootstrapDependencies {
-  engine?: AgentEngine;
-  skillSelector?: SkillSelector;
-  toolRegistry?: ToolRegistry;
-  createBuiltInToolRegistry?: (
-    workingDirectory: string | WorkingDirectoryState,
-    agent?: AgentDefinition,
-  ) => ToolRegistry;
-  createLogger?: (path: string, level: DaemonConfig["logging"]["level"]) => Logger;
-  createConversationStore?: (paths: RuntimePaths) => ConversationStore;
-}
+export type RuntimeBootstrapDependencies = BuildRuntimeComponentsDependencies;
 
 export async function bootstrapRuntime(
   config: DaemonConfig,
   botConfig: ActiveBotRuntimeConfig,
   dependencies: RuntimeBootstrapDependencies = {},
 ): Promise<BootstrappedRuntime> {
-  const createLogger = dependencies.createLogger ?? createFileLogger;
-  const createConversationStore =
-    dependencies.createConversationStore ?? createFsConversationStore;
-  const createBuiltInRegistry =
-    dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
-  const logger = createLogger(botConfig.paths.logFilePath, config.logging.level);
-  const conversationStore = createConversationStore(botConfig.paths);
-
-  let runtimeStateWritten = false;
+  let preparedRuntime: PreparedRuntime = { stateAcquired: false };
 
   try {
-    await ensureRuntimePaths(botConfig.paths);
-    await ensureLogFile(botConfig.paths.logFilePath);
-    await assertNoRunningInstance(botConfig.paths.runtimeStatePath);
-    await writeRuntimeState(botConfig.paths.runtimeStatePath, {
-      pid: process.pid,
-      botId: botConfig.id,
-      startedAt: new Date().toISOString(),
-      configPath: config.configPath,
-      logFilePath: botConfig.paths.logFilePath,
-    });
-    runtimeStateWritten = true;
-    await logger.debug("initialized bot runtime state", {
-      botId: botConfig.id,
-    });
+    await prepareRuntimeFilesystem(botConfig.paths);
+    preparedRuntime = await acquireRuntimeState(config, botConfig);
 
-    const getApiKey = async (provider: string, agent: AgentDefinition) =>
-      createOAuthApiKeyResolver(agent.authFile, logger)(provider);
-    const engine =
-      dependencies.engine ??
-      createPiAgentEngine({
-        logger,
-        getApiKey,
-        ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
-        createBuiltInToolRegistry: createBuiltInRegistry,
-      });
-    const skillSelector =
-      dependencies.skillSelector ??
-      createLlmSkillSelector({
-        getApiKey,
-      });
+    const components = buildRuntimeComponents(config, botConfig, dependencies);
+
+    await components.logger.debug("initialized bot runtime state", {
+      botId: botConfig.id,
+    });
 
     return {
       botConfig,
       configPath: config.configPath,
-      loggingLevel: config.logging.level,
-      logger,
-      conversationStore,
-      engine,
-      skillSelector,
+      ...components,
     };
   } catch (error) {
-    if (runtimeStateWritten) {
-      await cleanupRuntimeState(botConfig.paths.runtimeStatePath);
-    }
+    await cleanupPreparedRuntime(preparedRuntime, botConfig);
     throw error;
   }
-}
-
-async function ensureRuntimePaths(paths: RuntimePaths): Promise<void> {
-  await mkdir(paths.dataRoot, { recursive: true });
-  await mkdir(paths.botRoot, { recursive: true });
-  await mkdir(paths.conversationsDir, { recursive: true });
-  await mkdir(paths.logsDir, { recursive: true });
-  await mkdir(paths.runtimeDir, { recursive: true });
-}
-
-async function ensureLogFile(path: string): Promise<void> {
-  await writeFile(path, "", { encoding: "utf8", flag: "a" });
 }
