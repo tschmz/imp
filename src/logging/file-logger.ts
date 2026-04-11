@@ -1,4 +1,5 @@
-import { appendFile } from "node:fs/promises";
+import { appendFile, mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { LogFields, Logger, LogLevel } from "./types.js";
 
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
@@ -44,6 +45,30 @@ export function createFileLogger(path: string, level: LogLevel = "info"): Logger
   };
 }
 
+export async function rotateLogFileOnStartup(path: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+
+  const hasContent = await hasExistingLogContent(path);
+  if (hasContent) {
+    await rename(path, `${path}.1`);
+  }
+
+  await writeFile(path, "", { encoding: "utf8", flag: "w" });
+}
+
+async function hasExistingLogContent(path: string): Promise<boolean> {
+  try {
+    const fileStats = await stat(path);
+    return fileStats.size > 0;
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
 function shouldLog(entryLevel: LogLevel, configuredLevel: LogLevel): boolean {
   return LOG_LEVEL_PRIORITY[entryLevel] >= LOG_LEVEL_PRIORITY[configuredLevel];
 }
@@ -62,6 +87,10 @@ async function writeLogLine(
   };
 
   await appendFile(path, `${JSON.stringify(payload)}\n`, "utf8");
+}
+
+function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function formatError(error: unknown): string {

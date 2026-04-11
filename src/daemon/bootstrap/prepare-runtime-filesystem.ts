@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
+import { rotateLogFileOnStartup } from "../../logging/file-logger.js";
 import type { RuntimePaths } from "../types.js";
 
 export async function prepareRuntimeFilesystem(paths: RuntimePaths): Promise<void> {
@@ -7,5 +8,5 @@ export async function prepareRuntimeFilesystem(paths: RuntimePaths): Promise<voi
   await mkdir(paths.conversationsDir, { recursive: true });
   await mkdir(paths.logsDir, { recursive: true });
   await mkdir(paths.runtimeDir, { recursive: true });
-  await writeFile(paths.logFilePath, "", { encoding: "utf8", flag: "a" });
+  await rotateLogFileOnStartup(paths.logFilePath);
 }

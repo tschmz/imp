@@ -1,8 +1,8 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFileLogger } from "./file-logger.js";
+import { createFileLogger, rotateLogFileOnStartup } from "./file-logger.js";
 
 const tempDirs: string[] = [];
 
@@ -63,6 +63,40 @@ describe("createFileLogger", () => {
 
     await expect(readFile(logFilePath, "utf8")).resolves.toContain('"message":"visible"');
     expect(consoleError).toHaveBeenCalledWith("visible");
+  });
+
+  it("rotates a non-empty daemon log to daemon.log.1 on startup", async () => {
+    const logFilePath = await createLogFilePath();
+    await writeFile(logFilePath, "older run\n", "utf8");
+    await writeFile(`${logFilePath}.1`, "stale previous run\n", "utf8");
+
+    await rotateLogFileOnStartup(logFilePath);
+
+    await expect(readFile(logFilePath, "utf8")).resolves.toBe("");
+    await expect(readFile(`${logFilePath}.1`, "utf8")).resolves.toBe("older run\n");
+  });
+
+  it("creates an empty daemon log without rotation when the current file is missing", async () => {
+    const logFilePath = await createLogFilePath();
+
+    await rotateLogFileOnStartup(logFilePath);
+
+    await expect(readFile(logFilePath, "utf8")).resolves.toBe("");
+    await expect(readFile(`${logFilePath}.1`, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
+  it("creates an empty daemon log without rotation when the current file is empty", async () => {
+    const logFilePath = await createLogFilePath();
+    await writeFile(logFilePath, "", "utf8");
+
+    await rotateLogFileOnStartup(logFilePath);
+
+    await expect(readFile(logFilePath, "utf8")).resolves.toBe("");
+    await expect(readFile(`${logFilePath}.1`, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 });
 
