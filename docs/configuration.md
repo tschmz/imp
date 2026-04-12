@@ -118,27 +118,27 @@ Operational guidance:
 - keep secret files and the config directory readable only by the `imp` user, for example with `chmod 600` on files and `chmod 700` on the directory
 - avoid copying secret files into unrelated sync folders, support bundles, or broad filesystem backups unless that is intentional
 
-### Prompt File Templating V1
+### Prompt File Templating
 
-`imp` can render a small set of template variables in prompt files, but only for file-backed entries in:
+`imp` renders Handlebars templates for file-backed prompt entries in:
 
+- `prompt.base.file`
 - `prompt.instructions[].file`
 - `prompt.references[].file`
 
 Not templated:
 
-- `prompt.base`
 - inline `text` prompt sources
 
-Syntax is strictly `{{path.to.value}}`.
+Supported syntax includes normal variable paths such as `{{bot.id}}`, conditionals such as `{{#if skills.length}}...{{else}}...{{/if}}`, and loops such as `{{#each skills}}...{{/each}}`.
 
 Constraints:
 
 - unknown variables fail hard during prompt assembly
 - documented variables with no runtime value render as an empty string
-- only simple variable paths are supported
-- no functions, loops, conditionals, defaults, or date/time variables
-- expressions with extra syntax such as whitespace inside the braces fail as unsupported template syntax
+- only the built-in `if`, `unless`, `each`, and `with` helpers are available by default
+- `instructionAttr` escapes values for XML-like instruction tag attributes
+- arbitrary JavaScript execution, date/time variables, and custom user-defined helpers are not supported
 - the context is curated and stable so prompt caching stays deterministic
 
 Available variables:
@@ -158,6 +158,24 @@ Available variables:
 - `transport.kind`
 - `imp.configPath`
 - `imp.dataRoot`
+- `skills`
+- `skills[].name`
+- `skills[].description`
+- `skills[].directoryPath`
+
+Example:
+
+```hbs
+{{#if skills.length}}
+<AVAILABLE-SKILLS>
+{{#each skills}}
+<AVAILABLE-SKILL name="{{instructionAttr name}}" from="{{instructionAttr directoryPath}}">
+{{description}}
+</AVAILABLE-SKILL>
+{{/each}}
+</AVAILABLE-SKILLS>
+{{/if}}
+```
 
 ## Bots
 
@@ -193,7 +211,7 @@ Skill discovery notes:
 - invalid workspace skills are ignored and logged on the affected turn
 - duplicate skill names across configured `agents[].skills.paths` are rejected and all colliding configured entries are ignored
 - when a workspace `.skills` entry has the same name as a configured agent skill, the workspace skill overrides the configured one for that turn
-- available skills are always injected into prompt context as metadata only: skill directory path, skill name, and skill description
+- available skills are always available to prompt file templates as metadata only: skill directory path, skill name, and skill description
 - when available skills exist, the `load_skill` tool is enabled automatically for that turn
 - `load_skill` returns the selected skill's `SKILL.md` content and files under `references/`
 - `load_skill` does not return script contents; scripts can be documented from `SKILL.md` and inspected through normal filesystem tools if needed

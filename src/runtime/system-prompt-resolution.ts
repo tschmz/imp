@@ -65,27 +65,31 @@ export async function buildSystemPrompt(
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
   const sections: string[] = [];
+  const promptTemplateContext: PromptTemplateContext = {
+    ...templateContext,
+    skills: availableSkills.map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      directoryPath: skill.directoryPath,
+    })),
+  };
 
   const basePrompt = await resolvePromptSourceContent(agent, agent.prompt.base, readTextFile, {
     kind: "base prompt",
-    templateFileContent: false,
-    templateContext,
+    templateFileContent: true,
+    templateContext: promptTemplateContext,
   });
   if (!basePrompt) {
     throw new Error(`Configured base prompt for agent "${agent.id}" must define text or file.`);
   }
   sections.push(basePrompt);
 
-  if (availableSkills.length > 0) {
-    sections.push(formatAvailableSkillsSection(availableSkills));
-  }
-
   for (const source of resolveInstructionSources(agent, promptWorkingDirectory)) {
     const content = await resolvePromptSourceContent(agent, source.source, readTextFile, {
       kind: "instruction file",
       optional: source.optional,
       templateFileContent: true,
-      templateContext,
+      templateContext: promptTemplateContext,
     });
     if (!content) {
       continue;
@@ -98,7 +102,7 @@ export async function buildSystemPrompt(
     const content = await resolvePromptSourceContent(agent, source, readTextFile, {
       kind: "reference file",
       templateFileContent: true,
-      templateContext,
+      templateContext: promptTemplateContext,
     });
     if (!content) {
       continue;
@@ -116,26 +120,6 @@ function formatPromptSection(tagName: "INSTRUCTIONS" | "REFERENCE", source: stri
 
 function escapeInstructionAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
-}
-
-function formatAvailableSkillsSection(availableSkills: SkillDefinition[]): string {
-  const renderedSkills = availableSkills
-    .map(
-      (skill) =>
-        `<AVAILABLE-SKILL name="${escapeInstructionAttribute(skill.name)}" from="${escapeInstructionAttribute(skill.directoryPath)}">\n${skill.description}\n</AVAILABLE-SKILL>`,
-    )
-    .join("\n\n");
-
-  return (
-    "<AVAILABLE-SKILLS>\n\n" +
-    "You have access to the following skills.\n" +
-    "Treat this list as a catalog, not as full skill instructions.\n" +
-    "Use the load_skill tool when a listed skill is relevant to the user's request.\n" +
-    "Use exact skill names when loading or referring to skills.\n" +
-    "The catalog lists path, name, and description only.\n\n" +
-    `${renderedSkills}\n` +
-    "</AVAILABLE-SKILLS>"
-  );
 }
 
 export function resolveInstructionSources(

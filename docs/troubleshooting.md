@@ -83,19 +83,19 @@ If in doubt, switch to absolute paths for:
 
 ## Prompt Templating Fails
 
-Prompt templating only applies to file-backed `prompt.instructions` and `prompt.references` entries.
+Prompt templating only applies to file-backed `prompt.base`, `prompt.instructions`, and `prompt.references` entries.
 
 Common causes:
 
 - the file uses an unknown variable such as `{{agent.unknownField}}`
-- the file uses unsupported syntax such as `{{ agent.id }}` with spaces inside the braces
-- you expected templating in `prompt.base` or inline `text`, which is not supported in V1
+- the file uses an unknown helper or custom helper not provided by `imp`
+- you expected templating in inline `text`, which is not supported
 
 If templating fails, check:
 
 - the exact file path named in the error
 - whether the variable is one of the documented template variables
-- whether the expression uses exact `{{path.to.value}}` syntax without extra whitespace or helpers
+- whether the helper is one of `if`, `unless`, `each`, `with`, or `instructionAttr`
 
 ## Need More Detail
 

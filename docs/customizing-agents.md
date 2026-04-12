@@ -43,15 +43,15 @@ This is the main way to adapt `imp` to a project, workspace, or operating style.
 
 ## Prompt File Templates
 
-V1 prompt templating is intentionally narrow.
+Prompt files use Handlebars templating.
 
-- only file-backed `prompt.instructions` and `prompt.references` are templated
-- `prompt.base` is not templated
+- file-backed `prompt.base`, `prompt.instructions`, and `prompt.references` are templated
 - inline `text` sources are not templated
-- syntax is only `{{path.to.value}}`
+- syntax includes variables, `if`/`else`, `unless`, `each`, and `with`
 - unknown variables fail immediately with the file path in the error
 - documented variables with no runtime value render as an empty string
-- functions, loops, conditionals, defaults, and time-based variables are not supported
+- arbitrary JavaScript execution, custom user-defined helpers, defaults, and time-based variables are not supported
+- `instructionAttr` escapes values for XML-like instruction tag attributes
 
 Available variables:
 
@@ -70,6 +70,10 @@ Available variables:
 - `transport.kind`
 - `imp.configPath`
 - `imp.dataRoot`
+- `skills`
+- `skills[].name`
+- `skills[].description`
+- `skills[].directoryPath`
 
 Example instruction file:
 
@@ -108,7 +112,7 @@ Rules:
 - duplicate skill names across configured `skills.paths` are ignored for that agent
 - when a workspace skill name collides with a configured agent skill, the workspace skill overrides the configured one for that turn
 - skill discovery for configured paths is logged per agent at startup
-- all available skills are injected into prompt context as metadata only: skill directory path, skill name, and description
+- all available skills are exposed to prompt file templates as metadata only: skill directory path, skill name, and description
 - when available skills exist, the `load_skill` tool is enabled automatically for that turn
 - `load_skill` returns the selected skill's `SKILL.md` content and files under `references/`
 - `load_skill` does not return script contents; scripts can be documented from `SKILL.md` and inspected through normal filesystem tools if needed

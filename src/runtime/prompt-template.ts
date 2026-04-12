@@ -1,5 +1,7 @@
 import { arch, homedir, hostname, platform, type, userInfo } from "node:os";
+import Handlebars from "handlebars";
 import type { AgentDefinition } from "../domain/agent.js";
+import type { SkillDefinition } from "../skills/types.js";
 
 export interface PromptTemplateSystemContext {
   os: string;
@@ -33,6 +35,13 @@ export interface PromptTemplateContext {
     configPath?: string;
     dataRoot?: string;
   };
+  skills: PromptTemplateSkillContext[];
+}
+
+export interface PromptTemplateSkillContext {
+  name: string;
+  description: string;
+  directoryPath: string;
 }
 
 export function createDefaultPromptTemplateSystemContext(): PromptTemplateSystemContext {
@@ -53,6 +62,7 @@ export function createPromptTemplateContext(options: {
   transportKind: string;
   configPath?: string;
   dataRoot?: string;
+  availableSkills?: SkillDefinition[];
 }): PromptTemplateContext {
   return {
     system: options.system,
@@ -77,6 +87,11 @@ export function createPromptTemplateContext(options: {
       configPath: options.configPath ?? "",
       dataRoot: options.dataRoot ?? "",
     },
+    skills: (options.availableSkills ?? []).map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      directoryPath: skill.directoryPath,
+    })),
   };
 }
 
@@ -87,52 +102,34 @@ export function renderPromptTemplate(
     context: PromptTemplateContext;
   },
 ): string {
-  return template.replaceAll(TEMPLATE_PATTERN, (match, expression: string) => {
-    if (!VALID_TEMPLATE_EXPRESSION_PATTERN.test(expression)) {
-      throw new Error(
-        `Unsupported prompt template expression in ${options.filePath}: ${match}. Only {{path.to.value}} is supported.`,
-      );
-    }
-
-    const resolvedValue = resolveTemplateExpression(options.context, expression);
-    if (resolvedValue === undefined) {
-      throw new Error(
-        `Unknown prompt template variable in ${options.filePath}: ${expression}. Available top-level roots: ${PROMPT_TEMPLATE_TOP_LEVEL_ROOTS.join(", ")}`,
-      );
-    }
-
-    return resolvedValue;
-  });
+  try {
+    return promptHandlebars.compile(template, {
+      knownHelpers: PROMPT_TEMPLATE_KNOWN_HELPERS,
+      knownHelpersOnly: true,
+      noEscape: true,
+      strict: true,
+    })(options.context);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to render prompt template ${options.filePath}: ${detail}`);
+  }
 }
 
-const TEMPLATE_PATTERN = /{{([^{}]+)}}/g;
-const VALID_TEMPLATE_EXPRESSION_PATTERN = /^[a-z][A-Za-z0-9]*(\.[a-z][A-Za-z0-9]*)*$/;
-const PROMPT_TEMPLATE_TOP_LEVEL_ROOTS = ["system", "bot", "agent", "transport", "imp"] as const;
+const promptHandlebars = Handlebars.create();
+const PROMPT_TEMPLATE_KNOWN_HELPERS = {
+  each: true,
+  if: true,
+  instructionAttr: true,
+  unless: true,
+  with: true,
+};
 
-function resolveTemplateExpression(
-  context: PromptTemplateContext,
-  expression: string,
-): string | undefined {
-  const segments = expression.split(".");
-  let current: unknown = context;
+promptHandlebars.registerHelper("instructionAttr", (value: unknown) =>
+  escapeInstructionAttribute(String(value ?? "")),
+);
 
-  for (const segment of segments) {
-    if (typeof current !== "object" || current === null || !(segment in current)) {
-      return undefined;
-    }
-
-    current = (current as Record<string, unknown>)[segment];
-  }
-
-  if (current === undefined || current === null) {
-    return undefined;
-  }
-
-  if (typeof current === "object") {
-    return undefined;
-  }
-
-  return String(current);
+function escapeInstructionAttribute(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
 function resolveUsername(): string {

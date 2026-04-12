@@ -85,7 +85,7 @@ describe("resolveSystemPrompt", () => {
         },
       ),
     ).rejects.toThrow(
-      "Unknown prompt template variable in /workspace/AGENTS.md: agent.unknownField. Available top-level roots: system, bot, agent, transport, imp",
+      'Failed to render prompt template /workspace/AGENTS.md: "unknownField" not defined',
     );
   });
 
@@ -133,32 +133,47 @@ describe("resolveSystemPrompt", () => {
     );
   });
 
-  it("fails clearly when a file-backed prompt template uses unsupported syntax", async () => {
-    await expect(
-      buildSystemPrompt(
-        createAgent(),
-        "/workspace",
-        createTemplateContext(),
-        [],
-        async (path) => {
-          if (path === "/workspace/AGENTS.md") {
-            return "Invalid {{ agent.id }}";
-          }
-
-          throw new Error(`unexpected path: ${path}`);
-        },
-      ),
-    ).rejects.toThrow(
-      "Unsupported prompt template expression in /workspace/AGENTS.md: {{ agent.id }}. Only {{path.to.value}} is supported.",
-    );
-  });
-
-  it("does not template prompt.base or inline text sources", async () => {
+  it("supports Handlebars conditionals and loops in file-backed prompt templates", async () => {
     const prompt = await buildSystemPrompt(
       {
         ...createAgent(),
         prompt: {
-          base: { text: "Base {{bot.id}}" },
+          base: { text: "You are concise." },
+          instructions: [{ file: "/workspace/AGENTS.md" }],
+        },
+      },
+      "/workspace",
+      createTemplateContext(),
+      [
+        {
+          name: "commit",
+          description: "Stage and commit changes.",
+          directoryPath: "/skills/commit",
+          filePath: "/skills/commit/SKILL.md",
+          body: "\nUse focused commits.",
+          content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+          references: [],
+          scripts: [],
+        },
+      ],
+      async (path) => {
+        if (path === "/workspace/AGENTS.md") {
+          return "{{#if skills.length}}{{#each skills}}{{name}}:{{description}}{{/each}}{{else}}no skills{{/if}}";
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      },
+    );
+
+    expect(prompt).toContain("commit:Stage and commit changes.");
+  });
+
+  it("templates file-backed prompt.base but not inline text sources", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { file: "/workspace/SYSTEM.md" },
           instructions: [{ text: "Inline {{bot.id}}" }, { file: "/workspace/AGENTS.md" }],
         },
       },
@@ -166,6 +181,10 @@ describe("resolveSystemPrompt", () => {
       createTemplateContext(),
       [],
       async (path) => {
+        if (path === "/workspace/SYSTEM.md") {
+          return "Base {{bot.id}}";
+        }
+
         if (path === "/workspace/AGENTS.md") {
           return "File {{bot.id}}";
         }
@@ -175,7 +194,7 @@ describe("resolveSystemPrompt", () => {
     );
 
     expect(prompt).toBe(
-      "Base {{bot.id}}\n\n" +
+      "Base private-telegram\n\n" +
         '<INSTRUCTIONS from="inline">\n\n' +
         "Inline {{bot.id}}\n" +
         "</INSTRUCTIONS>\n\n" +
@@ -190,7 +209,7 @@ describe("resolveSystemPrompt", () => {
       {
         ...createAgent(),
         prompt: {
-          base: { text: "You are concise." },
+          base: { file: "/workspace/SYSTEM.md" },
           instructions: [{ file: "/workspace/AGENTS.md" }],
           references: [{ file: "/workspace/RUNBOOK.md" }],
         },
@@ -210,6 +229,20 @@ describe("resolveSystemPrompt", () => {
         },
       ],
       async (path) => {
+        if (path === "/workspace/SYSTEM.md") {
+          return (
+            "{{#if skills.length}}<AVAILABLE-SKILLS>\n\n" +
+            "You have access to the following skills.\n" +
+            "Treat this list as a catalog, not as full skill instructions.\n" +
+            "Use the load_skill tool when a listed skill is relevant to the user's request.\n" +
+            "Use exact skill names when loading or referring to skills.\n" +
+            "The catalog lists path, name, and description only.\n\n" +
+            '{{#each skills}}<AVAILABLE-SKILL name="{{instructionAttr name}}" from="{{instructionAttr directoryPath}}">\n' +
+            "{{description}}\n" +
+            "</AVAILABLE-SKILL>\n\n{{/each}}</AVAILABLE-SKILLS>{{/if}}"
+          );
+        }
+
         if (path === "/workspace/AGENTS.md") {
           return "Project instructions.";
         }
@@ -280,5 +313,6 @@ function createTemplateContext(): PromptTemplateContext {
       configPath: "/etc/imp/config.json",
       dataRoot: "/var/lib/imp",
     },
+    skills: [],
   };
 }

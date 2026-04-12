@@ -28,6 +28,7 @@ export async function resolvePromptStage(
       transportKind: context.input.message.conversation.transport,
       configPath: context.input.runtime?.configPath,
       dataRoot: context.input.runtime?.dataRoot,
+      availableSkills: context.input.runtime?.availableSkills,
     }),
     availableSkills: context.input.runtime?.availableSkills,
     readTextFile: dependencies.readTextFile,
