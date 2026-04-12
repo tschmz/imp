@@ -12,6 +12,7 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
     runtime: {
       configPath: context.dependencies.runtimeInfo.configPath,
       dataRoot: context.dependencies.runtimeInfo.dataRoot,
+      ...(context.availableSkills.length > 0 ? { availableSkills: context.availableSkills } : {}),
       ...(context.activatedSkills.length > 0 ? { activatedSkills: context.activatedSkills } : {}),
     },
   });

@@ -22,6 +22,37 @@ describe("SystemPromptCache", () => {
     expect(key).toContain('"bot":{"id":"private-telegram"}');
   });
 
+  it("includes available skill metadata without full skill content in cache keys", async () => {
+    const cache = new SystemPromptCache({
+      getContextFileFingerprint: async () => "fp",
+      readTextFile: async () => "unused",
+      strategy: new InMemoryCacheStrategy<string>(),
+    });
+
+    const key = await cache.buildCacheKey({
+      agent: createAgent(),
+      promptWorkingDirectory: "/workspace/project",
+      promptFiles: [],
+      templateContext: createTemplateContext(),
+      availableSkills: [
+        {
+          name: "commit",
+          description: "Stage and commit changes.",
+          directoryPath: "/skills/commit",
+          filePath: "/skills/commit/SKILL.md",
+          body: "\nUse focused commits.",
+          content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+          references: [],
+          scripts: [],
+        },
+      ],
+    });
+
+    expect(key).toContain('"availableSkills":[{"directoryPath":"/skills/commit","name":"commit","description":"Stage and commit changes."}]');
+    expect(key).not.toContain("Use focused commits.");
+    expect(key).not.toContain('"content":"---\\nname: commit');
+  });
+
   it("evicts prior key per agent on set", () => {
     const strategy = new InMemoryCacheStrategy<string>();
     const cache = new SystemPromptCache({

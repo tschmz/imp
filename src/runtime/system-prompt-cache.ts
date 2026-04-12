@@ -36,6 +36,7 @@ export interface SystemPromptCacheKeyInput {
   promptWorkingDirectory?: string;
   promptFiles: string[];
   templateContext: PromptTemplateContext;
+  availableSkills?: SkillDefinition[];
   activatedSkills?: SkillDefinition[];
 }
 
@@ -76,6 +77,11 @@ export class SystemPromptCache {
       references: (input.agent.prompt.references ?? []).map(serializePromptSource),
       promptWorkingDirectory: input.promptWorkingDirectory,
       templateContext: input.templateContext,
+      availableSkills: (input.availableSkills ?? []).map((skill) => ({
+        directoryPath: skill.directoryPath,
+        name: skill.name,
+        description: skill.description,
+      })),
       activatedSkills: (input.activatedSkills ?? []).map((skill) => ({
         name: skill.name,
         description: skill.description,

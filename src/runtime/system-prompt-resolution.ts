@@ -8,6 +8,7 @@ export interface SystemPromptResolutionOptions {
   agent: AgentDefinition;
   promptWorkingDirectory?: string;
   templateContext: PromptTemplateContext;
+  availableSkills?: SkillDefinition[];
   activatedSkills?: SkillDefinition[];
   readTextFile: (path: string) => Promise<string>;
   cache: SystemPromptCache;
@@ -31,6 +32,7 @@ export async function resolveSystemPrompt(
     promptWorkingDirectory: options.promptWorkingDirectory,
     promptFiles,
     templateContext: options.templateContext,
+    availableSkills: options.availableSkills,
     activatedSkills: options.activatedSkills,
   });
 
@@ -46,6 +48,7 @@ export async function resolveSystemPrompt(
     options.agent,
     options.promptWorkingDirectory,
     options.templateContext,
+    options.availableSkills ?? [],
     options.activatedSkills ?? [],
     options.readTextFile,
   );
@@ -62,6 +65,7 @@ export async function buildSystemPrompt(
   agent: AgentDefinition,
   promptWorkingDirectory: string | undefined,
   templateContext: PromptTemplateContext,
+  availableSkills: SkillDefinition[],
   activatedSkills: SkillDefinition[],
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
@@ -104,6 +108,10 @@ export async function buildSystemPrompt(
     sections.push(formatPromptSection("REFERENCE", describePromptSource(source), content));
   }
 
+  if (availableSkills.length > 0) {
+    sections.push(formatAvailableSkillsSection(availableSkills));
+  }
+
   if (activatedSkills.length > 0) {
     sections.push(await formatActivatedSkillsSection(activatedSkills, readTextFile));
   }
@@ -117,6 +125,24 @@ function formatPromptSection(tagName: "INSTRUCTIONS" | "REFERENCE", source: stri
 
 function escapeInstructionAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+}
+
+function formatAvailableSkillsSection(availableSkills: SkillDefinition[]): string {
+  const renderedSkills = availableSkills
+    .map(
+      (skill) =>
+        `<AVAILABLE-SKILL>\nPath: ${skill.directoryPath}\nName: ${skill.name}\nDescription: ${skill.description}\n</AVAILABLE-SKILL>`,
+    )
+    .join("\n\n");
+
+  return (
+    "<AVAILABLE-SKILLS>\n\n" +
+    "These skills are available to activate when they are relevant to the user's request. " +
+    "Use the exact skill names shown below when referring to them. " +
+    "This section contains metadata only; full skill instructions are loaded separately only for activated skills.\n\n" +
+    `${renderedSkills}\n` +
+    "</AVAILABLE-SKILLS>"
+  );
 }
 
 async function formatActivatedSkillsSection(
@@ -177,7 +203,7 @@ function resolvePromptFileSources(
 ): Array<{ path: string; optional: boolean }> {
   return [
     ...extractFileSources([agent.prompt.base]),
-    ...extractFileSources((agent.prompt.references ?? [])),
+    ...extractFileSources(agent.prompt.references ?? []),
     ...resolveInstructionSources(agent, promptWorkingDirectory)
       .filter((entry) => entry.source.file)
       .map((entry) => ({ path: entry.source.file!, optional: entry.optional })),

@@ -225,6 +225,7 @@ describe("createHandleIncomingMessage", () => {
     );
 
     const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
+    expect(runInput?.runtime?.availableSkills).toHaveLength(4);
     expect(runInput?.runtime?.activatedSkills).toHaveLength(3);
     expect(logger.info).toHaveBeenCalledWith(
       "resolved agent skills for turn",
@@ -302,6 +303,17 @@ describe("createHandleIncomingMessage", () => {
     );
 
     const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
+    expect(runInput?.runtime?.availableSkills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "git-commit",
+          filePath: join(workspaceRoot, ".skills", "git-commit", "SKILL.md"),
+        }),
+        expect.objectContaining({
+          name: "git-review",
+        }),
+      ]),
+    );
     expect(runInput?.runtime?.activatedSkills).toEqual([
       expect.objectContaining({
         name: "git-commit",
@@ -406,6 +418,18 @@ describe("createHandleIncomingMessage", () => {
         }),
       ]),
     );
+    const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
+    expect(runInput?.runtime?.availableSkills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "git-commit",
+          filePath: join(conversationWorkspaceRoot, ".skills", "git-commit", "SKILL.md"),
+        }),
+        expect.objectContaining({
+          name: "git-review",
+        }),
+      ]),
+    );
   });
 
   it("does not load .skills from process.cwd() without an explicit workspace", async () => {
@@ -491,9 +515,10 @@ describe("createHandleIncomingMessage", () => {
     expect(runInput?.runtime).toEqual({
       configPath: "/tmp/config.json",
       dataRoot: "/tmp/data",
+      availableSkills: [createSkill("git-commit", "Commit Git changes carefully.")],
     });
     expect(logger.error).toHaveBeenCalledWith(
-      "failed to resolve agent skills for turn; continuing without skill activation",
+      "failed to select agent skills for turn; continuing without skill activation",
       expect.objectContaining({
         botId: "private-telegram",
         messageId: "6",

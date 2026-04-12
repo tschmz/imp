@@ -18,5 +18,6 @@ export interface InboundProcessingContext {
   response?: OutgoingMessage;
   conversation?: ConversationContext;
   agent?: AgentDefinition;
+  availableSkills: SkillDefinition[];
   activatedSkills: SkillDefinition[];
 }

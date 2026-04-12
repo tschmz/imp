@@ -45,6 +45,7 @@ export function createHandleIncomingMessage(
         readRecentLogLines: readRecentLogLinesImpl,
         hookRunner,
         startedAt: Date.now(),
+        availableSkills: [],
         activatedSkills: [],
       };
 

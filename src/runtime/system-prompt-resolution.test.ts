@@ -45,6 +45,7 @@ describe("resolveSystemPrompt", () => {
       "/workspace",
       createTemplateContext(),
       [],
+      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "Bot {{bot.id}} on {{system.platform}} for {{agent.model.provider}}/{{agent.model.modelId}}.";
@@ -75,6 +76,7 @@ describe("resolveSystemPrompt", () => {
         createAgent(),
         "/workspace",
         createTemplateContext(),
+        [],
         [],
         async (path) => {
           if (path === "/workspace/AGENTS.md") {
@@ -116,6 +118,7 @@ describe("resolveSystemPrompt", () => {
         },
       },
       [],
+      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "auth=[{{agent.authFile}}] cwd=[{{agent.workspace.cwd}}] config=[{{imp.configPath}}] data=[{{imp.dataRoot}}]";
@@ -139,6 +142,7 @@ describe("resolveSystemPrompt", () => {
         createAgent(),
         "/workspace",
         createTemplateContext(),
+        [],
         [],
         async (path) => {
           if (path === "/workspace/AGENTS.md") {
@@ -165,6 +169,7 @@ describe("resolveSystemPrompt", () => {
       "/workspace",
       createTemplateContext(),
       [],
+      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "File {{bot.id}}";
@@ -185,6 +190,43 @@ describe("resolveSystemPrompt", () => {
     );
   });
 
+  it("injects available skill metadata without loading full skill prompts", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { text: "You are concise." },
+        },
+      },
+      undefined,
+      createTemplateContext(),
+      [
+        {
+          name: "commit",
+          description: "Stage and commit changes.",
+          directoryPath: "/skills/commit",
+          filePath: "/skills/commit/SKILL.md",
+          body: "\nUse focused commits.",
+          content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+          references: [],
+          scripts: [],
+        },
+      ],
+      [],
+      async () => {
+        throw new Error("should not read full skill content for available skill metadata");
+      },
+    );
+
+    expect(prompt).toContain("<AVAILABLE-SKILLS>");
+    expect(prompt).toContain("Path: /skills/commit");
+    expect(prompt).toContain("Name: commit");
+    expect(prompt).toContain("Description: Stage and commit changes.");
+    expect(prompt).not.toContain("name: commit");
+    expect(prompt).not.toContain("Use focused commits.");
+    expect(prompt).not.toContain("<SKILLS>");
+  });
+
   it("injects activated skill contents into a dedicated context block", async () => {
     const prompt = await buildSystemPrompt(
       {
@@ -195,6 +237,7 @@ describe("resolveSystemPrompt", () => {
       },
       undefined,
       createTemplateContext(),
+      [],
       [
         {
           name: "commit",

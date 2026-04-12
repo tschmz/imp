@@ -6,6 +6,7 @@ import type { SkillDefinition } from "../skills/types.js";
 export interface AgentRunRuntimeContext {
   configPath?: string;
   dataRoot?: string;
+  availableSkills?: SkillDefinition[];
   activatedSkills?: SkillDefinition[];
 }
 

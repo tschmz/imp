@@ -193,8 +193,9 @@ Skill discovery and activation notes:
 - invalid workspace skills are ignored and logged on the affected turn
 - duplicate skill names across configured `agents[].skills.paths` are rejected and all colliding configured entries are ignored
 - when a workspace `.skills` entry has the same name as a configured agent skill, the workspace skill overrides the configured one for that turn
+- available skills are always injected into prompt context as metadata only: skill directory path, skill name, and skill description
 - per user turn, `imp` asks the configured agent model to select at most three skills using only skill `name` and `description`
-- if selection fails, `imp` activates no skills
+- if selection fails, `imp` still exposes the available skill metadata in prompt context but activates no skills
 - activated `SKILL.md` files are injected into prompt context as read-only content
 - when a skill contains `references/`, those files are loaded into prompt context when the skill is activated
 - when a skill contains `scripts/`, those script paths are exposed to the agent as explicit local resources; they are never executed automatically

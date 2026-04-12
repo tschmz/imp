@@ -108,8 +108,9 @@ Rules:
 - duplicate skill names across configured `skills.paths` are ignored for that agent
 - when a workspace skill name collides with a configured agent skill, the workspace skill overrides the configured one for that turn
 - skill discovery for configured paths is logged per agent at startup
+- all available skills are injected into prompt context as metadata only: skill directory path, skill name, and description
 - selection uses only skill metadata and activates at most three skills per user turn
-- if selection fails, no skills are activated for that turn
+- if selection fails, no skills are activated for that turn, but the available skill metadata remains visible in prompt context
 - the selected `SKILL.md` contents are injected into prompt context
 - files under `references/` are loaded into prompt context when their skill is activated
 - files under `scripts/` are exposed as local script paths for explicit inspection or execution, but are never run automatically

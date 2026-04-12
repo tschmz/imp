@@ -29,6 +29,7 @@ export async function resolvePromptStage(
       configPath: context.input.runtime?.configPath,
       dataRoot: context.input.runtime?.dataRoot,
     }),
+    availableSkills: context.input.runtime?.availableSkills,
     activatedSkills: context.input.runtime?.activatedSkills,
     readTextFile: dependencies.readTextFile,
     cache: dependencies.systemPromptCache,
