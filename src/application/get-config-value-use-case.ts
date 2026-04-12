@@ -2,10 +2,21 @@ import { discoverConfigPath } from "../config/discover-config-path.js";
 import { loadAppConfig } from "../config/load-app-config.js";
 import { getValueAtKeyPath } from "./config-key-path.js";
 
-export function createGetConfigValueUseCase(): (options: {
+interface GetConfigValueUseCaseDependencies {
+  writeOutput: (line: string) => void;
+}
+
+export function createGetConfigValueUseCase(
+  dependencies: Partial<GetConfigValueUseCaseDependencies> = {},
+): (options: {
   configPath?: string;
   keyPath: string;
 }) => Promise<void> {
+  const deps: GetConfigValueUseCaseDependencies = {
+    writeOutput: console.log,
+    ...dependencies,
+  };
+
   return async ({ configPath, keyPath }) => {
     const { configPath: resolvedConfigPath } = await discoverConfigPath({
       cliConfigPath: configPath,
@@ -17,7 +28,7 @@ export function createGetConfigValueUseCase(): (options: {
       throw new Error(`Config key not found: ${keyPath}`);
     }
 
-    console.log(formatConfigValue(value));
+    deps.writeOutput(formatConfigValue(value));
   };
 }
 

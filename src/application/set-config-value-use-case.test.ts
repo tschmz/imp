@@ -21,14 +21,14 @@ describe("createSetConfigValueUseCase", () => {
   it("updates a discovered config value using array id navigation", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
-    const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const writeOutput = vi.fn();
     vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
     vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
-    await createSetConfigValueUseCase()({
+    await createSetConfigValueUseCase({ writeOutput })({
       keyPath: "endpoints.private-telegram.enabled",
       value: "false",
     });
@@ -47,7 +47,7 @@ describe("createSetConfigValueUseCase", () => {
 
     await writeConfig(configPath);
 
-    await createSetConfigValueUseCase()({
+    await createSetConfigValueUseCase({ writeOutput: vi.fn() })({
       keyPath: "instance.name",
       value: "custom-instance",
     });
@@ -62,7 +62,7 @@ describe("createSetConfigValueUseCase", () => {
 
     await writeConfig(configPath);
 
-    await createSetConfigValueUseCase()({
+    await createSetConfigValueUseCase({ writeOutput: vi.fn() })({
       configPath,
       keyPath: "endpoints.0.enabled",
       value: "false",
@@ -81,7 +81,7 @@ describe("createSetConfigValueUseCase", () => {
       `\uFEFF${JSON.stringify(createConfig(join(root, "state-home", "imp")), null, 2)}\n`,
     );
 
-    await createSetConfigValueUseCase()({
+    await createSetConfigValueUseCase({ writeOutput: vi.fn() })({
       configPath,
       keyPath: "instance.name",
       value: "custom-instance",
@@ -150,7 +150,7 @@ describe("createSetConfigValueUseCase", () => {
     config.defaults.agentId = "missing-agent";
     await writeRawFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
 
-    await createSetConfigValueUseCase()({
+    await createSetConfigValueUseCase({ writeOutput: vi.fn() })({
       keyPath: "defaults.agentId",
       value: "default",
     });

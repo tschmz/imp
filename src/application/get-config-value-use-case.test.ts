@@ -21,14 +21,14 @@ describe("createGetConfigValueUseCase", () => {
   it("reads a primitive config value from the discovered config", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
-    const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const writeOutput = vi.fn();
     vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
     vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
-    await createGetConfigValueUseCase()({
+    await createGetConfigValueUseCase({ writeOutput })({
       keyPath: "endpoints.private-telegram.enabled",
     });
 
@@ -38,11 +38,11 @@ describe("createGetConfigValueUseCase", () => {
   it("reads a structured config value from an explicit path", async () => {
     const root = await createTempDir();
     const configPath = join(root, "custom", "imp.json");
-    const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const writeOutput = vi.fn();
 
     await writeConfig(configPath);
 
-    await createGetConfigValueUseCase()({
+    await createGetConfigValueUseCase({ writeOutput })({
       configPath,
       keyPath: "endpoints.private-telegram.access",
     });

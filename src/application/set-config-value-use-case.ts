@@ -5,11 +5,22 @@ import { appConfigSchema } from "../config/schema.js";
 import { discoverConfigPath } from "../config/discover-config-path.js";
 import { setValueAtKeyPath } from "./config-key-path.js";
 
-export function createSetConfigValueUseCase(): (options: {
+interface SetConfigValueUseCaseDependencies {
+  writeOutput: (line: string) => void;
+}
+
+export function createSetConfigValueUseCase(
+  dependencies: Partial<SetConfigValueUseCaseDependencies> = {},
+): (options: {
   configPath?: string;
   keyPath: string;
   value: string;
 }) => Promise<void> {
+  const deps: SetConfigValueUseCaseDependencies = {
+    writeOutput: console.log,
+    ...dependencies,
+  };
+
   return async ({ configPath, keyPath, value }) => {
     const resolvedConfigPath = await resolveWritableConfigPath(configPath);
     const raw = await readFile(resolvedConfigPath, "utf8");
@@ -27,7 +38,7 @@ export function createSetConfigValueUseCase(): (options: {
     assertUpdatedConfigIsValid(parsed, resolvedConfigPath);
 
     await writeFile(resolvedConfigPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
-    console.log(`Updated config ${resolvedConfigPath}: ${keyPath}`);
+    deps.writeOutput(`Updated config ${resolvedConfigPath}: ${keyPath}`);
   };
 }
 

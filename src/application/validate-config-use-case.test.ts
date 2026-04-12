@@ -21,14 +21,14 @@ describe("createValidateConfigUseCase", () => {
   it("validates the discovered config", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
-    const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const writeOutput = vi.fn();
     vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
     vi.stubEnv("IMP_CONFIG_PATH", "");
 
     await writeConfig(configPath);
 
-    await createValidateConfigUseCase()({});
+    await createValidateConfigUseCase({ writeOutput })({});
 
     expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${configPath}`);
   });
@@ -36,11 +36,11 @@ describe("createValidateConfigUseCase", () => {
   it("validates an explicit config path", async () => {
     const root = await createTempDir();
     const configPath = join(root, "custom", "imp.json");
-    const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const writeOutput = vi.fn();
 
     await writeConfig(configPath);
 
-    await createValidateConfigUseCase()({ configPath });
+    await createValidateConfigUseCase({ writeOutput })({ configPath });
 
     expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${configPath}`);
   });
@@ -48,7 +48,7 @@ describe("createValidateConfigUseCase", () => {
   it("accepts env-backed telegram token references when the env var is set", async () => {
     const root = await createTempDir();
     const configPath = join(root, "custom", "imp.json");
-    const writeOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const writeOutput = vi.fn();
 
     vi.stubEnv("IMP_TELEGRAM_BOT_TOKEN", "telegram-from-env");
     await writeConfig(configPath, {
@@ -65,7 +65,7 @@ describe("createValidateConfigUseCase", () => {
       ],
     });
 
-    await createValidateConfigUseCase()({ configPath });
+    await createValidateConfigUseCase({ writeOutput })({ configPath });
 
     expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${configPath}`);
   });

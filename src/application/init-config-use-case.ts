@@ -2,11 +2,22 @@ import { assertInitConfigCanBeCreated, initAppConfig } from "../config/init-app-
 import { promptForInitialAppConfig } from "../config/prompt-init-config.js";
 import { installService } from "../service/install-service.js";
 
-export function createInitConfigUseCase(): (options: {
+interface InitConfigUseCaseDependencies {
+  writeOutput: (line: string) => void;
+}
+
+export function createInitConfigUseCase(
+  dependencies: Partial<InitConfigUseCaseDependencies> = {},
+): (options: {
   configPath?: string;
   force: boolean;
   defaults: boolean;
 }) => Promise<void> {
+  const deps: InitConfigUseCaseDependencies = {
+    writeOutput: console.log,
+    ...dependencies,
+  };
+
   return async ({ configPath, force, defaults }) => {
     const resolvedConfigPath = await assertInitConfigCanBeCreated({ configPath, force });
     const initSetup = defaults
@@ -21,7 +32,7 @@ export function createInitConfigUseCase(): (options: {
       force,
       config: initSetup.config,
     });
-    console.log(`Created config at ${createdConfigPath}`);
+    deps.writeOutput(`Created config at ${createdConfigPath}`);
 
     if (initSetup.installService) {
       const result = await installService({
@@ -29,7 +40,7 @@ export function createInitConfigUseCase(): (options: {
         force,
         serviceEnvironment: initSetup.serviceEnvironment,
       });
-      console.log(`Installed ${result.operation.platform} service at ${result.operation.definitionPath}`);
+      deps.writeOutput(`Installed ${result.operation.platform} service at ${result.operation.definitionPath}`);
     }
   };
 }
