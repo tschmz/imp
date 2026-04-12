@@ -64,7 +64,7 @@ describe("installService", () => {
     expect(result.environmentPath).toBe(join(root, ".config", "imp", "service.env"));
     await expect(readFile(result.operation.definitionPath, "utf8")).resolves.toContain("ExecStart=");
     await expect(readFile(result.operation.definitionPath, "utf8")).resolves.toContain(
-      `EnvironmentFile=${join(root, ".config", "imp", "service.env")}`,
+      `EnvironmentFile="${join(root, ".config", "imp", "service.env")}"`,
     );
     await expect(readFile(join(root, ".config", "imp", "service.env"), "utf8")).resolves.toBe("\n");
     expect(calls).toEqual([

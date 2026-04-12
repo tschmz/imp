@@ -35,10 +35,24 @@ describe("service install plan", () => {
     );
 
     expect(definition).toContain("[Unit]");
-    expect(definition).toContain("WorkingDirectory=/tmp/imp");
-    expect(definition).toContain("EnvironmentFile=/tmp/imp/service.env");
+    expect(definition).toContain('WorkingDirectory="/tmp/imp"');
+    expect(definition).toContain('EnvironmentFile="/tmp/imp/service.env"');
     expect(definition).toContain("ExecStart=");
     expect(definition).toContain("WantedBy=default.target");
+  });
+
+  it("quotes systemd service paths with spaces", () => {
+    const definition = renderServiceDefinition(
+      createServiceInstallPlan({
+        platform: "linux",
+        configPath: "/tmp/imp config/config.json",
+        execPath: "/usr/bin/node",
+        argv: ["/usr/bin/node", "/app/dist/main.js"],
+      }),
+    );
+
+    expect(definition).toContain('WorkingDirectory="/tmp/imp config"');
+    expect(definition).toContain('EnvironmentFile="/tmp/imp config/service.env"');
   });
 
   it("uses an explicit linux service environment file path as-is", () => {
