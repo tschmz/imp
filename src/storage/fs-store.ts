@@ -975,7 +975,8 @@ function isAlreadyExistsError(error: unknown): boolean {
 }
 
 function sanitizePathSegment(value: string): string {
-  return value.replaceAll("/", "_");
+  const sanitized = value.replaceAll(/[\\/]/g, "_");
+  return sanitized.length === 0 || sanitized === "." || sanitized === ".." ? "_" : sanitized;
 }
 
 function requireSessionId(ref: ConversationRef): string {

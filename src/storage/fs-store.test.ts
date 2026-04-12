@@ -202,6 +202,31 @@ describe("createFsConversationStore", () => {
     expect(JSON.parse(written)).toEqual(created);
   });
 
+  it("sanitizes dot-only session path segments before writing snapshots", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const context: ConversationContext = {
+      state: {
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+          sessionId: "..",
+        },
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:00:00.000Z",
+        version: 1,
+      },
+      messages: [],
+    };
+
+    await store.put(context);
+
+    await expect(
+      readFile(join(root, "conversations", "telegram", "42", "sessions", "_", "conversation.json"), "utf8"),
+    ).resolves.toContain('"sessionId": ".."');
+  });
+
   it("lists inactive sessions as restore points after /new-style creation", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
