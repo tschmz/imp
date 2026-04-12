@@ -219,6 +219,8 @@ describe("resolveSystemPrompt", () => {
     );
 
     expect(prompt).toContain("<AVAILABLE-SKILLS>");
+    expect(prompt).toContain("imp selects relevant skills for each user turn from this catalog before the main agent run.");
+    expect(prompt).toContain("If no <SKILL> blocks appear later in the prompt, then no skill was activated for this turn.");
     expect(prompt).toContain("Path: /skills/commit");
     expect(prompt).toContain("Name: commit");
     expect(prompt).toContain("Description: Stage and commit changes.");

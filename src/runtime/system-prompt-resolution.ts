@@ -137,9 +137,10 @@ function formatAvailableSkillsSection(availableSkills: SkillDefinition[]): strin
 
   return (
     "<AVAILABLE-SKILLS>\n\n" +
-    "These skills are available to activate when they are relevant to the user's request. " +
+    "These skills are available for this agent. imp selects relevant skills for each user turn from this catalog before the main agent run. " +
     "Use the exact skill names shown below when referring to them. " +
-    "This section contains metadata only; full skill instructions are loaded separately only for activated skills.\n\n" +
+    "This section contains metadata only: skill path, name, and description. Full skill instructions are loaded separately only for activated skills. " +
+    "If no <SKILL> blocks appear later in the prompt, then no skill was activated for this turn.\n\n" +
     `${renderedSkills}\n` +
     "</AVAILABLE-SKILLS>"
   );
