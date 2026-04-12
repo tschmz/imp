@@ -80,11 +80,8 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
           );
           const current = await readSessionSnapshot(context.state.conversation, paths.conversationsDir);
           const nextSnapshot = resolveNextSnapshot(normalizeSnapshot(context), current);
-          const tempPath = `${snapshotPath}.${process.pid}.tmp`;
 
-          await mkdir(dirname(snapshotPath), { recursive: true });
-          await writeFile(tempPath, JSON.stringify(nextSnapshot, null, 2));
-          await rename(tempPath, snapshotPath);
+          await writeFileAtomically(snapshotPath, JSON.stringify(nextSnapshot, null, 2));
         });
       });
     },
@@ -210,11 +207,7 @@ async function writeConversationSnapshot(
   context: ConversationContext,
 ): Promise<void> {
   const snapshotPath = getSessionSnapshotPath(conversationsDir, context.state.conversation);
-  const tempPath = `${snapshotPath}.${process.pid}.tmp`;
-
-  await mkdir(dirname(snapshotPath), { recursive: true });
-  await writeFile(tempPath, JSON.stringify(context, null, 2));
-  await rename(tempPath, snapshotPath);
+  await writeFileAtomically(snapshotPath, JSON.stringify(context, null, 2));
 }
 
 function pathsafeRef(ref: ChatRef, sessionId: string): ConversationRef {
@@ -289,11 +282,15 @@ async function writeActiveConversationRef(
   ref: ConversationRef,
 ): Promise<void> {
   const activePath = getActiveSessionPath(conversationsDir, ref);
-  const tempPath = `${activePath}.${process.pid}.tmp`;
+  await writeFileAtomically(activePath, `${JSON.stringify({ sessionId: ref.sessionId }, null, 2)}\n`);
+}
 
-  await mkdir(dirname(activePath), { recursive: true });
-  await writeFile(tempPath, `${JSON.stringify({ sessionId: ref.sessionId }, null, 2)}\n`, "utf8");
-  await rename(tempPath, activePath);
+async function writeFileAtomically(path: string, content: string): Promise<void> {
+  const tempPath = `${path}.${process.pid}.tmp`;
+
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(tempPath, content, "utf8");
+  await rename(tempPath, path);
 }
 
 function normalizeSnapshot(snapshot: ConversationContext): ConversationContext {
