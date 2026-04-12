@@ -298,9 +298,10 @@ async function walkSkillResourceDirectory(
       continue;
     }
 
+    const relativePath = relative(rootPath, entryPath).replaceAll("\\", "/");
     discoveredResources.push({
       filePath: entryPath,
-      relativePath: relative(rootPath, entryPath).replaceAll("\\", "/"),
+      relativePath,
     });
   }
 }

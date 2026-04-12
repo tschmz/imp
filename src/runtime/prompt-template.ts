@@ -42,6 +42,7 @@ export interface PromptTemplateSkillContext {
   name: string;
   description: string;
   directoryPath: string;
+  filePath: string;
 }
 
 export function createDefaultPromptTemplateSystemContext(): PromptTemplateSystemContext {
@@ -91,6 +92,7 @@ export function createPromptTemplateContext(options: {
       name: skill.name,
       description: skill.description,
       directoryPath: skill.directoryPath,
+      filePath: skill.filePath,
     })),
   };
 }
@@ -120,6 +122,7 @@ const PROMPT_TEMPLATE_KNOWN_HELPERS = {
   each: true,
   if: true,
   instructionAttr: true,
+  instructionText: true,
   unless: true,
   with: true,
 };
@@ -127,9 +130,16 @@ const PROMPT_TEMPLATE_KNOWN_HELPERS = {
 promptHandlebars.registerHelper("instructionAttr", (value: unknown) =>
   escapeInstructionAttribute(String(value ?? "")),
 );
+promptHandlebars.registerHelper("instructionText", (value: unknown) =>
+  escapeInstructionText(String(value ?? "")),
+);
 
 function escapeInstructionAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+}
+
+function escapeInstructionText(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 function resolveUsername(): string {

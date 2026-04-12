@@ -1136,7 +1136,7 @@ describe("createPiAgentEngine", () => {
     expect(capturedTools?.map((tool) => tool.name)).toEqual(["read", "bash"]);
   });
 
-  it("adds load_skill for available skills and loads only skill instructions and references", async () => {
+  it("adds load_skill for available skills and lists bundled resources", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-load-skill-"));
     tempDirs.push(root);
     const referencePath = join(root, "skills", "commit", "references", "checklist.md");
@@ -1191,18 +1191,44 @@ describe("createPiAgentEngine", () => {
 
     const loadSkill = capturedTools?.find((tool) => tool.name === "load_skill");
     expect(loadSkill).toBeDefined();
+    expect(loadSkill!.parameters).toMatchObject({
+      properties: {
+        name: {
+          enum: ["commit"],
+        },
+      },
+    });
 
     const result = await loadSkill!.execute("load-1", { name: "commit" });
     const text = result.content
       .flatMap((item) => (item.type === "text" ? [item.text] : []))
       .join("\n");
 
-    expect(text).toContain('<SKILL name="commit"');
+    expect(text).toContain('<skill_content name="commit">');
     expect(text).toContain("Use focused commits.");
     expect(text).not.toContain("description: Stage and commit changes.");
-    expect(text).toContain('<SKILL-REFERENCE skill="commit"');
-    expect(text).toContain("Review staged files first.");
-    expect(text).not.toContain("prepare.sh");
+    expect(text).toContain(`Skill directory: ${join(root, "skills", "commit")}`);
+    expect(text).toContain("<skill_resources>");
+    expect(text).toContain(`<file kind="script" path="${join(root, "skills", "commit", "scripts", "prepare.sh")}">scripts/prepare.sh</file>`);
+    expect(text).toContain(`<file kind="reference" path="${referencePath}">references/checklist.md</file>`);
+    expect(text).not.toContain("Review staged files first.");
+    expect(result.details).toMatchObject({
+      skillName: "commit",
+      skillPath: join(root, "skills", "commit", "SKILL.md"),
+      skillDirectoryPath: join(root, "skills", "commit"),
+      references: [
+        {
+          path: referencePath,
+          relativePath: "references/checklist.md",
+        },
+      ],
+      scripts: [
+        {
+          path: join(root, "skills", "commit", "scripts", "prepare.sh"),
+          relativePath: "scripts/prepare.sh",
+        },
+      ],
+    });
   });
 
   it("allows agents to inspect and change their working directory via tools", async () => {

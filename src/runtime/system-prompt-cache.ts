@@ -78,6 +78,7 @@ export class SystemPromptCache {
       templateContext: input.templateContext,
       availableSkills: (input.availableSkills ?? []).map((skill) => ({
         directoryPath: skill.directoryPath,
+        filePath: skill.filePath,
         name: skill.name,
         description: skill.description,
       })),

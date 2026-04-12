@@ -185,8 +185,9 @@ Constraints:
 
 - unknown variables fail hard during prompt assembly
 - documented variables with no runtime value render as an empty string
-- only the built-in `if`, `unless`, `each`, and `with` helpers are available by default
+- only the built-in `if`, `unless`, `each`, `with`, `instructionAttr`, and `instructionText` helpers are available by default
 - `instructionAttr` escapes values for XML-like instruction tag attributes
+- `instructionText` escapes values for XML-like instruction tag text
 - arbitrary JavaScript execution, date/time variables, and custom user-defined helpers are not supported
 - the context is curated and stable so prompt caching stays deterministic
 
@@ -211,18 +212,27 @@ Available variables:
 - `skills[].name`
 - `skills[].description`
 - `skills[].directoryPath`
+- `skills[].filePath`
 
 Example:
 
 ```hbs
 {{#if skills.length}}
-<AVAILABLE-SKILLS>
+<available_skills>
 {{#each skills}}
-<AVAILABLE-SKILL name="{{instructionAttr name}}" from="{{instructionAttr directoryPath}}">
-{{description}}
-</AVAILABLE-SKILL>
+<skill>
+<name>
+{{instructionText name}}
+</name>
+<description>
+{{instructionText description}}
+</description>
+<location>
+{{instructionText filePath}}
+</location>
+</skill>
 {{/each}}
-</AVAILABLE-SKILLS>
+</available_skills>
 {{/if}}
 ```
 
@@ -270,10 +280,10 @@ Skill discovery notes:
 - invalid workspace skills are ignored and logged on the affected turn
 - duplicate skill names across configured `agents[].skills.paths` are rejected and all colliding configured entries are ignored
 - when a workspace `.skills` entry has the same name as a configured agent skill, the workspace skill overrides the configured one for that turn
-- available skills are always available to prompt file templates as metadata only: skill directory path, skill name, and skill description
+- available skills are always available to prompt file templates as metadata only: skill directory path, `SKILL.md` path, skill name, and skill description
 - when available skills exist, the `load_skill` tool is enabled automatically for that turn
-- `load_skill` returns the selected skill's `SKILL.md` content and files under `references/`
-- `load_skill` does not return script contents; scripts can be documented from `SKILL.md` and inspected through normal filesystem tools if needed
+- `load_skill` returns the selected skill's `SKILL.md` instructions, the absolute skill directory, and a `<skill_resources>` list of bundled `scripts/` and `references/` files
+- `load_skill` does not return bundled resource contents; scripts and references can be documented from `SKILL.md` and inspected through normal filesystem tools when needed
 
 Voice transcription notes:
 

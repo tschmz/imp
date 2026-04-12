@@ -253,15 +253,19 @@ describe("resolveSystemPrompt", () => {
       async (path) => {
         if (path === "/workspace/SYSTEM.md") {
           return (
-            "{{#if skills.length}}<AVAILABLE-SKILLS>\n\n" +
+            "{{#if skills.length}}" +
             "You have access to the following skills.\n" +
             "Treat this list as a catalog, not as full skill instructions.\n" +
             "Use the load_skill tool when a listed skill is relevant to the user's request.\n" +
             "Use exact skill names when loading or referring to skills.\n" +
-            "The catalog lists path, name, and description only.\n\n" +
-            '{{#each skills}}<AVAILABLE-SKILL name="{{instructionAttr name}}" from="{{instructionAttr directoryPath}}">\n' +
-            "{{description}}\n" +
-            "</AVAILABLE-SKILL>\n\n{{/each}}</AVAILABLE-SKILLS>{{/if}}"
+            "The catalog lists each skill's name, description, and SKILL.md location only.\n\n" +
+            "Treat bundled scripts as executable resources. Do not read script files before running them unless the loaded SKILL.md explicitly tells you to inspect them, required arguments are missing, or execution fails.\n\n" +
+            "<available_skills>\n" +
+            "{{#each skills}}<skill>\n" +
+            "<name>\n{{instructionText name}}\n</name>\n" +
+            "<description>\n{{instructionText description}}\n</description>\n" +
+            "<location>\n{{instructionText filePath}}\n</location>\n" +
+            "</skill>\n\n{{/each}}</available_skills>{{/if}}"
           );
         }
 
@@ -277,17 +281,24 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toContain("<AVAILABLE-SKILLS>");
+    expect(prompt).toContain("<available_skills>");
     expect(prompt).toContain("You have access to the following skills.");
     expect(prompt).toContain("Treat this list as a catalog, not as full skill instructions.");
     expect(prompt).toContain("Use the load_skill tool when a listed skill is relevant to the user's request.");
     expect(prompt).toContain("Use exact skill names when loading or referring to skills.");
-    expect(prompt).toContain('<AVAILABLE-SKILL name="commit" from="/skills/commit">\nStage and commit changes.\n</AVAILABLE-SKILL>');
+    expect(prompt).toContain("Treat bundled scripts as executable resources.");
+    expect(prompt).toContain(
+      "<skill>\n" +
+        "<name>\ncommit\n</name>\n" +
+        "<description>\nStage and commit changes.\n</description>\n" +
+        "<location>\n/skills/commit/SKILL.md\n</location>\n" +
+        "</skill>",
+    );
     expect(prompt).not.toContain("name: commit");
     expect(prompt).not.toContain("Use focused commits.");
     expect(prompt).not.toContain("<SKILLS>");
-    expect(prompt.indexOf("<AVAILABLE-SKILLS>")).toBeLessThan(prompt.indexOf("<INSTRUCTIONS"));
-    expect(prompt.indexOf("<AVAILABLE-SKILLS>")).toBeLessThan(prompt.indexOf("<REFERENCE"));
+    expect(prompt.indexOf("<available_skills>")).toBeLessThan(prompt.indexOf("<INSTRUCTIONS"));
+    expect(prompt.indexOf("<available_skills>")).toBeLessThan(prompt.indexOf("<REFERENCE"));
   });
 });
 

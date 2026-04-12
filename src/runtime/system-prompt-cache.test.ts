@@ -48,7 +48,9 @@ describe("SystemPromptCache", () => {
       ],
     });
 
-    expect(key).toContain('"availableSkills":[{"directoryPath":"/skills/commit","name":"commit","description":"Stage and commit changes."}]');
+    expect(key).toContain(
+      '"availableSkills":[{"directoryPath":"/skills/commit","filePath":"/skills/commit/SKILL.md","name":"commit","description":"Stage and commit changes."}]',
+    );
     expect(key).not.toContain("Use focused commits.");
     expect(key).not.toContain('"content":"---\\nname: commit');
   });

@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { delimiter as pathDelimiter, resolve } from "node:path";
 import { createFindTool, createGrepTool, createLsTool, createCodingTools, type ToolsOptions } from "@mariozechner/pi-coding-agent";
 import type { StreamOptions } from "@mariozechner/pi-ai";
@@ -82,6 +82,7 @@ export function createLoadSkillTool(skills: SkillDefinition[]): ToolDefinition {
     properties: {
       name: {
         type: "string",
+        enum: skills.map((skill) => skill.name),
         minLength: 1,
         description: "Exact skill name from the available skill catalog.",
       },
@@ -93,7 +94,7 @@ export function createLoadSkillTool(skills: SkillDefinition[]): ToolDefinition {
   return {
     name: "load_skill",
     label: "load_skill",
-    description: "Load the full SKILL.md instructions and reference files for an available skill.",
+    description: "Load the full SKILL.md instructions for an available skill and list bundled resources.",
     parameters,
     async execute(_toolCallId, params) {
       const { name } = parseLoadSkillParams(params);
@@ -102,20 +103,8 @@ export function createLoadSkillTool(skills: SkillDefinition[]): ToolDefinition {
         throw new Error(`Unknown skill: ${name}. Available skills: ${skills.map((entry) => entry.name).join(", ")}`);
       }
 
-      const references = await Promise.all(
-        skill.references.map(async (reference) => ({
-          ...reference,
-          content: (await readFile(reference.filePath, "utf8")).trim(),
-        })),
-      );
-
-      const renderedReferences = references.map((reference) =>
-        `<SKILL-REFERENCE skill="${escapeToolAttribute(skill.name)}" from="${escapeToolAttribute(reference.filePath)}">\n\n${reference.content}\n</SKILL-REFERENCE>`,
-      );
-
       const text = [
-        `<SKILL name="${escapeToolAttribute(skill.name)}" from="${escapeToolAttribute(skill.filePath)}">\n\n${skill.body.trim()}\n</SKILL>`,
-        ...renderedReferences,
+        `<skill_content name="${escapeToolAttribute(skill.name)}">\n${skill.body.trim()}\n\nSkill directory: ${skill.directoryPath}\n\n${renderSkillResources(skill)}\n</skill_content>`,
       ].join("\n\n");
 
       return {
@@ -123,14 +112,52 @@ export function createLoadSkillTool(skills: SkillDefinition[]): ToolDefinition {
         details: {
           skillName: skill.name,
           skillPath: skill.filePath,
-          references: references.map((reference) => ({
+          skillDirectoryPath: skill.directoryPath,
+          references: skill.references.map((reference) => ({
             path: reference.filePath,
-            relativePath: reference.relativePath,
+            relativePath: toSkillRelativeResourcePath("references", reference.relativePath),
+          })),
+          scripts: skill.scripts.map((script) => ({
+            path: script.filePath,
+            relativePath: toSkillRelativeResourcePath("scripts", script.relativePath),
           })),
         },
       };
     },
   };
+}
+
+function renderSkillResources(skill: SkillDefinition): string {
+  const resources = [
+    ...skill.scripts.map((resource) => ({
+      kind: "script",
+      relativePath: toSkillRelativeResourcePath("scripts", resource.relativePath),
+      filePath: resource.filePath,
+    })),
+    ...skill.references.map((resource) => ({
+      kind: "reference",
+      relativePath: toSkillRelativeResourcePath("references", resource.relativePath),
+      filePath: resource.filePath,
+    })),
+  ].sort((left, right) =>
+    left.relativePath.localeCompare(right.relativePath) || left.filePath.localeCompare(right.filePath),
+  );
+
+  if (resources.length === 0) {
+    return "<skill_resources>\n</skill_resources>";
+  }
+
+  return [
+    "<skill_resources>",
+    ...resources.map((resource) =>
+      `<file kind="${escapeToolAttribute(resource.kind)}" path="${escapeToolAttribute(resource.filePath)}">${escapeToolText(resource.relativePath)}</file>`,
+    ),
+    "</skill_resources>",
+  ].join("\n");
+}
+
+function toSkillRelativeResourcePath(directoryName: "references" | "scripts", relativePath: string): string {
+  return `${directoryName}/${relativePath}`;
 }
 
 function createConfiguredSkillTools(skills: SkillDefinition[]): ToolDefinition[] {
@@ -152,6 +179,10 @@ function parseLoadSkillParams(params: unknown): { name: string } {
 
 function escapeToolAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+}
+
+function escapeToolText(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 function resolveBuiltInToolOptions(agent?: AgentDefinition): ToolsOptions | undefined {

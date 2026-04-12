@@ -42,14 +42,26 @@ You have access to the following skills.
 Treat this list as a catalog, not as full skill instructions.
 Use the load_skill tool when a listed skill is relevant to the user's request.
 Use exact skill names when loading or referring to skills.
-The catalog lists path, name, and description only.
+The catalog lists each skill's name, description, and SKILL.md location only.
+When a loaded skill references relative paths, resolve them against the skill directory, which is the parent directory of the listed SKILL.md location.
+Treat bundled scripts as executable resources. Do not read script files before running them unless the loaded SKILL.md explicitly tells you to inspect them, required arguments are missing, or execution fails.
 
+<available_skills>
 {{#each skills}}
-<AVAILABLE-SKILL name="{{instructionAttr name}}" from="{{instructionAttr directoryPath}}">
-{{description}}
-</AVAILABLE-SKILL>
+<skill>
+<name>
+{{instructionText name}}
+</name>
+<description>
+{{instructionText description}}
+</description>
+<location>
+{{instructionText filePath}}
+</location>
+</skill>
 
 {{/each}}
+</available_skills>
 {{/if}}
 
 # Communication

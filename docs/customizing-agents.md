@@ -52,6 +52,7 @@ Prompt files use Handlebars templating.
 - documented variables with no runtime value render as an empty string
 - arbitrary JavaScript execution, custom user-defined helpers, defaults, and time-based variables are not supported
 - `instructionAttr` escapes values for XML-like instruction tag attributes
+- `instructionText` escapes values for XML-like instruction tag text
 
 Available variables:
 
@@ -74,6 +75,7 @@ Available variables:
 - `skills[].name`
 - `skills[].description`
 - `skills[].directoryPath`
+- `skills[].filePath`
 
 Example instruction file:
 
@@ -112,10 +114,10 @@ Rules:
 - duplicate skill names across configured `skills.paths` are ignored for that agent
 - when a workspace skill name collides with a configured agent skill, the workspace skill overrides the configured one for that turn
 - skill discovery for configured paths is logged per agent at startup
-- all available skills are exposed to prompt file templates as metadata only: skill directory path, skill name, and description
+- all available skills are exposed to prompt file templates as metadata only: skill directory path, `SKILL.md` path, skill name, and description
 - when available skills exist, the `load_skill` tool is enabled automatically for that turn
-- `load_skill` returns the selected skill's `SKILL.md` content and files under `references/`
-- `load_skill` does not return script contents; scripts can be documented from `SKILL.md` and inspected through normal filesystem tools if needed
+- `load_skill` returns the selected skill's `SKILL.md` instructions, the absolute skill directory, and a `<skill_resources>` list of bundled `scripts/` and `references/` files
+- `load_skill` does not return bundled resource contents; scripts and references can be documented from `SKILL.md` and inspected through normal filesystem tools when needed
 
 Example:
 

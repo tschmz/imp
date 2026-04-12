@@ -72,6 +72,7 @@ export async function buildSystemPrompt(
       name: skill.name,
       description: skill.description,
       directoryPath: skill.directoryPath,
+      filePath: skill.filePath,
     })),
   };
 
