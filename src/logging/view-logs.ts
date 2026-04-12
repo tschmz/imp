@@ -1,5 +1,6 @@
 import { readFile, watch } from "node:fs/promises";
 import type { DaemonConfig } from "../daemon/types.js";
+import { isMissingFileError } from "../files/node-error.js";
 
 export interface LogTarget {
   endpointId: string;
@@ -238,10 +239,6 @@ async function closeWatcher(watcher: AsyncIterable<{ eventType: string }>): Prom
 
     throw error;
   }
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function isAbortError(error: unknown): boolean {

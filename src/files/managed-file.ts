@@ -1,6 +1,7 @@
 import { access, mkdir, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createTimestampedBackupPath } from "./backup.js";
+import { isAlreadyExistsError, isMissingFileError } from "./node-error.js";
 
 export interface ManagedFileOptions {
   path: string;
@@ -95,12 +96,4 @@ async function backupExistingFile(options: {
   } finally {
     await sourceFile.close();
   }
-}
-
-function isAlreadyExistsError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "EEXIST";
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

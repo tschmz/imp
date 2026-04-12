@@ -1,5 +1,6 @@
 import { access, rm } from "node:fs/promises";
 import { resolve } from "node:path";
+import { isMissingFileError } from "../files/node-error.js";
 import { createServiceInstallPlan } from "./install-plan.js";
 import type { ServiceInstaller } from "./install-service.js";
 import { resolveServiceDefinitionPath } from "./install-service.js";
@@ -58,8 +59,4 @@ export async function assertServiceDefinitionExists(definitionPath: string): Pro
   }
 
   return resolvedPath;
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

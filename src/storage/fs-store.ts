@@ -15,6 +15,7 @@ import type {
   ConversationUserMessage,
 } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
+import { isAlreadyExistsError, isMissingFileError } from "../files/node-error.js";
 import type { ConversationBackupSummary, ConversationStore } from "./types.js";
 
 const conversationWriteQueues = new Map<string, Promise<void>>();
@@ -154,7 +155,7 @@ async function readInactiveSessions(
   try {
     entries = await readdir(sessionsDir, { withFileTypes: true });
   } catch (error) {
-    if (isMissingFile(error)) {
+    if (isMissingFileError(error)) {
       return [];
     }
     throw error;
@@ -244,7 +245,7 @@ async function readSessionSnapshot(
     const raw = await readFile(snapshotPath, "utf8");
     return normalizeSnapshot(JSON.parse(raw) as ConversationContext);
   } catch (error: unknown) {
-    if (isMissingFile(error)) {
+    if (isMissingFileError(error)) {
       return undefined;
     }
     throw error;
@@ -270,7 +271,7 @@ async function readActiveConversationRef(
       sessionId: parsed.sessionId,
     };
   } catch (error: unknown) {
-    if (isMissingFile(error)) {
+    if (isMissingFileError(error)) {
       return undefined;
     }
     throw error;
@@ -562,7 +563,7 @@ async function acquireConversationLock(lockPath: string): Promise<() => Promise<
         try {
           await rm(lockPath);
         } catch (error) {
-          if (!isMissingFile(error)) {
+          if (!isMissingFileError(error)) {
             throw error;
           }
         }
@@ -594,7 +595,7 @@ async function tryCleanupExpiredLock(lockPath: string): Promise<boolean> {
     await rm(lockPath);
     return true;
   } catch (error) {
-    if (isMissingFile(error)) {
+    if (isMissingFileError(error)) {
       return true;
     }
 
@@ -630,14 +631,6 @@ function getConversationKey(ref: ChatRef | ConversationRef): string {
   return "sessionId" in ref
     ? `${ref.transport}/${ref.externalId}/${ref.sessionId}`
     : `${ref.transport}/${ref.externalId}`;
-}
-
-function isMissingFile(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
-}
-
-function isAlreadyExistsError(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST";
 }
 
 function sanitizePathSegment(value: string): string {
