@@ -227,8 +227,7 @@ function readStringField(buffer: Buffer, offset: number, length: number): string
   return buffer
     .subarray(offset, offset + length)
     .toString("utf8")
-    .replace(/\0.*$/, "")
-    .trim();
+    .replace(/\0.*$/, "");
 }
 
 function readOctalField(buffer: Buffer, offset: number, length: number): number {

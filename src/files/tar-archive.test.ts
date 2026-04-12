@@ -126,6 +126,23 @@ describe("tar archive", () => {
     await expect(readFile(join(extractDir, "file.txt"), "utf8")).resolves.toBe("hello from short writes\n");
   });
 
+  it("preserves tar entry path spaces", async () => {
+    const root = await createTempDir();
+    const archivePath = join(root, "backup.tar");
+    const extractDir = join(root, "extract");
+
+    await writeFile(
+      archivePath,
+      buildTarArchive([
+        { path: " prompts / base prompt .md", type: "file", mode: 0o600, content: "prompt\n" },
+      ]),
+    );
+
+    await extractTarArchive(archivePath, extractDir);
+
+    await expect(readFile(join(extractDir, " prompts ", " base prompt .md"), "utf8")).resolves.toBe("prompt\n");
+  });
+
   it("rejects a tar archive with an invalid header checksum", async () => {
     const root = await createTempDir();
     const sourceDir = join(root, "source");
