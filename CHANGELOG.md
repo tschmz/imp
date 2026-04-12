@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.0 - 2026-04-12
+
+### Added
+
+- Add an interactive CLI chat endpoint.
+
+### Fixed
+
+- Escape systemd `WorkingDirectory` and `EnvironmentFile` service paths.
+
 ## 0.1.1 - 2026-04-12
 
 ### Changed
