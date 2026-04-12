@@ -102,15 +102,15 @@ function hasTokenSecret(endpoint: AppConfig["endpoints"][number]): endpoint is A
   return Object.hasOwn(endpoint, "token") && (endpoint as { token?: unknown }).token !== undefined;
 }
 
-function resolveAgentPrompt(prompt: AgentPromptConfig, configDir: string): AgentPromptConfig {
+function resolveAgentPrompt(prompt: AppConfig["agents"][number]["prompt"], configDir: string): AgentPromptConfig {
   return {
-    base: resolvePromptSource(prompt.base, configDir),
-    ...(prompt.instructions
+    base: prompt?.base ? resolvePromptSource(prompt.base, configDir) : { builtIn: "default" },
+    ...(prompt?.instructions
       ? {
           instructions: prompt.instructions.map((source) => resolvePromptSource(source, configDir)),
         }
       : {}),
-    ...(prompt.references
+    ...(prompt?.references
       ? {
           references: prompt.references.map((source) => resolvePromptSource(source, configDir)),
         }

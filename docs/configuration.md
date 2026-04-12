@@ -30,11 +30,6 @@ The top-level structure is:
       "model": {
         "provider": "openai",
         "modelId": "gpt-5.4"
-      },
-      "prompt": {
-        "base": {
-          "file": "/home/me/.local/state/imp/SYSTEM.md"
-        }
       }
     }
   ],
@@ -76,7 +71,7 @@ Common fields:
 - `name`: optional display name
 - `model.provider`: provider ID
 - `model.modelId`: model name or ID
-- `prompt.base`: required system prompt, as `text` or `file`
+- `prompt.base`: optional system prompt override, as `text` or `file`; when omitted, `imp` uses the built-in default prompt from the installed code
 - `prompt.instructions`: optional extra instruction files or inline text
 - `prompt.references`: optional context files or inline text
 - `authFile`: optional OAuth credential file for providers that support it
@@ -99,7 +94,6 @@ Important rules:
 
 ```text
 dataRoot/
-  SYSTEM.md
   auth.json
   agents/
     <agent-id>/

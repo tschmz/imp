@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
 import type { SkillDefinition } from "../skills/types.js";
 import { renderPromptTemplate, type PromptTemplateContext } from "./prompt-template.js";
@@ -80,7 +81,7 @@ export async function buildSystemPrompt(
     templateContext: promptTemplateContext,
   });
   if (!basePrompt) {
-    throw new Error(`Configured base prompt for agent "${agent.id}" must define text or file.`);
+    throw new Error(`Configured base prompt for agent "${agent.id}" must define text, file, or built-in source.`);
   }
   sections.push(basePrompt);
 
@@ -178,9 +179,22 @@ async function resolvePromptSourceContent(
     return trimmedContent;
   }
 
+  if (source.builtIn === "default") {
+    const content = renderPromptTemplate(DEFAULT_AGENT_SYSTEM_PROMPT, {
+      filePath: "built-in:default-system-prompt",
+      context: options.templateContext,
+    });
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      throw new Error(`Built-in ${options.kind} for agent "${agent.id}" is empty.`);
+    }
+
+    return trimmedContent;
+  }
+
   let content: string;
   if (!source.file) {
-    throw new Error(`Configured ${options.kind} for agent "${agent.id}" must define text or file.`);
+    throw new Error(`Configured ${options.kind} for agent "${agent.id}" must define text, file, or built-in source.`);
   }
   try {
     content = await readTextFile(source.file);
@@ -220,7 +234,7 @@ function extractFileSources(sources: PromptSource[]): Array<{ path: string; opti
 }
 
 function describePromptSource(source: PromptSource): string {
-  return source.file ?? "inline";
+  return source.file ?? source.builtIn ?? "inline";
 }
 
 function isFileNotFoundError(error: unknown): boolean {

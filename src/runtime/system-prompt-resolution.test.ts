@@ -204,6 +204,28 @@ describe("resolveSystemPrompt", () => {
     );
   });
 
+  it("templates the built-in default prompt", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { builtIn: "default" },
+        },
+      },
+      undefined,
+      createTemplateContext(),
+      [],
+      async (path) => {
+        throw new Error(`unexpected path: ${path}`);
+      },
+    );
+
+    expect(prompt).toContain("Agent: default");
+    expect(prompt).toContain("Model: faux/faux-1");
+    expect(prompt).toContain("Transport: telegram");
+    expect(prompt).not.toContain("{{agent.id}}");
+  });
+
   it("injects available skill metadata before additional context files", async () => {
     const prompt = await buildSystemPrompt(
       {

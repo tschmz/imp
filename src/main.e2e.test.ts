@@ -51,7 +51,6 @@ describe("imp CLI e2e", () => {
 
     const { stdout } = await runCli(["init", "--defaults"], env);
     const configPath = join(root, "config-home", "imp", "config.json");
-    const promptPath = join(root, "state-home", "imp", "SYSTEM.md");
     const environmentPath = join(root, "config-home", "imp", "service.env");
     const servicePath =
       process.platform === "darwin"
@@ -62,7 +61,7 @@ describe("imp CLI e2e", () => {
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
-      agents: Array<{ id: string; prompt: { base: { file?: string } } }>;
+      agents: Array<{ id: string; prompt?: { base?: { file?: string } } }>;
       endpoints: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
@@ -76,11 +75,11 @@ describe("imp CLI e2e", () => {
     }
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
-    expect(config.agents[0]?.prompt.base.file).toBe(promptPath);
+    expect(config.agents[0]?.prompt).toBeUndefined();
     expect(config.endpoints[0]?.access.allowedUserIds).toEqual([]);
-    await expect(readFile(promptPath, "utf8")).resolves.toContain(
-      "You are a helpful assistant running through a local Imp daemon.",
-    );
+    await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("creates and restores a backup with config, agent files, and conversations", async () => {

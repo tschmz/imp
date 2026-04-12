@@ -1936,7 +1936,7 @@ describe("createPiAgentEngine", () => {
     ]);
   });
 
-  it("fails clearly when an agent defines neither base prompt text nor file", async () => {
+  it("fails clearly when an agent defines no usable base prompt", async () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
@@ -1963,7 +1963,7 @@ describe("createPiAgentEngine", () => {
         conversation: createConversation(),
         message: createIncomingMessage(),
       }),
-    ).rejects.toThrow('Configured base prompt for agent "default" must define text or file.');
+    ).rejects.toThrow('Configured base prompt for agent "default" must define text, file, or built-in source.');
   });
 });
 

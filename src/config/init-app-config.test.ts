@@ -2,7 +2,6 @@ import { chmod, mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
 import { buildInitialAppConfig } from "./default-app-config.js";
 import { assertInitConfigCanBeCreated, initAppConfig } from "./init-app-config.js";
 
@@ -42,8 +41,8 @@ describe("initAppConfig", () => {
         workspace?: {
           cwd?: string;
         };
-        prompt: {
-          base: { file?: string; text?: string };
+        prompt?: {
+          base?: { file?: string; text?: string };
         };
         inference?: {
           maxOutputTokens?: number;
@@ -79,16 +78,14 @@ describe("initAppConfig", () => {
         store: true,
       },
     });
-    expect(config.agents[0]?.prompt.base).toEqual({
-      file: join(root, "state-home", "imp", "SYSTEM.md"),
-    });
+    expect(config.agents[0]?.prompt).toBeUndefined();
     expect(config.endpoints[0]?.access.allowedUserIds).toEqual([]);
 
     const fileMode = (await stat(configPath)).mode & 0o777;
     expect(fileMode).toBe(0o600);
-    await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).resolves.toBe(
-      `${DEFAULT_AGENT_SYSTEM_PROMPT}\n`,
-    );
+    await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("refuses to overwrite an existing config without force", async () => {
@@ -159,7 +156,7 @@ describe("initAppConfig", () => {
     expect(backupMode).toBe(0o600);
   });
 
-  it("writes the default agent system prompt file with owner read/write permissions", async () => {
+  it("does not write the default agent system prompt file", async () => {
     const root = await createTempDir();
     const env = {
       XDG_CONFIG_HOME: join(root, "config-home"),
@@ -169,16 +166,15 @@ describe("initAppConfig", () => {
     await initAppConfig({ env });
 
     const promptPath = join(root, "state-home", "imp", "SYSTEM.md");
-    await expect(readFile(promptPath, "utf8")).resolves.toBe(`${DEFAULT_AGENT_SYSTEM_PROMPT}\n`);
-    const fileMode = (await stat(promptPath)).mode & 0o777;
-    expect(fileMode).toBe(0o600);
+    await expect(readFile(promptPath, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
-  it("creates a backup before overwriting an existing system prompt file with force", async () => {
+  it("does not manage a configured base prompt file", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
     const promptPath = join(root, "SYSTEM.md");
-    const backupPath = `${promptPath}.2026-04-05T18-15-00.000Z.bak`;
     const config = buildInitialAppConfig(process.env, {
       instanceName: "default",
       dataRoot: root,
@@ -189,19 +185,13 @@ describe("initAppConfig", () => {
       promptBaseFile: promptPath,
     });
 
-    await initAppConfig({ configPath, config });
-    await chmod(promptPath, 0o644);
-
-    await initAppConfig({
-      configPath,
-      config,
-      force: true,
-      now: new Date("2026-04-05T18:15:00.000Z"),
+    await expect(readFile(promptPath, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
     });
-
-    await expect(readFile(backupPath, "utf8")).resolves.toBe(`${DEFAULT_AGENT_SYSTEM_PROMPT}\n`);
-    const backupMode = (await stat(backupPath)).mode & 0o777;
-    expect(backupMode).toBe(0o600);
+    await initAppConfig({ configPath, config });
+    await expect(readFile(promptPath, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("writes a provided config template", async () => {

@@ -29,9 +29,6 @@
         "ls"
       ],
       "prompt": {
-        "base": {
-          "file": "/var/lib/imp/SYSTEM.md"
-        },
         "instructions": [
           {
             "file": "/var/lib/imp/agents/default/AGENTS.md"

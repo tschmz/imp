@@ -194,7 +194,7 @@ export function renderAgentMessage(
     availableAgentIds: string[];
   },
 ): string {
-  const basePrompt = "file" in agent.prompt.base ? agent.prompt.base.file : "inline";
+  const basePrompt = agent.prompt.base.file ?? (agent.prompt.base.builtIn ? `built-in:${agent.prompt.base.builtIn}` : "inline");
   const instructionSources = (agent.prompt.instructions ?? []).map((source) =>
     "file" in source ? source.file : "inline",
   );

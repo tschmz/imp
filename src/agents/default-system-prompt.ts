@@ -1,7 +1,3 @@
-import { join } from "node:path";
-
-export const DEFAULT_AGENT_SYSTEM_PROMPT_FILE_NAME = "SYSTEM.md";
-
 export const DEFAULT_AGENT_SYSTEM_PROMPT = `
 You are a helpful assistant running through a local Imp daemon.
 
@@ -68,7 +64,3 @@ The catalog lists path, name, and description only.
 - Summaries should emphasize outcomes, changed behavior, and any remaining risk.
 - For reviews, prioritize findings, broken behavior, and test gaps.
 `.trim();
-
-export function getDefaultAgentSystemPromptFilePath(dataRoot: string): string {
-  return join(dataRoot, DEFAULT_AGENT_SYSTEM_PROMPT_FILE_NAME);
-}

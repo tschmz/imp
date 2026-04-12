@@ -51,13 +51,15 @@ The generated setup includes:
 
 - one default agent
 - one Telegram endpoint
-- one base prompt file under the data directory
+- the built-in default system prompt from the installed `imp` code
 - the default built-in tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`)
 - `logging.level: "info"`
 - `inference.metadata.app: "imp"`
 - `inference.request.store: true`
 
 If the selected provider supports OAuth, `imp init` also configures an `authFile` path under the data directory.
+
+`imp init` does not create a `SYSTEM.md` file. To replace the built-in default prompt later, configure `agents[].prompt.base.file` or `agents[].prompt.base.text`.
 
 Runtime data under the state directory uses this layout:
 

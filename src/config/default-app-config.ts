@@ -1,5 +1,4 @@
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import { getDefaultAgentSystemPromptFilePath } from "../agents/default-system-prompt.js";
 import { join } from "node:path";
 import { getDefaultUserDataRoot } from "./discover-config-path.js";
 import type { AppConfig } from "./types.js";
@@ -32,7 +31,6 @@ export function createDefaultAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     modelId: "gpt-5.4",
     telegramToken: "replace-me",
     allowedUserIds: [],
-    promptBaseFile: getDefaultAgentSystemPromptFilePath(dataRoot),
   });
 }
 
@@ -64,7 +62,7 @@ export function buildInitialAppConfig(
           provider: answers.provider,
           modelId: answers.modelId,
         },
-        prompt,
+        ...(prompt ? { prompt } : {}),
         ...(usesOAuth ? { authFile: join(answers.dataRoot, "auth.json") } : {}),
         tools: [...defaultTools],
         ...(workspace ? { workspace } : {}),
@@ -135,14 +133,17 @@ export function validateTelegramUserIds(raw: string): true | string {
   return "Telegram user IDs must contain digits only.";
 }
 
-function buildAgentPrompt(answers: InitialConfigAnswers): AppConfig["agents"][number]["prompt"] {
+function buildAgentPrompt(answers: InitialConfigAnswers): AppConfig["agents"][number]["prompt"] | undefined {
   const instructionFiles = answers.instructionFiles?.filter((value) => value.length > 0) ?? [];
   const referenceFiles = answers.referenceFiles?.filter((value) => value.length > 0) ?? [];
+  const promptBaseFile = answers.promptBaseFile?.trim();
+
+  if (!promptBaseFile && instructionFiles.length === 0 && referenceFiles.length === 0) {
+    return undefined;
+  }
 
   return {
-    base: {
-      file: answers.promptBaseFile ?? getDefaultAgentSystemPromptFilePath(answers.dataRoot),
-    },
+    ...(promptBaseFile ? { base: { file: promptBaseFile } } : {}),
     ...(instructionFiles.length > 0
       ? {
           instructions: instructionFiles.map((file) => ({ file })),

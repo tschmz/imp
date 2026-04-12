@@ -138,14 +138,16 @@ function validatePromptBase(
   basePrompt: {
     text?: string;
     file?: string;
+    builtIn?: string;
   },
 ): void {
   const hasText = typeof basePrompt.text === "string" && basePrompt.text.trim().length > 0;
   const hasFile = typeof basePrompt.file === "string" && basePrompt.file.trim().length > 0;
+  const hasBuiltIn = basePrompt.builtIn === "default";
 
-  if (hasText || hasFile) {
+  if (hasText || hasFile || hasBuiltIn) {
     return;
   }
 
-  throw new ConfigurationError(`Configured agent "${agentId}" must define prompt.base.text or prompt.base.file.`);
+  throw new ConfigurationError(`Configured agent "${agentId}" must define prompt.base.text, prompt.base.file, or a built-in base prompt.`);
 }

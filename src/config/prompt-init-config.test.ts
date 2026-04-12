@@ -38,9 +38,6 @@ describe("promptForInitialAppConfig", () => {
       shellPath: ["/custom/bin", "/usr/bin", "/bin"],
     });
     expect(result.config.agents[0]?.prompt).toEqual({
-      base: {
-        file: "/tmp/state-home/imp/SYSTEM.md",
-      },
       instructions: [{ file: "/workspace/AGENTS.md" }],
       references: [{ file: "/workspace/RULES.md" }],
     });
@@ -111,9 +108,7 @@ describe("promptForInitialAppConfig", () => {
     });
 
     expect(result.installService).toBe(false);
-    expect(result.config.agents[0]?.prompt.base).toEqual({
-      file: "/tmp/state-home/imp/SYSTEM.md",
-    });
+    expect(result.config.agents[0]?.prompt).toBeUndefined();
   });
 
   it("lists the expected environment variables for the openai provider", () => {

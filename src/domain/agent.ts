@@ -7,6 +7,7 @@ export interface InferenceSettings {
 export interface PromptSource {
   text?: string;
   file?: string;
+  builtIn?: "default";
 }
 
 export interface AgentPromptConfig {

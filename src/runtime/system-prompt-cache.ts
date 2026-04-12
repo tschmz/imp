@@ -106,5 +106,9 @@ function serializePromptSource(source: PromptSource): Record<string, string> {
     return { file: source.file };
   }
 
+  if (source.builtIn) {
+    return { builtIn: source.builtIn };
+  }
+
   return { text: source.text ?? "" };
 }

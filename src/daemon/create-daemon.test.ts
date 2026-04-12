@@ -292,7 +292,7 @@ describe("createDaemon", () => {
           }),
         },
       ),
-    ).toThrow('Configured agent "default" must define prompt.base.text or prompt.base.file.');
+    ).toThrow('Configured agent "default" must define prompt.base.text, prompt.base.file, or a built-in base prompt.');
   });
 
   it("starts all enabled endpoints with isolated runtime state", async () => {

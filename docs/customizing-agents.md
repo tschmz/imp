@@ -12,7 +12,7 @@ An agent combines:
 
 ## Prompt Structure
 
-Each agent needs `prompt.base`.
+Agents use the built-in default system prompt when `prompt.base` is omitted. Configure `prompt.base` only when you want to replace that default.
 
 You can define prompt content inline:
 

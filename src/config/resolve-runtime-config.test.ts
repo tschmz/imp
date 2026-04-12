@@ -194,6 +194,40 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.skillIssues ?? []).toEqual([]);
   });
 
+  it("uses the built-in default prompt when no prompt base is configured", async () => {
+    const appConfig = createAppConfig({
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          tools: [],
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.prompt).toEqual({
+      base: {
+        builtIn: "default",
+      },
+    });
+  });
+
   it("uses the global default agent id when the endpoint has no routing override", async () => {
     const appConfig = createAppConfig({
       defaults: {

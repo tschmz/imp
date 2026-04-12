@@ -9,12 +9,12 @@ import {
 } from "./default-app-config.js";
 
 describe("default app config helpers", () => {
-  it("uses a base prompt file by default", () => {
+  it("omits prompt.base by default so the runtime uses the built-in prompt", () => {
     const config = createDefaultAppConfig({
       XDG_STATE_HOME: "/tmp/state-home",
     });
 
-    expect(config.agents[0]?.prompt.base).toEqual({ file: "/tmp/state-home/imp/SYSTEM.md" });
+    expect(config.agents[0]?.prompt).toBeUndefined();
   });
 
   it("adds authFile for OAuth-capable providers", () => {
@@ -64,6 +64,24 @@ describe("default app config helpers", () => {
     });
     expect(config.agents[0]?.prompt).toEqual({
       base: { file: "/tmp/imp/SYSTEM.md" },
+      instructions: [{ file: "/workspace/AGENTS.md" }],
+      references: [{ file: "/workspace/RUNBOOK.md" }],
+    });
+  });
+
+  it("builds prompt context without a base override", () => {
+    const config = buildInitialAppConfig(process.env, {
+      instanceName: "home",
+      dataRoot: "/tmp/imp",
+      provider: "openai",
+      modelId: "gpt-5.4",
+      telegramToken: "replace-me",
+      allowedUserIds: ["1"],
+      instructionFiles: [join("/workspace", "AGENTS.md")],
+      referenceFiles: ["/workspace/RUNBOOK.md"],
+    });
+
+    expect(config.agents[0]?.prompt).toEqual({
       instructions: [{ file: "/workspace/AGENTS.md" }],
       references: [{ file: "/workspace/RUNBOOK.md" }],
     });

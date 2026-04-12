@@ -1,6 +1,5 @@
 import { confirm, input, select } from "@inquirer/prompts";
 import { join } from "node:path";
-import { getDefaultAgentSystemPromptFilePath } from "../agents/default-system-prompt.js";
 import {
   buildInitialAppConfig,
   createDefaultAppConfig,
@@ -139,7 +138,6 @@ export async function promptForInitialAppConfig(
       ],
       referenceFiles: parseCommaSeparatedValues(extraContextFilesRaw),
       shellPath: parsePathEntries(shellPathRaw),
-      promptBaseFile: getDefaultAgentSystemPromptFilePath(dataRoot),
     }),
     installService,
     ...(serviceEnvironment ? { serviceEnvironment } : {}),

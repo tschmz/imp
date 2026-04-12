@@ -33,7 +33,7 @@ const promptSourceSchema = z
   });
 
 const agentPromptConfigSchema = z.object({
-  base: promptSourceSchema,
+  base: promptSourceSchema.optional(),
   instructions: promptSourceSchema.array().optional(),
   references: promptSourceSchema.array().optional(),
 });
@@ -99,7 +99,7 @@ const agentConfigSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1).optional(),
-    prompt: agentPromptConfigSchema,
+    prompt: agentPromptConfigSchema.optional(),
     model: modelConfigSchema.optional(),
     authFile: z.string().min(1).optional(),
     inference: inferenceSettingsSchema.optional(),

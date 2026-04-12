@@ -272,10 +272,10 @@ function collectAgentFiles(appConfig: AppConfig, configPath: string): Omit<Backu
       agentId: agent.id,
       reference: "prompt.base.file",
       configDir,
-      configuredPath: agent.prompt.base.file,
+      configuredPath: agent.prompt?.base?.file,
     });
 
-    for (const source of agent.prompt.instructions ?? []) {
+    for (const source of agent.prompt?.instructions ?? []) {
       addAgentFile(files, {
         agentId: agent.id,
         reference: "prompt.instructions[].file",
@@ -284,7 +284,7 @@ function collectAgentFiles(appConfig: AppConfig, configPath: string): Omit<Backu
       });
     }
 
-    for (const source of agent.prompt.references ?? []) {
+    for (const source of agent.prompt?.references ?? []) {
       addAgentFile(files, {
         agentId: agent.id,
         reference: "prompt.references[].file",
@@ -533,25 +533,31 @@ function relocateConfigFileReferences(
     agents: appConfig.agents.map((agent) => ({
       ...agent,
       authFile: relocateConfiguredFilePath(agent.authFile, sourceConfigDir, relocationMap),
-      prompt: {
-        ...agent.prompt,
-        base: relocatePromptSource(agent.prompt.base, sourceConfigDir, relocationMap),
-        instructions: agent.prompt.instructions?.map((source) =>
-          relocatePromptSource(source, sourceConfigDir, relocationMap),
-        ),
-        references: agent.prompt.references?.map((source) =>
-          relocatePromptSource(source, sourceConfigDir, relocationMap),
-        ),
-      },
+      ...(agent.prompt
+        ? {
+            prompt: {
+              ...agent.prompt,
+              ...(agent.prompt.base
+                ? { base: relocatePromptSource(agent.prompt.base, sourceConfigDir, relocationMap) }
+                : {}),
+              instructions: agent.prompt.instructions?.map((source) =>
+                relocatePromptSource(source, sourceConfigDir, relocationMap),
+              ),
+              references: agent.prompt.references?.map((source) =>
+                relocatePromptSource(source, sourceConfigDir, relocationMap),
+              ),
+            },
+          }
+        : {}),
     })),
   };
 }
 
 function relocatePromptSource(
-  source: AppConfig["agents"][number]["prompt"]["base"],
+  source: NonNullable<NonNullable<AppConfig["agents"][number]["prompt"]>["base"]>,
   sourceConfigDir: string,
   relocationMap: ReadonlyMap<string, string>,
-): AppConfig["agents"][number]["prompt"]["base"] {
+): NonNullable<NonNullable<AppConfig["agents"][number]["prompt"]>["base"]> {
   if (!source.file) {
     return source;
   }

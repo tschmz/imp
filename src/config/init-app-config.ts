@@ -1,4 +1,3 @@
-import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
 import { resolve } from "node:path";
 import { createDefaultAppConfig } from "./default-app-config.js";
 import { getDefaultUserConfigPath } from "./discover-config-path.js";
@@ -18,19 +17,6 @@ export async function initAppConfig(options: {
   const env = options.env ?? process.env;
   const configPath = resolveConfigPath({ configPath: options.configPath, env });
   const config = appConfigSchema.parse(options.config ?? createDefaultAppConfig(env));
-  const defaultAgent = config.agents.find((agent) => agent.id === config.defaults.agentId);
-
-  const basePromptFile = defaultAgent?.prompt.base.file;
-  if (basePromptFile) {
-    await writeManagedFile({
-      path: basePromptFile,
-      resourceLabel: "Base prompt file",
-      content: `${DEFAULT_AGENT_SYSTEM_PROMPT}\n`,
-      force: options.force,
-      now: options.now,
-      mode: ownerReadWriteMode,
-    });
-  }
 
   return writeManagedFile({
     path: configPath,

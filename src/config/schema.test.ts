@@ -78,7 +78,7 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects agents without a prompt definition", () => {
+  it("accepts agents without a prompt definition", () => {
     const result = appConfigSchema.safeParse(
       createConfig({
         id: "default",
@@ -89,17 +89,7 @@ describe("appConfigSchema", () => {
       }),
     );
 
-    expect(result.success).toBe(false);
-    if (result.success) {
-      throw new Error("Expected schema validation to fail.");
-    }
-
-    expect(result.error.issues).toContainEqual(
-      expect.objectContaining({
-        path: ["agents", 0, "prompt"],
-        message: "Invalid input: expected object, received undefined",
-      }),
-    );
+    expect(result.success).toBe(true);
   });
 
   it("rejects agents without a model", () => {

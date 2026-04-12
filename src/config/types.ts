@@ -1,9 +1,9 @@
 import type {
   AgentMcpConfig,
-  AgentPromptConfig,
   AgentWorkspaceConfig,
   InferenceSettings,
   ModelRef,
+  PromptSource,
 } from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
 import type { SecretValueConfig } from "./secret-value.js";
@@ -37,10 +37,16 @@ export interface AgentSkillsConfig {
   paths: string[];
 }
 
+export interface AgentPromptConfigInput {
+  base?: PromptSource;
+  instructions?: PromptSource[];
+  references?: PromptSource[];
+}
+
 export interface AgentConfig {
   id: string;
   name?: string;
-  prompt: AgentPromptConfig;
+  prompt?: AgentPromptConfigInput;
   model?: ModelConfig;
   authFile?: string;
   inference?: InferenceSettings;
