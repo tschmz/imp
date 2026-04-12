@@ -5,6 +5,7 @@ import type { AppConfig } from "./types.js";
 
 const defaultAgentId = "default";
 const defaultEndpointId = "private-telegram";
+const defaultTelegramToken = "replace-me";
 const defaultTools = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 
 export interface InitialConfigAnswers {
@@ -12,8 +13,8 @@ export interface InitialConfigAnswers {
   dataRoot: string;
   provider: string;
   modelId: string;
-  telegramToken: string;
-  allowedUserIds: string[];
+  telegramToken?: string;
+  allowedUserIds?: string[];
   workingDirectory?: string;
   instructionFiles?: string[];
   referenceFiles?: string[];
@@ -29,8 +30,6 @@ export function createDefaultAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     dataRoot,
     provider: "openai",
     modelId: "gpt-5.4",
-    telegramToken: "replace-me",
-    allowedUserIds: [],
   });
 }
 
@@ -79,18 +78,25 @@ export function buildInitialAppConfig(
         },
       },
     ],
-    endpoints: [
-      {
-        id: defaultEndpointId,
-        type: "telegram",
-        enabled: true,
-        token: answers.telegramToken,
-        access: {
-          allowedUserIds: answers.allowedUserIds,
-        },
-      },
-    ],
+    endpoints:
+      answers.telegramToken === undefined
+        ? []
+        : [
+            {
+              id: defaultEndpointId,
+              type: "telegram",
+              enabled: true,
+              token: answers.telegramToken,
+              access: {
+                allowedUserIds: answers.allowedUserIds ?? [],
+              },
+            },
+          ],
   };
+}
+
+export function getDefaultTelegramToken(): string {
+  return defaultTelegramToken;
 }
 
 export function getSuggestedModelId(provider: string): string {

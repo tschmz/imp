@@ -105,6 +105,31 @@ describe("createChatUseCase", () => {
     );
   });
 
+  it("uses an implicit local cli endpoint when the config has no endpoints", async () => {
+    const dependencies = createDependencies(createAppConfig({
+      endpoints: [],
+    }));
+    const useCase = createChatUseCase(dependencies);
+
+    await useCase({});
+
+    expect(dependencies.resolveRuntimeConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endpoints: [
+          {
+            id: "local-cli",
+            type: "cli",
+            enabled: true,
+          },
+        ],
+      }),
+      "/etc/imp/config.json",
+      {
+        includeCliEndpoints: true,
+      },
+    );
+  });
+
   it("rejects ambiguous configured cli endpoint selection", async () => {
     const useCase = createChatUseCase(
       createDependencies(createAppConfig({

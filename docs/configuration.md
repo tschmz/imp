@@ -9,9 +9,37 @@ The top-level structure is:
 - `logging`: daemon log level
 - `defaults`: fallback routing
 - `agents`: one or more agent definitions
-- `endpoints`: one or more endpoint definitions
+- `endpoints`: zero or more endpoint definitions
 
 ## Minimal Shape
+
+The local CLI chat endpoint is always available through `imp chat`, so a starter config can omit explicit endpoints:
+
+```json
+{
+  "instance": {
+    "name": "home"
+  },
+  "paths": {
+    "dataRoot": "/home/me/.local/state/imp"
+  },
+  "defaults": {
+    "agentId": "default"
+  },
+  "agents": [
+    {
+      "id": "default",
+      "model": {
+        "provider": "openai",
+        "modelId": "gpt-5.4"
+      }
+    }
+  ],
+  "endpoints": []
+}
+```
+
+Add a non-CLI endpoint before running `imp start` or installing the service:
 
 ```json
 {

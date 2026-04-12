@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 describe("initAppConfig", () => {
-  it("creates a config under the XDG config path with a fail-closed allowlist", async () => {
+  it("creates a config under the XDG config path without daemon endpoints", async () => {
     const root = await createTempDir();
     const env = {
       XDG_CONFIG_HOME: join(root, "config-home"),
@@ -50,7 +50,7 @@ describe("initAppConfig", () => {
           request?: Record<string, unknown>;
         };
       }>;
-      endpoints: Array<{ access: { allowedUserIds: string[] } }>;
+      endpoints: unknown[];
     };
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
@@ -79,7 +79,7 @@ describe("initAppConfig", () => {
       },
     });
     expect(config.agents[0]?.prompt).toBeUndefined();
-    expect(config.endpoints[0]?.access.allowedUserIds).toEqual([]);
+    expect(config.endpoints).toEqual([]);
 
     const fileMode = (await stat(configPath)).mode & 0o777;
     expect(fileMode).toBe(0o600);

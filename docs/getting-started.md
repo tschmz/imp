@@ -2,7 +2,7 @@
 
 `imp` is a local daemon for running agent-based endpoints as persistent services.
 
-This guide gets you from a fresh install to a running Telegram endpoint.
+This guide gets you from a fresh install to a working local setup.
 
 Use it for the first setup. For day-to-day operation, see [Running And Service](./running-and-service.md).
 
@@ -10,7 +10,7 @@ Use it for the first setup. For day-to-day operation, see [Running And Service](
 
 - Node.js 20.6 or newer
 - Credentials for at least one supported model provider
-- A Telegram endpoint token
+- A Telegram endpoint token if you want to run a Telegram daemon endpoint
 
 ## Install
 
@@ -47,17 +47,19 @@ By default, `imp` writes:
 
 If `XDG_CONFIG_HOME` or `XDG_STATE_HOME` is set, those locations are used instead.
 
+`imp init --defaults` creates a starter config for local CLI chat. It does not add a Telegram endpoint or install a service, so the generated config can be inspected and edited before any daemon transport starts.
+
 The generated setup includes:
 
 - one default agent
-- one Telegram endpoint
+- no daemon endpoints when using `--defaults`
 - the built-in default system prompt from the installed `imp` code
 - the default built-in tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`)
 - `logging.level: "info"`
 - `inference.metadata.app: "imp"`
 - `inference.request.store: true`
 
-If the selected provider supports OAuth, `imp init` also configures an `authFile` path under the data directory.
+Interactive `imp init` still prompts for Telegram settings and writes one Telegram endpoint. If the selected provider supports OAuth, `imp init` also configures an `authFile` path under the data directory.
 
 `imp init` does not create a `SYSTEM.md` file. To replace the built-in default prompt later, configure `agents[].prompt.base.file` or `agents[].prompt.base.text`.
 
@@ -68,7 +70,17 @@ Runtime data under the state directory uses this layout:
 - endpoint runtime state: `runtime/endpoints/<endpoint-id>.json`
 - agent-managed files, when you keep them in the data root: `agents/<agent-id>/...`
 
+## Start Local Chat
+
+Start the implicit local CLI endpoint:
+
+```bash
+imp chat
+```
+
 ## Start The Daemon
+
+`imp start` starts enabled daemon endpoints such as Telegram. A config created with `imp init --defaults` has no daemon endpoints yet, so add one before starting the service.
 
 Start with the discovered config:
 

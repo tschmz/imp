@@ -17,6 +17,37 @@ describe("default app config helpers", () => {
     expect(config.agents[0]?.prompt).toBeUndefined();
   });
 
+  it("does not create daemon endpoints by default", () => {
+    const config = createDefaultAppConfig({
+      XDG_STATE_HOME: "/tmp/state-home",
+    });
+
+    expect(config.endpoints).toEqual([]);
+  });
+
+  it("creates a telegram endpoint when a token is provided", () => {
+    const config = buildInitialAppConfig(process.env, {
+      instanceName: "default",
+      dataRoot: "/tmp/imp",
+      provider: "openai",
+      modelId: "gpt-5.4",
+      telegramToken: "123:abc",
+      allowedUserIds: ["1"],
+    });
+
+    expect(config.endpoints).toEqual([
+      {
+        id: "private-telegram",
+        type: "telegram",
+        enabled: true,
+        token: "123:abc",
+        access: {
+          allowedUserIds: ["1"],
+        },
+      },
+    ]);
+  });
+
   it("adds authFile for OAuth-capable providers", () => {
     const config = buildInitialAppConfig(process.env, {
       instanceName: "default",

@@ -1,6 +1,5 @@
-import { createDefaultAppConfig } from "../config/default-app-config.js";
 import { assertInitConfigCanBeCreated, initAppConfig } from "../config/init-app-config.js";
-import { getProviderEnvironmentVariables, promptForInitialAppConfig } from "../config/prompt-init-config.js";
+import { promptForInitialAppConfig } from "../config/prompt-init-config.js";
 import { installService } from "../service/install-service.js";
 
 export function createInitConfigUseCase(): (options: {
@@ -13,8 +12,8 @@ export function createInitConfigUseCase(): (options: {
     const initSetup = defaults
       ? {
           config: undefined,
-          installService: process.platform !== "win32",
-          serviceEnvironment: resolveDefaultServiceEnvironment(),
+          installService: false,
+          serviceEnvironment: undefined,
         }
       : await resolveInitConfig();
     const createdConfigPath = await initAppConfig({
@@ -33,24 +32,6 @@ export function createInitConfigUseCase(): (options: {
       console.log(`Installed ${result.operation.platform} service at ${result.operation.definitionPath}`);
     }
   };
-}
-
-function resolveDefaultServiceEnvironment(): Record<string, string> | undefined {
-  const defaultAgent = createDefaultAppConfig(process.env).agents[0];
-  const provider = defaultAgent?.model?.provider;
-  if (!provider) {
-    return undefined;
-  }
-
-  const entries = getProviderEnvironmentVariables(provider)
-    .map((name) => [name, process.env[name]?.trim()] as const)
-    .filter((entry): entry is readonly [string, string] => Boolean(entry[1] && entry[1].length > 0));
-
-  if (entries.length === 0) {
-    return undefined;
-  }
-
-  return Object.fromEntries(entries);
 }
 
 async function resolveInitConfig() {

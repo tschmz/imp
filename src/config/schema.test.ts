@@ -92,6 +92,21 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts configs without explicit endpoints", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      endpoints: [],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("rejects agents without a model", () => {
     const result = appConfigSchema.safeParse(
       createConfig({

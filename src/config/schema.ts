@@ -176,7 +176,7 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
     agentId: z.string().min(1),
   }),
   agents: agentConfigSchema.array().min(1),
-  endpoints: endpointConfigSchema.array().min(1),
+  endpoints: endpointConfigSchema.array(),
 }).superRefine((config, ctx) => {
   const agentIds = new Set<string>();
   const knownAgentIds = new Set<string>();

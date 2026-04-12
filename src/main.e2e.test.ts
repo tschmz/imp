@@ -65,21 +65,25 @@ describe("imp CLI e2e", () => {
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
       agents: Array<{ id: string; prompt?: { base?: { file?: string } } }>;
-      endpoints: Array<{ access: { allowedUserIds: string[] } }>;
+      endpoints: unknown[];
     };
 
     expect(stdout).toContain(`Created config at ${configPath}`);
     if (servicePath) {
-      expect(stdout).toContain(`Installed`);
-      await expect(stat(servicePath)).resolves.toBeDefined();
+      expect(stdout).not.toContain(`Installed`);
+      await expect(stat(servicePath)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
     }
     if (process.platform === "linux") {
-      await expect(readFile(environmentPath, "utf8")).resolves.not.toContain("PATH=");
+      await expect(readFile(environmentPath, "utf8")).rejects.toMatchObject({
+        code: "ENOENT",
+      });
     }
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
     expect(config.agents[0]?.prompt).toBeUndefined();
-    expect(config.endpoints[0]?.access.allowedUserIds).toEqual([]);
+    expect(config.endpoints).toEqual([]);
     await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
@@ -192,6 +196,40 @@ describe("imp CLI e2e", () => {
     const configPath = join(root, "config-home", "imp", "config.json");
 
     await runCli(["init", "--defaults"], env);
+    await overwriteConfig(configPath, {
+      instance: {
+        name: "default",
+      },
+      paths: {
+        dataRoot: join(root, "state-home", "imp"),
+      },
+      logging: {
+        level: "info",
+      },
+      defaults: {
+        agentId: "default",
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
 
     const { stdout } = await runCli(["config", "set", "--config", configPath, "endpoints.private-telegram.enabled", "false"], env);
     const config = JSON.parse(await readFile(configPath, "utf8")) as {

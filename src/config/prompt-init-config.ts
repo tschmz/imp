@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   buildInitialAppConfig,
   createDefaultAppConfig,
+  getDefaultTelegramToken,
   getSuggestedModelId,
   parseCommaSeparatedValues,
   parsePathEntries,
@@ -38,9 +39,8 @@ export async function promptForInitialAppConfig(
 ): Promise<InitialAppSetup> {
   const defaults = createDefaultAppConfig(env);
   const defaultAgent = defaults.agents[0];
-  const defaultEndpoint = defaults.endpoints[0];
 
-  if (!defaultAgent || !defaultAgent.model || !defaultEndpoint || defaultEndpoint.type !== "telegram") {
+  if (!defaultAgent || !defaultAgent.model) {
     throw new Error("Default init config is incomplete.");
   }
 
@@ -78,7 +78,7 @@ export async function promptForInitialAppConfig(
 
   const telegramToken = await dependencies.input({
     message: "Telegram endpoint token",
-    default: typeof defaultEndpoint.token === "string" ? defaultEndpoint.token : "",
+    default: getDefaultTelegramToken(),
     validate: requireNonEmpty("Telegram endpoint token is required."),
   });
 
