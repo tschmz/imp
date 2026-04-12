@@ -18,7 +18,7 @@ Current commands:
 - `/export` renders the active session transcript as plain text, including tool calls and tool results.
 - `/ping` returns a simple liveness response.
 - `/config` shows runtime and config details for the current endpoint, including instance name, config path, data root, logging level, enabled endpoints, and the endpoint's default agent.
-- `/agent` shows the current agent details, including provider, model, base prompt, auth file, instructions, references, workspace, skills, tools, and available agent IDs.
+- `/agent` shows the current agent details, including provider, model, base prompt, home, auth file, instructions, references, workspace, skills, tools, and available agent IDs.
 - `/agent <id>` switches the active session to another configured agent and shows its details.
 - `/logs` shows the last 20 daemon log lines for the current endpoint.
 - `/logs <lines>` shows that many recent daemon log lines for the current endpoint for this command invocation only.

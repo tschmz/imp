@@ -6,6 +6,7 @@ An agent combines:
 
 - a model
 - a prompt
+- an optional home directory
 - an optional workspace
 - an optional tool set
 - optional provider-specific request settings
@@ -41,6 +42,8 @@ You can then add:
 
 This is the main way to adapt `imp` to a project, workspace, or operating style.
 
+Each agent also has a home directory. It defaults to `paths.dataRoot/agents/<agent-id>`, or you can set `home` explicitly on the agent. On each turn, `imp` loads every direct `*.md` file in the agent home alphabetically as separate instruction blocks before explicit `prompt.instructions`; it then loads the workspace `AGENTS.md` when available.
+
 ## Prompt File Templates
 
 Prompt files use Handlebars templating.
@@ -64,6 +67,7 @@ Available variables:
 - `system.homeDir`
 - `endpoint.id`
 - `agent.id`
+- `agent.home`
 - `agent.model.provider`
 - `agent.model.modelId`
 - `agent.authFile`

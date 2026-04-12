@@ -83,6 +83,7 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents).toEqual([
       {
         id: "default-agent",
+        home: "/var/lib/imp/agents/default-agent",
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
@@ -312,10 +313,46 @@ describe("resolveRuntimeConfig", () => {
       instructions: [{ file: "/etc/imp/AGENTS.md" }],
       references: [{ file: "/opt/shared/README.md" }],
     });
+    expect(result.agents[0]?.home).toBe("/var/lib/imp/agents/default");
     expect(result.agents[0]?.workspace).toEqual({
       cwd: "/etc/imp/workspace",
     });
     expect(result.agents[0]?.tools).toEqual(["read", "bash"]);
+  });
+
+  it("resolves explicit agent home relative to the config directory", async () => {
+    const appConfig = createAppConfig({
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          home: "./agents/custom",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.home).toBe("/etc/imp/agents/custom");
   });
 
   it("resolves MCP server cwd relative to the config directory", async () => {

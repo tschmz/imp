@@ -102,6 +102,7 @@ Common fields:
 - `prompt.base`: optional system prompt override, as `text` or `file`; when omitted, `imp` uses the built-in default prompt from the installed code
 - `prompt.instructions`: optional extra instruction files or inline text
 - `prompt.references`: optional context files or inline text
+- `home`: optional agent home directory; defaults to `paths.dataRoot/agents/<agent-id>`
 - `authFile`: optional OAuth credential file for providers that support it
 - `tools`: tools the agent may use
 - `workspace.cwd`: working directory for file and shell tools
@@ -140,7 +141,7 @@ dataRoot/
   skills/
 ```
 
-Endpoint directories store conversation data. Endpoint logs and runtime lock/state files live under the central `logs/endpoints` and `runtime/endpoints` trees. Agent prompt files and workspaces should live under `agents/<agent-id>` when they are managed inside `paths.dataRoot`.
+Endpoint directories store conversation data. Endpoint logs and runtime lock/state files live under the central `logs/endpoints` and `runtime/endpoints` trees. Agent home directories default to `agents/<agent-id>`, and every direct `*.md` file in an agent home is loaded alphabetically as an instruction block before explicit `prompt.instructions` and the workspace `AGENTS.md`.
 
 ## Secret References
 
@@ -201,6 +202,7 @@ Available variables:
 - `system.homeDir`
 - `endpoint.id`
 - `agent.id`
+- `agent.home`
 - `agent.model.provider`
 - `agent.model.modelId`
 - `agent.authFile`

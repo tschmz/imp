@@ -48,6 +48,7 @@ export interface AgentConfig {
   name?: string;
   prompt?: AgentPromptConfigInput;
   model?: ModelConfig;
+  home?: string;
   authFile?: string;
   inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;

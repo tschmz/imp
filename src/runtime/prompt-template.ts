@@ -23,6 +23,7 @@ export interface PromptTemplateContext {
       provider: string;
       modelId: string;
     };
+    home: string;
     authFile?: string;
     workspace: {
       cwd?: string;
@@ -76,6 +77,7 @@ export function createPromptTemplateContext(options: {
         provider: options.agent.model.provider,
         modelId: options.agent.model.modelId,
       },
+      home: options.agent.home ?? "",
       authFile: options.agent.authFile ?? "",
       workspace: {
         cwd: options.agent.workspace?.cwd ?? "",

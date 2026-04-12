@@ -101,6 +101,7 @@ const agentConfigSchema = z
     name: z.string().min(1).optional(),
     prompt: agentPromptConfigSchema.optional(),
     model: modelConfigSchema.optional(),
+    home: z.string().min(1).optional(),
     authFile: z.string().min(1).optional(),
     inference: inferenceSettingsSchema.optional(),
     workspace: agentWorkspaceConfigSchema.optional(),

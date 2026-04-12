@@ -101,6 +101,7 @@ function createTemplateContext(): PromptTemplateContext {
     },
     agent: {
       id: "default",
+      home: "/var/lib/imp/agents/default",
       model: {
         provider: "faux",
         modelId: "faux-1",

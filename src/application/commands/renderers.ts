@@ -209,6 +209,7 @@ export function renderAgentMessage(
     `Provider: ${agent.model.provider}`,
     `Model: ${agent.model.modelId}`,
     `Base prompt: ${basePrompt}`,
+    `Home: ${agent.home ?? "not set"}`,
     `Auth file: ${agent.authFile ?? "not set"}`,
     `Instructions: ${instructionSources.length > 0 ? instructionSources.join(", ") : "none"}`,
     `References: ${referenceSources.length > 0 ? referenceSources.join(", ") : "none"}`,

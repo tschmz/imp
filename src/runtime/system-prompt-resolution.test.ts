@@ -69,6 +69,71 @@ describe("resolveSystemPrompt", () => {
     );
   });
 
+  it("loads agent home markdown instructions before configured instructions", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        home: "/var/lib/imp/agents/default",
+        prompt: {
+          base: { text: "You are concise." },
+          instructions: [
+            { file: "/workspace/AGENTS.md" },
+            { file: "/var/lib/imp/agents/default/B.md" },
+          ],
+          references: [{ file: "/workspace/RUNBOOK.md" }],
+        },
+      },
+      "/workspace",
+      {
+        ...createTemplateContext(),
+        agent: {
+          ...createTemplateContext().agent,
+          home: "/var/lib/imp/agents/default",
+        },
+      },
+      [],
+      async (path) => {
+        if (path === "/var/lib/imp/agents/default/A.md") {
+          return "Home A at {{agent.home}}.";
+        }
+
+        if (path === "/var/lib/imp/agents/default/B.md") {
+          return "Home B.";
+        }
+
+        if (path === "/workspace/AGENTS.md") {
+          return "Workspace instructions.";
+        }
+
+        if (path === "/workspace/RUNBOOK.md") {
+          return "Reference content.";
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      },
+      [
+        "/var/lib/imp/agents/default/A.md",
+        "/var/lib/imp/agents/default/B.md",
+      ],
+    );
+
+    expect(prompt).toBe(
+      "You are concise.\n\n" +
+        '<INSTRUCTIONS from="/var/lib/imp/agents/default/A.md">\n\n' +
+        "Home A at /var/lib/imp/agents/default.\n" +
+        "</INSTRUCTIONS>\n\n" +
+        '<INSTRUCTIONS from="/var/lib/imp/agents/default/B.md">\n\n' +
+        "Home B.\n" +
+        "</INSTRUCTIONS>\n\n" +
+        '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
+        "Workspace instructions.\n" +
+        "</INSTRUCTIONS>\n\n" +
+        '<REFERENCE from="/workspace/RUNBOOK.md">\n\n' +
+        "Reference content.\n" +
+        "</REFERENCE>",
+    );
+  });
+
   it("fails clearly when a file-backed prompt template references an unknown variable", async () => {
     await expect(
       buildSystemPrompt(
@@ -331,6 +396,7 @@ function createTemplateContext(): PromptTemplateContext {
     },
     agent: {
       id: "default",
+      home: "/var/lib/imp/agents/default",
       model: {
         provider: "faux",
         modelId: "faux-1",

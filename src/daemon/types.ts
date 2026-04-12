@@ -73,6 +73,7 @@ export interface ConfiguredAgent {
   name?: string;
   prompt: AgentPromptConfig;
   model?: ModelRef;
+  home?: string;
   authFile?: string;
   inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;

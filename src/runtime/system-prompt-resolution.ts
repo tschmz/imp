@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
@@ -11,6 +12,7 @@ export interface SystemPromptResolutionOptions {
   templateContext: PromptTemplateContext;
   availableSkills?: SkillDefinition[];
   readTextFile: (path: string) => Promise<string>;
+  listAgentHomeMarkdownFiles?: (path: string) => Promise<string[]>;
   cache: SystemPromptCache;
 }
 
@@ -22,8 +24,16 @@ export interface SystemPromptResolutionResult {
 export async function resolveSystemPrompt(
   options: SystemPromptResolutionOptions,
 ): Promise<SystemPromptResolutionResult> {
+  const agentHomeMarkdownFiles = await resolveAgentHomeMarkdownFiles(
+    options.agent,
+    options.listAgentHomeMarkdownFiles ?? defaultListAgentHomeMarkdownFiles,
+  );
   const promptFiles = [
-    ...resolvePromptFileSources(options.agent, options.promptWorkingDirectory).map((source) => source.path),
+    ...resolvePromptFileSources(
+      options.agent,
+      options.promptWorkingDirectory,
+      agentHomeMarkdownFiles,
+    ).map((source) => source.path),
   ];
 
   const cacheKey = await options.cache.buildCacheKey({
@@ -48,6 +58,7 @@ export async function resolveSystemPrompt(
     options.templateContext,
     options.availableSkills ?? [],
     options.readTextFile,
+    agentHomeMarkdownFiles,
   );
 
   options.cache.set(options.agent.id, cacheKey, systemPrompt);
@@ -64,6 +75,7 @@ export async function buildSystemPrompt(
   templateContext: PromptTemplateContext,
   availableSkills: SkillDefinition[],
   readTextFile: (path: string) => Promise<string>,
+  agentHomeMarkdownFiles: string[] = [],
 ): Promise<string> {
   const sections: string[] = [];
   const promptTemplateContext: PromptTemplateContext = {
@@ -86,7 +98,7 @@ export async function buildSystemPrompt(
   }
   sections.push(basePrompt);
 
-  for (const source of resolveInstructionSources(agent, promptWorkingDirectory)) {
+  for (const source of resolveInstructionSources(agent, promptWorkingDirectory, agentHomeMarkdownFiles)) {
     const content = await resolvePromptSourceContent(agent, source.source, readTextFile, {
       kind: "instruction file",
       optional: source.optional,
@@ -127,12 +139,27 @@ function escapeInstructionAttribute(value: string): string {
 export function resolveInstructionSources(
   agent: AgentDefinition,
   promptWorkingDirectory: string | undefined,
+  agentHomeMarkdownFiles: string[] = [],
 ): Array<{ source: PromptSource; optional: boolean }> {
-  const sources = (agent.prompt.instructions ?? []).map((source) => ({ source, optional: false }));
+  const sources: Array<{ source: PromptSource; optional: boolean }> = [
+    ...agentHomeMarkdownFiles.map((file) => ({ source: { file }, optional: false })),
+  ];
+  const seenFiles = new Set(sources.map((entry) => entry.source.file).filter((file): file is string => !!file));
+
+  for (const source of agent.prompt.instructions ?? []) {
+    if (source.file && seenFiles.has(source.file)) {
+      continue;
+    }
+    if (source.file) {
+      seenFiles.add(source.file);
+    }
+    sources.push({ source, optional: false });
+  }
+
   const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(promptWorkingDirectory);
   if (
     workingDirectoryAgentsFile &&
-    !sources.some((entry) => entry.source.file === workingDirectoryAgentsFile)
+    !seenFiles.has(workingDirectoryAgentsFile)
   ) {
     sources.push({ source: { file: workingDirectoryAgentsFile }, optional: true });
   }
@@ -142,14 +169,43 @@ export function resolveInstructionSources(
 function resolvePromptFileSources(
   agent: AgentDefinition,
   promptWorkingDirectory: string | undefined,
+  agentHomeMarkdownFiles: string[],
 ): Array<{ path: string; optional: boolean }> {
   return [
     ...extractFileSources([agent.prompt.base]),
     ...extractFileSources(agent.prompt.references ?? []),
-    ...resolveInstructionSources(agent, promptWorkingDirectory)
+    ...resolveInstructionSources(agent, promptWorkingDirectory, agentHomeMarkdownFiles)
       .filter((entry) => entry.source.file)
       .map((entry) => ({ path: entry.source.file!, optional: entry.optional })),
   ];
+}
+
+async function resolveAgentHomeMarkdownFiles(
+  agent: AgentDefinition,
+  listAgentHomeMarkdownFiles: (path: string) => Promise<string[]>,
+): Promise<string[]> {
+  if (!agent.home) {
+    return [];
+  }
+
+  try {
+    return await listAgentHomeMarkdownFiles(agent.home);
+  } catch (error) {
+    if (isFileNotFoundError(error) || isNotDirectoryError(error)) {
+      return [];
+    }
+
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to list agent home markdown files for agent "${agent.id}": ${agent.home} (${detail})`);
+  }
+}
+
+async function defaultListAgentHomeMarkdownFiles(path: string): Promise<string[]> {
+  const entries = await readdir(path, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => join(path, entry.name))
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function resolveWorkingDirectoryAgentsFile(workingDirectory: string | undefined): string | undefined {
@@ -250,4 +306,18 @@ function isFileNotFoundError(error: unknown): boolean {
 
   const message = "message" in error ? error.message : undefined;
   return typeof message === "string" && message.includes("ENOENT");
+}
+
+function isNotDirectoryError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const code = "code" in error ? error.code : undefined;
+  if (code === "ENOTDIR") {
+    return true;
+  }
+
+  const message = "message" in error ? error.message : undefined;
+  return typeof message === "string" && message.includes("ENOTDIR");
 }

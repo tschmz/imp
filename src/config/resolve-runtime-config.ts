@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import type {
   AgentMcpConfig,
   AgentPromptConfig,
@@ -46,6 +46,7 @@ export async function resolveRuntimeConfig(
           ...(agent.name ? { name: agent.name } : {}),
           prompt: resolveAgentPrompt(agent.prompt, configDir),
           ...(agent.model ? { model: agent.model } : {}),
+          home: resolveAgentHome(agent, appConfig.paths.dataRoot, configDir),
           ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, configDir) } : {}),
           ...(agent.workspace ? { workspace: resolveAgentWorkspace(agent.workspace, configDir) } : {}),
           ...(agent.skills ? { skills: resolveAgentSkills(agent.skills, configDir) } : {}),
@@ -121,6 +122,14 @@ function resolveAgentWorkspace(workspace: AgentWorkspaceConfig, configDir: strin
     ...workspace,
     ...(workspace.cwd ? { cwd: resolveConfigPath(workspace.cwd, configDir) } : {}),
   };
+}
+
+function resolveAgentHome(
+  agent: AppConfig["agents"][number],
+  dataRoot: string,
+  configDir: string,
+): string {
+  return resolveConfigPath(agent.home ?? join(dataRoot, "agents", agent.id), configDir);
 }
 
 function resolveAgentSkills(
