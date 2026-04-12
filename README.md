@@ -14,8 +14,8 @@ Agents define how `imp` should answer within a conversation. An agent combines a
 
 ### Endpoints
 
-Endpoints define where conversations enter the system. Today, Telegram is the supported endpoint type. Endpoints are transport-facing, own their runtime files and conversation store, and route messages to a default agent unless a conversation selects another configured agent.
+Endpoints define where conversations enter the system. Telegram and local CLI chat are supported endpoint types. Endpoints are transport-facing, own their runtime files and conversation store, and route messages to a default agent unless a conversation selects another configured agent. The local CLI chat endpoint is started directly with `imp chat`; it is not started by the daemon service.
 
 ### Transports
 
-Transports connect endpoint types to external systems. The built-in Telegram transport receives Telegram messages, sends them into `imp`, and delivers responses back to Telegram. The transport registry is the extension point for adding other endpoint types later.
+Transports connect endpoint types to external systems. The built-in Telegram transport receives Telegram messages, sends them into `imp`, and delivers responses back to Telegram. The built-in CLI transport powers `imp chat` for a local terminal conversation.

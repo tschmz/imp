@@ -68,7 +68,11 @@ export interface TelegramEndpointConfig extends BaseEndpointConfig {
   voice?: TelegramVoiceConfig;
 }
 
-export type EndpointConfig = TelegramEndpointConfig;
+export interface CliEndpointConfig extends BaseEndpointConfig {
+  type: "cli";
+}
+
+export type EndpointConfig = TelegramEndpointConfig | CliEndpointConfig;
 
 export interface TelegramAccessConfig {
   allowedUserIds: string[];

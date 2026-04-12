@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { secretValueConfigSchema } from "../../config/secret-value.js";
 import type { TelegramEndpointConfig } from "../../config/types.js";
-import type { ActiveEndpointRuntimeConfig } from "../../daemon/types.js";
+import type { ActiveEndpointRuntimeConfig, TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport } from "../types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
@@ -83,5 +83,9 @@ export function createTelegramTransportFromRuntimeConfig(
   config: ActiveEndpointRuntimeConfig,
   logger: Logger,
 ): Transport {
-  return createTelegramTransport(config, undefined, logger);
+  if (config.type !== "telegram") {
+    throw new Error(`Expected Telegram endpoint runtime config, got "${config.type}".`);
+  }
+
+  return createTelegramTransport(config as TelegramEndpointRuntimeConfig, undefined, logger);
 }

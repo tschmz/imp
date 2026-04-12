@@ -40,7 +40,7 @@ export async function promptForInitialAppConfig(
   const defaultAgent = defaults.agents[0];
   const defaultEndpoint = defaults.endpoints[0];
 
-  if (!defaultAgent || !defaultAgent.model || !defaultEndpoint) {
+  if (!defaultAgent || !defaultAgent.model || !defaultEndpoint || defaultEndpoint.type !== "telegram") {
     throw new Error("Default init config is incomplete.");
   }
 

@@ -608,7 +608,7 @@ function createRuntimePaths(root: string, endpointId = "private-telegram"): Runt
 
 function createEndpointConfig(
   root: string,
-  overrides: Partial<DaemonConfig["activeEndpoints"][number]> = {},
+  overrides: Partial<Extract<DaemonConfig["activeEndpoints"][number], { type: "telegram" }>> = {},
 ): DaemonConfig["activeEndpoints"][number] {
   const id = overrides.id ?? "private-telegram";
   const paths = overrides.paths ?? createRuntimePaths(root, id);

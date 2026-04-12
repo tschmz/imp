@@ -16,6 +16,10 @@ export async function validateAppConfigSecretReferences(
 
   await Promise.all(
     appConfig.endpoints.map(async (endpoint, index) => {
+      if (endpoint.type !== "telegram") {
+        return;
+      }
+
       await resolveSecretValue(endpoint.token, {
         configDir,
         env: options.env,

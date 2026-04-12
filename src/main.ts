@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createBackupUseCases } from "./application/backup-use-cases.js";
+import { createChatUseCase } from "./application/chat-use-case.js";
 import { createGetConfigValueUseCase } from "./application/get-config-value-use-case.js";
 import { createInitConfigUseCase } from "./application/init-config-use-case.js";
 import { createReloadConfigUseCase } from "./application/reload-config-use-case.js";
@@ -36,6 +37,7 @@ async function main(): Promise<void> {
       const outcome = await runDaemonUseCase(options);
       presentRunDaemonOutcome(outcome);
     },
+    startChat: createChatUseCase(),
     viewLogs: createViewLogsUseCase(),
     validateConfig: validateConfigUseCase,
     reloadConfig: createReloadConfigUseCase(),

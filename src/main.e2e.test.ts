@@ -5,9 +5,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
+import { createRequire } from "node:module";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
+const packageJson = require("../package.json") as { version: string };
 const tempDirs: string[] = [];
 const projectRoot = resolveProjectRoot();
 const cliEntryPoint = join(projectRoot, "dist", "main.js");
@@ -42,7 +45,7 @@ describe("imp CLI e2e", () => {
 
     const { stdout } = await runCli(["--version"], env);
 
-    expect(stdout.trim()).toBe("0.1.0");
+    expect(stdout.trim()).toBe(packageJson.version);
   });
 
   it("creates a default config through `imp init --defaults`", async () => {

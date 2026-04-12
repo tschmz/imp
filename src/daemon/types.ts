@@ -22,6 +22,11 @@ export interface TelegramEndpointRuntimeConfig extends BaseTransportRuntimeConfi
   voice?: TelegramVoiceRuntimeConfig;
 }
 
+export interface CliEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
+  type: "cli";
+  userId: string;
+}
+
 export interface TelegramVoiceRuntimeConfig {
   enabled: boolean;
   transcription: TelegramTranscriptionRuntimeConfig;
@@ -33,7 +38,7 @@ export interface TelegramTranscriptionRuntimeConfig {
   language?: string;
 }
 
-export type TransportEndpointRuntimeConfig = TelegramEndpointRuntimeConfig;
+export type TransportEndpointRuntimeConfig = TelegramEndpointRuntimeConfig | CliEndpointRuntimeConfig;
 
 export interface RuntimePaths {
   dataRoot: string;

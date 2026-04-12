@@ -20,6 +20,22 @@ This mode is useful while setting up the config, testing prompts, or watching lo
 
 It is also the simplest way to verify behavior before installing a background service.
 
+## Chat In The Terminal
+
+Start the local CLI chat endpoint:
+
+```bash
+imp chat
+```
+
+Use a named CLI chat profile from the config:
+
+```bash
+imp chat --endpoint local-cli
+```
+
+`imp chat` always starts a local CLI endpoint in the foreground. If no CLI profile is configured, it uses `local-cli`. Chat uses `defaults.agentId` as the default agent and does not start Telegram endpoints.
+
 ## View Logs
 
 Show recent logs:

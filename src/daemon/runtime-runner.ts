@@ -16,7 +16,7 @@ export interface RuntimeEntry {
 interface RuntimeRunnerDependencies {
   agentRegistry: ReturnType<typeof createAgentRegistry>;
   createTransport: TransportFactory<ActiveEndpointRuntimeConfig, BootstrappedRuntime["logger"]>;
-  requestControlAction?: (action: RuntimeControlAction) => void;
+  requestControlAction?: (action: RuntimeControlAction) => Promise<void> | void;
 }
 
 export function createRuntimeEntries(

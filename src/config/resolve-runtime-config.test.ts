@@ -131,6 +131,25 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
+  it("does not start enabled cli endpoints in daemon runtime config", async () => {
+    const appConfig = createAppConfig({
+      endpoints: [
+        {
+          id: "local-cli",
+          type: "cli",
+          enabled: true,
+          routing: {
+            defaultAgentId: "default",
+          },
+        },
+      ],
+    });
+
+    await expect(resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).rejects.toThrowError(
+      "Config must enable at least one daemon endpoint.",
+    );
+  });
+
   it("discovers valid agent skills from configured paths", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config", "imp.json");
@@ -391,7 +410,7 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.authFile).toBe("/etc/imp/auth.json");
   });
 
-  it("fails when no endpoint is enabled", async () => {
+  it("fails when no daemon endpoint is enabled", async () => {
     const appConfig = createAppConfig({
       endpoints: [
         {
@@ -407,7 +426,7 @@ describe("resolveRuntimeConfig", () => {
     });
 
     await expect(resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).rejects.toThrowError(
-      "Config must enable at least one endpoint.",
+      "Config must enable at least one daemon endpoint.",
     );
   });
 
@@ -487,7 +506,11 @@ describe("resolveRuntimeConfig", () => {
       },
     });
 
-    expect(result.activeEndpoints[0]?.token).toBe("telegram-from-env");
+    const endpoint = result.activeEndpoints[0];
+    expect(endpoint?.type).toBe("telegram");
+    if (endpoint?.type === "telegram") {
+      expect(endpoint.token).toBe("telegram-from-env");
+    }
   });
 
   it("resolves telegram token file references relative to the config file", async () => {
@@ -514,7 +537,11 @@ describe("resolveRuntimeConfig", () => {
 
     const result = await resolveRuntimeConfig(appConfig, configPath);
 
-    expect(result.activeEndpoints[0]?.token).toBe("telegram-from-file");
+    const endpoint = result.activeEndpoints[0];
+    expect(endpoint?.type).toBe("telegram");
+    if (endpoint?.type === "telegram") {
+      expect(endpoint.token).toBe("telegram-from-file");
+    }
   });
 
   it("fails when a telegram token env reference is missing", async () => {

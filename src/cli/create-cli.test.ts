@@ -11,6 +11,7 @@ describe("createCli", () => {
 
     expect(cli.helpInformation()).toContain("Usage: imp");
     expect(cli.helpInformation()).toContain("start");
+    expect(cli.helpInformation()).toContain("chat");
     expect(cli.helpInformation()).toContain("log");
     expect(cli.helpInformation()).toContain("config");
     expect(cli.helpInformation()).toContain("init");
@@ -20,6 +21,7 @@ describe("createCli", () => {
     expect(cli.helpInformation()).toContain("--version");
 
     expect(findCommand(cli, "start").helpInformation()).toContain("--config <path>");
+    expect(findCommand(cli, "chat").helpInformation()).toContain("--endpoint <id>");
 
     const logHelp = findCommand(cli, "log").helpInformation();
     expect(logHelp).toContain("--endpoint <id>");
@@ -76,6 +78,7 @@ describe("createCli", () => {
 
     await cli.parseAsync(["node", "imp", "log", "--endpoint", "ops", "--follow", "--lines", "2", "--config", "/tmp/imp.json"]);
     await cli.parseAsync(["node", "imp", "config", "set", "--config", "/tmp/imp.json", "endpoints.0.enabled", "false"]);
+    await cli.parseAsync(["node", "imp", "chat", "--endpoint", "local-cli", "--config", "/tmp/imp.json"]);
     await cli.parseAsync(["node", "imp", "restore", "/tmp/backup.tar", "--config", "/tmp/imp.json", "--data-root", "/tmp/state", "--only", "agents", "--force"]);
     await cli.parseAsync(["node", "imp", "service", "install", "--config", "/tmp/imp.json", "--dry-run"]);
 
@@ -89,6 +92,10 @@ describe("createCli", () => {
       configPath: "/tmp/imp.json",
       keyPath: "endpoints.0.enabled",
       value: "false",
+    });
+    expect(dependencies.startChat).toHaveBeenCalledWith({
+      configPath: "/tmp/imp.json",
+      endpointId: "local-cli",
     });
     expect(dependencies.restoreBackup).toHaveBeenCalledWith({
       configPath: "/tmp/imp.json",
@@ -145,6 +152,7 @@ function findCommand(command: Command, name: string): Command {
 function createDependencies(): CliDependencies {
   return {
     startDaemon: vi.fn(async () => undefined),
+    startChat: vi.fn(async () => undefined),
     viewLogs: vi.fn(async () => undefined),
     validateConfig: vi.fn(async () => undefined),
     reloadConfig: vi.fn(async () => undefined),

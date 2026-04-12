@@ -3,6 +3,7 @@ import { Command, InvalidArgumentError } from "commander";
 
 export interface CliDependencies {
   startDaemon: (options: { configPath?: string }) => Promise<void>;
+  startChat: (options: { configPath?: string; endpointId?: string }) => Promise<void>;
   viewLogs: (options: { configPath?: string; endpointId?: string; follow: boolean; lines: number }) => Promise<void>;
   validateConfig: (options: { configPath?: string }) => Promise<void>;
   reloadConfig: (options: { configPath?: string }) => Promise<void>;
@@ -49,6 +50,18 @@ export function createCli(dependencies: CliDependencies): Command {
     .option("-c, --config <path>", "Path to the config file")
     .action(async function action(this: Command, options: { config?: string }) {
       await dependencies.startDaemon({ configPath: options.config });
+    });
+
+  program
+    .command("chat")
+    .description("Start an interactive CLI chat endpoint")
+    .option("-c, --config <path>", "Path to the config file")
+    .option("-b, --endpoint <id>", "CLI endpoint ID to use")
+    .action(async function action(this: Command, options: { config?: string; endpoint?: string }) {
+      await dependencies.startChat({
+        configPath: options.config,
+        endpointId: options.endpoint,
+      });
     });
 
   program

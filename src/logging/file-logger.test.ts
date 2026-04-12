@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFileLogger, rotateLogFileOnStartup } from "./file-logger.js";
+import { createFileLogger, createFileOnlyLogger, rotateLogFileOnStartup } from "./file-logger.js";
 
 const tempDirs: string[] = [];
 
@@ -63,6 +63,23 @@ describe("createFileLogger", () => {
 
     await expect(readFile(logFilePath, "utf8")).resolves.toContain('"message":"visible"');
     expect(consoleError).toHaveBeenCalledWith("visible");
+  });
+
+  it("can write logs without writing to the console", async () => {
+    const logFilePath = await createLogFilePath();
+    const consoleInfo = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logger = createFileOnlyLogger(logFilePath, "debug");
+
+    await logger.info("visible-info");
+    await logger.error("visible-error", undefined, new Error("boom"));
+
+    const content = await readFile(logFilePath, "utf8");
+    expect(content).toContain('"message":"visible-info"');
+    expect(content).toContain('"message":"visible-error"');
+    expect(content).toContain("Error: boom");
+    expect(consoleInfo).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   it("rotates a non-empty daemon log to daemon.log.1 on startup", async () => {

@@ -202,12 +202,19 @@ Example:
 
 Endpoints expose agents through transports.
 
-Today, `telegram` is the only supported endpoint type.
+Supported endpoint types:
 
-Common Telegram fields:
+- `telegram`
+- `cli`
+
+Common endpoint fields:
 
 - `id`: unique endpoint ID
-- `enabled`: whether the endpoint starts
+- `enabled`: whether the endpoint starts under `imp start` or the service
+- `routing.defaultAgentId`: optional per-endpoint agent override for daemon endpoints
+
+Telegram fields:
+
 - `token`: Telegram endpoint token
 - `token.env`: read the token from an environment variable
 - `token.file`: read the token from a secret file
@@ -216,9 +223,12 @@ Common Telegram fields:
 - `voice.transcription.provider`: STT backend, currently only `openai`
 - `voice.transcription.model`: OpenAI transcription model, for example `gpt-4o-mini-transcribe`
 - `voice.transcription.language`: optional ISO-639-1 language hint such as `en`
-- `routing.defaultAgentId`: optional per-endpoint agent override
 
-Only enabled endpoints are started. At least one endpoint must be enabled.
+CLI endpoints do not have additional public config fields.
+
+`imp chat` always has a local CLI endpoint available. If no CLI endpoint is configured, it uses `local-cli`. Configured CLI endpoints are optional named chat profiles for `imp chat --endpoint <id>`; they are not started by `imp start` or the service, and chat uses `defaults.agentId` rather than `routing.defaultAgentId`.
+
+Only enabled daemon endpoints are started by `imp start` and the service. At least one non-CLI endpoint must be enabled for daemon startup.
 
 Skill discovery notes:
 

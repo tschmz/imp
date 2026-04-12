@@ -41,7 +41,11 @@ describe("promptForInitialAppConfig", () => {
       instructions: [{ file: "/workspace/AGENTS.md" }],
       references: [{ file: "/workspace/RULES.md" }],
     });
-    expect(result.config.endpoints[0]?.access.allowedUserIds).toEqual(["1", "2"]);
+    const endpoint = result.config.endpoints[0];
+    expect(endpoint?.type).toBe("telegram");
+    if (endpoint?.type === "telegram") {
+      expect(endpoint.access.allowedUserIds).toEqual(["1", "2"]);
+    }
     if (process.platform === "linux") {
       expect(result.serviceEnvironment).toEqual({
         OPENAI_API_KEY: "sk-test",

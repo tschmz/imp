@@ -9,11 +9,11 @@ import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
 import { getTransport } from "../transports/registry.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
-import type { SecretValueConfig } from "./secret-value.js";
 import type { AgentToolsConfig, AppConfig } from "./types.js";
 
 interface ResolveRuntimeConfigOptions {
   env?: NodeJS.ProcessEnv;
+  includeCliEndpoints?: boolean;
   readTextFile?: (path: string) => Promise<string>;
 }
 
@@ -22,10 +22,12 @@ export async function resolveRuntimeConfig(
   configPath: string,
   options: ResolveRuntimeConfigOptions = {},
 ): Promise<DaemonConfig> {
-  const enabledEndpoints = appConfig.endpoints.filter((endpoint) => endpoint.enabled);
+  const enabledEndpoints = appConfig.endpoints.filter(
+    (endpoint) => endpoint.enabled && (options.includeCliEndpoints || endpoint.type !== "cli"),
+  );
 
   if (enabledEndpoints.length === 0) {
-    throw new Error("Config must enable at least one endpoint.");
+    throw new Error("Config must enable at least one daemon endpoint.");
   }
   const configDir = dirname(configPath);
 
@@ -83,7 +85,7 @@ async function resolveEndpointRuntimeSecrets(
   configDir: string,
   options: ResolveRuntimeConfigOptions,
 ): Promise<AppConfig["endpoints"][number]> {
-  if (!hasTokenSecret(endpoint)) {
+  if (endpoint.type !== "telegram") {
     return endpoint;
   }
 
@@ -96,10 +98,6 @@ async function resolveEndpointRuntimeSecrets(
       fieldLabel: `endpoints.${endpoint.id}.token`,
     }),
   };
-}
-
-function hasTokenSecret(endpoint: AppConfig["endpoints"][number]): endpoint is AppConfig["endpoints"][number] & { token: SecretValueConfig } {
-  return Object.hasOwn(endpoint, "token") && (endpoint as { token?: unknown }).token !== undefined;
 }
 
 function resolveAgentPrompt(prompt: AppConfig["agents"][number]["prompt"], configDir: string): AgentPromptConfig {

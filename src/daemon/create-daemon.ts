@@ -91,7 +91,7 @@ export function createDaemon(
   };
 }
 
-function validateAgentRegistry(
+export function validateAgentRegistry(
   agentRegistry: ReturnType<typeof createAgentRegistry>,
   toolRegistry: ToolRegistry | undefined,
   createBuiltInRegistry: (workingDirectory: string, agent?: AgentDefinition) => ToolRegistry,
@@ -103,7 +103,7 @@ function validateAgentRegistry(
   }
 }
 
-function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[] {
+export function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[] {
   return configuredAgents.map((configuredAgent) => {
     validatePromptBase(configuredAgent.id, configuredAgent.prompt.base);
 

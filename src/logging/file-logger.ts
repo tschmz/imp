@@ -10,6 +10,18 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
 };
 
 export function createFileLogger(path: string, level: LogLevel = "info"): Logger {
+  return createFileLoggerWithOptions(path, level, { writeConsole: true });
+}
+
+export function createFileOnlyLogger(path: string, level: LogLevel = "info"): Logger {
+  return createFileLoggerWithOptions(path, level, { writeConsole: false });
+}
+
+function createFileLoggerWithOptions(
+  path: string,
+  level: LogLevel,
+  options: { writeConsole: boolean },
+): Logger {
   return {
     async debug(message: string, fields?: LogFields): Promise<void> {
       if (!shouldLog("debug", level)) {
@@ -17,7 +29,9 @@ export function createFileLogger(path: string, level: LogLevel = "info"): Logger
       }
 
       await writeLogLine(path, "DEBUG", message, fields);
-      console.debug(formatConsoleLog(message, fields));
+      if (options.writeConsole) {
+        console.debug(formatConsoleLog(message, fields));
+      }
     },
     async info(message: string, fields?: LogFields): Promise<void> {
       if (!shouldLog("info", level)) {
@@ -25,7 +39,9 @@ export function createFileLogger(path: string, level: LogLevel = "info"): Logger
       }
 
       await writeLogLine(path, "INFO", message, fields);
-      console.log(formatConsoleLog(message, fields));
+      if (options.writeConsole) {
+        console.log(formatConsoleLog(message, fields));
+      }
     },
     async error(message: string, fields?: LogFields, error?: unknown): Promise<void> {
       if (!shouldLog("error", level)) {
@@ -37,9 +53,11 @@ export function createFileLogger(path: string, level: LogLevel = "info"): Logger
         await writeLogLine(path, "ERROR", formatError(error), fields);
       }
 
-      console.error(formatConsoleLog(message, fields));
-      if (error !== undefined) {
-        console.error(error);
+      if (options.writeConsole) {
+        console.error(formatConsoleLog(message, fields));
+        if (error !== undefined) {
+          console.error(error);
+        }
       }
     },
   };
