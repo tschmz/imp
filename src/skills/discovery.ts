@@ -23,6 +23,31 @@ export interface MergeSkillCatalogsResult {
   overriddenSkillNames: string[];
 }
 
+export async function loadSkillFromDirectory(skillDirectoryPath: string): Promise<SkillDefinition> {
+  const resolvedSkillDirectoryPath = resolve(skillDirectoryPath);
+  const skillFilePath = join(resolvedSkillDirectoryPath, SKILL_FILE_NAME);
+  const content = await readFile(skillFilePath, "utf8");
+  const parsedSkill = parseSkillFile(content);
+  if (!parsedSkill.success) {
+    throw new Error(parsedSkill.error);
+  }
+
+  const validationError = validateSkillFrontmatter(parsedSkill.frontmatter);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  return {
+    ...parsedSkill.frontmatter,
+    directoryPath: resolvedSkillDirectoryPath,
+    filePath: skillFilePath,
+    body: parsedSkill.body,
+    content,
+    references: await discoverSkillResources(resolvedSkillDirectoryPath, "references"),
+    scripts: await discoverSkillResources(resolvedSkillDirectoryPath, "scripts"),
+  };
+}
+
 export async function discoverSkills(
   paths: string[],
   options: DiscoverSkillsOptions = {},
@@ -52,10 +77,8 @@ export async function discoverSkills(
 
       const skillDirectoryPath = join(directoryPath, entry.name);
       const skillFilePath = join(skillDirectoryPath, SKILL_FILE_NAME);
-      let content: string;
-
       try {
-        content = await readFile(skillFilePath, "utf8");
+        discoveredSkills.push(await loadSkillFromDirectory(skillDirectoryPath));
       } catch (error) {
         if (isFileNotFoundError(error)) {
           continue;
@@ -64,28 +87,6 @@ export async function discoverSkills(
         issues.push(`Ignored skill file "${skillFilePath}": ${formatErrorDetail(error)}.`);
         continue;
       }
-
-      const parsedSkill = parseSkillFile(content);
-      if (!parsedSkill.success) {
-        issues.push(`Ignored skill file "${skillFilePath}": ${parsedSkill.error}.`);
-        continue;
-      }
-
-      const validationError = validateSkillFrontmatter(parsedSkill.frontmatter);
-      if (validationError) {
-        issues.push(`Ignored skill file "${skillFilePath}": ${validationError}.`);
-        continue;
-      }
-
-      discoveredSkills.push({
-        ...parsedSkill.frontmatter,
-        directoryPath: skillDirectoryPath,
-        filePath: skillFilePath,
-        body: parsedSkill.body,
-        content,
-        references: await discoverSkillResources(skillDirectoryPath, "references"),
-        scripts: await discoverSkillResources(skillDirectoryPath, "scripts"),
-      });
     }
   }
 

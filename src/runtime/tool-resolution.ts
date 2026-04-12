@@ -3,6 +3,7 @@ import { delimiter as pathDelimiter, resolve } from "node:path";
 import { createFindTool, createGrepTool, createLsTool, createCodingTools, type ToolsOptions } from "@mariozechner/pi-coding-agent";
 import type { StreamOptions } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
+import { loadSkillFromDirectory } from "../skills/discovery.js";
 import type { SkillDefinition } from "../skills/types.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
@@ -103,21 +104,27 @@ export function createLoadSkillTool(skills: SkillDefinition[]): ToolDefinition {
         throw new Error(`Unknown skill: ${name}. Available skills: ${skills.map((entry) => entry.name).join(", ")}`);
       }
 
+      const refreshedSkill = await loadSkillFromDirectory(skill.directoryPath);
+      const loadedSkill = {
+        ...refreshedSkill,
+        name: skill.name,
+        description: skill.description,
+      };
       const text = [
-        `<skill_content name="${escapeToolAttribute(skill.name)}">\n${skill.body.trim()}\n\nSkill directory: ${skill.directoryPath}\n\n${renderSkillResources(skill)}\n</skill_content>`,
+        `<skill_content name="${escapeToolAttribute(loadedSkill.name)}">\n${loadedSkill.body.trim()}\n\nSkill directory: ${loadedSkill.directoryPath}\n\n${renderSkillResources(loadedSkill)}\n</skill_content>`,
       ].join("\n\n");
 
       return {
         content: [{ type: "text", text }],
         details: {
-          skillName: skill.name,
-          skillPath: skill.filePath,
-          skillDirectoryPath: skill.directoryPath,
-          references: skill.references.map((reference) => ({
+          skillName: loadedSkill.name,
+          skillPath: loadedSkill.filePath,
+          skillDirectoryPath: loadedSkill.directoryPath,
+          references: loadedSkill.references.map((reference) => ({
             path: reference.filePath,
             relativePath: toSkillRelativeResourcePath("references", reference.relativePath),
           })),
-          scripts: skill.scripts.map((script) => ({
+          scripts: loadedSkill.scripts.map((script) => ({
             path: script.filePath,
             relativePath: toSkillRelativeResourcePath("scripts", script.relativePath),
           })),

@@ -15,6 +15,7 @@ import {
   createPiAgentEngine,
   mergeShellPathEntries,
 } from "./create-pi-agent-engine.js";
+import { createLoadSkillTool } from "./tool-resolution.js";
 import { toAgentMessages } from "./message-mapping.js";
 
 const registrations: FauxProviderRegistration[] = [];
@@ -1139,9 +1140,20 @@ describe("createPiAgentEngine", () => {
   it("adds load_skill for available skills and lists bundled resources", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-load-skill-"));
     tempDirs.push(root);
-    const referencePath = join(root, "skills", "commit", "references", "checklist.md");
+    const skillDirectoryPath = join(root, "skills", "commit");
+    const skillPath = join(skillDirectoryPath, "SKILL.md");
+    const referencePath = join(skillDirectoryPath, "references", "checklist.md");
+    const scriptPath = join(skillDirectoryPath, "scripts", "prepare.sh");
+    await mkdir(skillDirectoryPath, { recursive: true });
+    await writeFile(
+      skillPath,
+      "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+      "utf8",
+    );
     await mkdir(dirname(referencePath), { recursive: true });
     await writeFile(referencePath, "Review staged files first.\n", "utf8");
+    await mkdir(dirname(scriptPath), { recursive: true });
+    await writeFile(scriptPath, "#!/usr/bin/env bash", "utf8");
 
     let capturedTools: ToolDefinition[] | undefined;
 
@@ -1168,10 +1180,10 @@ describe("createPiAgentEngine", () => {
           {
             name: "commit",
             description: "Stage and commit changes.",
-            directoryPath: join(root, "skills", "commit"),
-            filePath: join(root, "skills", "commit", "SKILL.md"),
-            body: "\nUse focused commits.",
-            content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+            directoryPath: skillDirectoryPath,
+            filePath: skillPath,
+            body: "\nStale catalog body.",
+            content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nStale catalog body.",
             references: [
               {
                 filePath: referencePath,
@@ -1180,7 +1192,7 @@ describe("createPiAgentEngine", () => {
             ],
             scripts: [
               {
-                filePath: join(root, "skills", "commit", "scripts", "prepare.sh"),
+                filePath: scriptPath,
                 relativePath: "prepare.sh",
               },
             ],
@@ -1207,15 +1219,16 @@ describe("createPiAgentEngine", () => {
     expect(text).toContain('<skill_content name="commit">');
     expect(text).toContain("Use focused commits.");
     expect(text).not.toContain("description: Stage and commit changes.");
-    expect(text).toContain(`Skill directory: ${join(root, "skills", "commit")}`);
+    expect(text).not.toContain("Stale catalog body.");
+    expect(text).toContain(`Skill directory: ${skillDirectoryPath}`);
     expect(text).toContain("<skill_resources>");
-    expect(text).toContain(`<file kind="script" path="${join(root, "skills", "commit", "scripts", "prepare.sh")}">scripts/prepare.sh</file>`);
+    expect(text).toContain(`<file kind="script" path="${scriptPath}">scripts/prepare.sh</file>`);
     expect(text).toContain(`<file kind="reference" path="${referencePath}">references/checklist.md</file>`);
     expect(text).not.toContain("Review staged files first.");
     expect(result.details).toMatchObject({
       skillName: "commit",
-      skillPath: join(root, "skills", "commit", "SKILL.md"),
-      skillDirectoryPath: join(root, "skills", "commit"),
+      skillPath,
+      skillDirectoryPath,
       references: [
         {
           path: referencePath,
@@ -1224,11 +1237,89 @@ describe("createPiAgentEngine", () => {
       ],
       scripts: [
         {
-          path: join(root, "skills", "commit", "scripts", "prepare.sh"),
+          path: scriptPath,
           relativePath: "scripts/prepare.sh",
         },
       ],
     });
+  });
+
+  it("reloads skill content and bundled resources from disk on same-turn load_skill calls", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-load-skill-reload-"));
+    tempDirs.push(root);
+    const skillDirectoryPath = join(root, "skills", "commit");
+    const skillPath = join(skillDirectoryPath, "SKILL.md");
+    const firstScriptPath = join(skillDirectoryPath, "scripts", "first.sh");
+    const secondReferencePath = join(skillDirectoryPath, "references", "second.md");
+    await mkdir(dirname(firstScriptPath), { recursive: true });
+    await writeFile(
+      skillPath,
+      "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nFirst instructions.",
+      "utf8",
+    );
+    await writeFile(firstScriptPath, "#!/usr/bin/env bash", "utf8");
+
+    const loadSkill = createLoadSkillTool([
+      {
+        name: "commit",
+        description: "Stage and commit changes.",
+        directoryPath: skillDirectoryPath,
+        filePath: skillPath,
+        body: "\nStale first instructions.",
+        content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nStale first instructions.",
+        references: [],
+        scripts: [
+          {
+            filePath: firstScriptPath,
+            relativePath: "first.sh",
+          },
+        ],
+      },
+    ]);
+
+    const firstResult = await loadSkill.execute("load-1", { name: "commit" });
+    const firstText = firstResult.content
+      .flatMap((item) => (item.type === "text" ? [item.text] : []))
+      .join("\n");
+    expect(firstText).toContain("First instructions.");
+    expect(firstText).toContain(`<file kind="script" path="${firstScriptPath}">scripts/first.sh</file>`);
+
+    await writeFile(
+      skillPath,
+      "---\nname: edited-name\ndescription: Edited during the same turn.\n---\n\nSecond instructions.",
+      "utf8",
+    );
+    await mkdir(dirname(secondReferencePath), { recursive: true });
+    await writeFile(secondReferencePath, "Reference content", "utf8");
+
+    const secondResult = await loadSkill.execute("load-2", { name: "commit" });
+    const secondText = secondResult.content
+      .flatMap((item) => (item.type === "text" ? [item.text] : []))
+      .join("\n");
+
+    expect(secondText).toContain('<skill_content name="commit">');
+    expect(secondText).toContain("Second instructions.");
+    expect(secondText).not.toContain("First instructions.");
+    expect(secondText).toContain(`<file kind="reference" path="${secondReferencePath}">references/second.md</file>`);
+    expect(secondResult.details).toMatchObject({
+      skillName: "commit",
+      references: [
+        {
+          path: secondReferencePath,
+          relativePath: "references/second.md",
+        },
+      ],
+    });
+    expect(loadSkill.parameters).toMatchObject({
+      properties: {
+        name: {
+          enum: ["commit"],
+        },
+      },
+    });
+    await expect(loadSkill.execute("load-3", { name: "edited-name" })).rejects.toThrow(
+      "Unknown skill: edited-name. Available skills: commit",
+    );
   });
 
   it("allows agents to inspect and change their working directory via tools", async () => {
