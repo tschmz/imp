@@ -93,6 +93,33 @@ Important rules:
 - prompt sources must specify exactly one of `text` or `file`
 - `authFile` only works with OAuth-capable providers
 
+## Data Root Layout
+
+`paths.dataRoot` stores local runtime and agent support files. The conventional layout is:
+
+```text
+dataRoot/
+  SYSTEM.md
+  auth.json
+  agents/
+    <agent-id>/
+      AGENTS.md
+      SOUL.md
+      workspace/
+  endpoints/
+    <endpoint-id>/
+      conversations/
+  logs/
+    endpoints/
+      <endpoint-id>.log
+  runtime/
+    endpoints/
+      <endpoint-id>.json
+  skills/
+```
+
+Endpoint directories store conversation data. Endpoint logs and runtime lock/state files live under the central `logs/endpoints` and `runtime/endpoints` trees. Agent prompt files and workspaces should live under `agents/<agent-id>` when they are managed inside `paths.dataRoot`.
+
 ## Secret References
 
 V1 secret references are currently supported for Telegram endpoint tokens via `endpoints[].token`.

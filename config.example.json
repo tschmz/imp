@@ -34,12 +34,12 @@
         },
         "instructions": [
           {
-            "file": "/path/to/workspace/AGENTS.md"
+            "file": "/var/lib/imp/agents/default/AGENTS.md"
           }
         ]
       },
       "workspace": {
-        "cwd": "/path/to/workspace",
+        "cwd": "/var/lib/imp/agents/default/workspace",
         "shellPath": [
           "/home/example/.local/bin",
           "/usr/local/bin",
@@ -75,17 +75,17 @@
         },
         "instructions": [
           {
-            "file": "/path/to/ops-workspace/AGENTS.md"
+            "file": "/var/lib/imp/agents/ops/AGENTS.md"
           }
         ],
         "references": [
           {
-            "file": "/path/to/ops-workspace/RUNBOOK.md"
+            "file": "/var/lib/imp/agents/ops/RUNBOOK.md"
           }
         ]
       },
       "workspace": {
-        "cwd": "/path/to/ops-workspace",
+        "cwd": "/var/lib/imp/agents/ops/workspace",
         "shellPath": [
           "/usr/local/bin",
           "/usr/bin",

@@ -29,7 +29,7 @@ Common causes:
 - duplicate agent IDs
 - duplicate endpoint IDs
 - `defaults.agentId` points to a missing agent
-- a endpoint routes to a missing agent
+- an endpoint routes to a missing agent
 - a prompt source defines both `text` and `file`
 - all endpoints are disabled
 - a Telegram token env reference points to a variable that is not set

@@ -49,6 +49,8 @@ export function normalizeTelegramRuntimeConfig(
   }
 
   const endpointRoot = join(options.dataRoot, "endpoints", endpoint.id);
+  const logsDir = join(options.dataRoot, "logs", "endpoints");
+  const runtimeDir = join(options.dataRoot, "runtime", "endpoints");
 
   return {
     id: endpoint.id,
@@ -61,10 +63,10 @@ export function normalizeTelegramRuntimeConfig(
       dataRoot: options.dataRoot,
       endpointRoot,
       conversationsDir: join(endpointRoot, "conversations"),
-      logsDir: join(endpointRoot, "logs"),
-      logFilePath: join(endpointRoot, "logs", "daemon.log"),
-      runtimeDir: join(endpointRoot, "runtime"),
-      runtimeStatePath: join(endpointRoot, "runtime", "daemon.json"),
+      logsDir,
+      logFilePath: join(logsDir, `${endpoint.id}.log`),
+      runtimeDir,
+      runtimeStatePath: join(runtimeDir, `${endpoint.id}.json`),
     },
   };
 }

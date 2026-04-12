@@ -59,6 +59,13 @@ The generated setup includes:
 
 If the selected provider supports OAuth, `imp init` also configures an `authFile` path under the data directory.
 
+Runtime data under the state directory uses this layout:
+
+- endpoint conversations: `endpoints/<endpoint-id>/conversations`
+- endpoint logs: `logs/endpoints/<endpoint-id>.log`
+- endpoint runtime state: `runtime/endpoints/<endpoint-id>.json`
+- agent-managed files, when you keep them in the data root: `agents/<agent-id>/...`
+
 ## Start The Daemon
 
 Start with the discovered config:

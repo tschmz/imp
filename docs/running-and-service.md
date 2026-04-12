@@ -143,8 +143,8 @@ At runtime, `imp`:
 - loads the config
 - starts all enabled endpoints
 - routes each incoming conversation to an agent
-- persists conversation state and logs under `paths.dataRoot`
+- persists conversation state, logs, and runtime state under `paths.dataRoot`
 
-If a endpoint is disabled in the config, it is skipped on startup.
+If an endpoint is disabled in the config, it is skipped on startup.
 
 For command-level endpoint behavior, see [Telegram Commands](./telegram.md).

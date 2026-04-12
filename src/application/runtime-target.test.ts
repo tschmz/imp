@@ -106,10 +106,10 @@ describe("createRuntimeTransportFactory", () => {
         dataRoot: "/tmp",
         endpointRoot: "/tmp/endpoint",
         conversationsDir: "/tmp/endpoint/conversations",
-        logsDir: "/tmp/endpoint/logs",
-        logFilePath: "/tmp/endpoint/logs/daemon.log",
-        runtimeDir: "/tmp/endpoint/runtime",
-        runtimeStatePath: "/tmp/endpoint/runtime/daemon.json",
+        logsDir: "/tmp/logs/endpoints",
+        logFilePath: "/tmp/logs/endpoints/private-telegram.log",
+        runtimeDir: "/tmp/runtime/endpoints",
+        runtimeStatePath: "/tmp/runtime/endpoints/private-telegram.json",
       },
     };
     const logger = {

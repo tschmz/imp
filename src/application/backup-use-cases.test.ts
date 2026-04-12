@@ -24,7 +24,7 @@ describe("backup use cases", () => {
     const promptPath = join(root, "config", "prompts", "SYSTEM.md");
     const authPath = join(root, "config", "oauth.json");
     const conversationPath = join(dataRoot, "endpoints", "private-telegram", "conversations", "telegram", "42", "conversation.json");
-    const logPath = join(dataRoot, "endpoints", "private-telegram", "logs", "daemon.log");
+    const logPath = join(dataRoot, "logs", "endpoints", "private-telegram.log");
     const backupPath = join(root, "backup.tar");
     const extractDir = join(root, "extract");
 
@@ -62,7 +62,7 @@ describe("backup use cases", () => {
     await expect(
       readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "telegram", "42", "conversation.json"), "utf8"),
     ).resolves.toContain('"id":"1"');
-    await expect(readFile(join(extractDir, "conversations", "private-telegram", "logs", "daemon.log"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(extractDir, "logs", "endpoints", "private-telegram.log"), "utf8")).rejects.toThrow();
   });
 
   it("restores only the targeted conversations subtree and preserves unrelated data-root content", async () => {
@@ -95,7 +95,7 @@ describe("backup use cases", () => {
       "{\"messages\":[{\"id\":\"old\"}]}\n",
     );
     await writeTextFile(
-      join(targetDataRoot, "endpoints", "private-telegram", "logs", "daemon.log"),
+      join(targetDataRoot, "logs", "endpoints", "private-telegram.log"),
       "keep log\n",
     );
     await writeTextFile(
@@ -123,7 +123,7 @@ describe("backup use cases", () => {
         "utf8",
       ),
     ).resolves.toContain('"source"');
-    await expect(readFile(join(targetDataRoot, "endpoints", "private-telegram", "logs", "daemon.log"), "utf8")).resolves.toBe(
+    await expect(readFile(join(targetDataRoot, "logs", "endpoints", "private-telegram.log"), "utf8")).resolves.toBe(
       "keep log\n",
     );
     await expect(

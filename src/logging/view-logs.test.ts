@@ -67,7 +67,7 @@ describe("viewDaemonLogs", () => {
     expect(resolveLogTargets(runtimeConfig, "ops-telegram")).toEqual([
       {
         endpointId: "ops-telegram",
-        logFilePath: "/tmp/log-targets/endpoints/ops-telegram/logs/daemon.log",
+        logFilePath: "/tmp/log-targets/logs/endpoints/ops-telegram.log",
       },
     ]);
   });
@@ -234,10 +234,10 @@ function createRuntimeConfig(root: string, endpointIds: string[]): DaemonConfig 
         dataRoot: root,
         endpointRoot: join(root, "endpoints", endpointId),
         conversationsDir: join(root, "endpoints", endpointId, "conversations"),
-        logsDir: join(root, "endpoints", endpointId, "logs"),
-        logFilePath: join(root, "endpoints", endpointId, "logs", "daemon.log"),
-        runtimeDir: join(root, "endpoints", endpointId, "runtime"),
-        runtimeStatePath: join(root, "endpoints", endpointId, "runtime", "daemon.json"),
+        logsDir: join(root, "logs", "endpoints"),
+        logFilePath: join(root, "logs", "endpoints", `${endpointId}.log`),
+        runtimeDir: join(root, "runtime", "endpoints"),
+        runtimeStatePath: join(root, "runtime", "endpoints", `${endpointId}.json`),
       },
     })),
   };

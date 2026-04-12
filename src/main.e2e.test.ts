@@ -283,12 +283,11 @@ describe("imp CLI e2e", () => {
       );
     });
 
-    const endpointRoot = join(dataRoot, "endpoints", "private-telegram");
-    const logFilePath = join(endpointRoot, "logs", "daemon.log");
-    const runtimeStatePath = join(endpointRoot, "runtime", "daemon.json");
+    const logFilePath = join(dataRoot, "logs", "endpoints", "private-telegram.log");
+    const runtimeStatePath = join(dataRoot, "runtime", "endpoints", "private-telegram.json");
 
-    await expect(stat(join(endpointRoot, "logs"))).resolves.toBeDefined();
-    await expect(stat(join(endpointRoot, "runtime"))).resolves.toBeDefined();
+    await expect(stat(join(dataRoot, "logs", "endpoints"))).resolves.toBeDefined();
+    await expect(stat(join(dataRoot, "runtime", "endpoints"))).resolves.toBeDefined();
     await expect(readFile(logFilePath, "utf8")).resolves.toContain(
       "daemon failed to start",
     );
@@ -301,7 +300,7 @@ describe("imp CLI e2e", () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
-    const logFilePath = join(root, "state-home", "imp", "endpoints", "private-telegram", "logs", "daemon.log");
+    const logFilePath = join(root, "state-home", "imp", "logs", "endpoints", "private-telegram.log");
 
     await runCli(["init", "--defaults"], env);
     await overwriteConfig(configPath, {

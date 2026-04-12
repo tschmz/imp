@@ -599,10 +599,10 @@ function createRuntimePaths(root: string, endpointId = "private-telegram"): Runt
     dataRoot: root,
     endpointRoot: join(root, "endpoints", endpointId),
     conversationsDir: join(root, "endpoints", endpointId, "conversations"),
-    logsDir: join(root, "endpoints", endpointId, "logs"),
-    logFilePath: join(root, "endpoints", endpointId, "logs", "daemon.log"),
-    runtimeDir: join(root, "endpoints", endpointId, "runtime"),
-    runtimeStatePath: join(root, "endpoints", endpointId, "runtime", "daemon.json"),
+    logsDir: join(root, "logs", "endpoints"),
+    logFilePath: join(root, "logs", "endpoints", `${endpointId}.log`),
+    runtimeDir: join(root, "runtime", "endpoints"),
+    runtimeStatePath: join(root, "runtime", "endpoints", `${endpointId}.json`),
   };
 }
 
