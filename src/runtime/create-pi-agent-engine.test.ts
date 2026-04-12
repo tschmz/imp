@@ -1249,6 +1249,25 @@ describe("createPiAgentEngine", () => {
     expect(secondListingText).toContain("from-second.txt");
   });
 
+  it("resolves relative cd targets from the current agent working directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-working-directory-"));
+    tempDirs.push(root);
+    const workspaceDir = join(root, "workspace");
+    const nestedDir = join(workspaceDir, "nested");
+    await mkdir(nestedDir, { recursive: true });
+
+    const registry = createBuiltInToolRegistry(workspaceDir);
+    const setWorkingDirectory = registry.get("cd");
+    const getWorkingDirectory = registry.get("pwd");
+
+    await expect(setWorkingDirectory!.execute("1", { path: "nested" })).resolves.toMatchObject({
+      details: { workingDirectory: nestedDir },
+    });
+    await expect(getWorkingDirectory!.execute("2", {})).resolves.toMatchObject({
+      details: { workingDirectory: nestedDir },
+    });
+  });
+
   it("prepends the agent shell PATH for bash tool execution", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-shell-path-"));
     tempDirs.push(root);

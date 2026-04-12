@@ -1,5 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
-import { delimiter as pathDelimiter } from "node:path";
+import { delimiter as pathDelimiter, resolve } from "node:path";
 import { createFindTool, createGrepTool, createLsTool, createCodingTools, type ToolsOptions } from "@mariozechner/pi-coding-agent";
 import type { StreamOptions } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
@@ -288,15 +288,16 @@ function createSetWorkingDirectoryTool(workingDirectoryState: WorkingDirectorySt
     parameters,
     async execute(_toolCallId, params) {
       const { path } = parseSetWorkingDirectoryParams(params);
-      const directoryStats = await stat(path);
+      const workingDirectory = resolve(workingDirectoryState.get(), path);
+      const directoryStats = await stat(workingDirectory);
       if (!directoryStats.isDirectory()) {
-        throw new Error(`Not a directory: ${path}`);
+        throw new Error(`Not a directory: ${workingDirectory}`);
       }
 
-      workingDirectoryState.set(path);
+      workingDirectoryState.set(workingDirectory);
       return {
-        content: [{ type: "text", text: path }],
-        details: { workingDirectory: path },
+        content: [{ type: "text", text: workingDirectory }],
+        details: { workingDirectory },
       };
     },
   };
