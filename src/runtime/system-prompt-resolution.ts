@@ -81,6 +81,10 @@ export async function buildSystemPrompt(
   }
   sections.push(basePrompt);
 
+  if (availableSkills.length > 0) {
+    sections.push(formatAvailableSkillsSection(availableSkills));
+  }
+
   for (const source of resolveInstructionSources(agent, promptWorkingDirectory)) {
     const content = await resolvePromptSourceContent(agent, source.source, readTextFile, {
       kind: "instruction file",
@@ -108,10 +112,6 @@ export async function buildSystemPrompt(
     sections.push(formatPromptSection("REFERENCE", describePromptSource(source), content));
   }
 
-  if (availableSkills.length > 0) {
-    sections.push(formatAvailableSkillsSection(availableSkills));
-  }
-
   if (activatedSkills.length > 0) {
     sections.push(await formatActivatedSkillsSection(activatedSkills, readTextFile));
   }
@@ -137,10 +137,11 @@ function formatAvailableSkillsSection(availableSkills: SkillDefinition[]): strin
 
   return (
     "<AVAILABLE-SKILLS>\n\n" +
-    "These skills are available for this agent. imp selects relevant skills for each user turn from this catalog before the main agent run. " +
-    "Use the exact skill names shown below when referring to them. " +
-    "This section contains metadata only: skill path, name, and description. Full skill instructions are loaded separately only for activated skills. " +
-    "If no <SKILL> blocks appear later in the prompt, then no skill was activated for this turn.\n\n" +
+    "Available skills for this agent.\n" +
+    "imp may activate relevant skills before the main run.\n" +
+    "Use exact skill names when referring to them.\n" +
+    "Entries list path, name, and description only.\n" +
+    "Full skill instructions appear later only for activated skills.\n\n" +
     `${renderedSkills}\n` +
     "</AVAILABLE-SKILLS>"
   );
@@ -165,7 +166,7 @@ async function formatActivatedSkillsSection(
       if (skill.scripts.length > 0) {
         sections.push(
           `<SKILL-SCRIPTS skill="${escapeInstructionAttribute(skill.name)}">\n\n` +
-            "These local scripts are available for explicit use. Inspect them and run them only when needed.\n" +
+            "Local scripts for this skill. Inspect before running. Run only when needed.\n" +
             `${skill.scripts
               .map(
                 (script) =>

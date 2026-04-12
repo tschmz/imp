@@ -190,12 +190,14 @@ describe("resolveSystemPrompt", () => {
     );
   });
 
-  it("injects available skill metadata without loading full skill prompts", async () => {
+  it("injects available skill metadata before additional context files", async () => {
     const prompt = await buildSystemPrompt(
       {
         ...createAgent(),
         prompt: {
           base: { text: "You are concise." },
+          instructions: [{ file: "/workspace/AGENTS.md" }],
+          references: [{ file: "/workspace/RUNBOOK.md" }],
         },
       },
       undefined,
@@ -213,20 +215,31 @@ describe("resolveSystemPrompt", () => {
         },
       ],
       [],
-      async () => {
-        throw new Error("should not read full skill content for available skill metadata");
+      async (path) => {
+        if (path === "/workspace/AGENTS.md") {
+          return "Project instructions.";
+        }
+
+        if (path === "/workspace/RUNBOOK.md") {
+          return "Reference content.";
+        }
+
+        throw new Error(`unexpected path: ${path}`);
       },
     );
 
     expect(prompt).toContain("<AVAILABLE-SKILLS>");
-    expect(prompt).toContain("imp selects relevant skills for each user turn from this catalog before the main agent run.");
-    expect(prompt).toContain("If no <SKILL> blocks appear later in the prompt, then no skill was activated for this turn.");
+    expect(prompt).toContain("Available skills for this agent.");
+    expect(prompt).toContain("imp may activate relevant skills before the main run.");
+    expect(prompt).toContain("Use exact skill names when referring to them.");
     expect(prompt).toContain("Path: /skills/commit");
     expect(prompt).toContain("Name: commit");
     expect(prompt).toContain("Description: Stage and commit changes.");
     expect(prompt).not.toContain("name: commit");
     expect(prompt).not.toContain("Use focused commits.");
     expect(prompt).not.toContain("<SKILLS>");
+    expect(prompt.indexOf("<AVAILABLE-SKILLS>")).toBeLessThan(prompt.indexOf("<INSTRUCTIONS"));
+    expect(prompt.indexOf("<AVAILABLE-SKILLS>")).toBeLessThan(prompt.indexOf("<REFERENCE"));
   });
 
   it("injects activated skill contents into a dedicated context block", async () => {
@@ -278,6 +291,7 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toContain('<SKILL-REFERENCE skill="commit" from="/skills/commit/references/checklist.md">');
     expect(prompt).toContain("Review the staged files first.");
     expect(prompt).toContain('<SKILL-SCRIPTS skill="commit">');
+    expect(prompt).toContain("Local scripts for this skill. Inspect before running. Run only when needed.");
     expect(prompt).toContain("/skills/commit/scripts/prepare.sh");
   });
 });

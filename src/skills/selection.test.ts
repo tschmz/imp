@@ -40,6 +40,21 @@ describe("createLlmSkillSelector", () => {
     expect(completeFn).not.toHaveBeenCalled();
   });
 
+  it("deduplicates skills returned both explicitly and by the model", async () => {
+    const selector = createLlmSkillSelector({
+      completeFn: vi.fn(async () => createAssistantMessage('{"skills":["wohnungssuche"]}')),
+    });
+
+    const result = await selector.selectRelevantSkills({
+      agent: createAgent(),
+      userText: "Nutze wohnungssuche für diese Anfrage.",
+      catalog: [createSkill("wohnungssuche", "Search and review apartment listings.")],
+      maxActivatedSkills: 3,
+    });
+
+    expect(result.map((skill) => skill.name)).toEqual(["wohnungssuche"]);
+  });
+
   it("fails closed when the model returns an unknown skill name", async () => {
     const selector = createLlmSkillSelector({
       completeFn: vi.fn(async () => createAssistantMessage('{"skills":["unknown-skill"]}')),

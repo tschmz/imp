@@ -91,9 +91,25 @@ export function createLlmSkillSelector(
         maxActivatedSkills - explicitMatches.length,
       );
 
-      return [...explicitMatches, ...modelSelectedSkills].slice(0, maxActivatedSkills);
+      return deduplicateSelectedSkills([...explicitMatches, ...modelSelectedSkills], maxActivatedSkills);
     },
   };
+}
+
+function deduplicateSelectedSkills(skills: SkillDefinition[], maxActivatedSkills: number): SkillDefinition[] {
+  const selectedSkills: SkillDefinition[] = [];
+  const seenSkillNames = new Set<string>();
+
+  for (const skill of skills) {
+    if (selectedSkills.length >= maxActivatedSkills || seenSkillNames.has(skill.name)) {
+      continue;
+    }
+
+    seenSkillNames.add(skill.name);
+    selectedSkills.push(skill);
+  }
+
+  return selectedSkills;
 }
 
 function parseSelectedSkills(
