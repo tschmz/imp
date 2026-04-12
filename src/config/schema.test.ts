@@ -320,6 +320,46 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("rejects endpoint ids that are unsafe as path segments", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      endpoints: [
+        {
+          id: "../ops",
+          type: "telegram",
+          enabled: true,
+          token: "replace-me",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["endpoints", 0, "id"],
+        message: "Endpoint ids may only contain letters, numbers, hyphens, and underscores.",
+      }),
+    );
+  });
+
   it("accepts telegram token env references", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({

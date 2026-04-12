@@ -7,8 +7,16 @@ import type { Logger } from "../../logging/types.js";
 import type { Transport } from "../types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
 
+const endpointIdSchema = z
+  .string()
+  .min(1)
+  .regex(
+    /^[A-Za-z0-9_-]+$/,
+    "Endpoint ids may only contain letters, numbers, hyphens, and underscores.",
+  );
+
 export const telegramTransportConfigSchema = z.object({
-  id: z.string().min(1),
+  id: endpointIdSchema,
   type: z.literal("telegram"),
   enabled: z.boolean(),
   token: secretValueConfigSchema,
