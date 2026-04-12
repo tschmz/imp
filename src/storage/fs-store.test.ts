@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ChatRef, ConversationContext } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
@@ -247,9 +247,9 @@ describe("createFsConversationStore", () => {
           role: "assistant",
           content: [{ type: "text", text: "finished" }],
           timestamp: Date.parse("2026-04-05T00:02:00.000Z"),
-          api: "legacy",
-          provider: "legacy",
-          model: "legacy",
+          api: "openai-responses",
+          provider: "openai",
+          model: "gpt-5-mini",
           usage: {
             input: 0,
             output: 0,
@@ -307,9 +307,9 @@ describe("createFsConversationStore", () => {
           role: "assistant",
           content: [{ type: "text", text: "older" }],
           timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
-          api: "legacy",
-          provider: "legacy",
-          model: "legacy",
+          api: "openai-responses",
+          provider: "openai",
+          model: "gpt-5-mini",
           usage: {
             input: 0,
             output: 0,
@@ -340,9 +340,9 @@ describe("createFsConversationStore", () => {
           role: "assistant",
           content: [{ type: "text", text: "newer" }],
           timestamp: Date.parse("2026-04-05T00:05:00.000Z"),
-          api: "legacy",
-          provider: "legacy",
-          model: "legacy",
+          api: "openai-responses",
+          provider: "openai",
+          model: "gpt-5-mini",
           usage: {
             input: 0,
             output: 0,
@@ -377,9 +377,9 @@ describe("createFsConversationStore", () => {
           role: "assistant",
           content: [{ type: "text", text: "older" }],
           timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
-          api: "legacy",
-          provider: "legacy",
-          model: "legacy",
+          api: "openai-responses",
+          provider: "openai",
+          model: "gpt-5-mini",
           usage: {
             input: 0,
             output: 0,
@@ -403,249 +403,6 @@ describe("createFsConversationStore", () => {
     ]);
   });
 
-  it("migrates a legacy active conversation into the new session layout", async () => {
-    const root = await createTempDir();
-    const chatRef = createChatRef();
-    const snapshotPath = join(root, "conversations", "telegram", "42", "conversation.json");
-    await (await import("node:fs/promises")).mkdir(dirname(snapshotPath), { recursive: true });
-    await writeFile(
-      snapshotPath,
-      JSON.stringify({
-        state: {
-          conversation: chatRef,
-          agentId: "default",
-          createdAt: "2026-04-05T00:00:00.000Z",
-          updatedAt: "2026-04-05T00:01:00.000Z",
-          version: 1,
-        },
-        messages: [
-          {
-            id: "legacy-1",
-            role: "assistant",
-            content: [{ type: "text", text: "legacy" }],
-            timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
-            api: "legacy",
-            provider: "legacy",
-            model: "legacy",
-            usage: {
-              input: 0,
-              output: 0,
-              cacheRead: 0,
-              cacheWrite: 0,
-              totalTokens: 0,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-            },
-            stopReason: "stop",
-            createdAt: "2026-04-05T00:01:00.000Z",
-          },
-        ],
-      }),
-    );
-
-    const store = createFsConversationStore(createRuntimePaths(root));
-    const current = await store.get(chatRef);
-
-    expect(current?.state.conversation.sessionId).toBe("legacy");
-    await expect(store.listBackups(chatRef)).resolves.toEqual([]);
-  });
-
-  it("loads session snapshots written before tool event support", async () => {
-    const root = await createTempDir();
-    const ref = {
-      ...createChatRef(),
-      sessionId: "session-1",
-    };
-    const snapshotPath = join(
-      root,
-      "conversations",
-      "telegram",
-      "42",
-      "sessions",
-      "session-1",
-      "conversation.json",
-    );
-    await (await import("node:fs/promises")).mkdir(dirname(snapshotPath), { recursive: true });
-    await writeFile(
-      snapshotPath,
-      JSON.stringify({
-        state: {
-          conversation: ref,
-          agentId: "default",
-          createdAt: "2026-04-05T00:00:00.000Z",
-          updatedAt: "2026-04-05T00:01:00.000Z",
-          version: 1,
-        },
-        messages: [
-          {
-            id: "legacy-1",
-            role: "user",
-            text: "hello",
-            createdAt: "2026-04-05T00:00:00.000Z",
-          },
-          {
-            id: "legacy-1:assistant",
-            role: "assistant",
-            text: "hi there",
-            createdAt: "2026-04-05T00:00:01.000Z",
-          },
-        ],
-      }),
-      "utf8",
-    );
-
-    const store = createFsConversationStore(createRuntimePaths(root));
-
-    await expect(store.get(ref)).resolves.toEqual({
-      state: {
-        conversation: ref,
-        agentId: "default",
-        createdAt: "2026-04-05T00:00:00.000Z",
-        updatedAt: "2026-04-05T00:01:00.000Z",
-        version: 1,
-      },
-      messages: [
-        {
-          kind: "message",
-          id: "legacy-1",
-          role: "user",
-          content: "hello",
-          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
-          createdAt: "2026-04-05T00:00:00.000Z",
-        },
-        {
-          kind: "message",
-          id: "legacy-1:assistant",
-          role: "assistant",
-          content: [{ type: "text", text: "hi there" }],
-          timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
-          api: "legacy",
-          provider: "legacy",
-          model: "legacy",
-          usage: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 0,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-          },
-          stopReason: "stop",
-          createdAt: "2026-04-05T00:00:01.000Z",
-        },
-      ],
-    });
-  });
-
-  it("migrates legacy tool-call and tool-result events into native replayable messages", async () => {
-    const root = await createTempDir();
-    const ref = {
-      ...createChatRef(),
-      sessionId: "session-legacy-tools",
-    };
-    const snapshotPath = join(
-      root,
-      "conversations",
-      "telegram",
-      "42",
-      "sessions",
-      "session-legacy-tools",
-      "conversation.json",
-    );
-    await (await import("node:fs/promises")).mkdir(dirname(snapshotPath), { recursive: true });
-    await writeFile(
-      snapshotPath,
-      JSON.stringify({
-        state: {
-          conversation: ref,
-          agentId: "default",
-          createdAt: "2026-04-05T00:00:00.000Z",
-          updatedAt: "2026-04-05T00:01:00.000Z",
-          version: 1,
-        },
-        messages: [
-          {
-            kind: "tool-call",
-            id: "legacy:tool-call:1",
-            createdAt: "2026-04-05T00:00:10.000Z",
-            text: "Inspecting the config.",
-            toolCalls: [
-              {
-                id: "tool-1",
-                name: "read_file",
-                arguments: {
-                  path: "config.json",
-                },
-              },
-            ],
-          },
-          {
-            kind: "tool-result",
-            id: "legacy:tool-result:1",
-            createdAt: "2026-04-05T00:00:11.000Z",
-            toolCallId: "tool-1",
-            toolName: "read_file",
-            content: [{ type: "text", text: "{\"ok\":true}" }],
-          },
-        ],
-      }),
-      "utf8",
-    );
-
-    const store = createFsConversationStore(createRuntimePaths(root));
-
-    await expect(store.get(ref)).resolves.toEqual({
-      state: {
-        conversation: ref,
-        agentId: "default",
-        createdAt: "2026-04-05T00:00:00.000Z",
-        updatedAt: "2026-04-05T00:01:00.000Z",
-        version: 1,
-      },
-      messages: [
-        {
-          kind: "message",
-          id: "legacy:tool-call:1",
-          role: "assistant",
-          createdAt: "2026-04-05T00:00:10.000Z",
-          timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
-          api: "legacy",
-          provider: "legacy",
-          model: "legacy",
-          usage: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 0,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-          },
-          stopReason: "toolUse",
-          content: [
-            { type: "text", text: "Inspecting the config." },
-            {
-              type: "toolCall",
-              id: "tool-1",
-              name: "read_file",
-              arguments: {
-                path: "config.json",
-              },
-            },
-          ],
-        },
-        {
-          kind: "message",
-          id: "legacy:tool-result:1",
-          role: "toolResult",
-          createdAt: "2026-04-05T00:00:11.000Z",
-          timestamp: Date.parse("2026-04-05T00:00:11.000Z"),
-          toolCallId: "tool-1",
-          toolName: "read_file",
-          content: [{ type: "text", text: "{\"ok\":true}" }],
-          isError: false,
-        },
-      ],
-    });
-  });
 });
 
 function createChatRef(): ChatRef {

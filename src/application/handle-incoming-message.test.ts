@@ -890,9 +890,9 @@ function createAgentRunResult(message: IncomingMessage, text: string) {
         role: "assistant" as const,
         content: [{ type: "text" as const, text }],
         timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
-        api: "legacy",
-        provider: "legacy",
-        model: "legacy",
+        api: "openai-responses",
+        provider: "openai",
+        model: "gpt-5-mini",
         usage: {
           input: 0,
           output: 0,

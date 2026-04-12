@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
-  AssistantMessage,
   ToolResultMessage,
   UserMessage,
 } from "@mariozechner/pi-ai";
@@ -19,31 +18,11 @@ import type { RuntimePaths } from "../daemon/types.js";
 import type { ConversationBackupSummary, ConversationStore } from "./types.js";
 
 const conversationWriteQueues = new Map<string, Promise<void>>();
-const legacySessionId = "legacy";
 // The critical section is intentionally short: read latest snapshot, compute next state, atomically rename.
 // A short-lived lock file guards that section across processes while the in-memory queue serializes writers locally.
 const lockTtlMs = 30_000;
 const lockRetryDelayMs = 25;
 const lockRetryCount = 400;
-const LEGACY_ASSISTANT_REPLAY_SOURCE = {
-  api: "legacy",
-  provider: "legacy",
-  model: "legacy",
-} as const;
-const EMPTY_USAGE: AssistantMessage["usage"] = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    total: 0,
-  },
-};
 
 function getChatDir(conversationsDir: string, ref: ChatRef): string {
   return join(
@@ -83,7 +62,6 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
 
       return withConversationWriteQueue(ref, async () =>
         withConversationLock(paths.conversationsDir, ref, async () => {
-          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
           const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
           if (!activeRef) {
             return undefined;
@@ -113,7 +91,6 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     async listBackups(ref) {
       return withConversationWriteQueue(ref, async () =>
         withConversationLock(paths.conversationsDir, ref, async () => {
-          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
           const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
           return readInactiveSessions(paths.conversationsDir, ref, activeRef?.sessionId);
         }),
@@ -122,7 +99,6 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     async restore(ref, backupId) {
       return withConversationWriteQueue(ref, async () =>
         withConversationLock(paths.conversationsDir, ref, async () => {
-          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
           const summaries = await readInactiveSessions(paths.conversationsDir, ref);
           const selected = summaries.find((summary) => summary.id === backupId);
           if (!selected) {
@@ -141,7 +117,6 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     async create(ref, options) {
       return withConversationWriteQueue(ref, async () =>
         withConversationLock(paths.conversationsDir, ref, async () => {
-          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
           const context = createEmptyConversationContext(ref, options);
 
           await writeConversationSnapshot(paths.conversationsDir, context);
@@ -153,7 +128,6 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     async ensureActive(ref, options) {
       return withConversationWriteQueue(ref, async () =>
         withConversationLock(paths.conversationsDir, ref, async () => {
-          await migrateLegacyConversationIfNeeded(paths.conversationsDir, ref);
           const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
           if (activeRef) {
             const existing = await readSessionSnapshot(activeRef, paths.conversationsDir);
@@ -252,7 +226,7 @@ function pathsafeRef(ref: ChatRef, sessionId: string): ConversationRef {
 }
 
 function toBackupSummary(snapshot: ConversationContext): ConversationBackupSummary {
-  const sessionId = snapshot.state.conversation.sessionId ?? legacySessionId;
+  const sessionId = requireSessionId(snapshot.state.conversation);
   return {
     id: sessionId,
     sessionId,
@@ -320,110 +294,6 @@ async function writeActiveConversationRef(
   await mkdir(dirname(activePath), { recursive: true });
   await writeFile(tempPath, `${JSON.stringify({ sessionId: ref.sessionId }, null, 2)}\n`, "utf8");
   await rename(tempPath, activePath);
-}
-
-async function migrateLegacyConversationIfNeeded(
-  conversationsDir: string,
-  ref: ChatRef,
-): Promise<void> {
-  const activeRef = await readActiveConversationRef(conversationsDir, ref);
-  if (activeRef) {
-    return;
-  }
-
-  const legacy = await readLegacyConversation(conversationsDir, ref);
-  if (!legacy) {
-    return;
-  }
-
-  const migratedRef: ConversationRef = {
-    transport: ref.transport,
-    externalId: ref.externalId,
-    sessionId: legacySessionId,
-  };
-  const migrated: ConversationContext = normalizeSnapshot({
-    ...legacy,
-    state: {
-      ...legacy.state,
-      conversation: migratedRef,
-    },
-  });
-  const snapshotPath = getSessionSnapshotPath(conversationsDir, migratedRef);
-  const tempPath = `${snapshotPath}.${process.pid}.tmp`;
-
-  await mkdir(dirname(snapshotPath), { recursive: true });
-  await writeFile(tempPath, JSON.stringify(migrated, null, 2));
-  await rename(tempPath, snapshotPath);
-  await writeActiveConversationRef(conversationsDir, migratedRef);
-}
-
-async function readLegacyConversation(
-  conversationsDir: string,
-  ref: ChatRef,
-): Promise<ConversationContext | undefined> {
-  const snapshotPath = join(getChatDir(conversationsDir, ref), "conversation.json");
-  try {
-    const raw = await readFile(snapshotPath, "utf8");
-    return normalizeSnapshot(JSON.parse(raw) as ConversationContext);
-  } catch (error: unknown) {
-    if (!isMissingFile(error)) {
-      throw error;
-    }
-  }
-
-  const statePath = join(getChatDir(conversationsDir, ref), "meta.json");
-
-  try {
-    const raw = await readFile(statePath, "utf8");
-    const state = JSON.parse(raw) as Omit<ConversationContext["state"], "conversation"> & {
-      conversation?: unknown;
-    };
-    const messages = await readLegacyMessages(conversationsDir, ref);
-    return normalizeSnapshot({
-      state: {
-        conversation: {
-          transport: ref.transport,
-          externalId: ref.externalId,
-          sessionId: legacySessionId,
-        },
-        agentId: state.agentId,
-        ...(typeof state.title === "string" ? { title: state.title } : {}),
-        ...(typeof state.workingDirectory === "string"
-          ? { workingDirectory: state.workingDirectory }
-          : {}),
-        createdAt: state.createdAt,
-        updatedAt: state.updatedAt,
-        version: state.version,
-      },
-      messages,
-    });
-  } catch (error: unknown) {
-    if (isMissingFile(error)) {
-      return undefined;
-    }
-
-    throw error;
-  }
-}
-
-async function readLegacyMessages(
-  conversationsDir: string,
-  ref: ChatRef,
-): Promise<ConversationEvent[]> {
-  const path = join(getChatDir(conversationsDir, ref), "messages.json");
-
-  try {
-    const raw = await readFile(path, "utf8");
-    return (JSON.parse(raw) as unknown[]).map((message) =>
-      normalizeConversationEvent(message as ConversationEvent),
-    );
-  } catch (error: unknown) {
-    if (isMissingFile(error)) {
-      return [];
-    }
-
-    throw error;
-  }
 }
 
 function normalizeSnapshot(snapshot: ConversationContext): ConversationContext {
@@ -521,22 +391,6 @@ function areMessagesEqual(left: ConversationEvent, right: ConversationEvent): bo
 }
 
 function normalizeConversationEvent(message: unknown): ConversationEvent {
-  if (isLegacyToolCallEvent(message)) {
-    return normalizeLegacyToolCallEvent(message);
-  }
-
-  if (isLegacyToolResultEvent(message)) {
-    return normalizeLegacyToolResultEvent(message);
-  }
-
-  if (isLegacyUserMessage(message)) {
-    return normalizeLegacyUserMessage(message);
-  }
-
-  if (isLegacyAssistantMessage(message)) {
-    return normalizeLegacyAssistantMessage(message);
-  }
-
   if (isConversationUserMessage(message)) {
     return normalizeConversationUserMessage(message);
   }
@@ -576,12 +430,8 @@ function normalizeConversationAssistantMessage(
           }
         : content,
     ),
-    usage: message.usage ?? EMPTY_USAGE,
-    stopReason: message.stopReason ?? inferAssistantStopReason(message),
+    stopReason: message.stopReason,
     timestamp: normalizeTimestamp(message.timestamp, message.createdAt),
-    ...(message.api ? {} : LEGACY_ASSISTANT_REPLAY_SOURCE),
-    ...(message.provider ? {} : { provider: LEGACY_ASSISTANT_REPLAY_SOURCE.provider }),
-    ...(message.model ? {} : { model: LEGACY_ASSISTANT_REPLAY_SOURCE.model }),
   };
 }
 
@@ -593,115 +443,6 @@ function normalizeConversationToolResultMessage(
     kind: "message",
     content: normalizeToolResultContent(message.content),
     timestamp: normalizeTimestamp(message.timestamp, message.createdAt),
-    isError: message.isError ?? false,
-  };
-}
-
-function normalizeLegacyUserMessage(
-  message: {
-    id: string;
-    createdAt: string;
-    correlationId?: string;
-    role: "user";
-    text: string;
-    source?: ConversationUserMessage["source"];
-  },
-): ConversationUserMessage {
-  return {
-    kind: "message",
-    id: message.id,
-    role: "user",
-    content: message.text,
-    createdAt: message.createdAt,
-    timestamp: normalizeTimestamp(undefined, message.createdAt),
-    ...(message.correlationId ? { correlationId: message.correlationId } : {}),
-    ...(message.source ? { source: message.source } : {}),
-  };
-}
-
-function normalizeLegacyAssistantMessage(
-  message: {
-    id: string;
-    createdAt: string;
-    correlationId?: string;
-    role: "assistant";
-    text: string;
-  },
-): ConversationAssistantMessage {
-  return {
-    kind: "message",
-    id: message.id,
-    role: "assistant",
-    content: [{ type: "text", text: message.text }],
-    createdAt: message.createdAt,
-    timestamp: normalizeTimestamp(undefined, message.createdAt),
-    ...(message.correlationId ? { correlationId: message.correlationId } : {}),
-    ...LEGACY_ASSISTANT_REPLAY_SOURCE,
-    usage: EMPTY_USAGE,
-    stopReason: "stop",
-  };
-}
-
-function normalizeLegacyToolCallEvent(
-  message: {
-    kind: "tool-call";
-    id: string;
-    createdAt: string;
-    correlationId?: string;
-    text?: string;
-    toolCalls: Array<{
-      id: string;
-      name: string;
-      arguments?: Record<string, unknown>;
-    }>;
-  },
-): ConversationAssistantMessage {
-  return {
-    kind: "message",
-    id: message.id,
-    role: "assistant",
-    createdAt: message.createdAt,
-    timestamp: normalizeTimestamp(undefined, message.createdAt),
-    ...(message.correlationId ? { correlationId: message.correlationId } : {}),
-    ...LEGACY_ASSISTANT_REPLAY_SOURCE,
-    usage: EMPTY_USAGE,
-    stopReason: "toolUse",
-    content: [
-      ...(message.text ? [{ type: "text" as const, text: message.text }] : []),
-      ...message.toolCalls.map((toolCall) => ({
-        type: "toolCall" as const,
-        id: toolCall.id,
-        name: toolCall.name,
-        arguments: toolCall.arguments ?? {},
-      })),
-    ],
-  };
-}
-
-function normalizeLegacyToolResultEvent(
-  message: {
-    kind: "tool-result";
-    id: string;
-    createdAt: string;
-    correlationId?: string;
-    toolCallId: string;
-    toolName: string;
-    content?: ToolResultMessage["content"];
-    details?: unknown;
-    isError?: boolean;
-  },
-): ConversationToolResultMessage {
-  return {
-    kind: "message",
-    id: message.id,
-    role: "toolResult",
-    createdAt: message.createdAt,
-    timestamp: normalizeTimestamp(undefined, message.createdAt),
-    ...(message.correlationId ? { correlationId: message.correlationId } : {}),
-    toolCallId: message.toolCallId,
-    toolName: message.toolName,
-    content: normalizeToolResultContent(message.content),
-    ...(message.details !== undefined ? { details: message.details } : {}),
     isError: message.isError ?? false,
   };
 }
@@ -733,74 +474,6 @@ function normalizeTimestamp(timestamp: number | undefined, createdAt: string): n
   return Number.isNaN(parsed) ? Date.now() : parsed;
 }
 
-function inferAssistantStopReason(
-  message: Pick<ConversationAssistantMessage, "content"> & Partial<Pick<ConversationAssistantMessage, "errorMessage">>,
-): AssistantMessage["stopReason"] {
-  if (message.errorMessage !== undefined) {
-    return "error";
-  }
-
-  return message.content.some((content) => content.type === "toolCall") ? "toolUse" : "stop";
-}
-
-function isLegacyUserMessage(
-  message: unknown,
-): message is {
-  id: string;
-  createdAt: string;
-  correlationId?: string;
-  role: "user";
-  text: string;
-  source?: ConversationUserMessage["source"];
-} {
-  return hasMessageRole(message, "user") && hasProperty(message, "text");
-}
-
-function isLegacyAssistantMessage(
-  message: unknown,
-): message is {
-  id: string;
-  createdAt: string;
-  correlationId?: string;
-  role: "assistant";
-  text: string;
-} {
-  return hasMessageRole(message, "assistant") && hasProperty(message, "text");
-}
-
-function isLegacyToolCallEvent(
-  message: unknown,
-): message is {
-  kind: "tool-call";
-  id: string;
-  createdAt: string;
-  correlationId?: string;
-  text?: string;
-  toolCalls: Array<{
-    id: string;
-    name: string;
-    arguments?: Record<string, unknown>;
-  }>;
-} {
-  return hasKind(message, "tool-call");
-}
-
-function isLegacyToolResultEvent(
-  message: unknown,
-): message is {
-  kind: "tool-result";
-  id: string;
-  createdAt: string;
-  correlationId?: string;
-  toolCallId: string;
-  toolName: string;
-  content?: ToolResultMessage["content"];
-  details?: unknown;
-  isError?: boolean;
-} {
-  return hasKind(message, "tool-result");
-}
-
 function isConversationUserMessage(message: unknown): message is ConversationUserMessage {
   return hasMessageRole(message, "user") && hasProperty(message, "content");
 }
@@ -811,10 +484,6 @@ function isConversationAssistantMessage(message: unknown): message is Conversati
 
 function isConversationToolResultMessage(message: unknown): message is ConversationToolResultMessage {
   return hasMessageRole(message, "toolResult") && hasProperty(message, "content");
-}
-
-function hasKind(message: unknown, kind: string): boolean {
-  return typeof message === "object" && message !== null && "kind" in message && message.kind === kind;
 }
 
 function hasMessageRole(message: unknown, role: string): boolean {

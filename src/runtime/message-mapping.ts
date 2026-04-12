@@ -4,7 +4,6 @@ import type {
   AssistantMessage,
   Model,
   ToolResultMessage,
-  Usage,
   UserMessage,
 } from "@mariozechner/pi-ai";
 import type {
@@ -15,21 +14,6 @@ import type {
 
 const TRANSCRIBED_MESSAGE_PREFIX =
   "[Transcribed from a Telegram voice message. Automatic speech recognition may contain mistakes. If the request seems unclear or inconsistent with the conversation, ask a brief clarifying question before acting on uncertain details.]\n";
-
-const EMPTY_USAGE: Usage = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    total: 0,
-  },
-};
 
 export function toAgentMessages(
   messages: ConversationEvent[],
@@ -63,8 +47,8 @@ export function toAgentMessages(
       provider: message.provider ?? model.provider,
       model: message.model ?? model.id,
       ...(message.responseId ? { responseId: message.responseId } : {}),
-      usage: message.usage ?? EMPTY_USAGE,
-      stopReason: message.stopReason ?? inferLegacyAssistantStopReason(message),
+      usage: message.usage,
+      stopReason: message.stopReason,
       ...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),
       timestamp: resolveMessageTimestamp(message),
     };
@@ -158,19 +142,9 @@ function resolveMessageTimestamp(
   return Number.isNaN(parsed) ? Date.now() : parsed;
 }
 
-function inferLegacyAssistantStopReason(message: ConversationAssistantMessage): AssistantMessage["stopReason"] {
-  if (message.errorMessage !== undefined) {
-    return "error";
-  }
-
-  return message.content.some((content) => content.type === "toolCall") ? "toolUse" : "stop";
-}
-
 export function getAssistantText(message: AssistantMessage): string {
   return message.content
     .filter((content) => content.type === "text")
     .map((content) => content.text)
     .join("\n");
 }
-
-export { EMPTY_USAGE };

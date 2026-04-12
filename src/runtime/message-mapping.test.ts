@@ -230,42 +230,6 @@ describe("toAgentMessages", () => {
     ]);
   });
 
-  it("maps legacy errored assistant messages to pi-ai error stop reasons", () => {
-    const messages = toAgentMessages(
-      [
-        {
-          kind: "message",
-          id: "1:assistant:error",
-          role: "assistant",
-          content: [{ type: "text", text: "partial response" }],
-          api: "openai-responses",
-          provider: "openai",
-          model: "gpt-5-mini",
-          usage: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 0,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-          },
-          errorMessage: "upstream failed",
-          timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
-          createdAt: "2026-04-05T00:00:01.000Z",
-        },
-      ] as ConversationEvent[],
-      reasoningResponsesModel,
-    );
-
-    expect(messages).toEqual([
-      expect.objectContaining({
-        role: "assistant",
-        stopReason: "error",
-        errorMessage: "upstream failed",
-      }),
-    ]);
-  });
-
   it("defaults missing tool result error flags to successful replay results", () => {
     const messages = toAgentMessages(
       [
