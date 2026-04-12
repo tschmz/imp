@@ -11,8 +11,12 @@ export function parsePositiveIntegerArgument(commandArgs?: string): number | und
     return undefined;
   }
 
+  if (!/^\d+$/.test(value)) {
+    return undefined;
+  }
+
   const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
+  if (parsed <= 0) {
     return undefined;
   }
 
@@ -27,8 +31,13 @@ export function pickRestoreBackup(
     return undefined;
   }
 
-  const selectedIndex = Number.parseInt(commandArgs.trim(), 10);
-  if (!Number.isInteger(selectedIndex) || selectedIndex < 1) {
+  const normalizedIndex = normalizeCommandArgument(commandArgs);
+  if (!normalizedIndex || !/^\d+$/.test(normalizedIndex)) {
+    return undefined;
+  }
+
+  const selectedIndex = Number.parseInt(normalizedIndex, 10);
+  if (selectedIndex < 1) {
     return undefined;
   }
 
