@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.0 - 2026-04-12
+
+### Changed
+
+- Improve skill loading paths, prompt skill metadata, and bundled skill resource reporting.
+- Inject output writers into config-related application use cases.
+- Centralize conversation file writes in filesystem-backed storage.
+- Share node error guards across filesystem, logging, service, and storage helpers.
+- Reuse the shared missing-file guard in file logger and Linux service environment handling.
+
+### Fixed
+
+- Omit the Telegram endpoint from `imp init --defaults` starter configs so local CLI-only setups validate without daemon endpoints.
+- Share config JSON parsing so config load and update paths handle malformed JSON consistently, including UTF-8 BOM stripping.
+
 ## 0.2.0 - 2026-04-12
 
 ### Added
