@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.1 - 2026-04-12
+
+### Changed
+
+- Removed legacy session migration and replay fallbacks.
+
+### Fixed
+
+- Resolve relative agent `cd` tool paths from the current agent working directory.
+- Honor explicit Linux service environment file paths.
+- Reject partially numeric session indexes such as `/restore 1abc`.
+- Preserve spaces in tar archive entry paths.
+- Reject malformed tar numeric fields.
+- Sanitize dot-only conversation session path segments.
+- Reject endpoint IDs that are unsafe for runtime file paths.
+- Quote systemd `WorkingDirectory` and `EnvironmentFile` service paths.
+
 ## 0.1.0 - 2026-04-12
 
 ### Added
