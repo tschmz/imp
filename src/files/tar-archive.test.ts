@@ -161,6 +161,26 @@ describe("tar archive", () => {
     );
   });
 
+  it("rejects tar headers with malformed numeric fields", async () => {
+    const root = await createTempDir();
+    const archivePath = join(root, "backup.tar");
+    const extractDir = join(root, "extract");
+    const archive = buildTarArchive([
+      { path: "file.txt", type: "file", mode: 0o600, content: "hello\n" },
+    ]);
+    const header = archive.subarray(0, tarBlockSize);
+
+    header.fill(0, 124, 136);
+    Buffer.from("0000000000x\0", "ascii").copy(header, 124);
+    header.fill(0x20, 148, 156);
+    writeChecksumField(header, calculateChecksum(header));
+    await writeFile(archivePath, archive);
+
+    await expect(extractTarArchive(archivePath, extractDir)).rejects.toThrow(
+      "Invalid backup archive: malformed tar numeric field",
+    );
+  });
+
   it("rejects a tar archive with a truncated file entry", async () => {
     const root = await createTempDir();
     const sourceDir = join(root, "source");

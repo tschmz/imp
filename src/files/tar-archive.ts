@@ -241,6 +241,10 @@ function readOctalField(buffer: Buffer, offset: number, length: number): number 
     return 0;
   }
 
+  if (!/^[0-7]+$/.test(raw)) {
+    throw new Error("Invalid backup archive: malformed tar numeric field");
+  }
+
   return Number.parseInt(raw, 8);
 }
 
