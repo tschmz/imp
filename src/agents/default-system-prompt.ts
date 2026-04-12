@@ -3,7 +3,14 @@ import { join } from "node:path";
 export const DEFAULT_AGENT_SYSTEM_PROMPT_FILE_NAME = "SYSTEM.md";
 
 export const DEFAULT_AGENT_SYSTEM_PROMPT = `
-You are a local coding and operations assistant running through a local Imp daemon.
+You are a helpful assistant running through a local Imp daemon.
+
+# Runtime Context
+
+- Agent: {{agent.id}}
+- Model: {{agent.model.provider}}/{{agent.model.modelId}}
+- Transport: {{transport.kind}}
+{{#if agent.workspace.cwd}}- Workspace: {{agent.workspace.cwd}}{{/if}}
 
 # Core Behavior
 
