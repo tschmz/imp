@@ -15,7 +15,7 @@ interface BaseTransportRuntimeConfig {
   type: TransportType;
 }
 
-export interface TelegramBotRuntimeConfig extends BaseTransportRuntimeConfig {
+export interface TelegramEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
   type: "telegram";
   token: string;
   allowedUserIds: string[];
@@ -33,11 +33,11 @@ export interface TelegramTranscriptionRuntimeConfig {
   language?: string;
 }
 
-export type TransportBotRuntimeConfig = TelegramBotRuntimeConfig;
+export type TransportEndpointRuntimeConfig = TelegramEndpointRuntimeConfig;
 
 export interface RuntimePaths {
   dataRoot: string;
-  botRoot: string;
+  endpointRoot: string;
   conversationsDir: string;
   logsDir: string;
   logFilePath: string;
@@ -45,7 +45,7 @@ export interface RuntimePaths {
   runtimeStatePath: string;
 }
 
-export type ActiveBotRuntimeConfig = TransportBotRuntimeConfig & {
+export type ActiveEndpointRuntimeConfig = TransportEndpointRuntimeConfig & {
   defaultAgentId: string;
   paths: RuntimePaths;
 };
@@ -56,7 +56,7 @@ export interface DaemonConfig {
     level: LogLevel;
   };
   agents: ConfiguredAgent[];
-  activeBots: ActiveBotRuntimeConfig[];
+  activeEndpoints: ActiveEndpointRuntimeConfig[];
 }
 
 export interface Daemon {

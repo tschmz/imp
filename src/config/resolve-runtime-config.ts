@@ -22,10 +22,10 @@ export async function resolveRuntimeConfig(
   configPath: string,
   options: ResolveRuntimeConfigOptions = {},
 ): Promise<DaemonConfig> {
-  const enabledBots = appConfig.bots.filter((bot) => bot.enabled);
+  const enabledEndpoints = appConfig.endpoints.filter((endpoint) => endpoint.enabled);
 
-  if (enabledBots.length === 0) {
-    throw new Error("Config must enable at least one bot.");
+  if (enabledEndpoints.length === 0) {
+    throw new Error("Config must enable at least one endpoint.");
   }
   const configDir = dirname(configPath);
 
@@ -54,20 +54,20 @@ export async function resolveRuntimeConfig(
         };
       }),
     ),
-    activeBots: await Promise.all(
-      enabledBots.map(async (bot) => {
-        const transport = getTransport(bot.type);
+    activeEndpoints: await Promise.all(
+      enabledEndpoints.map(async (endpoint) => {
+        const transport = getTransport(endpoint.type);
         if (!transport) {
-          throw new Error(`Unsupported bot type: ${bot.type}`);
+          throw new Error(`Unsupported endpoint type: ${endpoint.type}`);
         }
 
-        const runtimeBotConfig = await resolveBotRuntimeSecrets(bot, configDir, {
+        const runtimeEndpointConfig = await resolveEndpointRuntimeSecrets(endpoint, configDir, {
           env: options.env,
           readTextFile: options.readTextFile,
         });
 
         return transport.normalizeRuntimeConfig(
-          runtimeBotConfig,
+          runtimeEndpointConfig,
           {
             dataRoot: appConfig.paths.dataRoot,
             defaultAgentId: appConfig.defaults.agentId,
@@ -78,28 +78,28 @@ export async function resolveRuntimeConfig(
   };
 }
 
-async function resolveBotRuntimeSecrets(
-  bot: AppConfig["bots"][number],
+async function resolveEndpointRuntimeSecrets(
+  endpoint: AppConfig["endpoints"][number],
   configDir: string,
   options: ResolveRuntimeConfigOptions,
-): Promise<AppConfig["bots"][number]> {
-  if (!hasTokenSecret(bot)) {
-    return bot;
+): Promise<AppConfig["endpoints"][number]> {
+  if (!hasTokenSecret(endpoint)) {
+    return endpoint;
   }
 
   return {
-    ...bot,
-    token: await resolveSecretValue(bot.token, {
+    ...endpoint,
+    token: await resolveSecretValue(endpoint.token, {
       configDir,
       env: options.env,
       readTextFile: options.readTextFile,
-      fieldLabel: `bots.${bot.id}.token`,
+      fieldLabel: `endpoints.${endpoint.id}.token`,
     }),
   };
 }
 
-function hasTokenSecret(bot: AppConfig["bots"][number]): bot is AppConfig["bots"][number] & { token: SecretValueConfig } {
-  return Object.hasOwn(bot, "token") && (bot as { token?: unknown }).token !== undefined;
+function hasTokenSecret(endpoint: AppConfig["endpoints"][number]): endpoint is AppConfig["endpoints"][number] & { token: SecretValueConfig } {
+  return Object.hasOwn(endpoint, "token") && (endpoint as { token?: unknown }).token !== undefined;
 }
 
 function resolveAgentPrompt(prompt: AgentPromptConfig, configDir: string): AgentPromptConfig {

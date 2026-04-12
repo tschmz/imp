@@ -172,7 +172,7 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects deprecated bot skill catalogs", () => {
+  it("rejects deprecated endpoint skill catalogs", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({
         id: "default",
@@ -186,7 +186,7 @@ describe("appConfigSchema", () => {
           modelId: "gpt-5.4",
         },
       }),
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -209,7 +209,7 @@ describe("appConfigSchema", () => {
 
     expect(result.error.issues).toContainEqual(
       expect.objectContaining({
-        path: ["bots", 0],
+        path: ["endpoints", 0],
       }),
     );
   });
@@ -306,7 +306,7 @@ describe("appConfigSchema", () => {
           modelId: "gpt-5.4",
         },
       }),
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -344,7 +344,7 @@ describe("appConfigSchema", () => {
           modelId: "gpt-5.4",
         },
       }),
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -376,7 +376,7 @@ describe("appConfigSchema", () => {
           modelId: "gpt-5.4",
         },
       }),
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -408,7 +408,7 @@ describe("appConfigSchema", () => {
           modelId: "gpt-5.4",
         },
       }),
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -431,7 +431,7 @@ describe("appConfigSchema", () => {
 
     expect(result.error.issues).toContainEqual(
       expect.objectContaining({
-        path: ["bots", 0, "token"],
+        path: ["endpoints", 0, "token"],
         message: "Specify exactly one of env or file.",
       }),
     );
@@ -450,7 +450,7 @@ function createConfig(agent: Record<string, unknown>) {
       agentId: "default",
     },
     agents: [agent],
-    bots: [
+    endpoints: [
       {
         id: "private-telegram",
         type: "telegram",

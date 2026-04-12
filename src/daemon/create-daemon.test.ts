@@ -28,9 +28,9 @@ afterEach(async () => {
 describe("createDaemon", () => {
   it("loads persisted native history into the next agent run", async () => {
     const root = await createTempDir();
-    const botConfig = createBotConfig(root);
-    const config = createConfig(botConfig);
-    const conversationStore = createFsConversationStore(botConfig.paths);
+    const endpointConfig = createEndpointConfig(root);
+    const config = createConfig(endpointConfig);
+    const conversationStore = createFsConversationStore(endpointConfig.paths);
     const runInputs: AgentRunInput[] = [];
     const engine: AgentEngine = {
       run: vi.fn(async (input) => {
@@ -91,7 +91,7 @@ describe("createDaemon", () => {
     const persistedConversation = JSON.parse(
       await readFile(
         join(
-          botConfig.paths.conversationsDir,
+          endpointConfig.paths.conversationsDir,
           "telegram",
           "42",
           "sessions",
@@ -107,7 +107,7 @@ describe("createDaemon", () => {
 
   it("builds the default agent from configured agents", async () => {
     const root = await createTempDir();
-    const botConfig = createBotConfig(root);
+    const endpointConfig = createEndpointConfig(root);
     const runInputs: AgentRunInput[] = [];
     const engine: AgentEngine = {
       run: vi.fn(async (input) => {
@@ -118,7 +118,7 @@ describe("createDaemon", () => {
 
     const daemon = createDaemon(
       {
-        ...createConfig(botConfig),
+        ...createConfig(endpointConfig),
         agents: [
           {
             id: "default",
@@ -165,7 +165,7 @@ describe("createDaemon", () => {
 
   it("accepts configured agents that define a file-backed base prompt", async () => {
     const root = await createTempDir();
-    const botConfig = createBotConfig(root);
+    const endpointConfig = createEndpointConfig(root);
     const runInputs: AgentRunInput[] = [];
     const engine: AgentEngine = {
       run: vi.fn(async (input) => {
@@ -176,7 +176,7 @@ describe("createDaemon", () => {
 
     const daemon = createDaemon(
       {
-        ...createConfig(botConfig),
+        ...createConfig(endpointConfig),
         agents: [
           {
             id: "default",
@@ -224,12 +224,12 @@ describe("createDaemon", () => {
 
   it("fails startup when an agent references an unknown tool", async () => {
     const root = await createTempDir();
-    const botConfig = createBotConfig(root);
+    const endpointConfig = createEndpointConfig(root);
     const startTransport = vi.fn();
 
     const daemon = createDaemon(
       {
-        ...createConfig(botConfig),
+        ...createConfig(endpointConfig),
         agents: [
           {
             id: "default",
@@ -267,12 +267,12 @@ describe("createDaemon", () => {
 
   it("fails fast when an agent does not define a usable base prompt", async () => {
     const root = await createTempDir();
-    const botConfig = createBotConfig(root);
+    const endpointConfig = createEndpointConfig(root);
 
     expect(() =>
       createDaemon(
         {
-          ...createConfig(botConfig),
+          ...createConfig(endpointConfig),
           agents: [
             {
               id: "default",
@@ -295,10 +295,10 @@ describe("createDaemon", () => {
     ).toThrow('Configured agent "default" must define prompt.base.text or prompt.base.file.');
   });
 
-  it("starts all enabled bots with isolated runtime state", async () => {
+  it("starts all enabled endpoints with isolated runtime state", async () => {
     const root = await createTempDir();
-    const privateBot = createBotConfig(root);
-    const opsBot = createBotConfig(root, {
+    const privateBot = createEndpointConfig(root);
+    const opsBot = createEndpointConfig(root, {
       id: "ops-telegram",
       defaultAgentId: "ops",
     });
@@ -336,7 +336,7 @@ describe("createDaemon", () => {
             },
           },
         ],
-        activeBots: [privateBot, opsBot],
+        activeEndpoints: [privateBot, opsBot],
       },
       {
         engine: {
@@ -347,7 +347,7 @@ describe("createDaemon", () => {
             startedBotIds.push(config.id);
             await handler.handle(createTransportEvent({
               ...createIncomingMessage("1", "hello"),
-              botId: config.id,
+              endpointId: config.id,
             }));
           },
         }),
@@ -367,8 +367,8 @@ describe("createDaemon", () => {
 
   it("exits cleanly on SIGTERM", async () => {
     const root = await createTempDir();
-    const botConfig = createBotConfig(root);
-    const config = createConfig(botConfig);
+    const endpointConfig = createEndpointConfig(root);
+    const config = createConfig(endpointConfig);
     const runtimeProcess = createFakeProcess();
     const transport = createBlockingTransport();
 
@@ -390,16 +390,16 @@ describe("createDaemon", () => {
       expect(runtimeProcess.exit).toHaveBeenCalledWith(0);
     });
     expect(transport.stop).toHaveBeenCalledTimes(1);
-    await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
+    await expect(access(endpointConfig.paths.runtimeStatePath)).rejects.toThrow();
   });
 
   it("exits cleanly on SIGINT", async () => {
     const root = await createTempDir();
-    const botConfig = createBotConfig(root);
+    const endpointConfig = createEndpointConfig(root);
     const runtimeProcess = createFakeProcess();
     const transport = createBlockingTransport();
 
-    const daemon = createDaemon(createConfig(botConfig), {
+    const daemon = createDaemon(createConfig(endpointConfig), {
       agentRegistry: createAgentRegistry([createDefaultAgent()]),
       engine: {
         run: vi.fn(),
@@ -417,15 +417,15 @@ describe("createDaemon", () => {
       expect(runtimeProcess.exit).toHaveBeenCalledWith(130);
     });
     expect(transport.stop).toHaveBeenCalledTimes(1);
-    await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
+    await expect(access(endpointConfig.paths.runtimeStatePath)).rejects.toThrow();
   });
 
   it("cleans up runtime state and stops transports when start fails", async () => {
     const root = await createTempDir();
-    const botConfig = createBotConfig(root);
+    const endpointConfig = createEndpointConfig(root);
     const transport = createFailingTransport(new Error("boom"));
 
-    const daemon = createDaemon(createConfig(botConfig), {
+    const daemon = createDaemon(createConfig(endpointConfig), {
       agentRegistry: createAgentRegistry([createDefaultAgent()]),
       engine: {
         run: vi.fn(),
@@ -436,13 +436,13 @@ describe("createDaemon", () => {
     await expect(daemon.start()).rejects.toThrow("boom");
 
     expect(transport.stop).toHaveBeenCalledTimes(1);
-    await expect(access(botConfig.paths.runtimeStatePath)).rejects.toThrow();
+    await expect(access(endpointConfig.paths.runtimeStatePath)).rejects.toThrow();
   });
 
   it("closes bootstrapped engines when a later runtime fails during bootstrap", async () => {
     const root = await createTempDir();
-    const privateBot = createBotConfig(root);
-    const opsBot = createBotConfig(root, {
+    const privateBot = createEndpointConfig(root);
+    const opsBot = createEndpointConfig(root, {
       id: "ops-telegram",
       defaultAgentId: "ops",
     });
@@ -481,7 +481,7 @@ describe("createDaemon", () => {
             },
           },
         ],
-        activeBots: [privateBot, opsBot],
+        activeEndpoints: [privateBot, opsBot],
       },
       {
         engine: {
@@ -510,10 +510,10 @@ describe("createDaemon", () => {
     await expect(access(opsBot.paths.runtimeStatePath)).rejects.toThrow();
   });
 
-  it("stops all runtimes and removes all runtime state after a partial multi-bot start failure", async () => {
+  it("stops all runtimes and removes all runtime state after a partial multi-endpoint start failure", async () => {
     const root = await createTempDir();
-    const privateBot = createBotConfig(root);
-    const opsBot = createBotConfig(root, {
+    const privateBot = createEndpointConfig(root);
+    const opsBot = createEndpointConfig(root, {
       id: "ops-telegram",
       defaultAgentId: "ops",
     });
@@ -557,16 +557,16 @@ describe("createDaemon", () => {
             },
           },
         ],
-        activeBots: [privateBot, opsBot],
+        activeEndpoints: [privateBot, opsBot],
       },
       {
         engine: {
           run: vi.fn(),
         },
-        createTransport: (botConfig) => {
-          const transport = transports.get(botConfig.id);
+        createTransport: (endpointConfig) => {
+          const transport = transports.get(endpointConfig.id);
           if (!transport) {
-            throw new Error(`missing transport for ${botConfig.id}`);
+            throw new Error(`missing transport for ${endpointConfig.id}`);
           }
 
           return transport;
@@ -594,22 +594,22 @@ async function createTempDir(): Promise<string> {
   return path;
 }
 
-function createRuntimePaths(root: string, botId = "private-telegram"): RuntimePaths {
+function createRuntimePaths(root: string, endpointId = "private-telegram"): RuntimePaths {
   return {
     dataRoot: root,
-    botRoot: join(root, "bots", botId),
-    conversationsDir: join(root, "bots", botId, "conversations"),
-    logsDir: join(root, "bots", botId, "logs"),
-    logFilePath: join(root, "bots", botId, "logs", "daemon.log"),
-    runtimeDir: join(root, "bots", botId, "runtime"),
-    runtimeStatePath: join(root, "bots", botId, "runtime", "daemon.json"),
+    endpointRoot: join(root, "endpoints", endpointId),
+    conversationsDir: join(root, "endpoints", endpointId, "conversations"),
+    logsDir: join(root, "endpoints", endpointId, "logs"),
+    logFilePath: join(root, "endpoints", endpointId, "logs", "daemon.log"),
+    runtimeDir: join(root, "endpoints", endpointId, "runtime"),
+    runtimeStatePath: join(root, "endpoints", endpointId, "runtime", "daemon.json"),
   };
 }
 
-function createBotConfig(
+function createEndpointConfig(
   root: string,
-  overrides: Partial<DaemonConfig["activeBots"][number]> = {},
-): DaemonConfig["activeBots"][number] {
+  overrides: Partial<DaemonConfig["activeEndpoints"][number]> = {},
+): DaemonConfig["activeEndpoints"][number] {
   const id = overrides.id ?? "private-telegram";
   const paths = overrides.paths ?? createRuntimePaths(root, id);
 
@@ -624,13 +624,13 @@ function createBotConfig(
   };
 }
 
-function createConfig(botConfig: DaemonConfig["activeBots"][number]): DaemonConfig {
+function createConfig(endpointConfig: DaemonConfig["activeEndpoints"][number]): DaemonConfig {
   return {
-    configPath: join(botConfig.paths.dataRoot, "config.json"),
+    configPath: join(endpointConfig.paths.dataRoot, "config.json"),
     logging: {
       level: "info",
     },
-    activeBots: [botConfig],
+    activeEndpoints: [endpointConfig],
     agents: [
       {
         id: "default",
@@ -700,7 +700,7 @@ function createAgentRunResult(message: IncomingMessage, text: string) {
 
 function createIncomingMessage(messageId: string, text: string): IncomingMessage {
   return {
-    botId: "private-telegram",
+    endpointId: "private-telegram",
     conversation: {
       transport: "telegram",
       externalId: "42",
@@ -724,7 +724,7 @@ function createTransportEvent(message: IncomingMessage) {
 function createBlockingTransport(
   startedBotIds?: string[],
   stoppingBotIds?: string[],
-  botId = "private-telegram",
+  endpointId = "private-telegram",
 ): Transport & { waitUntilStarted(): Promise<void> } {
   let releaseStart: (() => void) | undefined;
   let resolveStarted: (() => void) | undefined;
@@ -734,14 +734,14 @@ function createBlockingTransport(
 
   return {
     async start() {
-      startedBotIds?.push(botId);
+      startedBotIds?.push(endpointId);
       resolveStarted?.();
       await new Promise<void>((resolve) => {
         releaseStart = resolve;
       });
     },
     stop: vi.fn(async () => {
-      stoppingBotIds?.push(botId);
+      stoppingBotIds?.push(endpointId);
       releaseStart?.();
     }),
     waitUntilStarted: () => started,
@@ -752,15 +752,15 @@ function createFailingTransport(
   error: Error,
   startedBotIds?: string[],
   stoppingBotIds?: string[],
-  botId = "private-telegram",
+  endpointId = "private-telegram",
 ): Transport {
   return {
     async start() {
-      startedBotIds?.push(botId);
+      startedBotIds?.push(endpointId);
       throw error;
     },
     stop: vi.fn(async () => {
-      stoppingBotIds?.push(botId);
+      stoppingBotIds?.push(endpointId);
     }),
   };
 }

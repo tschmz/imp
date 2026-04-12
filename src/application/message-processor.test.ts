@@ -569,7 +569,7 @@ async function tick(): Promise<void> {
 
 function createIncomingMessage(messageId: string, externalId: string): IncomingMessage {
   return {
-    botId: "private-telegram",
+    endpointId: "private-telegram",
     conversation: {
       transport: "telegram",
       externalId,

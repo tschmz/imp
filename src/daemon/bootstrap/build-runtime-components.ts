@@ -11,7 +11,7 @@ import type { AgentEngine } from "../../runtime/types.js";
 import { createFsConversationStore } from "../../storage/fs-store.js";
 import type { ConversationStore } from "../../storage/types.js";
 import type { ToolRegistry } from "../../tools/registry.js";
-import type { ActiveBotRuntimeConfig, DaemonConfig, RuntimePaths } from "../types.js";
+import type { ActiveEndpointRuntimeConfig, DaemonConfig, RuntimePaths } from "../types.js";
 
 export interface RuntimeComponents {
   loggingLevel: LogLevel;
@@ -33,7 +33,7 @@ export interface BuildRuntimeComponentsDependencies {
 
 export function buildRuntimeComponents(
   config: DaemonConfig,
-  botConfig: ActiveBotRuntimeConfig,
+  endpointConfig: ActiveEndpointRuntimeConfig,
   dependencies: BuildRuntimeComponentsDependencies = {},
 ): RuntimeComponents {
   const createLogger = dependencies.createLogger ?? createFileLogger;
@@ -42,8 +42,8 @@ export function buildRuntimeComponents(
   const createBuiltInRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
 
-  const logger = createLogger(botConfig.paths.logFilePath, config.logging.level);
-  const conversationStore = createConversationStore(botConfig.paths);
+  const logger = createLogger(endpointConfig.paths.logFilePath, config.logging.level);
+  const conversationStore = createConversationStore(endpointConfig.paths);
 
   const getApiKey = async (provider: string, agent: AgentDefinition) =>
     createOAuthApiKeyResolver(agent.authFile, logger)(provider);

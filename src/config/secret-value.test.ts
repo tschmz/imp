@@ -36,7 +36,7 @@ describe("resolveSecretValue", () => {
     await expect(
       resolveSecretValue("telegram-token", {
         configDir: "/etc/imp",
-        fieldLabel: "bots.0.token",
+        fieldLabel: "endpoints.0.token",
       }),
     ).resolves.toBe("telegram-token");
   });
@@ -52,7 +52,7 @@ describe("resolveSecretValue", () => {
           env: {
             IMP_TELEGRAM_BOT_TOKEN: "telegram-from-env",
           },
-          fieldLabel: "bots.0.token",
+          fieldLabel: "endpoints.0.token",
         },
       ),
     ).resolves.toBe("telegram-from-env");
@@ -67,11 +67,11 @@ describe("resolveSecretValue", () => {
         {
           configDir: "/etc/imp",
           env: {},
-          fieldLabel: "bots.0.token",
+          fieldLabel: "endpoints.0.token",
         },
       ),
     ).rejects.toThrow(
-      "bots.0.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
+      "endpoints.0.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
     );
   });
 
@@ -87,7 +87,7 @@ describe("resolveSecretValue", () => {
             expect(path).toBe("/etc/imp/secrets/telegram.token");
             return "telegram-from-file\n";
           },
-          fieldLabel: "bots.0.token",
+          fieldLabel: "endpoints.0.token",
         },
       ),
     ).resolves.toBe("telegram-from-file");
@@ -104,11 +104,11 @@ describe("resolveSecretValue", () => {
           readTextFile: async () => {
             throw new Error("ENOENT: no such file or directory");
           },
-          fieldLabel: "bots.0.token",
+          fieldLabel: "endpoints.0.token",
         },
       ),
     ).rejects.toThrow(
-      "bots.0.token references secret file /etc/imp/secrets/telegram.token, but it could not be read: ENOENT: no such file or directory",
+      "endpoints.0.token references secret file /etc/imp/secrets/telegram.token, but it could not be read: ENOENT: no such file or directory",
     );
   });
 
@@ -121,11 +121,11 @@ describe("resolveSecretValue", () => {
         {
           configDir: "/etc/imp",
           readTextFile: async () => "\n",
-          fieldLabel: "bots.0.token",
+          fieldLabel: "endpoints.0.token",
         },
       ),
     ).rejects.toThrow(
-      "bots.0.token references secret file /etc/imp/secrets/telegram.token, but it is empty.",
+      "endpoints.0.token references secret file /etc/imp/secrets/telegram.token, but it is empty.",
     );
   });
 });

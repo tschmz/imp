@@ -1,7 +1,7 @@
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface LogFields {
-  botId?: string;
+  endpointId?: string;
   transport?: string;
   conversationId?: string;
   messageId?: string;

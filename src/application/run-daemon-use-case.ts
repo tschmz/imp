@@ -53,7 +53,7 @@ export function createRunDaemonUseCase(
       return {
         status: "startup_failed",
         error: normalizeRunDaemonError(error),
-        failedBotIds: runtimeConfig.activeBots.map((bot) => bot.id),
+        failedBotIds: runtimeConfig.activeEndpoints.map((endpoint) => endpoint.id),
       };
     }
   };

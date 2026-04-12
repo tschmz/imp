@@ -833,12 +833,12 @@ function createSkill(name: string, description: string) {
 
 function createRuntimeInfo() {
   return {
-    botId: "private-telegram",
+    endpointId: "private-telegram",
     configPath: "/tmp/config.json",
     dataRoot: "/tmp/data",
     logFilePath: "/tmp/private-telegram.log",
     loggingLevel: "info" as const,
-    activeBotIds: ["private-telegram", "ops-telegram"],
+    activeEndpointIds: ["private-telegram", "ops-telegram"],
   };
 }
 
@@ -927,7 +927,7 @@ function createIncomingMessage(
   commandArgs?: string,
 ): IncomingMessage {
   return {
-    botId: "private-telegram",
+    endpointId: "private-telegram",
     conversation: {
       transport: "telegram",
       externalId: "42",

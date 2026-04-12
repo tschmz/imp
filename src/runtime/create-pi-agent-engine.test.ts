@@ -503,7 +503,7 @@ describe("createPiAgentEngine", () => {
     expect(logger.error).toHaveBeenCalledWith(
       "agent engine run failed",
       expect.objectContaining({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         transport: "telegram",
         conversationId: "42",
         messageId: "2",
@@ -930,7 +930,7 @@ describe("createPiAgentEngine", () => {
     });
 
     expect(logger.debug).toHaveBeenCalledWith("agent-engine.pipeline", {
-      botId: "private-telegram",
+      endpointId: "private-telegram",
       transport: "telegram",
       conversationId: "42",
       messageId: "2",
@@ -1847,7 +1847,7 @@ describe("createPiAgentEngine", () => {
       getContextFileFingerprint: async () => "mtime:1:size:100",
       readTextFile: async (path) => {
         readCalls.push(path);
-        return "Bot {{bot.id}} in {{imp.dataRoot}}.";
+        return "Endpoint {{endpoint.id}} in {{imp.dataRoot}}.";
       },
       createAgent: (options) => {
         systemPrompts.push(options.initialState?.systemPrompt ?? "");
@@ -1869,7 +1869,7 @@ describe("createPiAgentEngine", () => {
       conversation: createConversation(),
       message: {
         ...createIncomingMessage(),
-        botId: "ops-telegram",
+        endpointId: "ops-telegram",
       },
       runtime: {
         configPath: "/etc/imp/config.json",
@@ -1882,8 +1882,8 @@ describe("createPiAgentEngine", () => {
       "/workspace/AGENTS.md",
     ]);
     expect(systemPrompts).toEqual([
-      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\nBot private-telegram in /var/lib/imp-a.\n</INSTRUCTIONS>',
-      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\nBot ops-telegram in /var/lib/imp-b.\n</INSTRUCTIONS>',
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\nEndpoint private-telegram in /var/lib/imp-a.\n</INSTRUCTIONS>',
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\nEndpoint ops-telegram in /var/lib/imp-b.\n</INSTRUCTIONS>',
     ]);
   });
 
@@ -2081,7 +2081,7 @@ function createConversation(): ConversationContext {
 
 function createIncomingMessage(): IncomingMessage {
   return {
-    botId: "private-telegram",
+    endpointId: "private-telegram",
     conversation: {
       transport: "telegram",
       externalId: "42",

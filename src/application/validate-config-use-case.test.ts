@@ -52,7 +52,7 @@ describe("createValidateConfigUseCase", () => {
 
     vi.stubEnv("IMP_TELEGRAM_BOT_TOKEN", "telegram-from-env");
     await writeConfig(configPath, {
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -75,7 +75,7 @@ describe("createValidateConfigUseCase", () => {
     const configPath = join(root, "custom", "imp.json");
 
     await writeConfig(configPath, {
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -89,7 +89,7 @@ describe("createValidateConfigUseCase", () => {
     });
 
     await expect(createValidateConfigUseCase()({ configPath })).rejects.toThrow(
-      "bots.0.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
+      "endpoints.0.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
     );
   });
 });
@@ -121,7 +121,7 @@ async function writeConfig(configPath: string, overrides: Record<string, unknown
             },
           },
         ],
-        bots: [
+        endpoints: [
           {
             id: "private-telegram",
             type: "telegram",

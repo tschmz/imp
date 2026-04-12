@@ -9,12 +9,12 @@ import type { ModelResolver } from "../../runtime/model-resolution.js";
 import type { ConversationStore } from "../../storage/types.js";
 
 export interface RuntimeCommandInfo {
-  botId: string;
+  endpointId: string;
   configPath: string;
   dataRoot: string;
   logFilePath: string;
   loggingLevel: LogLevel;
-  activeBotIds: string[];
+  activeEndpointIds: string[];
 }
 
 export interface HandleIncomingMessageDependencies {

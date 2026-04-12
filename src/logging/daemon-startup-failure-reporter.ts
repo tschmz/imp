@@ -7,10 +7,10 @@ export function createDaemonStartupFailureReporter(): DaemonStartupFailureReport
   return {
     report: async ({ runtimeConfig, error }) => {
       await Promise.all(
-        runtimeConfig.activeBots.map(async (bot) => {
-          await ensureStartupLogFile(bot.paths.logFilePath);
-          const logger = createFileLogger(bot.paths.logFilePath, runtimeConfig.logging.level);
-          await logger.error("daemon failed to start", { botId: bot.id }, error);
+        runtimeConfig.activeEndpoints.map(async (endpoint) => {
+          await ensureStartupLogFile(endpoint.paths.logFilePath);
+          const logger = createFileLogger(endpoint.paths.logFilePath, runtimeConfig.logging.level);
+          await logger.error("daemon failed to start", { endpointId: endpoint.id }, error);
         }),
       );
     },

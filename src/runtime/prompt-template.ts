@@ -14,7 +14,7 @@ export interface PromptTemplateSystemContext {
 
 export interface PromptTemplateContext {
   system: PromptTemplateSystemContext;
-  bot: {
+  endpoint: {
     id: string;
   };
   agent: {
@@ -58,7 +58,7 @@ export function createDefaultPromptTemplateSystemContext(): PromptTemplateSystem
 export function createPromptTemplateContext(options: {
   system: PromptTemplateSystemContext;
   agent: AgentDefinition;
-  botId: string;
+  endpointId: string;
   transportKind: string;
   configPath?: string;
   dataRoot?: string;
@@ -66,8 +66,8 @@ export function createPromptTemplateContext(options: {
 }): PromptTemplateContext {
   return {
     system: options.system,
-    bot: {
-      id: options.botId,
+    endpoint: {
+      id: options.endpointId,
     },
     agent: {
       id: options.agent.id,

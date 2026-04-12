@@ -4,9 +4,9 @@ import { parsePositiveIntegerArgument } from "./utils.js";
 export const logsCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "logs",
-    description: "Show recent bot logs",
+    description: "Show recent endpoint logs",
     usage: "/logs [lines]",
-    helpDescription: "Show recent daemon log lines for this bot",
+    helpDescription: "Show recent daemon log lines for this endpoint",
     helpGroup: "Diagnostics",
   },
   canHandle(command) {
@@ -29,13 +29,13 @@ export const logsCommandHandler: InboundCommandHandler = {
         text:
           lines.length > 0
             ? [`Recent logs (${lines.length}):`, ...lines].join("\n")
-            : "No log lines are available yet for this bot.",
+            : "No log lines are available yet for this endpoint.",
       };
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("Log file not found:")) {
         return {
           conversation: message.conversation,
-          text: "No log file is available yet for this bot.",
+          text: "No log file is available yet for this endpoint.",
         };
       }
 

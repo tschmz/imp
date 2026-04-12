@@ -24,7 +24,7 @@ export async function resolvePromptStage(
     templateContext: createPromptTemplateContext({
       system: dependencies.promptTemplateSystemContext,
       agent: context.agent,
-      botId: context.input.message.botId,
+      endpointId: context.input.message.endpointId,
       transportKind: context.input.message.conversation.transport,
       configPath: context.input.runtime?.configPath,
       dataRoot: context.input.runtime?.dataRoot,

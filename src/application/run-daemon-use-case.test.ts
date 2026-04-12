@@ -44,7 +44,7 @@ describe("createRunDaemonUseCase", () => {
     expect(outcome).toEqual({
       status: "startup_failed",
       error: startupError,
-      failedBotIds: ["bot-1"],
+      failedBotIds: ["endpoint-1"],
     });
     expect(report).toHaveBeenCalledOnce();
     expect(report).toHaveBeenCalledWith({ runtimeConfig, error: startupError });
@@ -68,21 +68,21 @@ function createRuntimeConfig(): DaemonConfig {
         },
       },
     ],
-    activeBots: [
+    activeEndpoints: [
       {
-        id: "bot-1",
+        id: "endpoint-1",
         type: "telegram",
         token: "123:abc",
         allowedUserIds: [],
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          botRoot: "/tmp/bot-1",
-          conversationsDir: "/tmp/bot-1/conversations",
-          logsDir: "/tmp/bot-1/logs",
-          logFilePath: "/tmp/bot-1/logs/daemon.log",
-          runtimeDir: "/tmp/bot-1/runtime",
-          runtimeStatePath: "/tmp/bot-1/runtime/daemon.json",
+          endpointRoot: "/tmp/endpoint-1",
+          conversationsDir: "/tmp/endpoint-1/conversations",
+          logsDir: "/tmp/endpoint-1/logs",
+          logFilePath: "/tmp/endpoint-1/logs/daemon.log",
+          runtimeDir: "/tmp/endpoint-1/runtime",
+          runtimeStatePath: "/tmp/endpoint-1/runtime/daemon.json",
         },
       },
     ],

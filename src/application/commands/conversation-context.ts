@@ -12,7 +12,7 @@ export async function getOrCreateConversationContext(
   const existing = await conversationStore.get(message.conversation);
   if (existing) {
     await logger?.debug("loaded existing conversation", {
-      botId: message.botId,
+      endpointId: message.endpointId,
       transport: message.conversation.transport,
       conversationId: message.conversation.externalId,
       messageId: message.messageId,
@@ -37,7 +37,7 @@ export async function createConversationContext(
   });
   const createdState: ConversationState = createdContext.state;
   await logger?.debug("created new conversation", {
-    botId: message.botId,
+    endpointId: message.endpointId,
     transport: message.conversation.transport,
     conversationId: message.conversation.externalId,
     messageId: message.messageId,

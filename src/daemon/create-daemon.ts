@@ -23,11 +23,11 @@ import {
   type RuntimeLifecycleProcess,
 } from "./runtime-shutdown.js";
 import { cleanupRuntimeState } from "./runtime-state.js";
-import type { ActiveBotRuntimeConfig, Daemon, DaemonConfig } from "./types.js";
+import type { ActiveEndpointRuntimeConfig, Daemon, DaemonConfig } from "./types.js";
 
 interface DaemonDependencies extends RuntimeBootstrapDependencies {
   agentRegistry?: ReturnType<typeof createAgentRegistry>;
-  createTransport: TransportFactory<ActiveBotRuntimeConfig, Logger>;
+  createTransport: TransportFactory<ActiveEndpointRuntimeConfig, Logger>;
   runtimeProcess?: RuntimeLifecycleProcess;
 }
 
@@ -46,8 +46,8 @@ export function createDaemon(
       const runtimes: BootstrappedRuntime[] = [];
 
       try {
-        for (const botConfig of config.activeBots) {
-          runtimes.push(await bootstrapRuntime(config, botConfig, dependencies));
+        for (const endpointConfig of config.activeEndpoints) {
+          runtimes.push(await bootstrapRuntime(config, endpointConfig, dependencies));
         }
       } catch (error) {
         await Promise.all(
@@ -55,7 +55,7 @@ export function createDaemon(
             try {
               await runtime.engine.close?.();
             } finally {
-              await cleanupRuntimeState(runtime.botConfig.paths.runtimeStatePath);
+              await cleanupRuntimeState(runtime.endpointConfig.paths.runtimeStatePath);
             }
           }),
         );
@@ -73,7 +73,7 @@ export function createDaemon(
       });
       const shutdown = createRuntimeShutdown(
         runtimeEntries,
-        runtimes.map((runtime) => runtime.botConfig.paths.runtimeStatePath),
+        runtimes.map((runtime) => runtime.endpointConfig.paths.runtimeStatePath),
         dependencies.runtimeProcess,
       );
       runtimeControl.requestAction = (action) => {

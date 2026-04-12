@@ -50,7 +50,7 @@ interface PiAgentEngineDependencies {
 }
 
 interface EngineLogContext {
-  botId: string;
+  endpointId: string;
   transport: string;
   conversationId: string;
   messageId: string;
@@ -108,7 +108,7 @@ export function createPiAgentEngine(
       }
 
       const context: EngineLogContext = {
-        botId: input.message.botId,
+        endpointId: input.message.endpointId,
         transport: input.message.conversation.transport,
         conversationId: input.message.conversation.externalId,
         messageId: input.message.messageId,

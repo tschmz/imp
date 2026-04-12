@@ -28,10 +28,10 @@ Show recent logs:
 imp log
 ```
 
-Show logs for one bot:
+Show logs for one endpoint:
 
 ```bash
-imp log --bot private-telegram
+imp log --endpoint private-telegram
 ```
 
 Follow new log lines:
@@ -141,10 +141,10 @@ If foreground execution works but the installed Linux service does not, compare 
 At runtime, `imp`:
 
 - loads the config
-- starts all enabled bots
+- starts all enabled endpoints
 - routes each incoming conversation to an agent
 - persists conversation state and logs under `paths.dataRoot`
 
-If a bot is disabled in the config, it is skipped on startup.
+If a endpoint is disabled in the config, it is skipped on startup.
 
-For command-level bot behavior, see [Telegram Commands](./telegram.md).
+For command-level endpoint behavior, see [Telegram Commands](./telegram.md).

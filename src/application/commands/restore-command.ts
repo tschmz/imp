@@ -32,7 +32,7 @@ export const restoreCommandHandler: InboundCommandHandler = {
     }
 
     await logger?.debug("restored conversation via inbound command", {
-      botId: message.botId,
+      endpointId: message.endpointId,
       transport: message.conversation.transport,
       conversationId: message.conversation.externalId,
       messageId: message.messageId,

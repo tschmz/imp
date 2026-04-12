@@ -51,7 +51,7 @@ describe("initAppConfig", () => {
           request?: Record<string, unknown>;
         };
       }>;
-      bots: Array<{ access: { allowedUserIds: string[] } }>;
+      endpoints: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
@@ -82,7 +82,7 @@ describe("initAppConfig", () => {
     expect(config.agents[0]?.prompt.base).toEqual({
       file: join(root, "state-home", "imp", "SYSTEM.md"),
     });
-    expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
+    expect(config.endpoints[0]?.access.allowedUserIds).toEqual([]);
 
     const fileMode = (await stat(configPath)).mode & 0o777;
     expect(fileMode).toBe(0o600);

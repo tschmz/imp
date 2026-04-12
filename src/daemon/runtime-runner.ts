@@ -6,7 +6,7 @@ import { createAgentRegistry } from "../agents/registry.js";
 import type { Transport, TransportFactory } from "../transports/types.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
 import type { RuntimeControlAction } from "./runtime-shutdown.js";
-import type { ActiveBotRuntimeConfig } from "./types.js";
+import type { ActiveEndpointRuntimeConfig } from "./types.js";
 
 export interface RuntimeEntry {
   start(): Promise<void>;
@@ -15,7 +15,7 @@ export interface RuntimeEntry {
 
 interface RuntimeRunnerDependencies {
   agentRegistry: ReturnType<typeof createAgentRegistry>;
-  createTransport: TransportFactory<ActiveBotRuntimeConfig, BootstrappedRuntime["logger"]>;
+  createTransport: TransportFactory<ActiveEndpointRuntimeConfig, BootstrappedRuntime["logger"]>;
   requestControlAction?: (action: RuntimeControlAction) => void;
 }
 
@@ -28,14 +28,14 @@ export function createRuntimeEntries(
       agentRegistry: dependencies.agentRegistry,
       conversationStore: runtime.conversationStore,
       engine: runtime.engine,
-      defaultAgentId: runtime.botConfig.defaultAgentId,
+      defaultAgentId: runtime.endpointConfig.defaultAgentId,
       runtimeInfo: {
-        botId: runtime.botConfig.id,
+        endpointId: runtime.endpointConfig.id,
         configPath: runtime.configPath,
-        dataRoot: runtime.botConfig.paths.dataRoot,
-        logFilePath: runtime.botConfig.paths.logFilePath,
+        dataRoot: runtime.endpointConfig.paths.dataRoot,
+        logFilePath: runtime.endpointConfig.paths.logFilePath,
         loggingLevel: runtime.loggingLevel,
-        activeBotIds: runtimes.map((entry) => entry.botConfig.id),
+        activeEndpointIds: runtimes.map((entry) => entry.endpointConfig.id),
       },
       logger: runtime.logger,
     });
@@ -65,7 +65,7 @@ export function createRuntimeEntries(
         const conversation = await runtime.conversationStore.ensureActive(
           event.message.conversation,
           {
-            agentId: runtime.botConfig.defaultAgentId,
+            agentId: runtime.endpointConfig.defaultAgentId,
             now: event.message.receivedAt,
           },
         );
@@ -85,38 +85,38 @@ export function createRuntimeEntries(
 
     return {
       async start(): Promise<void> {
-        const defaultAgent = dependencies.agentRegistry.get(runtime.botConfig.defaultAgentId);
+        const defaultAgent = dependencies.agentRegistry.get(runtime.endpointConfig.defaultAgentId);
         await runtime.logger.info(
           `starting daemon with default agent "${defaultAgent?.id ?? "unknown"}"`,
         );
-        await runtime.logger.info(`data root: ${runtime.botConfig.paths.dataRoot}`);
-        await runtime.logger.info(`bot root: ${runtime.botConfig.paths.botRoot}`);
-        await runtime.logger.info(`conversations dir: ${runtime.botConfig.paths.conversationsDir}`);
-        await runtime.logger.info(`logs dir: ${runtime.botConfig.paths.logsDir}`);
-        await runtime.logger.info(`log file: ${runtime.botConfig.paths.logFilePath}`);
-        await runtime.logger.info(`runtime dir: ${runtime.botConfig.paths.runtimeDir}`);
-        await runtime.logger.info(`runtime file: ${runtime.botConfig.paths.runtimeStatePath}`);
-        await runtime.logger.info(`active bot: ${runtime.botConfig.id}`);
+        await runtime.logger.info(`data root: ${runtime.endpointConfig.paths.dataRoot}`);
+        await runtime.logger.info(`endpoint root: ${runtime.endpointConfig.paths.endpointRoot}`);
+        await runtime.logger.info(`conversations dir: ${runtime.endpointConfig.paths.conversationsDir}`);
+        await runtime.logger.info(`logs dir: ${runtime.endpointConfig.paths.logsDir}`);
+        await runtime.logger.info(`log file: ${runtime.endpointConfig.paths.logFilePath}`);
+        await runtime.logger.info(`runtime dir: ${runtime.endpointConfig.paths.runtimeDir}`);
+        await runtime.logger.info(`runtime file: ${runtime.endpointConfig.paths.runtimeStatePath}`);
+        await runtime.logger.info(`active endpoint: ${runtime.endpointConfig.id}`);
         for (const agent of dependencies.agentRegistry.list()) {
           await runtime.logger.info("discovered agent skills", {
-            botId: runtime.botConfig.id,
+            endpointId: runtime.endpointConfig.id,
             agentId: agent.id,
             skillCount: agent.skillCatalog?.length ?? 0,
             skillNames: (agent.skillCatalog ?? []).map((skill) => skill.name),
           });
           for (const issue of agent.skillIssues ?? []) {
-            await runtime.logger.info(issue, { botId: runtime.botConfig.id, agentId: agent.id });
+            await runtime.logger.info(issue, { endpointId: runtime.endpointConfig.id, agentId: agent.id });
           }
         }
-        await runtime.logger.debug("starting transport for bot", {
-          botId: runtime.botConfig.id,
+        await runtime.logger.debug("starting transport for endpoint", {
+          endpointId: runtime.endpointConfig.id,
         });
 
         if (stopped) {
           return;
         }
 
-        transport = dependencies.createTransport(runtime.botConfig, runtime.logger);
+        transport = dependencies.createTransport(runtime.endpointConfig, runtime.logger);
         if (stopped) {
           await transport.stop?.();
           return;

@@ -22,6 +22,6 @@ describe("helpCommandHandler", () => {
     expect(response?.text).toContain("Context:");
     expect(response?.text).toContain("/agent [id] Show or change the session agent.");
     expect(response?.text).toContain("Diagnostics:");
-    expect(response?.text).toContain("/logs [lines] Show recent daemon log lines for this bot.");
+    expect(response?.text).toContain("/logs [lines] Show recent daemon log lines for this endpoint.");
   });
 });

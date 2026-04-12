@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import type { AppConfig, BotConfig } from "./types.js";
+import type { AppConfig, EndpointConfig } from "./types.js";
 import { getTransport, listTransportTypes } from "../transports/registry.js";
 
 const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
@@ -142,23 +142,23 @@ const agentConfigSchema = z
 const transportSchemas = listTransportTypes().map((type) => {
   const entry = getTransport(type);
   if (!entry) {
-    throw new Error(`Unsupported bot transport: ${type}`);
+    throw new Error(`Unsupported endpoint transport: ${type}`);
   }
 
-  return entry.configSchema as z.ZodType<BotConfig>;
+  return entry.configSchema as z.ZodType<EndpointConfig>;
 });
 
 if (transportSchemas.length === 0) {
-  throw new Error("No bot transports registered.");
+  throw new Error("No endpoint transports registered.");
 }
 
-const botConfigSchema =
+const endpointConfigSchema =
   transportSchemas.length === 1
     ? transportSchemas[0]
     : (z.discriminatedUnion("type", [
         transportSchemas[0] as z.core.$ZodTypeDiscriminable,
         ...(transportSchemas.slice(1) as z.core.$ZodTypeDiscriminable[]),
-      ]) as unknown as z.ZodType<BotConfig>);
+      ]) as unknown as z.ZodType<EndpointConfig>);
 
 export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   instance: z.object({
@@ -176,7 +176,7 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
     agentId: z.string().min(1),
   }),
   agents: agentConfigSchema.array().min(1),
-  bots: botConfigSchema.array().min(1),
+  endpoints: endpointConfigSchema.array().min(1),
 }).superRefine((config, ctx) => {
   const agentIds = new Set<string>();
   const knownAgentIds = new Set<string>();
@@ -195,18 +195,18 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
     knownAgentIds.add(agent.id);
   }
 
-  const botIds = new Set<string>();
-  for (const [index, bot] of config.bots.entries()) {
-    if (botIds.has(bot.id)) {
+  const endpointIds = new Set<string>();
+  for (const [index, endpoint] of config.endpoints.entries()) {
+    if (endpointIds.has(endpoint.id)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["bots", index, "id"],
-        message: `Duplicate bot id "${bot.id}". Bot ids must be unique.`,
+        path: ["endpoints", index, "id"],
+        message: `Duplicate endpoint id "${endpoint.id}". Endpoint ids must be unique.`,
       });
       continue;
     }
 
-    botIds.add(bot.id);
+    endpointIds.add(endpoint.id);
   }
 
   if (!knownAgentIds.has(config.defaults.agentId)) {
@@ -217,16 +217,16 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
     });
   }
 
-  for (const [index, bot] of config.bots.entries()) {
-    const defaultAgentId = bot.routing?.defaultAgentId;
+  for (const [index, endpoint] of config.endpoints.entries()) {
+    const defaultAgentId = endpoint.routing?.defaultAgentId;
     if (!defaultAgentId || knownAgentIds.has(defaultAgentId)) {
       continue;
     }
 
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ["bots", index, "routing", "defaultAgentId"],
-      message: `Unknown default agent id "${defaultAgentId}" for bot "${bot.id}". Expected one of: ${formatKnownIds(knownAgentIds)}.`,
+      path: ["endpoints", index, "routing", "defaultAgentId"],
+      message: `Unknown default agent id "${defaultAgentId}" for endpoint "${endpoint.id}". Expected one of: ${formatKnownIds(knownAgentIds)}.`,
     });
   }
 });

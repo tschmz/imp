@@ -18,12 +18,12 @@ afterEach(async () => {
 });
 
 describe("viewDaemonLogs", () => {
-  it("prints the latest lines for a single bot", async () => {
+  it("prints the latest lines for a single endpoint", async () => {
     const root = await createTempDir();
     const runtimeConfig = createRuntimeConfig(root, ["private-telegram"]);
     const stdout = new PassThrough();
 
-    await writeLog(runtimeConfig.activeBots[0]!.paths.logFilePath, ["one", "two", "three"]);
+    await writeLog(runtimeConfig.activeEndpoints[0]!.paths.logFilePath, ["one", "two", "three"]);
 
     const chunks: string[] = [];
     stdout.on("data", (chunk) => {
@@ -39,13 +39,13 @@ describe("viewDaemonLogs", () => {
     expect(chunks.join("")).toBe("two\nthree\n");
   });
 
-  it("prefixes output when multiple bots are enabled", async () => {
+  it("prefixes output when multiple endpoints are enabled", async () => {
     const root = await createTempDir();
     const runtimeConfig = createRuntimeConfig(root, ["private-telegram", "ops-telegram"]);
     const stdout = new PassThrough();
 
-    await writeLog(runtimeConfig.activeBots[0]!.paths.logFilePath, ["one", "two"]);
-    await writeLog(runtimeConfig.activeBots[1]!.paths.logFilePath, ["three", "four"]);
+    await writeLog(runtimeConfig.activeEndpoints[0]!.paths.logFilePath, ["one", "two"]);
+    await writeLog(runtimeConfig.activeEndpoints[1]!.paths.logFilePath, ["three", "four"]);
 
     const chunks: string[] = [];
     stdout.on("data", (chunk) => {
@@ -61,26 +61,26 @@ describe("viewDaemonLogs", () => {
     expect(chunks.join("")).toBe("[private-telegram] two\n[ops-telegram] four\n");
   });
 
-  it("filters to a selected bot", () => {
+  it("filters to a selected endpoint", () => {
     const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram", "ops-telegram"]);
 
     expect(resolveLogTargets(runtimeConfig, "ops-telegram")).toEqual([
       {
-        botId: "ops-telegram",
-        logFilePath: "/tmp/log-targets/bots/ops-telegram/logs/daemon.log",
+        endpointId: "ops-telegram",
+        logFilePath: "/tmp/log-targets/endpoints/ops-telegram/logs/daemon.log",
       },
     ]);
   });
 
-  it("rejects an unknown bot selection", async () => {
+  it("rejects an unknown endpoint selection", async () => {
     const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram"]);
 
     await expect(
       viewDaemonLogs({
         runtimeConfig,
-        botId: "ops-telegram",
+        endpointId: "ops-telegram",
       }),
-    ).rejects.toThrow("Unknown bot ID: ops-telegram");
+    ).rejects.toThrow("Unknown endpoint ID: ops-telegram");
   });
 
   it("rejects non-positive line counts", async () => {
@@ -217,27 +217,27 @@ async function createTempDir(): Promise<string> {
   return path;
 }
 
-function createRuntimeConfig(root: string, botIds: string[]): DaemonConfig {
+function createRuntimeConfig(root: string, endpointIds: string[]): DaemonConfig {
   return {
     configPath: join(root, "config.json"),
     logging: {
       level: "info",
     },
     agents: [],
-    activeBots: botIds.map((botId) => ({
-      id: botId,
+    activeEndpoints: endpointIds.map((endpointId) => ({
+      id: endpointId,
       type: "telegram",
       token: "token",
       allowedUserIds: [],
       defaultAgentId: "default",
       paths: {
         dataRoot: root,
-        botRoot: join(root, "bots", botId),
-        conversationsDir: join(root, "bots", botId, "conversations"),
-        logsDir: join(root, "bots", botId, "logs"),
-        logFilePath: join(root, "bots", botId, "logs", "daemon.log"),
-        runtimeDir: join(root, "bots", botId, "runtime"),
-        runtimeStatePath: join(root, "bots", botId, "runtime", "daemon.json"),
+        endpointRoot: join(root, "endpoints", endpointId),
+        conversationsDir: join(root, "endpoints", endpointId, "conversations"),
+        logsDir: join(root, "endpoints", endpointId, "logs"),
+        logFilePath: join(root, "endpoints", endpointId, "logs", "daemon.log"),
+        runtimeDir: join(root, "endpoints", endpointId, "runtime"),
+        runtimeStatePath: join(root, "endpoints", endpointId, "runtime", "daemon.json"),
       },
     })),
   };

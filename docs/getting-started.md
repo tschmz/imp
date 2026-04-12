@@ -1,8 +1,8 @@
 # Getting Started
 
-`imp` is a local daemon for running agent-based bots as persistent services.
+`imp` is a local daemon for running agent-based endpoints as persistent services.
 
-This guide gets you from a fresh install to a running Telegram bot.
+This guide gets you from a fresh install to a running Telegram endpoint.
 
 Use it for the first setup. For day-to-day operation, see [Running And Service](./running-and-service.md).
 
@@ -10,7 +10,7 @@ Use it for the first setup. For day-to-day operation, see [Running And Service](
 
 - Node.js 20.6 or newer
 - Credentials for at least one supported model provider
-- A Telegram bot token
+- A Telegram endpoint token
 
 ## Install
 
@@ -50,7 +50,7 @@ If `XDG_CONFIG_HOME` or `XDG_STATE_HOME` is set, those locations are used instea
 The generated setup includes:
 
 - one default agent
-- one Telegram bot
+- one Telegram endpoint
 - one base prompt file under the data directory
 - the default built-in tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`)
 - `logging.level: "info"`
@@ -105,5 +105,5 @@ imp log --follow
 
 - Read [Configuration](./configuration.md) to understand the config structure and config discovery order.
 - Read [Running And Service](./running-and-service.md) to keep `imp` running in the background and handle service credentials correctly.
-- Read [Telegram Commands](./telegram.md) to see the built-in bot command surface.
+- Read [Telegram Commands](./telegram.md) to see the built-in endpoint command surface.
 - Read [Customizing Agents](./customizing-agents.md) to tailor prompts, tools, and workspaces.

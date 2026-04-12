@@ -27,11 +27,11 @@ imp config validate
 Common causes:
 
 - duplicate agent IDs
-- duplicate bot IDs
+- duplicate endpoint IDs
 - `defaults.agentId` points to a missing agent
-- a bot routes to a missing agent
+- a endpoint routes to a missing agent
 - a prompt source defines both `text` and `file`
-- all bots are disabled
+- all endpoints are disabled
 - a Telegram token env reference points to a variable that is not set
 - a Telegram token file reference points to a missing, unreadable, or empty file
 
@@ -42,16 +42,16 @@ If validation fails on a token reference, check whether:
 - the secret file is readable by the user running `imp`
 - the secret file contains the token rather than being empty
 
-## Telegram Bot Does Not Respond
+## Telegram Endpoint Does Not Respond
 
 Check these first:
 
-- the bot token is valid
-- the bot is enabled
+- the endpoint token is valid
+- the endpoint is enabled
 - your Telegram user ID is listed in `access.allowedUserIds`
-- you are messaging the bot in a private chat
+- you are messaging the endpoint in a private chat
 
-Use `/whoami` to inspect the current Telegram user and chat IDs once the bot is reachable.
+Use `/whoami` to inspect the current Telegram user and chat IDs once the endpoint is reachable.
 
 ## Service Starts Differently From The Shell
 

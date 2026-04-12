@@ -8,13 +8,13 @@ import { resolveServiceDefinitionPath } from "../service/install-service.js";
 import { createTransport } from "../transports/registry.js";
 import type { Transport, TransportFactory } from "../transports/types.js";
 
-export const createRuntimeTransportFactory: TransportFactory<DaemonConfig["activeBots"][number], Logger> =
-  (botConfig, logger): Transport => createTransport(botConfig.type, botConfig, logger);
+export const createRuntimeTransportFactory: TransportFactory<DaemonConfig["activeEndpoints"][number], Logger> =
+  (endpointConfig, logger): Transport => createTransport(endpointConfig.type, endpointConfig, logger);
 
 export async function resolveRuntimeTarget(options: { cliConfigPath?: string } = {}): Promise<{
   configPath: string;
   runtimeConfig: DaemonConfig;
-  createTransport: TransportFactory<DaemonConfig["activeBots"][number], Logger>;
+  createTransport: TransportFactory<DaemonConfig["activeEndpoints"][number], Logger>;
 }> {
   const { configPath } = await discoverConfigPath({
     cliConfigPath: options.cliConfigPath,

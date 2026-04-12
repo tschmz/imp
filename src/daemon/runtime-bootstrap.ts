@@ -8,10 +8,10 @@ import {
   type BuildRuntimeComponentsDependencies,
 } from "./bootstrap/build-runtime-components.js";
 import { prepareRuntimeFilesystem } from "./bootstrap/prepare-runtime-filesystem.js";
-import type { ActiveBotRuntimeConfig, DaemonConfig } from "./types.js";
+import type { ActiveEndpointRuntimeConfig, DaemonConfig } from "./types.js";
 
 export interface BootstrappedRuntime {
-  botConfig: ActiveBotRuntimeConfig;
+  endpointConfig: ActiveEndpointRuntimeConfig;
   configPath: string;
   logger: ReturnType<typeof buildRuntimeComponents>["logger"];
   loggingLevel: ReturnType<typeof buildRuntimeComponents>["loggingLevel"];
@@ -23,28 +23,28 @@ export type RuntimeBootstrapDependencies = BuildRuntimeComponentsDependencies;
 
 export async function bootstrapRuntime(
   config: DaemonConfig,
-  botConfig: ActiveBotRuntimeConfig,
+  endpointConfig: ActiveEndpointRuntimeConfig,
   dependencies: RuntimeBootstrapDependencies = {},
 ): Promise<BootstrappedRuntime> {
   let preparedRuntime: PreparedRuntime = { stateAcquired: false };
 
   try {
-    await prepareRuntimeFilesystem(botConfig.paths);
-    preparedRuntime = await acquireRuntimeState(config, botConfig);
+    await prepareRuntimeFilesystem(endpointConfig.paths);
+    preparedRuntime = await acquireRuntimeState(config, endpointConfig);
 
-    const components = buildRuntimeComponents(config, botConfig, dependencies);
+    const components = buildRuntimeComponents(config, endpointConfig, dependencies);
 
-    await components.logger.debug("initialized bot runtime state", {
-      botId: botConfig.id,
+    await components.logger.debug("initialized endpoint runtime state", {
+      endpointId: endpointConfig.id,
     });
 
     return {
-      botConfig,
+      endpointConfig,
       configPath: config.configPath,
       ...components,
     };
   } catch (error) {
-    await cleanupPreparedRuntime(preparedRuntime, botConfig);
+    await cleanupPreparedRuntime(preparedRuntime, endpointConfig);
     throw error;
   }
 }

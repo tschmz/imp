@@ -63,7 +63,7 @@ describe("imp CLI e2e", () => {
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
       agents: Array<{ id: string; prompt: { base: { file?: string } } }>;
-      bots: Array<{ access: { allowedUserIds: string[] } }>;
+      endpoints: Array<{ access: { allowedUserIds: string[] } }>;
     };
 
     expect(stdout).toContain(`Created config at ${configPath}`);
@@ -77,9 +77,9 @@ describe("imp CLI e2e", () => {
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.agents[0]?.id).toBe("default");
     expect(config.agents[0]?.prompt.base.file).toBe(promptPath);
-    expect(config.bots[0]?.access.allowedUserIds).toEqual([]);
+    expect(config.endpoints[0]?.access.allowedUserIds).toEqual([]);
     await expect(readFile(promptPath, "utf8")).resolves.toContain(
-      "You are a local coding and operations assistant running through a local Imp daemon.",
+      "You are a helpful assistant running through a local Imp daemon.",
     );
   });
 
@@ -91,7 +91,7 @@ describe("imp CLI e2e", () => {
     const backupPath = join(root, "backup.tar");
     const promptPath = join(dataRoot, "SYSTEM.md");
     const authPath = join(dataRoot, "auth.json");
-    const conversationPath = join(dataRoot, "bots", "private-telegram", "conversations", "telegram", "42", "conversation.json");
+    const conversationPath = join(dataRoot, "endpoints", "private-telegram", "conversations", "telegram", "42", "conversation.json");
 
     await runCli(["init", "--defaults"], env);
     await overwriteConfig(configPath, {
@@ -122,7 +122,7 @@ describe("imp CLI e2e", () => {
           },
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -161,7 +161,7 @@ describe("imp CLI e2e", () => {
           },
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -191,14 +191,14 @@ describe("imp CLI e2e", () => {
 
     await runCli(["init", "--defaults"], env);
 
-    const { stdout } = await runCli(["config", "set", "--config", configPath, "bots.private-telegram.enabled", "false"], env);
+    const { stdout } = await runCli(["config", "set", "--config", configPath, "endpoints.private-telegram.enabled", "false"], env);
     const config = JSON.parse(await readFile(configPath, "utf8")) as {
-      bots: Array<{ id: string; enabled: boolean }>;
+      endpoints: Array<{ id: string; enabled: boolean }>;
     };
 
-    expect(stdout).toBe(`Updated config ${configPath}: bots.private-telegram.enabled\n`);
-    expect(config.bots.find((bot) => bot.id === "private-telegram")?.enabled).toBe(false);
-  });
+    expect(stdout).toBe(`Updated config ${configPath}: endpoints.private-telegram.enabled\n`);
+    expect(config.endpoints.find((endpoint) => endpoint.id === "private-telegram")?.enabled).toBe(false);
+  }, 10_000);
 
   it("prints a native service definition in dry-run mode", async () => {
     const root = await createTempDir();
@@ -262,7 +262,7 @@ describe("imp CLI e2e", () => {
           },
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -278,17 +278,17 @@ describe("imp CLI e2e", () => {
     await expect(runCli(["start", "--config", configPath], env)).rejects.toSatisfy((error: { stderr?: string }) => {
       const stderr = error.stderr ?? "";
       return (
-        stderr.includes('Invalid Telegram bot token for bot "private-telegram"') ||
+        stderr.includes('Invalid Telegram endpoint token for endpoint "private-telegram"') ||
         stderr.includes("Network request for 'getMe' failed")
       );
     });
 
-    const botRoot = join(dataRoot, "bots", "private-telegram");
-    const logFilePath = join(botRoot, "logs", "daemon.log");
-    const runtimeStatePath = join(botRoot, "runtime", "daemon.json");
+    const endpointRoot = join(dataRoot, "endpoints", "private-telegram");
+    const logFilePath = join(endpointRoot, "logs", "daemon.log");
+    const runtimeStatePath = join(endpointRoot, "runtime", "daemon.json");
 
-    await expect(stat(join(botRoot, "logs"))).resolves.toBeDefined();
-    await expect(stat(join(botRoot, "runtime"))).resolves.toBeDefined();
+    await expect(stat(join(endpointRoot, "logs"))).resolves.toBeDefined();
+    await expect(stat(join(endpointRoot, "runtime"))).resolves.toBeDefined();
     await expect(readFile(logFilePath, "utf8")).resolves.toContain(
       "daemon failed to start",
     );
@@ -301,7 +301,7 @@ describe("imp CLI e2e", () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
-    const logFilePath = join(root, "state-home", "imp", "bots", "private-telegram", "logs", "daemon.log");
+    const logFilePath = join(root, "state-home", "imp", "endpoints", "private-telegram", "logs", "daemon.log");
 
     await runCli(["init", "--defaults"], env);
     await overwriteConfig(configPath, {
@@ -331,7 +331,7 @@ describe("imp CLI e2e", () => {
           },
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",

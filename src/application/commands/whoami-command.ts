@@ -3,8 +3,8 @@ import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 export const whoamiCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "whoami",
-    description: "Show bot and user IDs",
-    helpDescription: "Show your current bot, chat, and user IDs",
+    description: "Show endpoint and user IDs",
+    helpDescription: "Show your current endpoint, chat, and user IDs",
     helpGroup: "Diagnostics",
   },
   canHandle(command) {
@@ -16,7 +16,7 @@ export const whoamiCommandHandler: InboundCommandHandler = {
       conversation: message.conversation,
       text: [
         "Identity:",
-        `Bot: ${dependencies.runtimeInfo.botId}`,
+        `Endpoint: ${dependencies.runtimeInfo.endpointId}`,
         `Transport: ${message.conversation.transport}`,
         `Chat ID: ${message.conversation.externalId}`,
         `User ID: ${message.userId}`,

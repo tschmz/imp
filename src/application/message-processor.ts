@@ -111,7 +111,7 @@ async function processEvent(
       await dependencies.logger?.error(
         "failed to process inbound message",
         {
-          botId: event.message.botId,
+          endpointId: event.message.endpointId,
           transport: event.message.conversation.transport,
           conversationId: event.message.conversation.externalId,
           messageId: event.message.messageId,

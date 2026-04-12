@@ -41,9 +41,9 @@ By default, backups include:
 
 - the active config file
 - prompt and auth files referenced by the config
-- bot conversation stores under `paths.dataRoot`
+- endpoint conversation stores under `paths.dataRoot`
 
-Current backup behavior does **not** include Telegram token secret files referenced via `bots[].token.file`.
+Current backup behavior does **not** include Telegram token secret files referenced via `endpoints[].token.file`.
 Those files stay outside the archive and must be backed up separately if you use file-based token references.
 Environment-variable-based token references also do not embed the secret value into the backup archive.
 

@@ -36,7 +36,7 @@ describe("createRuntimeEntries", () => {
 
     await entries[0]?.start();
 
-    expect(createTransport).toHaveBeenCalledWith(runtime.botConfig, runtime.logger);
+    expect(createTransport).toHaveBeenCalledWith(runtime.endpointConfig, runtime.logger);
     expect(transport.start).toHaveBeenCalledOnce();
   });
 
@@ -67,7 +67,7 @@ describe("createRuntimeEntries", () => {
     await entries[0]?.start();
     await transport.handler.handle(
       createEvent({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         conversation: {
           transport: "telegram",
           externalId: "42",
@@ -120,7 +120,7 @@ describe("createRuntimeEntries", () => {
     await entries[0]?.start();
     await transport.handler.handle(
       createEvent({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         conversation: {
           transport: "telegram",
           externalId: "42",
@@ -172,7 +172,7 @@ describe("createRuntimeEntries", () => {
     await entries[0]?.start();
     await transport.handler.handle(
       createEvent({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         conversation: {
           transport: "telegram",
           externalId: "42",
@@ -267,7 +267,7 @@ describe("createRuntimeEntries", () => {
     expect(runtime.logger.info).toHaveBeenCalledWith(
       "discovered agent skills",
       expect.objectContaining({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         agentId: "default",
         skillCount: 1,
         skillNames: ["commit"],
@@ -308,7 +308,7 @@ function createEvent(message: IncomingMessage) {
 
 function createRuntime(): BootstrappedRuntime {
   return {
-    botConfig: {
+    endpointConfig: {
       id: "private-telegram",
       type: "telegram",
       token: "123:abc",
@@ -316,12 +316,12 @@ function createRuntime(): BootstrappedRuntime {
       defaultAgentId: "default",
       paths: {
         dataRoot: "/tmp",
-        botRoot: "/tmp/bots/private-telegram",
-        conversationsDir: "/tmp/bots/private-telegram/conversations",
-        logsDir: "/tmp/bots/private-telegram/logs",
-        logFilePath: "/tmp/bots/private-telegram/logs/daemon.log",
-        runtimeDir: "/tmp/bots/private-telegram/runtime",
-        runtimeStatePath: "/tmp/bots/private-telegram/runtime/daemon.json",
+        endpointRoot: "/tmp/endpoints/private-telegram",
+        conversationsDir: "/tmp/endpoints/private-telegram/conversations",
+        logsDir: "/tmp/endpoints/private-telegram/logs",
+        logFilePath: "/tmp/endpoints/private-telegram/logs/daemon.log",
+        runtimeDir: "/tmp/endpoints/private-telegram/runtime",
+        runtimeStatePath: "/tmp/endpoints/private-telegram/runtime/daemon.json",
       },
     },
     configPath: "/tmp/config.json",

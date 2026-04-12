@@ -2,7 +2,7 @@ import { readFile, watch } from "node:fs/promises";
 import type { DaemonConfig } from "../daemon/types.js";
 
 export interface LogTarget {
-  botId: string;
+  endpointId: string;
   logFilePath: string;
 }
 
@@ -19,7 +19,7 @@ interface ViewLogsDependencies {
 
 export async function viewDaemonLogs(options: {
   runtimeConfig: DaemonConfig;
-  botId?: string;
+  endpointId?: string;
   lines?: number;
   follow?: boolean;
   stdout?: NodeJS.WritableStream;
@@ -32,12 +32,12 @@ export async function viewDaemonLogs(options: {
   const lines = options.lines ?? 50;
 
   assertPositiveLineCount(lines);
-  const targets = resolveLogTargets(options.runtimeConfig, options.botId);
-  const multiBot = targets.length > 1;
+  const targets = resolveLogTargets(options.runtimeConfig, options.endpointId);
+  const multiEndpoint = targets.length > 1;
 
   for (const target of targets) {
     const recentLines = await readRecentLogLines(target.logFilePath, lines, readFileImpl);
-    writeLogLines(stdout, target.botId, recentLines, multiBot);
+    writeLogLines(stdout, target.endpointId, recentLines, multiEndpoint);
   }
 
   if (!options.follow) {
@@ -48,30 +48,30 @@ export async function viewDaemonLogs(options: {
     targets,
     stdout,
     signal: options.signal,
-    multiBot,
+    multiEndpoint,
     readFile: readFileImpl,
     watch: watchImpl,
   });
 }
 
-export function resolveLogTargets(runtimeConfig: DaemonConfig, botId?: string): LogTarget[] {
-  if (botId) {
-    const targetBot = runtimeConfig.activeBots.find((bot) => bot.id === botId);
+export function resolveLogTargets(runtimeConfig: DaemonConfig, endpointId?: string): LogTarget[] {
+  if (endpointId) {
+    const targetBot = runtimeConfig.activeEndpoints.find((endpoint) => endpoint.id === endpointId);
     if (!targetBot) {
-      throw new Error(`Unknown bot ID: ${botId}`);
+      throw new Error(`Unknown endpoint ID: ${endpointId}`);
     }
 
     return [
       {
-        botId: targetBot.id,
+        endpointId: targetBot.id,
         logFilePath: targetBot.paths.logFilePath,
       },
     ];
   }
 
-  return runtimeConfig.activeBots.map((bot) => ({
-    botId: bot.id,
-    logFilePath: bot.paths.logFilePath,
+  return runtimeConfig.activeEndpoints.map((endpoint) => ({
+    endpointId: endpoint.id,
+    logFilePath: endpoint.paths.logFilePath,
   }));
 }
 
@@ -101,7 +101,7 @@ async function followLogTargets(options: {
   targets: LogTarget[];
   stdout: NodeJS.WritableStream;
   signal?: AbortSignal;
-  multiBot: boolean;
+  multiEndpoint: boolean;
   readFile: ReadLogFile;
   watch: WatchLogFile;
 }): Promise<void> {
@@ -115,7 +115,7 @@ async function followLogTargets(options: {
   try {
     for (const target of options.targets) {
       const content = await options.readFile(target.logFilePath, "utf8");
-      offsets.set(target.botId, content.length);
+      offsets.set(target.endpointId, content.length);
 
       const watcher = options.watch(target.logFilePath, {
         signal,
@@ -142,7 +142,7 @@ async function watchTarget(
   target: LogTarget,
   options: {
     stdout: NodeJS.WritableStream;
-    multiBot: boolean;
+    multiEndpoint: boolean;
     readFile: ReadLogFile;
   },
   offsets: Map<string, number>,
@@ -154,16 +154,16 @@ async function watchTarget(
       }
 
       const content = await options.readFile(target.logFilePath, "utf8");
-      const previousOffset = offsets.get(target.botId) ?? 0;
+      const previousOffset = offsets.get(target.endpointId) ?? 0;
       const nextChunk = content.slice(previousOffset);
-      offsets.set(target.botId, content.length);
+      offsets.set(target.endpointId, content.length);
 
       const newLines = nextChunk
         .split("\n")
         .map((line) => line.trimEnd())
         .filter((line) => line.length > 0);
 
-      writeLogLines(options.stdout, target.botId, newLines, options.multiBot);
+      writeLogLines(options.stdout, target.endpointId, newLines, options.multiEndpoint);
     }
   } catch (error) {
     if (isAbortError(error)) {
@@ -176,12 +176,12 @@ async function watchTarget(
 
 function writeLogLines(
   stdout: NodeJS.WritableStream,
-  botId: string,
+  endpointId: string,
   lines: string[],
-  multiBot: boolean,
+  multiEndpoint: boolean,
 ): void {
   for (const line of lines) {
-    stdout.write(multiBot ? `[${botId}] ${line}\n` : `${line}\n`);
+    stdout.write(multiEndpoint ? `[${endpointId}] ${line}\n` : `${line}\n`);
   }
 }
 

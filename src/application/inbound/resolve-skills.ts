@@ -22,7 +22,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
 
     for (const issue of workspaceSkillCatalog.issues) {
       await context.dependencies.logger?.info(issue, {
-        botId: context.message.botId,
+        endpointId: context.message.endpointId,
         transport: context.message.conversation.transport,
         conversationId: context.message.conversation.externalId,
         messageId: context.message.messageId,
@@ -35,7 +35,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
 
     if (mergedSkillCatalog.overriddenSkillNames.length > 0) {
       await context.dependencies.logger?.info("workspace skills override configured agent skills for turn", {
-        botId: context.message.botId,
+        endpointId: context.message.endpointId,
         transport: context.message.conversation.transport,
         conversationId: context.message.conversation.externalId,
         messageId: context.message.messageId,
@@ -48,7 +48,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
     }
 
     await context.dependencies.logger?.debug("resolved available agent skills for turn", {
-      botId: context.message.botId,
+      endpointId: context.message.endpointId,
       transport: context.message.conversation.transport,
       conversationId: context.message.conversation.externalId,
       messageId: context.message.messageId,
@@ -67,7 +67,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
     void context.dependencies.logger?.error(
       "failed to resolve available agent skills for turn; continuing without skills",
       {
-        botId: context.message.botId,
+        endpointId: context.message.endpointId,
         transport: context.message.conversation.transport,
         conversationId: context.message.conversation.externalId,
         messageId: context.message.messageId,

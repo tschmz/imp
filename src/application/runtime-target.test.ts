@@ -96,7 +96,7 @@ describe("createRuntimeTransportFactory", () => {
       stop: vi.fn(async () => undefined),
     };
     createTransportMock.mockReturnValueOnce(transport);
-    const botConfig = {
+    const endpointConfig = {
       id: "private-telegram",
       type: "telegram" as const,
       token: "123:abc",
@@ -104,12 +104,12 @@ describe("createRuntimeTransportFactory", () => {
       defaultAgentId: "default",
       paths: {
         dataRoot: "/tmp",
-        botRoot: "/tmp/bot",
-        conversationsDir: "/tmp/bot/conversations",
-        logsDir: "/tmp/bot/logs",
-        logFilePath: "/tmp/bot/logs/daemon.log",
-        runtimeDir: "/tmp/bot/runtime",
-        runtimeStatePath: "/tmp/bot/runtime/daemon.json",
+        endpointRoot: "/tmp/endpoint",
+        conversationsDir: "/tmp/endpoint/conversations",
+        logsDir: "/tmp/endpoint/logs",
+        logFilePath: "/tmp/endpoint/logs/daemon.log",
+        runtimeDir: "/tmp/endpoint/runtime",
+        runtimeStatePath: "/tmp/endpoint/runtime/daemon.json",
       },
     };
     const logger = {
@@ -118,9 +118,9 @@ describe("createRuntimeTransportFactory", () => {
       error: vi.fn(async () => undefined),
     };
 
-    const resolved = createRuntimeTransportFactory(botConfig, logger);
+    const resolved = createRuntimeTransportFactory(endpointConfig, logger);
 
     expect(resolved).toBe(transport);
-    expect(createTransportMock).toHaveBeenCalledWith(botConfig.type, botConfig, logger);
+    expect(createTransportMock).toHaveBeenCalledWith(endpointConfig.type, endpointConfig, logger);
   });
 });

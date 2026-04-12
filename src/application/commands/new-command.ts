@@ -21,7 +21,7 @@ export const newCommandHandler: InboundCommandHandler = {
       ...(title ? { title } : {}),
     });
     await logger?.debug("created new session via inbound command", {
-      botId: message.botId,
+      endpointId: message.endpointId,
       transport: message.conversation.transport,
       conversationId: message.conversation.externalId,
       messageId: message.messageId,

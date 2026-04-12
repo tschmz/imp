@@ -47,7 +47,7 @@ describe("resolveSystemPrompt", () => {
       [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
-          return "Bot {{bot.id}} on {{system.platform}} for {{agent.model.provider}}/{{agent.model.modelId}}.";
+          return "Endpoint {{endpoint.id}} on {{system.platform}} for {{agent.model.provider}}/{{agent.model.modelId}}.";
         }
 
         if (path === "/workspace/RUNBOOK.md") {
@@ -61,7 +61,7 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toBe(
       "You are concise.\n\n" +
         '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
-        "Bot private-telegram on linux for faux/faux-1.\n" +
+        "Endpoint private-telegram on linux for faux/faux-1.\n" +
         "</INSTRUCTIONS>\n\n" +
         '<REFERENCE from="/workspace/RUNBOOK.md">\n\n' +
         "Config /etc/imp/config.json data /var/lib/imp transport telegram.\n" +
@@ -174,7 +174,7 @@ describe("resolveSystemPrompt", () => {
         ...createAgent(),
         prompt: {
           base: { file: "/workspace/SYSTEM.md" },
-          instructions: [{ text: "Inline {{bot.id}}" }, { file: "/workspace/AGENTS.md" }],
+          instructions: [{ text: "Inline {{endpoint.id}}" }, { file: "/workspace/AGENTS.md" }],
         },
       },
       "/workspace",
@@ -182,11 +182,11 @@ describe("resolveSystemPrompt", () => {
       [],
       async (path) => {
         if (path === "/workspace/SYSTEM.md") {
-          return "Base {{bot.id}}";
+          return "Base {{endpoint.id}}";
         }
 
         if (path === "/workspace/AGENTS.md") {
-          return "File {{bot.id}}";
+          return "File {{endpoint.id}}";
         }
 
         throw new Error(`unexpected path: ${path}`);
@@ -196,7 +196,7 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toBe(
       "Base private-telegram\n\n" +
         '<INSTRUCTIONS from="inline">\n\n' +
-        "Inline {{bot.id}}\n" +
+        "Inline {{endpoint.id}}\n" +
         "</INSTRUCTIONS>\n\n" +
         '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
         "File private-telegram\n" +
@@ -293,7 +293,7 @@ function createTemplateContext(): PromptTemplateContext {
       username: "thomas",
       homeDir: "/home/thomas",
     },
-    bot: {
+    endpoint: {
       id: "private-telegram",
     },
     agent: {

@@ -49,20 +49,20 @@ export interface AgentConfig {
   skills?: AgentSkillsConfig;
 }
 
-interface BaseBotConfig {
+interface BaseEndpointConfig {
   id: string;
   enabled: boolean;
-  routing?: BotRoutingConfig;
+  routing?: EndpointRoutingConfig;
 }
 
-export interface TelegramBotConfig extends BaseBotConfig {
+export interface TelegramEndpointConfig extends BaseEndpointConfig {
   type: "telegram";
   token: SecretValueConfig;
   access: TelegramAccessConfig;
   voice?: TelegramVoiceConfig;
 }
 
-export type BotConfig = TelegramBotConfig;
+export type EndpointConfig = TelegramEndpointConfig;
 
 export interface TelegramAccessConfig {
   allowedUserIds: string[];
@@ -79,7 +79,7 @@ export interface TelegramTranscriptionConfig {
   language?: string;
 }
 
-export interface BotRoutingConfig {
+export interface EndpointRoutingConfig {
   defaultAgentId?: string;
 }
 
@@ -89,5 +89,5 @@ export interface AppConfig {
   logging?: LoggingConfig;
   defaults: DefaultsConfig;
   agents: AgentConfig[];
-  bots: BotConfig[];
+  endpoints: EndpointConfig[];
 }

@@ -11,7 +11,7 @@ export function createIncomingMessage(
   commandArgs?: string,
 ): IncomingMessage {
   return {
-    botId: "private-telegram",
+    endpointId: "private-telegram",
     conversation: {
       transport: "telegram",
       externalId: "42",
@@ -93,12 +93,12 @@ export function createDependencies(
     },
     defaultAgentId: "default",
     runtimeInfo: {
-      botId: "private-telegram",
+      endpointId: "private-telegram",
       configPath: "/tmp/config.json",
       dataRoot: "/tmp/data",
       logFilePath: "/tmp/private-telegram.log",
       loggingLevel: "info",
-      activeBotIds: ["private-telegram", "ops-telegram"],
+      activeEndpointIds: ["private-telegram", "ops-telegram"],
     },
     availableCommands: inboundCommandHandlers,
     ...overrides,

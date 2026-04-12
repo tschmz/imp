@@ -72,7 +72,7 @@ describe("createTelegramTransport", () => {
         transport: "telegram",
         externalId: "42",
       },
-      botId: "private-telegram",
+      endpointId: "private-telegram",
       messageId: "99",
       correlationId: expect.any(String),
       userId: "7",
@@ -381,7 +381,7 @@ describe("createTelegramTransport", () => {
     expect(logger.debug).toHaveBeenCalledWith(
       "sending telegram processing error response",
       expect.objectContaining({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         transport: "telegram",
         conversationId: "42",
         messageId: "99",
@@ -436,7 +436,7 @@ describe("createTelegramTransport", () => {
       1,
       "failed to process telegram message",
       expect.objectContaining({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         transport: "telegram",
         conversationId: "42",
         messageId: "99",
@@ -448,7 +448,7 @@ describe("createTelegramTransport", () => {
       2,
       "telegram message processing terminated after an unhandled failure",
       expect.objectContaining({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         transport: "telegram",
         conversationId: "42",
         messageId: "99",
@@ -512,7 +512,7 @@ describe("createTelegramTransport", () => {
       1,
       "failed to process telegram message",
       expect.objectContaining({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         transport: "telegram",
         conversationId: "42",
         messageId: "99",
@@ -524,7 +524,7 @@ describe("createTelegramTransport", () => {
       2,
       "telegram message processing terminated after an unhandled failure",
       expect.objectContaining({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         transport: "telegram",
         conversationId: "42",
         messageId: "99",
@@ -693,7 +693,7 @@ describe("createTelegramTransport", () => {
     });
 
     expect(handler.handle).not.toHaveBeenCalled();
-    expect(bot.reply).toHaveBeenCalledWith("Voice messages are not enabled for this bot.");
+    expect(bot.reply).toHaveBeenCalledWith("Voice messages are not enabled for this endpoint.");
   });
 
   it("returns a stable reply when voice transcription fails", async () => {
@@ -748,7 +748,7 @@ describe("createTelegramTransport", () => {
     expect(logger.error).toHaveBeenCalledWith(
       "failed to transcribe telegram voice message",
       expect.objectContaining({
-        botId: "private-telegram",
+        endpointId: "private-telegram",
         transport: "telegram",
         conversationId: "42",
         messageId: "99",

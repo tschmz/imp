@@ -61,7 +61,7 @@ Available variables:
 - `system.hostname`
 - `system.username`
 - `system.homeDir`
-- `bot.id`
+- `endpoint.id`
 - `agent.id`
 - `agent.model.provider`
 - `agent.model.modelId`
@@ -79,7 +79,7 @@ Example instruction file:
 
 ```md
 Run on {{system.platform}} as {{system.username}}.
-Bot: {{bot.id}}
+Endpoint: {{endpoint.id}}
 Agent: {{agent.id}} using {{agent.model.provider}}/{{agent.model.modelId}}
 Workspace: {{agent.workspace.cwd}}
 Config: {{imp.configPath}}
@@ -176,7 +176,7 @@ See [Built-in tools](./tools.md) for the full reference.
 
 ## Multiple Agents
 
-You can define several agents and route bots or conversations between them.
+You can define several agents and route endpoints or conversations between them.
 
 Common patterns:
 
@@ -194,7 +194,7 @@ Global fallback:
 }
 ```
 
-Per-bot override:
+Per-endpoint override:
 
 ```json
 {

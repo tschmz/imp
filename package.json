@@ -2,7 +2,7 @@
   "name": "@tschmz/imp",
   "version": "0.1.0",
   "private": false,
-  "description": "A lightweight local daemon for modular agent bots",
+  "description": "A lightweight local daemon for modular agent endpoints",
   "type": "module",
   "bin": {
     "imp": "./dist/main.js"

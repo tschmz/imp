@@ -39,9 +39,9 @@ export async function promptForInitialAppConfig(
 ): Promise<InitialAppSetup> {
   const defaults = createDefaultAppConfig(env);
   const defaultAgent = defaults.agents[0];
-  const defaultBot = defaults.bots[0];
+  const defaultEndpoint = defaults.endpoints[0];
 
-  if (!defaultAgent || !defaultAgent.model || !defaultBot) {
+  if (!defaultAgent || !defaultAgent.model || !defaultEndpoint) {
     throw new Error("Default init config is incomplete.");
   }
 
@@ -78,9 +78,9 @@ export async function promptForInitialAppConfig(
   });
 
   const telegramToken = await dependencies.input({
-    message: "Telegram bot token",
-    default: typeof defaultBot.token === "string" ? defaultBot.token : "",
-    validate: requireNonEmpty("Telegram bot token is required."),
+    message: "Telegram endpoint token",
+    default: typeof defaultEndpoint.token === "string" ? defaultEndpoint.token : "",
+    validate: requireNonEmpty("Telegram endpoint token is required."),
   });
 
   const allowedUserIdsRaw = await dependencies.input({

@@ -1,14 +1,14 @@
 # imp
 
-`imp` is a local daemon for running agent-based bots as persistent services.
+`imp` is a local daemon for running agent-based endpoints as persistent services.
 
-It manages agent configuration and runtime state on disk, starts configured bots, and connects them
+It manages agent configuration and runtime state on disk, starts configured endpoints, and connects them
 to transports such as Telegram.
 
 ## Features
 
 - Run one or more named agents from a single local daemon
-- Route bot messages to specific agents
+- Route endpoint messages to specific agents
 - Persist runtime state and logs on disk
 - Configure models and providers through `@mariozechner/pi-ai`
 - Control sessions, history, and agent switching from Telegram commands
@@ -19,7 +19,7 @@ to transports such as Telegram.
 
 - Node.js 20.6 or newer
 - Credentials for at least one supported model provider
-- A Telegram bot token
+- A Telegram endpoint token
 
 Install:
 
@@ -45,7 +45,7 @@ Main commands:
 - `imp restore`
 - `imp service install|start|stop|restart|status|uninstall`
 
-Telegram bots also expose built-in commands such as:
+Telegram endpoints also expose built-in commands such as:
 
 - `/help`, `/new`, `/start`, `/rename`, `/reset`, `/history`, `/restore`, `/export`
 - `/agent` and `/agent <id>`

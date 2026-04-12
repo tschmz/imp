@@ -4,7 +4,7 @@ import { isAbsolute } from "node:path";
 import { Bot, GrammyError } from "grammy";
 import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
-import type { TelegramBotRuntimeConfig } from "../../daemon/types.js";
+import type { TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessageCommand } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
@@ -71,7 +71,7 @@ interface TelegramTransportDependencies {
 }
 
 export function createTelegramTransport(
-  config: TelegramBotRuntimeConfig,
+  config: TelegramEndpointRuntimeConfig,
   bot: TelegramBotAdapter = new Bot(config.token),
   logger?: Logger,
   dependencies: TelegramTransportDependencies = {},
@@ -86,13 +86,13 @@ export function createTelegramTransport(
     async start(handler: TransportHandler): Promise<void> {
       const profile = await getTelegramBotProfile(bot, config);
       await logger?.debug("validated telegram bot token", {
-        botId: config.id,
+        endpointId: config.id,
         transport: "telegram",
       });
 
       await registerTelegramCommands(bot, config);
       await logger?.debug("registered telegram bot commands", {
-        botId: config.id,
+        endpointId: config.id,
         transport: "telegram",
       });
 
@@ -110,7 +110,7 @@ export function createTelegramTransport(
         const text = textMessage.text.trim();
         if (!text) {
           await logger?.debug("ignored empty telegram message", {
-            botId: config.id,
+            endpointId: config.id,
             transport: "telegram",
             conversationId: String(safeContext.chat.id),
             messageId: String(textMessage.message_id),
@@ -155,13 +155,13 @@ export function createTelegramTransport(
 
         if (!config.voice?.enabled || !voiceTranscriber) {
           await logger?.debug("ignored telegram voice message because voice transcription is disabled", {
-            botId: config.id,
+            endpointId: config.id,
             transport: "telegram",
             conversationId,
             messageId,
             correlationId,
           });
-          await safeContext.reply("Voice messages are not enabled for this bot.");
+          await safeContext.reply("Voice messages are not enabled for this endpoint.");
           return;
         }
 
@@ -178,7 +178,7 @@ export function createTelegramTransport(
           }
 
           await logger?.debug("transcribed telegram voice message", {
-            botId: config.id,
+            endpointId: config.id,
             transport: "telegram",
             conversationId,
             messageId,
@@ -211,7 +211,7 @@ export function createTelegramTransport(
           await logger?.error(
             "failed to transcribe telegram voice message",
             {
-              botId: config.id,
+              endpointId: config.id,
               transport: "telegram",
               conversationId,
               messageId,
@@ -243,7 +243,7 @@ function dispatchTelegramEvent(
   const correlationId = event.message.correlationId;
 
   void logger?.debug("received telegram message", {
-    botId: event.message.botId,
+    endpointId: event.message.endpointId,
     transport: "telegram",
     conversationId,
     messageId,
@@ -253,7 +253,7 @@ function dispatchTelegramEvent(
   detachTelegramEventProcessing(
     processTelegramEvent(handler, event, {
       logger,
-      botId: event.message.botId,
+      endpointId: event.message.endpointId,
       conversationId,
       messageId,
       correlationId,
@@ -261,7 +261,7 @@ function dispatchTelegramEvent(
     }),
     {
       logger,
-      botId: event.message.botId,
+      endpointId: event.message.endpointId,
       conversationId,
       messageId,
       correlationId,
@@ -271,13 +271,13 @@ function dispatchTelegramEvent(
 
 function validateTelegramContext(
   ctx: TelegramMessageContext,
-  botId: string,
+  endpointId: string,
   allowedUserIds: Set<string>,
   logger?: Logger,
 ): Required<Pick<TelegramMessageContext, "chat" | "message" | "from" | "reply">> | undefined {
   if (!ctx.chat || !ctx.message || !ctx.from) {
     void logger?.debug("ignored telegram update without chat, message, or sender", {
-      botId,
+      endpointId,
       transport: "telegram",
     });
     return undefined;
@@ -285,7 +285,7 @@ function validateTelegramContext(
 
   if (ctx.chat.type !== "private") {
     void logger?.debug("ignored non-private telegram chat", {
-      botId,
+      endpointId,
       transport: "telegram",
       conversationId: String(ctx.chat.id),
       messageId: String(ctx.message.message_id),
@@ -295,7 +295,7 @@ function validateTelegramContext(
 
   if (!allowedUserIds.has(String(ctx.from.id))) {
     void logger?.debug("ignored telegram message from disallowed user", {
-      botId,
+      endpointId,
       transport: "telegram",
       conversationId: String(ctx.chat.id),
       messageId: String(ctx.message.message_id),
@@ -325,7 +325,7 @@ function getTelegramVoiceMessage(
 
 async function transcribeTelegramVoiceMessage(
   message: TelegramMessage,
-  config: TelegramBotRuntimeConfig,
+  config: TelegramEndpointRuntimeConfig,
   bot: TelegramBotAdapter,
   transcriber: VoiceTranscriber,
   fetchImpl: typeof fetch,
@@ -380,7 +380,7 @@ async function processTelegramEvent(
   event: TransportInboundEvent,
   options: {
     logger?: Logger;
-    botId: string;
+    endpointId: string;
     conversationId: string;
     messageId: string;
     correlationId: string;
@@ -390,7 +390,7 @@ async function processTelegramEvent(
   try {
     await handler.handle(event);
     await options.logger?.debug("processed telegram message", {
-      botId: options.botId,
+      endpointId: options.endpointId,
       transport: "telegram",
       conversationId: options.conversationId,
       messageId: options.messageId,
@@ -401,7 +401,7 @@ async function processTelegramEvent(
     await logTelegramProcessingFailure(
       options.logger,
       {
-        botId: options.botId,
+        endpointId: options.endpointId,
         conversationId: options.conversationId,
         messageId: options.messageId,
         correlationId: options.correlationId,
@@ -416,7 +416,7 @@ async function processTelegramEvent(
       await logTelegramTerminalFailure(
         options.logger,
         {
-          botId: options.botId,
+          endpointId: options.endpointId,
           conversationId: options.conversationId,
           messageId: options.messageId,
           correlationId: options.correlationId,
@@ -433,7 +433,7 @@ function detachTelegramEventProcessing(
   operation: Promise<void>,
   options: {
     logger?: Logger;
-    botId: string;
+    endpointId: string;
     conversationId: string;
     messageId: string;
     correlationId: string;
@@ -445,7 +445,7 @@ function detachTelegramEventProcessing(
       void logTelegramTerminalFailure(
         options.logger,
         {
-          botId: options.botId,
+          endpointId: options.endpointId,
           conversationId: options.conversationId,
           messageId: options.messageId,
           correlationId: options.correlationId,
@@ -461,7 +461,7 @@ function detachTelegramEventProcessing(
 async function logTelegramProcessingFailure(
   logger: Logger | undefined,
   fields: {
-    botId: string;
+    endpointId: string;
     conversationId: string;
     messageId: string;
     correlationId: string;
@@ -473,7 +473,7 @@ async function logTelegramProcessingFailure(
     logger,
     "failed to process telegram message",
     {
-      botId: fields.botId,
+      endpointId: fields.endpointId,
       transport: "telegram",
       conversationId: fields.conversationId,
       messageId: fields.messageId,
@@ -487,7 +487,7 @@ async function logTelegramProcessingFailure(
 async function logTelegramTerminalFailure(
   logger: Logger | undefined,
   fields: {
-    botId: string;
+    endpointId: string;
     conversationId: string;
     messageId: string;
     correlationId: string;
@@ -499,7 +499,7 @@ async function logTelegramTerminalFailure(
     logger,
     "telegram message processing terminated after an unhandled failure",
     {
-      botId: fields.botId,
+      endpointId: fields.endpointId,
       transport: "telegram",
       conversationId: fields.conversationId,
       messageId: fields.messageId,
@@ -514,7 +514,7 @@ async function safelyLogTelegramError(
   logger: Logger | undefined,
   message: string,
   fields: {
-    botId: string;
+    endpointId: string;
     transport: "telegram";
     conversationId: string;
     messageId: string;
@@ -531,7 +531,7 @@ async function safelyLogTelegramError(
 }
 
 function createTelegramInboundEvent(
-  botId: string,
+  endpointId: string,
   correlationId: string,
   ctx: Required<Pick<TelegramMessageContext, "chat" | "message" | "from" | "reply">>,
   bot: TelegramBotAdapter,
@@ -551,7 +551,7 @@ function createTelegramInboundEvent(
 ): TransportInboundEvent {
   return {
     message: {
-      botId,
+      endpointId,
       conversation: {
         transport: "telegram",
         externalId: String(ctx.chat.id),
@@ -589,7 +589,7 @@ function createTelegramInboundEvent(
     },
     async deliverError(): Promise<void> {
       await logger?.debug("sending telegram processing error response", {
-        botId,
+        endpointId,
         transport: "telegram",
         conversationId: String(ctx.chat.id),
         messageId: String(ctx.message.message_id),
@@ -602,14 +602,14 @@ function createTelegramInboundEvent(
 
 async function getTelegramBotProfile(
   bot: TelegramBotAdapter,
-  config: TelegramBotRuntimeConfig,
+  config: TelegramEndpointRuntimeConfig,
 ): Promise<TelegramBotProfile> {
   try {
     return await bot.api.getMe();
   } catch (error) {
     if (error instanceof GrammyError) {
       throw new Error(
-        `Invalid Telegram bot token for bot "${config.id}" (${error.error_code}: ${error.description})`,
+        `Invalid Telegram endpoint token for endpoint "${config.id}" (${error.error_code}: ${error.description})`,
       );
     }
 
@@ -619,14 +619,14 @@ async function getTelegramBotProfile(
 
 async function registerTelegramCommands(
   bot: TelegramBotAdapter,
-  config: TelegramBotRuntimeConfig,
+  config: TelegramEndpointRuntimeConfig,
 ): Promise<void> {
   try {
     await bot.api.setMyCommands(inboundCommandMenu);
   } catch (error) {
     if (error instanceof GrammyError) {
       throw new Error(
-        `Failed to register Telegram commands for bot "${config.id}" (${error.error_code}: ${error.description})`,
+        `Failed to register Telegram commands for endpoint "${config.id}" (${error.error_code}: ${error.description})`,
       );
     }
 

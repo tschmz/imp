@@ -16,7 +16,7 @@ export async function resolveConversation(context: InboundProcessingContext): Pr
   const agent = context.dependencies.agentRegistry.get(conversation.state.agentId) ?? context.defaultAgent;
 
   await context.dependencies.logger?.debug("resolved conversation context", {
-    botId: context.message.botId,
+    endpointId: context.message.endpointId,
     transport: context.message.conversation.transport,
     conversationId: context.message.conversation.externalId,
     messageId: context.message.messageId,

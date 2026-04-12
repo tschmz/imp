@@ -18,7 +18,7 @@ export const configCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "config",
     description: "Show runtime config",
-    helpDescription: "Show runtime and config details for this bot",
+    helpDescription: "Show runtime and config details for this endpoint",
     helpGroup: "Diagnostics",
   },
   canHandle(command) {
@@ -35,8 +35,8 @@ export const configCommandHandler: InboundCommandHandler = {
         `Config path: ${dependencies.runtimeInfo.configPath}`,
         `Data root: ${dependencies.runtimeInfo.dataRoot}`,
         `Logging level: ${dependencies.runtimeInfo.loggingLevel}`,
-        `Bot: ${dependencies.runtimeInfo.botId}`,
-        `Enabled bots: ${dependencies.runtimeInfo.activeBotIds.join(", ")}`,
+        `Endpoint: ${dependencies.runtimeInfo.endpointId}`,
+        `Enabled endpoints: ${dependencies.runtimeInfo.activeEndpointIds.join(", ")}`,
         `Default agent: ${dependencies.defaultAgentId}`,
       ].join("\n"),
     };

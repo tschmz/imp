@@ -22,7 +22,7 @@ afterEach(async () => {
 });
 
 describe("resolveRuntimeConfig", () => {
-  it("maps enabled telegram bots into daemon runtime config", async () => {
+  it("maps enabled telegram endpoints into daemon runtime config", async () => {
     const appConfig = createAppConfig({
       defaults: {
         agentId: "default-agent",
@@ -50,7 +50,7 @@ describe("resolveRuntimeConfig", () => {
           },
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -103,7 +103,7 @@ describe("resolveRuntimeConfig", () => {
         },
       },
     ]);
-    expect(result.activeBots).toEqual([
+    expect(result.activeEndpoints).toEqual([
       {
         id: "private-telegram",
         type: "telegram",
@@ -120,12 +120,12 @@ describe("resolveRuntimeConfig", () => {
         defaultAgentId: "ops-agent",
         paths: {
           dataRoot: "/var/lib/imp",
-          botRoot: "/var/lib/imp/bots/private-telegram",
-          conversationsDir: "/var/lib/imp/bots/private-telegram/conversations",
-          logsDir: "/var/lib/imp/bots/private-telegram/logs",
-          logFilePath: "/var/lib/imp/bots/private-telegram/logs/daemon.log",
-          runtimeDir: "/var/lib/imp/bots/private-telegram/runtime",
-          runtimeStatePath: "/var/lib/imp/bots/private-telegram/runtime/daemon.json",
+          endpointRoot: "/var/lib/imp/endpoints/private-telegram",
+          conversationsDir: "/var/lib/imp/endpoints/private-telegram/conversations",
+          logsDir: "/var/lib/imp/endpoints/private-telegram/logs",
+          logFilePath: "/var/lib/imp/endpoints/private-telegram/logs/daemon.log",
+          runtimeDir: "/var/lib/imp/endpoints/private-telegram/runtime",
+          runtimeStatePath: "/var/lib/imp/endpoints/private-telegram/runtime/daemon.json",
         },
       },
     ]);
@@ -167,7 +167,7 @@ describe("resolveRuntimeConfig", () => {
           },
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -194,12 +194,12 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.skillIssues ?? []).toEqual([]);
   });
 
-  it("uses the global default agent id when the bot has no routing override", async () => {
+  it("uses the global default agent id when the endpoint has no routing override", async () => {
     const appConfig = createAppConfig({
       defaults: {
         agentId: "default-agent",
       },
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -214,7 +214,7 @@ describe("resolveRuntimeConfig", () => {
 
     const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
-    expect(result.activeBots[0]?.defaultAgentId).toBe("default-agent");
+    expect(result.activeEndpoints[0]?.defaultAgentId).toBe("default-agent");
   });
 
   it("resolves relative prompt and workspace paths against the config directory", async () => {
@@ -239,7 +239,7 @@ describe("resolveRuntimeConfig", () => {
           tools: ["read", "bash"],
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -294,7 +294,7 @@ describe("resolveRuntimeConfig", () => {
           },
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -339,7 +339,7 @@ describe("resolveRuntimeConfig", () => {
           },
         },
       ],
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -357,9 +357,9 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.authFile).toBe("/etc/imp/auth.json");
   });
 
-  it("fails when no bot is enabled", async () => {
+  it("fails when no endpoint is enabled", async () => {
     const appConfig = createAppConfig({
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -373,13 +373,13 @@ describe("resolveRuntimeConfig", () => {
     });
 
     await expect(resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).rejects.toThrowError(
-      "Config must enable at least one bot.",
+      "Config must enable at least one endpoint.",
     );
   });
 
-  it("keeps more than one enabled bot", async () => {
+  it("keeps more than one enabled endpoint", async () => {
     const appConfig = createAppConfig({
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -403,7 +403,7 @@ describe("resolveRuntimeConfig", () => {
 
     const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
-    expect(result.activeBots.map((bot) => bot.id)).toEqual([
+    expect(result.activeEndpoints.map((endpoint) => endpoint.id)).toEqual([
       "private-telegram",
       "ops-telegram",
     ]);
@@ -412,7 +412,7 @@ describe("resolveRuntimeConfig", () => {
   it("defaults logging level to info when logging config is omitted", async () => {
     const appConfig = createAppConfig({
       logging: undefined,
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -432,7 +432,7 @@ describe("resolveRuntimeConfig", () => {
 
   it("resolves telegram token env references", async () => {
     const appConfig = createAppConfig({
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -453,7 +453,7 @@ describe("resolveRuntimeConfig", () => {
       },
     });
 
-    expect(result.activeBots[0]?.token).toBe("telegram-from-env");
+    expect(result.activeEndpoints[0]?.token).toBe("telegram-from-env");
   });
 
   it("resolves telegram token file references relative to the config file", async () => {
@@ -463,7 +463,7 @@ describe("resolveRuntimeConfig", () => {
     await writeRawFile(secretPath, "telegram-from-file\n");
 
     const appConfig = createAppConfig({
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -480,12 +480,12 @@ describe("resolveRuntimeConfig", () => {
 
     const result = await resolveRuntimeConfig(appConfig, configPath);
 
-    expect(result.activeBots[0]?.token).toBe("telegram-from-file");
+    expect(result.activeEndpoints[0]?.token).toBe("telegram-from-file");
   });
 
   it("fails when a telegram token env reference is missing", async () => {
     const appConfig = createAppConfig({
-      bots: [
+      endpoints: [
         {
           id: "private-telegram",
           type: "telegram",
@@ -501,7 +501,7 @@ describe("resolveRuntimeConfig", () => {
     });
 
     await expect(resolveRuntimeConfig(appConfig, "/etc/imp/config.json")).rejects.toThrowError(
-      "bots.private-telegram.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
+      "endpoints.private-telegram.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
     );
   });
 
@@ -516,8 +516,8 @@ describe("resolveRuntimeConfig", () => {
       createTransport: () => {
         throw new Error("Not used in this test.");
       },
-      normalizeRuntimeConfig: (bot: unknown, context: unknown) => {
-        const typedBot = bot as { id: string; type: string };
+      normalizeRuntimeConfig: (endpoint: unknown, context: unknown) => {
+        const typedBot = endpoint as { id: string; type: string };
         const typedContext = context as {
           dataRoot: string;
           defaultAgentId: string;
@@ -531,30 +531,30 @@ describe("resolveRuntimeConfig", () => {
         defaultAgentId: typedContext.defaultAgentId,
         paths: {
           dataRoot: typedContext.dataRoot,
-          botRoot: "/var/lib/imp/bots/no-token",
-          conversationsDir: "/var/lib/imp/bots/no-token/conversations",
-          logsDir: "/var/lib/imp/bots/no-token/logs",
-          logFilePath: "/var/lib/imp/bots/no-token/logs/daemon.log",
-          runtimeDir: "/var/lib/imp/bots/no-token/runtime",
-          runtimeStatePath: "/var/lib/imp/bots/no-token/runtime/daemon.json",
+          endpointRoot: "/var/lib/imp/endpoints/no-token",
+          conversationsDir: "/var/lib/imp/endpoints/no-token/conversations",
+          logsDir: "/var/lib/imp/endpoints/no-token/logs",
+          logFilePath: "/var/lib/imp/endpoints/no-token/logs/daemon.log",
+          runtimeDir: "/var/lib/imp/endpoints/no-token/runtime",
+          runtimeStatePath: "/var/lib/imp/endpoints/no-token/runtime/daemon.json",
         },
       };
       },
     } as unknown as RegisterTransportEntry);
 
     const appConfig = createAppConfig({
-      bots: [
+      endpoints: [
         {
           id: "no-token",
           type: transportType,
           enabled: true,
-        } as unknown as AppConfig["bots"][number],
+        } as unknown as AppConfig["endpoints"][number],
       ],
     });
 
     const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
-    expect(result.activeBots[0]?.id).toBe("no-token");
-    expect(result.activeBots[0]?.type).toBe(transportType);
+    expect(result.activeEndpoints[0]?.id).toBe("no-token");
+    expect(result.activeEndpoints[0]?.type).toBe(transportType);
   });
 
   it("rejects defaults.agentId when it does not reference a configured agent", () => {
@@ -563,7 +563,7 @@ describe("resolveRuntimeConfig", () => {
         defaults: {
           agentId: "missing-agent",
         },
-        bots: [
+        endpoints: [
           {
             id: "private-telegram",
             type: "telegram",
@@ -583,10 +583,10 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
-  it("rejects bots.routing.defaultAgentId when it does not reference a configured agent", () => {
+  it("rejects endpoints.routing.defaultAgentId when it does not reference a configured agent", () => {
     const result = appConfigSchema.safeParse(
       createAppConfig({
-        bots: [
+        endpoints: [
           {
             id: "private-telegram",
             type: "telegram",
@@ -603,8 +603,8 @@ describe("resolveRuntimeConfig", () => {
       }),
     );
 
-    expectSchemaIssue(result, ["bots", 0, "routing", "defaultAgentId"], [
-      'Unknown default agent id "missing-agent" for bot "private-telegram".',
+    expectSchemaIssue(result, ["endpoints", 0, "routing", "defaultAgentId"], [
+      'Unknown default agent id "missing-agent" for endpoint "private-telegram".',
       'Expected one of: "default".',
     ]);
   });
@@ -638,7 +638,7 @@ describe("resolveRuntimeConfig", () => {
             },
           },
         ],
-        bots: [
+        endpoints: [
           {
             id: "private-telegram",
             type: "telegram",
@@ -658,10 +658,10 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
-  it("rejects duplicate bot ids", () => {
+  it("rejects duplicate endpoint ids", () => {
     const result = appConfigSchema.safeParse(
       createAppConfig({
-        bots: [
+        endpoints: [
           {
             id: "private-telegram",
             type: "telegram",
@@ -684,9 +684,9 @@ describe("resolveRuntimeConfig", () => {
       }),
     );
 
-    expectSchemaIssue(result, ["bots", 1, "id"], [
-      'Duplicate bot id "private-telegram".',
-      "Bot ids must be unique.",
+    expectSchemaIssue(result, ["endpoints", 1, "id"], [
+      'Duplicate endpoint id "private-telegram".',
+      "Endpoint ids must be unique.",
     ]);
   });
 });
@@ -730,7 +730,7 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
         },
       },
     ],
-    bots: overrides.bots ?? [],
+    endpoints: overrides.endpoints ?? [],
   };
 }
 

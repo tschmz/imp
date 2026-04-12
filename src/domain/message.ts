@@ -20,7 +20,7 @@ export type IncomingMessageCommand =
 export type OutgoingMessageDeliveryAction = "reload" | "restart";
 
 export interface IncomingMessage {
-  botId: string;
+  endpointId: string;
   conversation: ChatRef;
   messageId: string;
   correlationId: string;

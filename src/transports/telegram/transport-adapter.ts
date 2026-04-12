@@ -1,8 +1,8 @@
 import { join } from "node:path";
 import { z } from "zod";
 import { secretValueConfigSchema } from "../../config/secret-value.js";
-import type { TelegramBotConfig } from "../../config/types.js";
-import type { ActiveBotRuntimeConfig } from "../../daemon/types.js";
+import type { TelegramEndpointConfig } from "../../config/types.js";
+import type { ActiveEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport } from "../types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
@@ -38,39 +38,39 @@ export const telegramTransportConfigSchema = z.object({
 }).strict();
 
 export function normalizeTelegramRuntimeConfig(
-  bot: TelegramBotConfig,
+  endpoint: TelegramEndpointConfig,
   options: {
     dataRoot: string;
     defaultAgentId: string;
   },
-): ActiveBotRuntimeConfig {
-  if (typeof bot.token !== "string") {
-    throw new Error(`Telegram bot "${bot.id}" token must be resolved before runtime normalization.`);
+): ActiveEndpointRuntimeConfig {
+  if (typeof endpoint.token !== "string") {
+    throw new Error(`Telegram endpoint "${endpoint.id}" token must be resolved before runtime normalization.`);
   }
 
-  const botRoot = join(options.dataRoot, "bots", bot.id);
+  const endpointRoot = join(options.dataRoot, "endpoints", endpoint.id);
 
   return {
-    id: bot.id,
-    type: bot.type,
-    token: bot.token,
-    allowedUserIds: bot.access.allowedUserIds,
-    ...(bot.voice ? { voice: bot.voice } : {}),
-    defaultAgentId: bot.routing?.defaultAgentId ?? options.defaultAgentId,
+    id: endpoint.id,
+    type: endpoint.type,
+    token: endpoint.token,
+    allowedUserIds: endpoint.access.allowedUserIds,
+    ...(endpoint.voice ? { voice: endpoint.voice } : {}),
+    defaultAgentId: endpoint.routing?.defaultAgentId ?? options.defaultAgentId,
     paths: {
       dataRoot: options.dataRoot,
-      botRoot,
-      conversationsDir: join(botRoot, "conversations"),
-      logsDir: join(botRoot, "logs"),
-      logFilePath: join(botRoot, "logs", "daemon.log"),
-      runtimeDir: join(botRoot, "runtime"),
-      runtimeStatePath: join(botRoot, "runtime", "daemon.json"),
+      endpointRoot,
+      conversationsDir: join(endpointRoot, "conversations"),
+      logsDir: join(endpointRoot, "logs"),
+      logFilePath: join(endpointRoot, "logs", "daemon.log"),
+      runtimeDir: join(endpointRoot, "runtime"),
+      runtimeStatePath: join(endpointRoot, "runtime", "daemon.json"),
     },
   };
 }
 
 export function createTelegramTransportFromRuntimeConfig(
-  config: ActiveBotRuntimeConfig,
+  config: ActiveEndpointRuntimeConfig,
   logger: Logger,
 ): Transport {
   return createTelegramTransport(config, undefined, logger);

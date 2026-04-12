@@ -22,7 +22,7 @@ describe("createCli", () => {
     expect(findCommand(cli, "start").helpInformation()).toContain("--config <path>");
 
     const logHelp = findCommand(cli, "log").helpInformation();
-    expect(logHelp).toContain("--bot <id>");
+    expect(logHelp).toContain("--endpoint <id>");
     expect(logHelp).toContain("--follow");
     expect(logHelp).toContain("--lines <count>");
 
@@ -74,20 +74,20 @@ describe("createCli", () => {
     const dependencies = createDependencies();
     const cli = createCli(dependencies);
 
-    await cli.parseAsync(["node", "imp", "log", "--bot", "ops", "--follow", "--lines", "2", "--config", "/tmp/imp.json"]);
-    await cli.parseAsync(["node", "imp", "config", "set", "--config", "/tmp/imp.json", "bots.0.enabled", "false"]);
+    await cli.parseAsync(["node", "imp", "log", "--endpoint", "ops", "--follow", "--lines", "2", "--config", "/tmp/imp.json"]);
+    await cli.parseAsync(["node", "imp", "config", "set", "--config", "/tmp/imp.json", "endpoints.0.enabled", "false"]);
     await cli.parseAsync(["node", "imp", "restore", "/tmp/backup.tar", "--config", "/tmp/imp.json", "--data-root", "/tmp/state", "--only", "agents", "--force"]);
     await cli.parseAsync(["node", "imp", "service", "install", "--config", "/tmp/imp.json", "--dry-run"]);
 
     expect(dependencies.viewLogs).toHaveBeenCalledWith({
-      botId: "ops",
+      endpointId: "ops",
       configPath: "/tmp/imp.json",
       follow: true,
       lines: 2,
     });
     expect(dependencies.setConfigValue).toHaveBeenCalledWith({
       configPath: "/tmp/imp.json",
-      keyPath: "bots.0.enabled",
+      keyPath: "endpoints.0.enabled",
       value: "false",
     });
     expect(dependencies.restoreBackup).toHaveBeenCalledWith({

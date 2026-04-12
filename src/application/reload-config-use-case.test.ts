@@ -109,7 +109,7 @@ function createValidAppConfig(): AppConfig {
         },
       },
     ],
-    bots: [
+    endpoints: [
       {
         id: "private-telegram",
         type: "telegram" as const,

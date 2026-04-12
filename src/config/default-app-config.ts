@@ -5,7 +5,7 @@ import { getDefaultUserDataRoot } from "./discover-config-path.js";
 import type { AppConfig } from "./types.js";
 
 const defaultAgentId = "default";
-const defaultBotId = "private-telegram";
+const defaultEndpointId = "private-telegram";
 const defaultTools = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 
 export interface InitialConfigAnswers {
@@ -81,9 +81,9 @@ export function buildInitialAppConfig(
         },
       },
     ],
-    bots: [
+    endpoints: [
       {
-        id: defaultBotId,
+        id: defaultEndpointId,
         type: "telegram",
         enabled: true,
         token: answers.telegramToken,

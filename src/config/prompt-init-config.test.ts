@@ -44,7 +44,7 @@ describe("promptForInitialAppConfig", () => {
       instructions: [{ file: "/workspace/AGENTS.md" }],
       references: [{ file: "/workspace/RULES.md" }],
     });
-    expect(result.config.bots[0]?.access.allowedUserIds).toEqual(["1", "2"]);
+    expect(result.config.endpoints[0]?.access.allowedUserIds).toEqual(["1", "2"]);
     if (process.platform === "linux") {
       expect(result.serviceEnvironment).toEqual({
         OPENAI_API_KEY: "sk-test",

@@ -29,7 +29,7 @@ describe("createGetConfigValueUseCase", () => {
     await writeConfig(configPath);
 
     await createGetConfigValueUseCase()({
-      keyPath: "bots.private-telegram.enabled",
+      keyPath: "endpoints.private-telegram.enabled",
     });
 
     expect(writeOutput).toHaveBeenCalledWith("true");
@@ -44,7 +44,7 @@ describe("createGetConfigValueUseCase", () => {
 
     await createGetConfigValueUseCase()({
       configPath,
-      keyPath: "bots.private-telegram.access",
+      keyPath: "endpoints.private-telegram.access",
     });
 
     expect(writeOutput).toHaveBeenCalledWith('{\n  "allowedUserIds": []\n}');
@@ -61,9 +61,9 @@ describe("createGetConfigValueUseCase", () => {
 
     await expect(
       createGetConfigValueUseCase()({
-        keyPath: "bots.private-telegram.missing",
+        keyPath: "endpoints.private-telegram.missing",
       }),
-    ).rejects.toThrow("Config key not found: bots.private-telegram.missing");
+    ).rejects.toThrow("Config key not found: endpoints.private-telegram.missing");
   });
 });
 
@@ -99,7 +99,7 @@ function createConfig(dataRoot: string) {
         },
       },
     ],
-    bots: [
+    endpoints: [
       {
         id: "private-telegram",
         type: "telegram",

@@ -54,7 +54,7 @@ interface BackupAgentFileEntry {
 
 interface BackupConversationEntry {
   archivePath: string;
-  botId: string;
+  endpointId: string;
   relativeToDataRoot: string;
 }
 
@@ -243,18 +243,18 @@ async function stageBackup(options: {
   if (selection.conversations) {
     manifest.conversations = [];
 
-    for (const bot of appConfig.bots) {
-      const relativeToDataRoot = join("bots", bot.id, "conversations");
+    for (const endpoint of appConfig.endpoints) {
+      const relativeToDataRoot = join("endpoints", endpoint.id, "conversations");
       const sourcePath = join(appConfig.paths.dataRoot, relativeToDataRoot);
       if (!(await pathExists(sourcePath))) {
         continue;
       }
 
-      const archivePath = join("conversations", bot.id);
+      const archivePath = join("conversations", endpoint.id);
       await cp(sourcePath, join(archiveRoot, archivePath), { recursive: true });
       manifest.conversations.push({
         archivePath: toPortablePath(archivePath),
-        botId: bot.id,
+        endpointId: endpoint.id,
         relativeToDataRoot: toPortablePath(relativeToDataRoot),
       });
     }
@@ -387,17 +387,17 @@ async function restoreConversationTrees(options: {
     const sourcePath = safeJoin(
       options.stageRoot,
       entry.archivePath,
-      `manifest.conversations[].archivePath (${entry.botId})`,
+      `manifest.conversations[].archivePath (${entry.endpointId})`,
     );
     const targetPath = safeJoin(
       options.targetDataRoot,
       entry.relativeToDataRoot,
-      `manifest.conversations[].relativeToDataRoot (${entry.botId})`,
+      `manifest.conversations[].relativeToDataRoot (${entry.endpointId})`,
     );
 
     await assertDirectoryCanBeRestored({
       path: targetPath,
-      resourceLabel: `Conversation store for bot ${entry.botId}`,
+      resourceLabel: `Conversation store for endpoint ${entry.endpointId}`,
       force: options.force,
     });
 

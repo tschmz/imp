@@ -1,5 +1,5 @@
 import { cleanupRuntimeState, assertNoRunningInstance, writeRuntimeState } from "../runtime-state.js";
-import type { ActiveBotRuntimeConfig, DaemonConfig } from "../types.js";
+import type { ActiveEndpointRuntimeConfig, DaemonConfig } from "../types.js";
 
 export interface PreparedRuntime {
   stateAcquired: boolean;
@@ -7,15 +7,15 @@ export interface PreparedRuntime {
 
 export async function acquireRuntimeState(
   config: DaemonConfig,
-  botConfig: ActiveBotRuntimeConfig,
+  endpointConfig: ActiveEndpointRuntimeConfig,
 ): Promise<PreparedRuntime> {
-  await assertNoRunningInstance(botConfig.paths.runtimeStatePath);
-  await writeRuntimeState(botConfig.paths.runtimeStatePath, {
+  await assertNoRunningInstance(endpointConfig.paths.runtimeStatePath);
+  await writeRuntimeState(endpointConfig.paths.runtimeStatePath, {
     pid: process.pid,
-    botId: botConfig.id,
+    endpointId: endpointConfig.id,
     startedAt: new Date().toISOString(),
     configPath: config.configPath,
-    logFilePath: botConfig.paths.logFilePath,
+    logFilePath: endpointConfig.paths.logFilePath,
   });
 
   return { stateAcquired: true };
@@ -23,11 +23,11 @@ export async function acquireRuntimeState(
 
 export async function cleanupPreparedRuntime(
   prepared: PreparedRuntime,
-  botConfig: ActiveBotRuntimeConfig,
+  endpointConfig: ActiveEndpointRuntimeConfig,
 ): Promise<void> {
   if (!prepared.stateAcquired) {
     return;
   }
 
-  await cleanupRuntimeState(botConfig.paths.runtimeStatePath);
+  await cleanupRuntimeState(endpointConfig.paths.runtimeStatePath);
 }

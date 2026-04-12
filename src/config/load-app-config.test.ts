@@ -47,7 +47,7 @@ describe("loadAppConfig", () => {
               },
             },
           ],
-          bots: [
+          endpoints: [
             {
               id: "private-telegram",
               type: "telegram",

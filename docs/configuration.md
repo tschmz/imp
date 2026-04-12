@@ -9,7 +9,7 @@ The top-level structure is:
 - `logging`: daemon log level
 - `defaults`: fallback routing
 - `agents`: one or more agent definitions
-- `bots`: one or more bot definitions
+- `endpoints`: one or more endpoint definitions
 
 ## Minimal Shape
 
@@ -38,7 +38,7 @@ The top-level structure is:
       }
     }
   ],
-  "bots": [
+  "endpoints": [
     {
       "id": "private-telegram",
       "type": "telegram",
@@ -95,7 +95,7 @@ Important rules:
 
 ## Secret References
 
-V1 secret references are currently supported for Telegram bot tokens via `bots[].token`.
+V1 secret references are currently supported for Telegram endpoint tokens via `endpoints[].token`.
 
 That field can be written in one of three forms:
 
@@ -130,7 +130,7 @@ Not templated:
 
 - inline `text` prompt sources
 
-Supported syntax includes normal variable paths such as `{{bot.id}}`, conditionals such as `{{#if skills.length}}...{{else}}...{{/if}}`, and loops such as `{{#each skills}}...{{/each}}`.
+Supported syntax includes normal variable paths such as `{{endpoint.id}}`, conditionals such as `{{#if skills.length}}...{{else}}...{{/if}}`, and loops such as `{{#each skills}}...{{/each}}`.
 
 Constraints:
 
@@ -149,7 +149,7 @@ Available variables:
 - `system.hostname`
 - `system.username`
 - `system.homeDir`
-- `bot.id`
+- `endpoint.id`
 - `agent.id`
 - `agent.model.provider`
 - `agent.model.modelId`
@@ -177,27 +177,27 @@ Example:
 {{/if}}
 ```
 
-## Bots
+## Endpoints
 
-Bots expose agents through transports.
+Endpoints expose agents through transports.
 
-Today, `telegram` is the only supported bot type.
+Today, `telegram` is the only supported endpoint type.
 
 Common Telegram fields:
 
-- `id`: unique bot ID
-- `enabled`: whether the bot starts
-- `token`: Telegram bot token
+- `id`: unique endpoint ID
+- `enabled`: whether the endpoint starts
+- `token`: Telegram endpoint token
 - `token.env`: read the token from an environment variable
 - `token.file`: read the token from a secret file
 - `access.allowedUserIds`: list of allowed Telegram user IDs
-- `voice.enabled`: whether Telegram voice messages are accepted for this bot
+- `voice.enabled`: whether Telegram voice messages are accepted for this endpoint
 - `voice.transcription.provider`: STT backend, currently only `openai`
 - `voice.transcription.model`: OpenAI transcription model, for example `gpt-4o-mini-transcribe`
 - `voice.transcription.language`: optional ISO-639-1 language hint such as `en`
-- `routing.defaultAgentId`: optional per-bot agent override
+- `routing.defaultAgentId`: optional per-endpoint agent override
 
-Only enabled bots are started. At least one bot must be enabled.
+Only enabled endpoints are started. At least one endpoint must be enabled.
 
 Skill discovery notes:
 
@@ -233,13 +233,13 @@ This applies to:
 - instruction files
 - reference files
 - `authFile`
-- secret reference files such as `bots[].token.file`
+- secret reference files such as `endpoints[].token.file`
 - `workspace.cwd`
 
 ## Service Environment
 
 Provider credentials and other service-only environment variables are not stored in `config.json`.
-Telegram bot tokens may stay inline for compatibility, but environment-variable or secret-file references are the preferred operational pattern.
+Telegram endpoint tokens may stay inline for compatibility, but environment-variable or secret-file references are the preferred operational pattern.
 
 When `imp` runs interactively, it uses the current process environment.
 When `imp` runs as a service, environment handling depends on the platform:
@@ -257,21 +257,21 @@ imp service install --force
 
 When inspecting a live installation, verify at least:
 
-- which bots are `enabled`
-- each bot's `routing.defaultAgentId`
+- which endpoints are `enabled`
+- each endpoint's `routing.defaultAgentId`
 - each agent's `model.provider` and `model.modelId`
 - each agent's `authFile`, if used
 - each agent's `prompt.base`, `prompt.instructions`, and `prompt.references`
 - each agent's `workspace.cwd` and `workspace.shellPath`, if used
 - whether required provider credentials are present in the interactive environment or, for Linux services, in `service.env`
-- whether each bot token resolves from its inline value, environment variable, or secret file as intended
+- whether each endpoint token resolves from its inline value, environment variable, or secret file as intended
 
 ## Updating Config Values
 
 Read a value:
 
 ```bash
-imp config get bots.0.enabled
+imp config get endpoints.0.enabled
 ```
 
 Set a value:
@@ -283,7 +283,7 @@ imp config set logging.level '"debug"'
 Set arrays or objects with JSON:
 
 ```bash
-imp config set bots.0.access.allowedUserIds '["123456789"]'
+imp config set endpoints.0.access.allowedUserIds '["123456789"]'
 ```
 
 Validate after changes:

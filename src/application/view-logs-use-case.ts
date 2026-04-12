@@ -3,16 +3,16 @@ import { resolveRuntimeTarget } from "./runtime-target.js";
 
 export function createViewLogsUseCase(): (options: {
   configPath?: string;
-  botId?: string;
+  endpointId?: string;
   follow: boolean;
   lines: number;
 }) => Promise<void> {
-  return async ({ configPath, botId, follow, lines }) => {
+  return async ({ configPath, endpointId, follow, lines }) => {
     const { runtimeConfig } = await resolveRuntimeTarget({ cliConfigPath: configPath });
 
     await viewDaemonLogs({
       runtimeConfig,
-      botId,
+      endpointId,
       follow,
       lines,
     });

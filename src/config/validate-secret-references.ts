@@ -15,12 +15,12 @@ export async function validateAppConfigSecretReferences(
   const configDir = dirname(configPath);
 
   await Promise.all(
-    appConfig.bots.map(async (bot, index) => {
-      await resolveSecretValue(bot.token, {
+    appConfig.endpoints.map(async (endpoint, index) => {
+      await resolveSecretValue(endpoint.token, {
         configDir,
         env: options.env,
         readTextFile: options.readTextFile,
-        fieldLabel: `bots.${index}.token`,
+        fieldLabel: `endpoints.${index}.token`,
       });
     }),
   );

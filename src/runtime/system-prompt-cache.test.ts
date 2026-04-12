@@ -19,7 +19,7 @@ describe("SystemPromptCache", () => {
     });
 
     expect(key).toContain('"files":["/workspace/AGENTS.md:/workspace/AGENTS.md:fp"]');
-    expect(key).toContain('"bot":{"id":"private-telegram"}');
+    expect(key).toContain('"endpoint":{"id":"private-telegram"}');
   });
 
   it("includes available skill metadata without full skill content in cache keys", async () => {
@@ -94,7 +94,7 @@ function createTemplateContext(): PromptTemplateContext {
       username: "thomas",
       homeDir: "/home/thomas",
     },
-    bot: {
+    endpoint: {
       id: "private-telegram",
     },
     agent: {

@@ -2,7 +2,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 
 export interface RuntimeState {
   pid: number;
-  botId: string;
+  endpointId: string;
   startedAt: string;
   configPath: string;
   logFilePath: string;
@@ -71,8 +71,8 @@ function parseRuntimeState(content: string): RuntimeState | null {
     !Number.isInteger(value.pid) ||
     value.pid === undefined ||
     value.pid <= 0 ||
-    typeof value.botId !== "string" ||
-    value.botId.length === 0 ||
+    typeof value.endpointId !== "string" ||
+    value.endpointId.length === 0 ||
     typeof value.startedAt !== "string" ||
     value.startedAt.length === 0 ||
     typeof value.configPath !== "string" ||
@@ -85,7 +85,7 @@ function parseRuntimeState(content: string): RuntimeState | null {
 
   return {
     pid: value.pid,
-    botId: value.botId,
+    endpointId: value.endpointId,
     startedAt: value.startedAt,
     configPath: value.configPath,
     logFilePath: value.logFilePath,

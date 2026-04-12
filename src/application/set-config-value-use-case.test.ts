@@ -29,13 +29,13 @@ describe("createSetConfigValueUseCase", () => {
     await writeConfig(configPath);
 
     await createSetConfigValueUseCase()({
-      keyPath: "bots.private-telegram.enabled",
+      keyPath: "endpoints.private-telegram.enabled",
       value: "false",
     });
 
-    const config = JSON.parse(await readFile(configPath, "utf8")) as { bots: Array<{ enabled: boolean }> };
-    expect(writeOutput).toHaveBeenCalledWith(`Updated config ${configPath}: bots.private-telegram.enabled`);
-    expect(config.bots[0]?.enabled).toBe(false);
+    const config = JSON.parse(await readFile(configPath, "utf8")) as { endpoints: Array<{ enabled: boolean }> };
+    expect(writeOutput).toHaveBeenCalledWith(`Updated config ${configPath}: endpoints.private-telegram.enabled`);
+    expect(config.endpoints[0]?.enabled).toBe(false);
   });
 
   it("updates a plain string value", async () => {
@@ -64,12 +64,12 @@ describe("createSetConfigValueUseCase", () => {
 
     await createSetConfigValueUseCase()({
       configPath,
-      keyPath: "bots.0.enabled",
+      keyPath: "endpoints.0.enabled",
       value: "false",
     });
 
-    const config = JSON.parse(await readFile(configPath, "utf8")) as { bots: Array<{ enabled: boolean }> };
-    expect(config.bots[0]?.enabled).toBe(false);
+    const config = JSON.parse(await readFile(configPath, "utf8")) as { endpoints: Array<{ enabled: boolean }> };
+    expect(config.endpoints[0]?.enabled).toBe(false);
   });
 
   it("fails when an explicit config path is missing", async () => {
@@ -113,10 +113,10 @@ describe("createSetConfigValueUseCase", () => {
 
     await expect(
       createSetConfigValueUseCase()({
-        keyPath: "bots.private-telegram.missing",
+        keyPath: "endpoints.private-telegram.missing",
         value: "false",
       }),
-    ).rejects.toThrow("Invalid target key path: bots.private-telegram.missing");
+    ).rejects.toThrow("Invalid target key path: endpoints.private-telegram.missing");
   });
 
 
@@ -214,7 +214,7 @@ function createConfig(dataRoot: string) {
         },
       },
     ],
-    bots: [
+    endpoints: [
       {
         id: "private-telegram",
         type: "telegram",
