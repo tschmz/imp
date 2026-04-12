@@ -72,6 +72,25 @@ describe("createSetConfigValueUseCase", () => {
     expect(config.endpoints[0]?.enabled).toBe(false);
   });
 
+  it("updates a BOM-prefixed config file", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+
+    await writeRawFile(
+      configPath,
+      `\uFEFF${JSON.stringify(createConfig(join(root, "state-home", "imp")), null, 2)}\n`,
+    );
+
+    await createSetConfigValueUseCase()({
+      configPath,
+      keyPath: "instance.name",
+      value: "custom-instance",
+    });
+
+    const config = JSON.parse(await readFile(configPath, "utf8")) as { instance: { name: string } };
+    expect(config.instance.name).toBe("custom-instance");
+  });
+
   it("fails when an explicit config path is missing", async () => {
     const root = await createTempDir();
     const configPath = join(root, "missing", "imp.json");

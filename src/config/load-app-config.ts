@@ -2,11 +2,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { AppConfig } from "./types.js";
 import { appConfigSchema } from "./schema.js";
+import { parseConfigJson } from "./config-json.js";
 
 export async function loadAppConfig(configPath: string): Promise<AppConfig> {
   const absolutePath = resolve(configPath);
   const raw = await readFile(absolutePath, "utf8");
-  const parsed = parseConfigJson(raw, absolutePath);
+  const parsed = parseConfigJson(raw, { errorPrefix: `Invalid config file ${absolutePath}` });
   const result = appConfigSchema.safeParse(parsed);
 
   if (!result.success) {
@@ -17,17 +18,4 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
   }
 
   return result.data;
-}
-
-function parseConfigJson(raw: string, absolutePath: string): unknown {
-  try {
-    return JSON.parse(stripUtf8Bom(raw)) as unknown;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid config file ${absolutePath}\nMalformed JSON: ${message}`);
-  }
-}
-
-function stripUtf8Bom(raw: string): string {
-  return raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
 }
