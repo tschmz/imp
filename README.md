@@ -1,75 +1,21 @@
 # imp
 
-`imp` is a local daemon for running agent-based endpoints as persistent services.
+`imp` is a local daemon for running personal AI agents behind persistent conversation endpoints.
 
-It manages agent configuration and runtime state on disk, starts configured endpoints, and connects them
-to transports such as Telegram.
+It is meant for personal automation where conversation sessions should keep context, agents should be reachable through communication channels such as Telegram, and the runtime should remain under local control.
 
-## Features
+`imp` is early-stage and can still change.
 
-- Run one or more named agents from a single local daemon
-- Route endpoint messages to specific agents
-- Persist runtime state and logs on disk
-- Configure models and providers through `@mariozechner/pi-ai`
-- Control sessions, history, and agent switching from Telegram commands
-- Create and restore backups of config, agent files, and conversation state
-- Run in the foreground for development or as a background service on Linux and macOS
+## Core Concepts
 
-## Quickstart
+### Agents
 
-- Node.js 20.6 or newer
-- Credentials for at least one supported model provider
-- A Telegram endpoint token
+Agents define how `imp` should answer within a conversation. An agent combines a model, prompt customization, tools, optional skills, and an optional workspace. Multiple agents can live in one daemon so different roles can share the same runtime while keeping their own behavior and working context.
 
-Install:
+### Endpoints
 
-```bash
-npm install -g @tschmz/imp
-```
+Endpoints define where conversations enter the system. Today, Telegram is the supported endpoint type. Endpoints are transport-facing, own their runtime files and conversation store, and route messages to a default agent unless a conversation selects another configured agent.
 
-Init the `imp` daemon:
+### Transports
 
-```bash
-imp init
-```
-
-## CLI
-
-Main commands:
-
-- `imp init`
-- `imp start`
-- `imp log`
-- `imp config get|set|validate|reload`
-- `imp backup create`
-- `imp restore`
-- `imp service install|start|stop|restart|status|uninstall`
-
-Telegram endpoints also expose built-in commands such as:
-
-- `/help`, `/new`, `/start`, `/rename`, `/reset`, `/history`, `/restore`, `/export`
-- `/agent` and `/agent <id>`
-- `/status`, `/config`, `/logs`, `/whoami`, `/ping`
-- `/reload`, `/restart`
-
-## Development
-
-```bash
-npm install
-npm run check
-npm test
-npm run build
-```
-
-## Documentation
-
-- [Documentation index](./docs/index.md)
-- [Getting started](./docs/getting-started.md)
-- [Configuration](./docs/configuration.md)
-- [Running and service](./docs/running-and-service.md)
-- [Customizing agents](./docs/customizing-agents.md)
-- [Backups](./docs/backups.md)
-- [Troubleshooting](./docs/troubleshooting.md)
-- [Supported providers](./docs/providers.md)
-- [Telegram commands](./docs/telegram.md)
-- [Built-in tools](./docs/tools.md)
+Transports connect endpoint types to external systems. The built-in Telegram transport receives Telegram messages, sends them into `imp`, and delivers responses back to Telegram. The transport registry is the extension point for adding other endpoint types later.
