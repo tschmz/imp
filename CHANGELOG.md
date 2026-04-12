@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.0 - 2026-04-13
+
+### Added
+
+- Auto-discover skills from `paths.dataRoot/skills`, `agent.home/.skills`, and `<working-directory>/.skills`, with later catalogs overriding earlier skills for the current turn.
+- Install the bundled `imp-skill-creator` skill when `imp init` writes a starter setup.
+- Load direct `*.md` files from the agent home as instruction blocks before explicit `prompt.instructions` and workspace `AGENTS.md`.
+
+### Fixed
+
+- Re-read skill content from disk when `load_skill` runs so edited skills are picked up without a restart.
+
 ## 0.3.0 - 2026-04-12
 
 ### Changed
