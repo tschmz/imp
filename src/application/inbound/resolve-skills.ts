@@ -8,19 +8,34 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
   }
 
   const configuredSkillCatalog = context.agent.skillCatalog ?? [];
+  const globalSkillsPath = join(context.dependencies.runtimeInfo.dataRoot, "skills");
+  const agentHomeSkillsPath = context.agent.home ? join(context.agent.home, ".skills") : undefined;
   const workspaceDirectory = resolveWorkspaceDirectory(context);
   const workspaceSkillsPath = workspaceDirectory ? join(workspaceDirectory, ".skills") : undefined;
 
   try {
+    const globalSkillCatalog = await discoverSkills([globalSkillsPath], { ignoreMissingPaths: true });
+    const agentHomeSkillCatalog = agentHomeSkillsPath
+      ? await discoverSkills([agentHomeSkillsPath], { ignoreMissingPaths: true })
+      : { skills: [], issues: [] };
     const workspaceSkillCatalog = workspaceSkillsPath
       ? await discoverSkills([workspaceSkillsPath], { ignoreMissingPaths: true })
       : { skills: [], issues: [] };
-    const mergedSkillCatalog = mergeSkillCatalogs(configuredSkillCatalog, workspaceSkillCatalog.skills);
+    const agentHomeMergedSkillCatalog = mergeSkillCatalogs(globalSkillCatalog.skills, agentHomeSkillCatalog.skills);
+    const configuredMergedSkillCatalog = mergeSkillCatalogs(
+      agentHomeMergedSkillCatalog.skills,
+      configuredSkillCatalog,
+    );
+    const mergedSkillCatalog = mergeSkillCatalogs(configuredMergedSkillCatalog.skills, workspaceSkillCatalog.skills);
     const skillCatalog = mergedSkillCatalog.skills;
 
     context.availableSkills = skillCatalog;
 
-    for (const issue of workspaceSkillCatalog.issues) {
+    for (const issue of [
+      ...globalSkillCatalog.issues,
+      ...agentHomeSkillCatalog.issues,
+      ...workspaceSkillCatalog.issues,
+    ]) {
       await context.dependencies.logger?.info(issue, {
         endpointId: context.message.endpointId,
         transport: context.message.conversation.transport,
@@ -28,22 +43,34 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
         messageId: context.message.messageId,
         correlationId: context.message.correlationId,
         agentId: context.agent.id,
+        globalSkillsPath,
+        agentHomeSkillsPath,
         workspaceDirectory,
         workspaceSkillsPath,
       });
     }
 
-    if (mergedSkillCatalog.overriddenSkillNames.length > 0) {
-      await context.dependencies.logger?.info("workspace skills override configured agent skills for turn", {
+    const overriddenSkillNames = [
+      ...new Set([
+        ...configuredMergedSkillCatalog.overriddenSkillNames,
+        ...agentHomeMergedSkillCatalog.overriddenSkillNames,
+        ...mergedSkillCatalog.overriddenSkillNames,
+      ]),
+    ].sort((left, right) => left.localeCompare(right));
+
+    if (overriddenSkillNames.length > 0) {
+      await context.dependencies.logger?.info("auto-discovered skills override earlier agent skills for turn", {
         endpointId: context.message.endpointId,
         transport: context.message.conversation.transport,
         conversationId: context.message.conversation.externalId,
         messageId: context.message.messageId,
         correlationId: context.message.correlationId,
         agentId: context.agent.id,
+        globalSkillsPath,
+        agentHomeSkillsPath,
         workspaceDirectory,
         workspaceSkillsPath,
-        overriddenSkillNames: mergedSkillCatalog.overriddenSkillNames,
+        overriddenSkillNames,
       });
     }
 
@@ -56,9 +83,11 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
       agentId: context.agent.id,
       skillCount: skillCatalog.length,
       skillNames: skillCatalog.map((skill) => skill.name),
+      globalSkillsPath,
+      ...(agentHomeSkillsPath ? { agentHomeSkillsPath } : {}),
       ...(workspaceDirectory ? { workspaceDirectory, workspaceSkillsPath } : {}),
-      ...(mergedSkillCatalog.overriddenSkillNames.length > 0
-        ? { overriddenSkillNames: mergedSkillCatalog.overriddenSkillNames }
+      ...(overriddenSkillNames.length > 0
+        ? { overriddenSkillNames }
         : {}),
     });
 
@@ -73,6 +102,8 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
         messageId: context.message.messageId,
         correlationId: context.message.correlationId,
         agentId: context.agent.id,
+        globalSkillsPath,
+        ...(agentHomeSkillsPath ? { agentHomeSkillsPath } : {}),
         ...(workspaceDirectory ? { workspaceDirectory, workspaceSkillsPath } : {}),
       },
       error,

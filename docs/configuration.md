@@ -273,15 +273,17 @@ Only enabled daemon endpoints are started by `imp start` and the service. At lea
 Skill discovery notes:
 
 - each `agents[].skills.paths` entry is resolved relative to the config file when needed
-- `imp` scans only direct subdirectories of each configured path for `SKILL.md`
-- if the active agent has an explicit working directory (`conversation.state.workingDirectory` or `agent.workspace.cwd`), `imp` also scans `<working-directory>/.skills` on each user turn
+- `imp` scans only direct subdirectories of each skill root for `SKILL.md`
+- on each user turn, `imp` also scans `paths.dataRoot/skills`, `agent.home/.skills`, and, if the active agent has an explicit working directory, `<working-directory>/.skills`
+- the effective working directory is `conversation.state.workingDirectory` or `agent.workspace.cwd`
 - automatic `.skills` loading does not fall back to the daemon process working directory
-- workspace `.skills` are discovered fresh on each turn, so edits take effect without a daemon restart
+- auto-discovered skill directories are discovered fresh on each turn, so edits take effect without a daemon restart
 - `SKILL.md` must have valid YAML frontmatter with at least `name` and `description`
 - invalid configured skills are ignored and logged during startup, and discovered configured skill names are logged per agent
-- invalid workspace skills are ignored and logged on the affected turn
+- invalid auto-discovered skills are ignored and logged on the affected turn
 - duplicate skill names across configured `agents[].skills.paths` are rejected and all colliding configured entries are ignored
-- when a workspace `.skills` entry has the same name as a configured agent skill, the workspace skill overrides the configured one for that turn
+- skill catalogs are merged in this order: `paths.dataRoot/skills`, `agent.home/.skills`, configured `agents[].skills.paths`, then `<working-directory>/.skills`
+- later skill sources override earlier sources with the same skill name for that turn
 - available skills are always available to prompt file templates as metadata only: skill directory path, `SKILL.md` path, skill name, and skill description
 - when available skills exist, the `load_skill` tool is enabled automatically for that turn
 - `load_skill` returns the selected skill's `SKILL.md` instructions, the absolute skill directory, and a `<skill_resources>` list of bundled `scripts/` and `references/` files

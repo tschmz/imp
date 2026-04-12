@@ -288,11 +288,148 @@ describe("createHandleIncomingMessage", () => {
     );
     expect(runInput?.runtime).not.toHaveProperty("activatedSkills");
     expect(logger.info).toHaveBeenCalledWith(
-      "workspace skills override configured agent skills for turn",
+      "auto-discovered skills override earlier agent skills for turn",
       expect.objectContaining({
+        globalSkillsPath: "/tmp/data/skills",
         workspaceDirectory: workspaceRoot,
         workspaceSkillsPath: join(workspaceRoot, ".skills"),
         overriddenSkillNames: ["git-commit"],
+      }),
+    );
+  });
+
+  it("loads auto-discovered skills from data root, agent home, and workspace in order", async () => {
+    const dataRoot = await createTempDir();
+    const agentHome = await createTempDir();
+    const workspaceRoot = await createTempDir();
+    await writeSkillFile(
+      join(dataRoot, "skills", "git-commit", "SKILL.md"),
+      [
+        "---",
+        "name: git-commit",
+        "description: Global commit flow.",
+        "---",
+        "",
+        "Use the global flow.",
+      ].join("\n"),
+    );
+    await writeSkillFile(
+      join(dataRoot, "skills", "git-review", "SKILL.md"),
+      [
+        "---",
+        "name: git-review",
+        "description: Global review flow.",
+        "---",
+        "",
+        "Use the global review flow.",
+      ].join("\n"),
+    );
+    await writeSkillFile(
+      join(dataRoot, "skills", "lint", "SKILL.md"),
+      [
+        "---",
+        "name: lint",
+        "description: Global lint flow.",
+        "---",
+        "",
+        "Use the global lint flow.",
+      ].join("\n"),
+    );
+    await writeSkillFile(
+      join(agentHome, ".skills", "git-commit", "SKILL.md"),
+      [
+        "---",
+        "name: git-commit",
+        "description: Agent home commit flow.",
+        "---",
+        "",
+        "Use the agent home flow.",
+      ].join("\n"),
+    );
+    await writeSkillFile(
+      join(agentHome, ".skills", "release", "SKILL.md"),
+      [
+        "---",
+        "name: release",
+        "description: Agent home release flow.",
+        "---",
+        "",
+        "Use the release flow.",
+      ].join("\n"),
+    );
+    await writeSkillFile(
+      join(workspaceRoot, ".skills", "release", "SKILL.md"),
+      [
+        "---",
+        "name: release",
+        "description: Workspace release flow.",
+        "---",
+        "",
+        "Use the workspace release flow.",
+      ].join("\n"),
+    );
+
+    const agent: AgentDefinition = {
+      ...createDefaultAgent(),
+      home: agentHome,
+      workspace: {
+        cwd: workspaceRoot,
+      },
+      skillCatalog: [
+        createSkill("git-commit", "Configured commit flow."),
+        createSkill("lint", "Configured lint flow."),
+      ],
+    };
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message }) => createAgentRunResult(message, "reply")),
+    };
+    const logger = {
+      debug: vi.fn(async () => undefined),
+      info: vi.fn(async () => undefined),
+      error: vi.fn(async () => undefined),
+    };
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: createConversationStore(),
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: {
+        ...createRuntimeInfo(),
+        dataRoot,
+      },
+      logger,
+    });
+
+    await service.handle(createIncomingMessage("6b", "Please commit and release this carefully."));
+
+    const runInput = vi.mocked(engine.run).mock.calls[0]?.[0];
+    expect(runInput?.runtime?.availableSkills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "git-commit",
+          filePath: "/skills/git-commit/SKILL.md",
+        }),
+        expect.objectContaining({
+          name: "git-review",
+          filePath: join(dataRoot, "skills", "git-review", "SKILL.md"),
+        }),
+        expect.objectContaining({
+          name: "lint",
+          filePath: "/skills/lint/SKILL.md",
+        }),
+        expect.objectContaining({
+          name: "release",
+          filePath: join(workspaceRoot, ".skills", "release", "SKILL.md"),
+        }),
+      ]),
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      "auto-discovered skills override earlier agent skills for turn",
+      expect.objectContaining({
+        globalSkillsPath: join(dataRoot, "skills"),
+        agentHomeSkillsPath: join(agentHome, ".skills"),
+        workspaceSkillsPath: join(workspaceRoot, ".skills"),
+        overriddenSkillNames: ["git-commit", "lint", "release"],
       }),
     );
   });

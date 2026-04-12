@@ -98,25 +98,36 @@ A typical project-aware agent uses:
 - `workspace.cwd` to point tools at the right directory
 - `prompt.instructions` to load `AGENTS.md`
 - `prompt.references` to load project-specific docs or runbooks
-- `agents[].skills.paths` to expose reusable shared `SKILL.md` catalogs per agent
+- `paths.dataRoot/skills` to expose shared auto-discovered skills
+- `agents[].skills.paths` to expose explicitly configured shared `SKILL.md` catalogs per agent
+- `agent.home/.skills` to expose agent-specific auto-discovered skills
 - `workspace.cwd` or the session's current working directory to expose workspace-local skills from `.skills`
 
 ## Agent Skill Catalogs
 
 Agents can define `skills.paths` to expose reusable shared skills alongside the normal agent prompt.
 
-In addition, if an agent has an explicit workspace directory, `imp` also loads skills from `<working-directory>/.skills` on each user turn. The effective working directory is the session working directory when the agent has changed it, otherwise `agent.workspace.cwd`.
+In addition, `imp` auto-discovers skills on each user turn from `paths.dataRoot/skills`, `agent.home/.skills`, and `<working-directory>/.skills`. The effective working directory is the session working directory when the agent has changed it, otherwise `agent.workspace.cwd`.
+
+Skill catalogs are merged in this order:
+
+1. `paths.dataRoot/skills`
+2. `agent.home/.skills`
+3. configured `agents[].skills.paths`
+4. `<working-directory>/.skills`
+
+Later entries override earlier entries with the same skill name.
 
 Rules:
 
-- each configured path and workspace `.skills` directory is scanned one level deep only
+- each configured path, `paths.dataRoot/skills`, `agent.home/.skills`, and workspace `.skills` directory is scanned one level deep only
 - only direct child directories containing `SKILL.md` are considered
 - automatic workspace `.skills` loading applies only to explicit working directories; it does not fall back to the daemon process working directory
-- workspace `.skills` are re-read on each turn, so changes apply without restarting `imp`
+- auto-discovered skill directories are re-read on each turn, so changes apply without restarting `imp`
 - `SKILL.md` frontmatter must be valid YAML and include `name` and `description`
 - invalid files are ignored for that agent or turn and logged for diagnostics
-- duplicate skill names across configured `skills.paths` are ignored for that agent
-- when a workspace skill name collides with a configured agent skill, the workspace skill overrides the configured one for that turn
+- duplicate skill names within one discovery source are ignored for that agent or turn
+- when an auto-discovered skill name collides with an earlier skill, the later source overrides the earlier one for that turn
 - skill discovery for configured paths is logged per agent at startup
 - all available skills are exposed to prompt file templates as metadata only: skill directory path, `SKILL.md` path, skill name, and description
 - when available skills exist, the `load_skill` tool is enabled automatically for that turn
