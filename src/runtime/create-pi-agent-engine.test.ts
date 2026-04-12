@@ -3,12 +3,13 @@ import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistrati
 import { Type } from "@sinclair/typebox";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
+import type { ToolDefinition } from "../tools/types.js";
 import {
   createBuiltInToolRegistry,
   createPiAgentEngine,
@@ -1133,6 +1134,75 @@ describe("createPiAgentEngine", () => {
 
     expect(capturedWorkingDirectory).toBe("/workspace/project");
     expect(capturedTools?.map((tool) => tool.name)).toEqual(["read", "bash"]);
+  });
+
+  it("adds load_skill for available skills and loads only skill instructions and references", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-load-skill-"));
+    tempDirs.push(root);
+    const referencePath = join(root, "skills", "commit", "references", "checklist.md");
+    await mkdir(dirname(referencePath), { recursive: true });
+    await writeFile(referencePath, "Review staged files first.\n", "utf8");
+
+    let capturedTools: ToolDefinition[] | undefined;
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        capturedTools = options.initialState?.tools as ToolDefinition[];
+        return createAgentDouble({ messages: [fauxAssistantMessage("skill-ready")] });
+      },
+    });
+
+    await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+      runtime: {
+        availableSkills: [
+          {
+            name: "commit",
+            description: "Stage and commit changes.",
+            directoryPath: join(root, "skills", "commit"),
+            filePath: join(root, "skills", "commit", "SKILL.md"),
+            body: "\nUse focused commits.",
+            content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+            references: [
+              {
+                filePath: referencePath,
+                relativePath: "checklist.md",
+              },
+            ],
+            scripts: [
+              {
+                filePath: join(root, "skills", "commit", "scripts", "prepare.sh"),
+                relativePath: "prepare.sh",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const loadSkill = capturedTools?.find((tool) => tool.name === "load_skill");
+    expect(loadSkill).toBeDefined();
+
+    const result = await loadSkill!.execute("load-1", { name: "commit" });
+    const text = result.content
+      .flatMap((item) => (item.type === "text" ? [item.text] : []))
+      .join("\n");
+
+    expect(text).toContain('<SKILL name="commit"');
+    expect(text).toContain("Use focused commits.");
+    expect(text).not.toContain("description: Stage and commit changes.");
+    expect(text).toContain('<SKILL-REFERENCE skill="commit"');
+    expect(text).toContain("Review staged files first.");
+    expect(text).not.toContain("prepare.sh");
   });
 
   it("allows agents to inspect and change their working directory via tools", async () => {

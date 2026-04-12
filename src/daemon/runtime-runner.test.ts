@@ -376,8 +376,5 @@ function createRuntime(): BootstrappedRuntime {
       })),
       close: vi.fn(async () => undefined),
     },
-    skillSelector: {
-      selectRelevantSkills: vi.fn(async () => []),
-    },
   };
 }

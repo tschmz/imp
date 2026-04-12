@@ -37,7 +37,6 @@ export function createRuntimeEntries(
         loggingLevel: runtime.loggingLevel,
         activeBotIds: runtimes.map((entry) => entry.botConfig.id),
       },
-      skillSelector: runtime.skillSelector,
       logger: runtime.logger,
     });
     const messageProcessor = createMessageProcessor({

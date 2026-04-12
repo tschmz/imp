@@ -7,7 +7,6 @@ export interface AgentRunRuntimeContext {
   configPath?: string;
   dataRoot?: string;
   availableSkills?: SkillDefinition[];
-  activatedSkills?: SkillDefinition[];
 }
 
 export interface AgentRunInput {

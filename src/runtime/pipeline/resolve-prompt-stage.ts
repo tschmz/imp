@@ -30,7 +30,6 @@ export async function resolvePromptStage(
       dataRoot: context.input.runtime?.dataRoot,
     }),
     availableSkills: context.input.runtime?.availableSkills,
-    activatedSkills: context.input.runtime?.activatedSkills,
     readTextFile: dependencies.readTextFile,
     cache: dependencies.systemPromptCache,
   });

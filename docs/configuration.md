@@ -181,7 +181,7 @@ Common Telegram fields:
 
 Only enabled bots are started. At least one bot must be enabled.
 
-Skill discovery and activation notes:
+Skill discovery notes:
 
 - each `agents[].skills.paths` entry is resolved relative to the config file when needed
 - `imp` scans only direct subdirectories of each configured path for `SKILL.md`
@@ -194,12 +194,9 @@ Skill discovery and activation notes:
 - duplicate skill names across configured `agents[].skills.paths` are rejected and all colliding configured entries are ignored
 - when a workspace `.skills` entry has the same name as a configured agent skill, the workspace skill overrides the configured one for that turn
 - available skills are always injected into prompt context as metadata only: skill directory path, skill name, and skill description
-- per user turn, `imp` asks the configured agent model to select at most three skills using only skill `name` and `description`
-- if selection fails, `imp` still exposes the available skill metadata in prompt context but activates no skills
-- activated `SKILL.md` files are injected into prompt context as read-only content
-- when a skill contains `references/`, those files are loaded into prompt context when the skill is activated
-- when a skill contains `scripts/`, those script paths are exposed to the agent as explicit local resources; they are never executed automatically
-- activated skill names are logged per turn for diagnostics
+- when available skills exist, the `load_skill` tool is enabled automatically for that turn
+- `load_skill` returns the selected skill's `SKILL.md` content and files under `references/`
+- `load_skill` does not return script contents; scripts can be documented from `SKILL.md` and inspected through normal filesystem tools if needed
 
 Voice transcription notes:
 

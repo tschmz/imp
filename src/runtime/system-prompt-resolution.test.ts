@@ -45,7 +45,6 @@ describe("resolveSystemPrompt", () => {
       "/workspace",
       createTemplateContext(),
       [],
-      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "Bot {{bot.id}} on {{system.platform}} for {{agent.model.provider}}/{{agent.model.modelId}}.";
@@ -76,7 +75,6 @@ describe("resolveSystemPrompt", () => {
         createAgent(),
         "/workspace",
         createTemplateContext(),
-        [],
         [],
         async (path) => {
           if (path === "/workspace/AGENTS.md") {
@@ -118,7 +116,6 @@ describe("resolveSystemPrompt", () => {
         },
       },
       [],
-      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "auth=[{{agent.authFile}}] cwd=[{{agent.workspace.cwd}}] config=[{{imp.configPath}}] data=[{{imp.dataRoot}}]";
@@ -142,7 +139,6 @@ describe("resolveSystemPrompt", () => {
         createAgent(),
         "/workspace",
         createTemplateContext(),
-        [],
         [],
         async (path) => {
           if (path === "/workspace/AGENTS.md") {
@@ -168,7 +164,6 @@ describe("resolveSystemPrompt", () => {
       },
       "/workspace",
       createTemplateContext(),
-      [],
       [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
@@ -214,7 +209,6 @@ describe("resolveSystemPrompt", () => {
           scripts: [],
         },
       ],
-      [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
           return "Project instructions.";
@@ -229,70 +223,16 @@ describe("resolveSystemPrompt", () => {
     );
 
     expect(prompt).toContain("<AVAILABLE-SKILLS>");
-    expect(prompt).toContain("Available skills for this agent.");
-    expect(prompt).toContain("imp may activate relevant skills before the main run.");
-    expect(prompt).toContain("Use exact skill names when referring to them.");
-    expect(prompt).toContain("Path: /skills/commit");
-    expect(prompt).toContain("Name: commit");
-    expect(prompt).toContain("Description: Stage and commit changes.");
+    expect(prompt).toContain("You have access to the following skills.");
+    expect(prompt).toContain("Treat this list as a catalog, not as full skill instructions.");
+    expect(prompt).toContain("Use the load_skill tool when a listed skill is relevant to the user's request.");
+    expect(prompt).toContain("Use exact skill names when loading or referring to skills.");
+    expect(prompt).toContain('<AVAILABLE-SKILL name="commit" from="/skills/commit">\nStage and commit changes.\n</AVAILABLE-SKILL>');
     expect(prompt).not.toContain("name: commit");
     expect(prompt).not.toContain("Use focused commits.");
     expect(prompt).not.toContain("<SKILLS>");
     expect(prompt.indexOf("<AVAILABLE-SKILLS>")).toBeLessThan(prompt.indexOf("<INSTRUCTIONS"));
     expect(prompt.indexOf("<AVAILABLE-SKILLS>")).toBeLessThan(prompt.indexOf("<REFERENCE"));
-  });
-
-  it("injects activated skill contents into a dedicated context block", async () => {
-    const prompt = await buildSystemPrompt(
-      {
-        ...createAgent(),
-        prompt: {
-          base: { text: "You are concise." },
-        },
-      },
-      undefined,
-      createTemplateContext(),
-      [],
-      [
-        {
-          name: "commit",
-          description: "Stage and commit changes.",
-          directoryPath: "/skills/commit",
-          filePath: "/skills/commit/SKILL.md",
-          body: "\nUse focused commits.",
-          content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
-          references: [
-            {
-              filePath: "/skills/commit/references/checklist.md",
-              relativePath: "checklist.md",
-            },
-          ],
-          scripts: [
-            {
-              filePath: "/skills/commit/scripts/prepare.sh",
-              relativePath: "prepare.sh",
-            },
-          ],
-        },
-      ],
-      async (path) => {
-        if (path === "/skills/commit/references/checklist.md") {
-          return "Review the staged files first.";
-        }
-
-        throw new Error(`unexpected file read: ${path}`);
-      },
-    );
-
-    expect(prompt).toContain("<SKILLS>");
-    expect(prompt).toContain('<SKILL name="commit" from="/skills/commit/SKILL.md">');
-    expect(prompt).toContain("name: commit");
-    expect(prompt).toContain("Use focused commits.");
-    expect(prompt).toContain('<SKILL-REFERENCE skill="commit" from="/skills/commit/references/checklist.md">');
-    expect(prompt).toContain("Review the staged files first.");
-    expect(prompt).toContain('<SKILL-SCRIPTS skill="commit">');
-    expect(prompt).toContain("Local scripts for this skill. Inspect before running. Run only when needed.");
-    expect(prompt).toContain("/skills/commit/scripts/prepare.sh");
   });
 });
 

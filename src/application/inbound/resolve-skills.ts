@@ -8,7 +8,6 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
   }
 
   const configuredSkillCatalog = context.agent.skillCatalog ?? [];
-  const skillSelector = context.dependencies.skillSelector;
   const workspaceDirectory = resolveWorkspaceDirectory(context);
   const workspaceSkillsPath = workspaceDirectory ? join(workspaceDirectory, ".skills") : undefined;
 
@@ -63,61 +62,10 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
         : {}),
     });
 
-    if (skillCatalog.length === 0 || !skillSelector) {
-      context.activatedSkills = [];
-      return;
-    }
-
-    try {
-      const activatedSkills = await skillSelector.selectRelevantSkills({
-        agent: context.agent,
-        userText: context.message.text,
-        catalog: skillCatalog,
-        maxActivatedSkills: 3,
-      });
-
-      const logFields = {
-        botId: context.message.botId,
-        transport: context.message.conversation.transport,
-        conversationId: context.message.conversation.externalId,
-        messageId: context.message.messageId,
-        correlationId: context.message.correlationId,
-        agentId: context.agent.id,
-        skillCount: activatedSkills.length,
-        skillNames: activatedSkills.map((skill) => skill.name),
-        ...(workspaceDirectory ? { workspaceDirectory, workspaceSkillsPath } : {}),
-        ...(mergedSkillCatalog.overriddenSkillNames.length > 0
-          ? { overriddenSkillNames: mergedSkillCatalog.overriddenSkillNames }
-          : {}),
-      };
-
-      if (activatedSkills.length > 0) {
-        await context.dependencies.logger?.info("resolved agent skills for turn", logFields);
-      } else {
-        await context.dependencies.logger?.debug("resolved agent skills for turn", logFields);
-      }
-
-      context.activatedSkills = activatedSkills;
-    } catch (error) {
-      void context.dependencies.logger?.error(
-        "failed to select agent skills for turn; continuing without skill activation",
-        {
-          botId: context.message.botId,
-          transport: context.message.conversation.transport,
-          conversationId: context.message.conversation.externalId,
-          messageId: context.message.messageId,
-          correlationId: context.message.correlationId,
-          agentId: context.agent.id,
-          ...(workspaceDirectory ? { workspaceDirectory, workspaceSkillsPath } : {}),
-        },
-        error,
-      );
-      context.activatedSkills = [];
-    }
   } catch (error) {
     context.availableSkills = [];
     void context.dependencies.logger?.error(
-      "failed to resolve available agent skills for turn; continuing without skill activation",
+      "failed to resolve available agent skills for turn; continuing without skills",
       {
         botId: context.message.botId,
         transport: context.message.conversation.transport,
@@ -129,7 +77,6 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
       },
       error,
     );
-    context.activatedSkills = [];
   }
 }
 

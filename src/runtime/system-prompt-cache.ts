@@ -37,7 +37,6 @@ export interface SystemPromptCacheKeyInput {
   promptFiles: string[];
   templateContext: PromptTemplateContext;
   availableSkills?: SkillDefinition[];
-  activatedSkills?: SkillDefinition[];
 }
 
 export class SystemPromptCache {
@@ -81,14 +80,6 @@ export class SystemPromptCache {
         directoryPath: skill.directoryPath,
         name: skill.name,
         description: skill.description,
-      })),
-      activatedSkills: (input.activatedSkills ?? []).map((skill) => ({
-        name: skill.name,
-        description: skill.description,
-        filePath: skill.filePath,
-        content: skill.content,
-        references: skill.references,
-        scripts: skill.scripts,
       })),
       files: fileFingerprints,
     });

@@ -46,7 +46,6 @@ export function createHandleIncomingMessage(
         hookRunner,
         startedAt: Date.now(),
         availableSkills: [],
-        activatedSkills: [],
       };
 
       try {

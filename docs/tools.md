@@ -24,6 +24,8 @@ Additional built-in tools are available when configured:
 | `pwd` | Show the current working directory used by filesystem and shell tools.      |
 | `cd`  | Change the working directory used by subsequent filesystem and shell tools. |
 
+When an agent has available skills, `imp` also enables `load_skill` automatically for that turn. It loads a skill's `SKILL.md` content and files under `references/`; script contents are not returned by this tool.
+
 ## Bash PATH
 
 The `bash` tool inherits the `PATH` from the running `imp` process and prepends the

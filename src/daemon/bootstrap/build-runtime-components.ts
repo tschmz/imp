@@ -8,7 +8,6 @@ import {
 } from "../../runtime/create-pi-agent-engine.js";
 import { createOAuthApiKeyResolver } from "../../runtime/create-oauth-api-key-resolver.js";
 import type { AgentEngine } from "../../runtime/types.js";
-import { createLlmSkillSelector, type SkillSelector } from "../../skills/selection.js";
 import { createFsConversationStore } from "../../storage/fs-store.js";
 import type { ConversationStore } from "../../storage/types.js";
 import type { ToolRegistry } from "../../tools/registry.js";
@@ -19,12 +18,10 @@ export interface RuntimeComponents {
   logger: Logger;
   conversationStore: ConversationStore;
   engine: AgentEngine;
-  skillSelector: SkillSelector;
 }
 
 export interface BuildRuntimeComponentsDependencies {
   engine?: AgentEngine;
-  skillSelector?: SkillSelector;
   toolRegistry?: ToolRegistry;
   createBuiltInToolRegistry?: (
     workingDirectory: string | WorkingDirectoryState,
@@ -58,17 +55,10 @@ export function buildRuntimeComponents(
       ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
       createBuiltInToolRegistry: createBuiltInRegistry,
     });
-  const skillSelector =
-    dependencies.skillSelector ??
-    createLlmSkillSelector({
-      getApiKey,
-    });
-
   return {
     loggingLevel: config.logging.level,
     logger,
     conversationStore,
     engine,
-    skillSelector,
   };
 }

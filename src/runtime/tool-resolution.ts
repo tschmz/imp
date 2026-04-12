@@ -1,8 +1,9 @@
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { delimiter as pathDelimiter } from "node:path";
 import { createFindTool, createGrepTool, createLsTool, createCodingTools, type ToolsOptions } from "@mariozechner/pi-coding-agent";
 import type { StreamOptions } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
+import type { SkillDefinition } from "../skills/types.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
 
@@ -39,6 +40,7 @@ export function createBuiltInToolRegistry(
 
   return createToolRegistry([
     ...createDynamicBuiltInTools(workingDirectoryState, agent),
+    ...createConfiguredSkillTools(agent?.skillCatalog ?? []),
     createGetWorkingDirectoryTool(workingDirectoryState),
     createSetWorkingDirectoryTool(workingDirectoryState),
   ]);
@@ -71,6 +73,85 @@ function createBaseBuiltInTools(workingDirectory: string, agent?: AgentDefinitio
     createFindTool(workingDirectory),
     createLsTool(workingDirectory),
   ];
+}
+
+export function createLoadSkillTool(skills: SkillDefinition[]): ToolDefinition {
+  const skillByName = new Map(skills.map((skill) => [skill.name, skill]));
+  const parameters = {
+    type: "object",
+    properties: {
+      name: {
+        type: "string",
+        minLength: 1,
+        description: "Exact skill name from the available skill catalog.",
+      },
+    },
+    required: ["name"],
+    additionalProperties: false,
+  } as unknown as ToolDefinition["parameters"];
+
+  return {
+    name: "load_skill",
+    label: "load_skill",
+    description: "Load the full SKILL.md instructions and reference files for an available skill.",
+    parameters,
+    async execute(_toolCallId, params) {
+      const { name } = parseLoadSkillParams(params);
+      const skill = skillByName.get(name);
+      if (!skill) {
+        throw new Error(`Unknown skill: ${name}. Available skills: ${skills.map((entry) => entry.name).join(", ")}`);
+      }
+
+      const references = await Promise.all(
+        skill.references.map(async (reference) => ({
+          ...reference,
+          content: (await readFile(reference.filePath, "utf8")).trim(),
+        })),
+      );
+
+      const renderedReferences = references.map((reference) =>
+        `<SKILL-REFERENCE skill="${escapeToolAttribute(skill.name)}" from="${escapeToolAttribute(reference.filePath)}">\n\n${reference.content}\n</SKILL-REFERENCE>`,
+      );
+
+      const text = [
+        `<SKILL name="${escapeToolAttribute(skill.name)}" from="${escapeToolAttribute(skill.filePath)}">\n\n${skill.body.trim()}\n</SKILL>`,
+        ...renderedReferences,
+      ].join("\n\n");
+
+      return {
+        content: [{ type: "text", text }],
+        details: {
+          skillName: skill.name,
+          skillPath: skill.filePath,
+          references: references.map((reference) => ({
+            path: reference.filePath,
+            relativePath: reference.relativePath,
+          })),
+        },
+      };
+    },
+  };
+}
+
+function createConfiguredSkillTools(skills: SkillDefinition[]): ToolDefinition[] {
+  return skills.length > 0 ? [createLoadSkillTool(skills)] : [];
+}
+
+function parseLoadSkillParams(params: unknown): { name: string } {
+  if (typeof params !== "object" || params === null) {
+    throw new Error("load_skill requires an object parameter with a name.");
+  }
+
+  const name = "name" in params ? params.name : undefined;
+  if (typeof name !== "string" || name.trim().length === 0) {
+    throw new Error("load_skill requires a non-empty string name.");
+  }
+
+  return { name: name.trim() };
+}
+
+function escapeToolAttribute(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
 function resolveBuiltInToolOptions(agent?: AgentDefinition): ToolsOptions | undefined {

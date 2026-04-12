@@ -4,6 +4,7 @@ import type { ToolRegistry } from "../../tools/registry.js";
 import type { McpToolCache } from "../mcp-tool-cache.js";
 import {
   createOnPayloadOverride,
+  createLoadSkillTool,
   createWorkingDirectoryState,
   resolveAgentTools,
   resolveWorkingDirectory,
@@ -45,7 +46,11 @@ export async function resolveToolsStage(
     dependencies.toolRegistry
     ?? dependencies.createBuiltInToolRegistry(workingDirectoryState, context.agent);
   const configuredBuiltInTools = [...context.agent.tools];
-  const builtInTools = resolveAgentTools(context.agent, toolRegistry);
+  const configuredTools = resolveAgentTools(context.agent, toolRegistry);
+  const builtInTools = resolveTurnBuiltInTools(
+    configuredTools,
+    context.input.runtime?.availableSkills ?? [],
+  );
   const resolvedBuiltInTools = builtInTools.map((tool) => tool.name);
   const missingBuiltInTools = configuredBuiltInTools.filter(
     (name) => !resolvedBuiltInTools.includes(name),
@@ -71,6 +76,20 @@ export async function resolveToolsStage(
     },
     tools: [...builtInTools, ...mcpToolResolution.tools],
   };
+}
+
+function resolveTurnBuiltInTools(
+  builtInTools: ReturnType<typeof resolveAgentTools>,
+  availableSkills: NonNullable<AgentRunContext["input"]["runtime"]>["availableSkills"],
+): ReturnType<typeof resolveAgentTools> {
+  if (!availableSkills || availableSkills.length === 0) {
+    return builtInTools;
+  }
+
+  return [
+    ...builtInTools.filter((tool) => tool.name !== "load_skill"),
+    createLoadSkillTool(availableSkills),
+  ];
 }
 
 function resolveConversationWorkingDirectory(

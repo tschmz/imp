@@ -9,7 +9,6 @@ export interface SystemPromptResolutionOptions {
   promptWorkingDirectory?: string;
   templateContext: PromptTemplateContext;
   availableSkills?: SkillDefinition[];
-  activatedSkills?: SkillDefinition[];
   readTextFile: (path: string) => Promise<string>;
   cache: SystemPromptCache;
 }
@@ -24,7 +23,6 @@ export async function resolveSystemPrompt(
 ): Promise<SystemPromptResolutionResult> {
   const promptFiles = [
     ...resolvePromptFileSources(options.agent, options.promptWorkingDirectory).map((source) => source.path),
-    ...resolveActivatedSkillReferenceFiles(options.activatedSkills ?? []),
   ];
 
   const cacheKey = await options.cache.buildCacheKey({
@@ -33,7 +31,6 @@ export async function resolveSystemPrompt(
     promptFiles,
     templateContext: options.templateContext,
     availableSkills: options.availableSkills,
-    activatedSkills: options.activatedSkills,
   });
 
   const cachedPrompt = options.cache.get(cacheKey);
@@ -49,7 +46,6 @@ export async function resolveSystemPrompt(
     options.promptWorkingDirectory,
     options.templateContext,
     options.availableSkills ?? [],
-    options.activatedSkills ?? [],
     options.readTextFile,
   );
 
@@ -66,7 +62,6 @@ export async function buildSystemPrompt(
   promptWorkingDirectory: string | undefined,
   templateContext: PromptTemplateContext,
   availableSkills: SkillDefinition[],
-  activatedSkills: SkillDefinition[],
   readTextFile: (path: string) => Promise<string>,
 ): Promise<string> {
   const sections: string[] = [];
@@ -112,10 +107,6 @@ export async function buildSystemPrompt(
     sections.push(formatPromptSection("REFERENCE", describePromptSource(source), content));
   }
 
-  if (activatedSkills.length > 0) {
-    sections.push(await formatActivatedSkillsSection(activatedSkills, readTextFile));
-  }
-
   return sections.join("\n\n");
 }
 
@@ -131,57 +122,20 @@ function formatAvailableSkillsSection(availableSkills: SkillDefinition[]): strin
   const renderedSkills = availableSkills
     .map(
       (skill) =>
-        `<AVAILABLE-SKILL>\nPath: ${skill.directoryPath}\nName: ${skill.name}\nDescription: ${skill.description}\n</AVAILABLE-SKILL>`,
+        `<AVAILABLE-SKILL name="${escapeInstructionAttribute(skill.name)}" from="${escapeInstructionAttribute(skill.directoryPath)}">\n${skill.description}\n</AVAILABLE-SKILL>`,
     )
     .join("\n\n");
 
   return (
     "<AVAILABLE-SKILLS>\n\n" +
-    "Available skills for this agent.\n" +
-    "imp may activate relevant skills before the main run.\n" +
-    "Use exact skill names when referring to them.\n" +
-    "Entries list path, name, and description only.\n" +
-    "Full skill instructions appear later only for activated skills.\n\n" +
+    "You have access to the following skills.\n" +
+    "Treat this list as a catalog, not as full skill instructions.\n" +
+    "Use the load_skill tool when a listed skill is relevant to the user's request.\n" +
+    "Use exact skill names when loading or referring to skills.\n" +
+    "The catalog lists path, name, and description only.\n\n" +
     `${renderedSkills}\n` +
     "</AVAILABLE-SKILLS>"
   );
-}
-
-async function formatActivatedSkillsSection(
-  activatedSkills: SkillDefinition[],
-  readTextFile: (path: string) => Promise<string>,
-): Promise<string> {
-  const renderedSkills = await Promise.all(
-    activatedSkills.map(async (skill) => {
-      const sections = [
-        `<SKILL name="${escapeInstructionAttribute(skill.name)}" from="${escapeInstructionAttribute(skill.filePath)}">\n\n${skill.content.trim()}\n</SKILL>`,
-      ];
-
-      for (const reference of skill.references) {
-        sections.push(
-          `<SKILL-REFERENCE skill="${escapeInstructionAttribute(skill.name)}" from="${escapeInstructionAttribute(reference.filePath)}">\n\n${(await readTextFile(reference.filePath)).trim()}\n</SKILL-REFERENCE>`,
-        );
-      }
-
-      if (skill.scripts.length > 0) {
-        sections.push(
-          `<SKILL-SCRIPTS skill="${escapeInstructionAttribute(skill.name)}">\n\n` +
-            "Local scripts for this skill. Inspect before running. Run only when needed.\n" +
-            `${skill.scripts
-              .map(
-                (script) =>
-                  `- ${script.filePath} (relative: ${script.relativePath})`,
-              )
-              .join("\n")}\n` +
-            "</SKILL-SCRIPTS>",
-        );
-      }
-
-      return sections.join("\n\n");
-    }),
-  );
-
-  return `<SKILLS>\n\n${renderedSkills.join("\n\n")}\n</SKILLS>`;
 }
 
 export function resolveInstructionSources(
@@ -218,10 +172,6 @@ function resolveWorkingDirectoryAgentsFile(workingDirectory: string | undefined)
   }
 
   return join(workingDirectory, "AGENTS.md");
-}
-
-function resolveActivatedSkillReferenceFiles(activatedSkills: SkillDefinition[]): string[] {
-  return activatedSkills.flatMap((skill) => skill.references.map((reference) => reference.filePath));
 }
 
 async function resolvePromptSourceContent(
