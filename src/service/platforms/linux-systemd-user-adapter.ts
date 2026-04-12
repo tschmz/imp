@@ -20,8 +20,8 @@ export const linuxSystemdUserAdapter: ServicePlatformAdapter = {
       "",
       "[Service]",
       "Type=simple",
-      `WorkingDirectory=${quoteSystemdValue(plan.workingDirectory)}`,
-      ...(plan.environmentPath ? [`EnvironmentFile=${quoteSystemdValue(plan.environmentPath)}`] : []),
+      `WorkingDirectory=${escapeSystemdPath(plan.workingDirectory)}`,
+      ...(plan.environmentPath ? [`EnvironmentFile=${escapeSystemdPath(plan.environmentPath)}`] : []),
       `ExecStart=${[plan.command, ...plan.args].map(quoteSystemdValue).join(" ")}`,
       "Restart=on-failure",
       "RestartSec=3",
@@ -105,4 +105,12 @@ export const linuxSystemdUserAdapter: ServicePlatformAdapter = {
 
 function quoteSystemdValue(value: string): string {
   return `"${value.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"")}"`;
+}
+
+function escapeSystemdPath(value: string): string {
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("%", "%%")
+    .replaceAll("\"", "\\x22")
+    .replaceAll(" ", "\\x20");
 }

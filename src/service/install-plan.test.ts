@@ -35,8 +35,8 @@ describe("service install plan", () => {
     );
 
     expect(definition).toContain("[Unit]");
-    expect(definition).toContain('WorkingDirectory="/tmp/imp"');
-    expect(definition).toContain('EnvironmentFile="/tmp/imp/service.env"');
+    expect(definition).toContain("WorkingDirectory=/tmp/imp");
+    expect(definition).toContain("EnvironmentFile=/tmp/imp/service.env");
     expect(definition).toContain("ExecStart=");
     expect(definition).toContain("WantedBy=default.target");
   });
@@ -51,8 +51,8 @@ describe("service install plan", () => {
       }),
     );
 
-    expect(definition).toContain('WorkingDirectory="/tmp/imp config"');
-    expect(definition).toContain('EnvironmentFile="/tmp/imp config/service.env"');
+    expect(definition).toContain("WorkingDirectory=/tmp/imp\\x20config");
+    expect(definition).toContain("EnvironmentFile=/tmp/imp\\x20config/service.env");
   });
 
   it("uses an explicit linux service environment file path as-is", () => {
