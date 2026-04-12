@@ -87,6 +87,9 @@ describe("imp CLI e2e", () => {
     await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
+    await expect(
+      readFile(join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
+    ).resolves.toContain(`global skills live under \`${join(root, "state-home", "imp", "skills")}\``);
   });
 
   it("creates and restores a backup with config, agent files, and conversations", async () => {

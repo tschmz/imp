@@ -52,6 +52,7 @@ describe("initAppConfig", () => {
       }>;
       endpoints: unknown[];
     };
+    const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
@@ -86,6 +87,11 @@ describe("initAppConfig", () => {
     await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
+    await expect(readFile(skillPath, "utf8")).resolves.toContain(
+      `global skills live under \`${join(root, "state-home", "imp", "skills")}\``,
+    );
+    await expect(readFile(skillPath, "utf8")).resolves.not.toContain("/home/thomas/.imp");
+    expect((await stat(skillPath)).mode & 0o777).toBe(0o644);
   });
 
   it("refuses to overwrite an existing config without force", async () => {
@@ -156,6 +162,48 @@ describe("initAppConfig", () => {
     expect(backupMode).toBe(0o600);
   });
 
+  it("creates a backup before overwriting an existing imp skill with force", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    const dataRoot = join(root, "state-home", "imp");
+    const skillPath = join(dataRoot, "skills", "imp-skill-creator", "SKILL.md");
+    const backupPath = `${skillPath}.2026-04-05T18-15-00.000Z.bak`;
+    const env = {
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
+
+    await initAppConfig({ configPath, env });
+    const originalContent = await readFile(skillPath, "utf8");
+
+    await initAppConfig({
+      configPath,
+      force: true,
+      env,
+      now: new Date("2026-04-05T18:15:00.000Z"),
+    });
+
+    await expect(readFile(backupPath, "utf8")).resolves.toBe(originalContent);
+    expect((await stat(backupPath)).mode & 0o777).toBe(0o644);
+  });
+
+  it("does not write the config when the imp skill already exists without force", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    const dataRoot = join(root, "state-home", "imp");
+    const skillPath = join(dataRoot, "skills", "imp-skill-creator", "SKILL.md");
+    const env = {
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
+
+    await initAppConfig({ configPath, env });
+    await expect(initAppConfig({ configPath: join(root, "second-config.json"), env })).rejects.toThrowError(
+      `Imp skill already exists: ${skillPath}\nRe-run with --force to overwrite.`,
+    );
+    await expect(readFile(join(root, "second-config.json"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   it("does not write the default agent system prompt file", async () => {
     const root = await createTempDir();
     const env = {
@@ -217,6 +265,9 @@ describe("initAppConfig", () => {
 
     await expect(readFile(configPath, "utf8")).resolves.toContain('"authFile"');
     await expect(readFile(configPath, "utf8")).resolves.toContain('"prompt"');
+    await expect(
+      readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
+    ).resolves.toContain(`global skills live under \`${join(root, "custom-state", "skills")}\``);
   });
 });
 
