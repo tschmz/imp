@@ -41,6 +41,18 @@ describe("service install plan", () => {
     expect(definition).toContain("WantedBy=default.target");
   });
 
+  it("uses an explicit linux service environment file path as-is", () => {
+    const plan = createServiceInstallPlan({
+      platform: "linux",
+      configPath: "/tmp/imp/config.json",
+      execPath: "/usr/bin/node",
+      argv: ["/usr/bin/node", "/app/dist/main.js"],
+      environmentPath: "/tmp/custom/imp.env",
+    });
+
+    expect(plan.environmentPath).toBe("/tmp/custom/imp.env");
+  });
+
   it("renders a launchd plist", () => {
     const definition = renderServiceDefinition(
       createServiceInstallPlan({
