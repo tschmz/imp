@@ -1,5 +1,6 @@
 import { appendFile, mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { isMissingFileError } from "../files/node-error.js";
 import type { LogFields, Logger, LogLevel } from "./types.js";
 
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
@@ -105,10 +106,6 @@ async function writeLogLine(
   };
 
   await appendFile(path, `${JSON.stringify(payload)}\n`, "utf8");
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function formatError(error: unknown): string {

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { isMissingFileError } from "../files/node-error.js";
 
 export async function renderLinuxServiceEnvironment(options: {
   path?: string;
@@ -72,8 +73,4 @@ function unquoteEnvironmentValue(value: string): string {
   }
 
   return value;
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
