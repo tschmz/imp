@@ -335,6 +335,72 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts telegram document download config", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "replace-me",
+          access: {
+            allowedUserIds: [],
+          },
+          document: {
+            maxDownloadBytes: 1048576,
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid telegram document download limits", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "replace-me",
+          access: {
+            allowedUserIds: [],
+          },
+          document: {
+            maxDownloadBytes: 0,
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("rejects endpoint ids that are unsafe as path segments", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({

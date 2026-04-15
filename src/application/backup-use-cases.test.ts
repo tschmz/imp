@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTarArchive, extractTarArchive } from "../files/tar-archive.js";
+import { createFsConversationStore } from "../storage/fs-store.js";
 import { createBackupUseCases } from "./backup-use-cases.js";
 
 const tempDirs: string[] = [];
@@ -132,6 +133,117 @@ describe("backup use cases", () => {
         "utf8",
       ),
     ).resolves.toContain('"other"');
+  });
+
+  it("restores telegram document attachments with relocatable conversation metadata", async () => {
+    const sourceRoot = await createTempDir();
+    const sourceConfigPath = join(sourceRoot, "config", "config.json");
+    const sourceDataRoot = join(sourceRoot, "state");
+    const sourceConversationsDir = join(sourceDataRoot, "endpoints", "private-telegram", "conversations");
+    const sourceStore = createFsConversationStore(createRuntimePaths(sourceDataRoot));
+    const created = await sourceStore.create({ transport: "telegram", externalId: "42" }, {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const sourceAttachmentPath = join(
+      sourceConversationsDir,
+      "telegram",
+      "42",
+      "sessions",
+      created.state.conversation.sessionId!,
+      "attachments",
+      "msg-1-report.txt",
+    );
+    const backupPath = join(sourceRoot, "backup.tar");
+
+    await writeConfig(sourceConfigPath, sourceDataRoot);
+    await writeTextFile(sourceAttachmentPath, "file contents\n");
+    await sourceStore.put({
+      state: {
+        ...created.state,
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+      messages: [
+        {
+          kind: "message",
+          id: "msg-1",
+          role: "user",
+          content: "Please inspect this report",
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
+          createdAt: "2026-04-05T00:01:00.000Z",
+          source: {
+            kind: "telegram-document",
+            document: {
+              fileId: "doc-file",
+              fileName: "report.txt",
+              relativePath: "attachments/msg-1-report.txt",
+              savedPath: sourceAttachmentPath,
+            },
+          },
+        },
+      ],
+    });
+
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+    await useCases.createBackup({
+      configPath: sourceConfigPath,
+      outputPath: backupPath,
+      only: "conversations",
+      force: false,
+    });
+
+    const targetRoot = await createTempDir();
+    const targetDataRoot = join(targetRoot, "state");
+    await useCases.restoreBackup({
+      inputPath: backupPath,
+      dataRoot: targetDataRoot,
+      only: "conversations",
+      force: true,
+    });
+
+    const targetStore = createFsConversationStore(createRuntimePaths(targetDataRoot));
+    const restored = await targetStore.get(created.state.conversation);
+    const targetAttachmentPath = join(
+      targetDataRoot,
+      "endpoints",
+      "private-telegram",
+      "conversations",
+      "telegram",
+      "42",
+      "sessions",
+      created.state.conversation.sessionId!,
+      "attachments",
+      "msg-1-report.txt",
+    );
+
+    expect(restored?.messages[0]).toMatchObject({
+      source: {
+        kind: "telegram-document",
+        document: {
+          relativePath: "attachments/msg-1-report.txt",
+          savedPath: targetAttachmentPath,
+        },
+      },
+    });
+    await expect(readFile(targetAttachmentPath, "utf8")).resolves.toBe("file contents\n");
+    await expect(
+      readFile(
+        join(
+          targetDataRoot,
+          "endpoints",
+          "private-telegram",
+          "conversations",
+          "telegram",
+          "42",
+          "sessions",
+          created.state.conversation.sessionId!,
+          "conversation.json",
+        ),
+        "utf8",
+      ),
+    ).resolves.not.toContain(sourceAttachmentPath);
   });
 
   it("fails clearly when a referenced agent file is missing during backup creation", async () => {
@@ -498,4 +610,16 @@ async function createBackupArchive(archivePath: string, files: Array<[archivePat
   }
 
   await createTarArchive(archiveRoot, archivePath);
+}
+
+function createRuntimePaths(dataRoot: string) {
+  return {
+    dataRoot,
+    endpointRoot: join(dataRoot, "endpoints", "private-telegram"),
+    conversationsDir: join(dataRoot, "endpoints", "private-telegram", "conversations"),
+    logsDir: join(dataRoot, "logs", "endpoints"),
+    logFilePath: join(dataRoot, "logs", "endpoints", "private-telegram.log"),
+    runtimeDir: join(dataRoot, "runtime", "endpoints"),
+    runtimeStatePath: join(dataRoot, "runtime", "endpoints", "private-telegram.json"),
+  };
 }

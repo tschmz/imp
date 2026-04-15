@@ -1,7 +1,7 @@
 import type { Model } from "@mariozechner/pi-ai";
 import { describe, expect, it } from "vitest";
 import type { ConversationEvent } from "../domain/conversation.js";
-import { toAgentMessages } from "./message-mapping.js";
+import { renderIncomingMessageTextForAgent, toAgentMessages } from "./message-mapping.js";
 
 const reasoningResponsesModel: Model<"openai-responses"> = {
   id: "gpt-5-mini",
@@ -22,6 +22,39 @@ const reasoningResponsesModel: Model<"openai-responses"> = {
 };
 
 describe("toAgentMessages", () => {
+  it("adds telegram document context when replaying persisted user messages", () => {
+    const messages = toAgentMessages(
+      [
+        {
+          kind: "message",
+          id: "1:user",
+          role: "user",
+          content: "Please inspect this report",
+          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
+          createdAt: "2026-04-05T00:00:00.000Z",
+          source: {
+            kind: "telegram-document",
+            document: {
+              fileId: "doc-file",
+              fileName: "report.txt",
+              mimeType: "text/plain",
+              sizeBytes: 13,
+              savedPath: "/var/lib/imp/report.txt",
+            },
+          },
+        },
+      ] satisfies ConversationEvent[],
+      reasoningResponsesModel,
+    );
+
+    expect(messages[0]).toMatchObject({
+      role: "user",
+      content: expect.stringContaining("Telegram document uploaded"),
+    });
+    expect(String(messages[0]?.content)).toContain("Saved path: /var/lib/imp/report.txt");
+    expect(String(messages[0]?.content)).toContain("Please inspect this report");
+  });
+
   it("replays persisted OpenAI reasoning and tool history as native messages", () => {
     const messages = toAgentMessages(
       [
@@ -254,5 +287,37 @@ describe("toAgentMessages", () => {
         isError: false,
       }),
     ]);
+  });
+});
+
+describe("renderIncomingMessageTextForAgent", () => {
+  it("adds telegram document context to the current user prompt", () => {
+    const text = renderIncomingMessageTextForAgent({
+      endpointId: "private-telegram",
+      conversation: {
+        transport: "telegram",
+        externalId: "42",
+      },
+      messageId: "100",
+      correlationId: "corr-100",
+      userId: "7",
+      text: "Please inspect this report",
+      receivedAt: "2026-04-05T00:00:00.000Z",
+      source: {
+        kind: "telegram-document",
+        document: {
+          fileId: "doc-file",
+          fileName: "report.txt",
+          mimeType: "text/plain",
+          sizeBytes: 13,
+          savedPath: "/var/lib/imp/report.txt",
+        },
+      },
+    });
+
+    expect(text).toContain("Telegram document uploaded");
+    expect(text).toContain("Saved path: /var/lib/imp/report.txt");
+    expect(text).toContain("File name: report.txt");
+    expect(text).toContain("Please inspect this report");
   });
 });

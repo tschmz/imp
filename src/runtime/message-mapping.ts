@@ -11,9 +11,13 @@ import type {
   ConversationEvent,
   ConversationUserMessage,
 } from "../domain/conversation.js";
+import type { IncomingMessage, IncomingMessageSource } from "../domain/message.js";
 
 const TRANSCRIBED_MESSAGE_PREFIX =
   "[Transcribed from a Telegram voice message. Automatic speech recognition may contain mistakes. If the request seems unclear or inconsistent with the conversation, ask a brief clarifying question before acting on uncertain details.]\n";
+
+const TELEGRAM_DOCUMENT_CONTEXT =
+  "Telegram document uploaded. The file has been downloaded and saved locally for this conversation.";
 
 export function toAgentMessages(
   messages: ConversationEvent[],
@@ -117,18 +121,62 @@ export function toConversationEvents(
 function renderUserMessageContent(
   message: ConversationUserMessage,
 ): UserMessage["content"] {
+  if (message.source?.kind === "telegram-document") {
+    return renderTextWithSourceContext(message.content, message.source);
+  }
+
   if (message.source?.kind !== "telegram-voice-transcript") {
     return message.content;
   }
 
-  if (typeof message.content === "string") {
-    return `${TRANSCRIBED_MESSAGE_PREFIX}${message.content}`;
+  return renderTextWithSourceContext(message.content, message.source);
+}
+
+function renderTextWithSourceContext(
+  content: UserMessage["content"],
+  source: IncomingMessageSource,
+): UserMessage["content"] {
+  if (typeof content === "string") {
+    return `${renderSourceContext(source)}${content}`;
   }
 
   return [
-    { type: "text", text: TRANSCRIBED_MESSAGE_PREFIX.trimEnd() },
-    ...message.content,
+    { type: "text", text: renderSourceContext(source).trimEnd() },
+    ...content,
   ];
+}
+
+export function renderIncomingMessageTextForAgent(message: IncomingMessage): string {
+  if (!message.source || message.source.kind === "text") {
+    return message.text;
+  }
+
+  return `${renderSourceContext(message.source)}${message.text}`;
+}
+
+function renderSourceContext(source: IncomingMessageSource): string {
+  if (source.kind === "telegram-voice-transcript") {
+    return TRANSCRIBED_MESSAGE_PREFIX;
+  }
+
+  if (source.kind === "telegram-document" && source.document) {
+    const lines = [
+      TELEGRAM_DOCUMENT_CONTEXT,
+      ...(source.document.savedPath ? [`Saved path: ${source.document.savedPath}`] : []),
+      ...(source.document.relativePath ? [`Relative path: ${source.document.relativePath}`] : []),
+      ...(source.document.fileName ? [`File name: ${source.document.fileName}`] : []),
+      ...(source.document.mimeType ? [`MIME type: ${source.document.mimeType}`] : []),
+      ...(typeof source.document.sizeBytes === "number"
+        ? [`Size: ${source.document.sizeBytes} bytes`]
+        : []),
+      `Telegram file id: ${source.document.fileId}`,
+      ...(source.document.fileUniqueId ? [`Telegram unique file id: ${source.document.fileUniqueId}`] : []),
+    ];
+
+    return `[${lines.join("\n")}]\n`;
+  }
+
+  return "";
 }
 
 function resolveMessageTimestamp(

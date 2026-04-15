@@ -67,6 +67,9 @@ describe("resolveRuntimeConfig", () => {
               language: "en",
             },
           },
+          document: {
+            maxDownloadBytes: 1048576,
+          },
           routing: {
             defaultAgentId: "ops-agent",
           },
@@ -117,6 +120,9 @@ describe("resolveRuntimeConfig", () => {
             model: "gpt-4o-mini-transcribe",
             language: "en",
           },
+        },
+        document: {
+          maxDownloadBytes: 1048576,
         },
         defaultAgentId: "ops-agent",
         paths: {

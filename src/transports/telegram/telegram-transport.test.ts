@@ -1,9 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { inboundCommandMenu } from "../../application/commands/registry.js";
 import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
 import type { VoiceTranscriber } from "./openai-voice-transcriber.js";
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
 
 describe("createTelegramTransport", () => {
   it("registers the new command on startup", async () => {
@@ -238,7 +247,7 @@ describe("createTelegramTransport", () => {
       from: { id: 7 },
       message: { message_id: 99, text: "long run" },
     });
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     const second = bot.emitTextMessage({
       chat: { id: 42, type: "private" },
@@ -665,6 +674,155 @@ describe("createTelegramTransport", () => {
     });
   });
 
+  it("downloads telegram documents into the resolved conversation session and adds attachment context", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-telegram-doc-"));
+    tempDirs.push(root);
+    const bot = createFakeBot();
+    bot.api.getFile = vi.fn(async () => ({ file_path: "documents/report.txt" }));
+    const fetchImpl = vi.fn(async () => new Response("file contents", {
+      headers: {
+        "content-type": "text/plain",
+      },
+    }));
+    let capturedEvent:
+      | {
+          message: IncomingMessage;
+          prepareMessage?(message: IncomingMessage): Promise<IncomingMessage> | IncomingMessage;
+        }
+      | undefined;
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+        document: {
+          maxDownloadBytes: 1024,
+        },
+        paths: {
+          conversationsDir: join(root, "endpoints", "private-telegram", "conversations"),
+        },
+      },
+      bot,
+      undefined,
+      { fetch: fetchImpl },
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedEvent = event;
+      }),
+    });
+
+    await bot.emitDocumentMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 100,
+        caption: "Please inspect this report",
+        document: {
+          file_id: "doc-file",
+          file_unique_id: "doc-unique",
+          file_name: "report.txt",
+          mime_type: "text/plain",
+          file_size: 13,
+        },
+      },
+    });
+
+    await waitForAsync(() => capturedEvent !== undefined, 200);
+    expect(capturedEvent?.prepareMessage).toBeTypeOf("function");
+    const capturedMessage = await capturedEvent?.prepareMessage?.({
+      ...capturedEvent.message,
+      conversation: {
+        ...capturedEvent.message.conversation,
+        sessionId: "session-1",
+      } as IncomingMessage["conversation"] & { sessionId: string },
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://api.telegram.org/file/bottelegram-token/documents/report.txt");
+    expect(capturedMessage).toMatchObject({
+      text: "Please inspect this report",
+      source: {
+        kind: "telegram-document",
+        document: {
+          fileId: "doc-file",
+          fileUniqueId: "doc-unique",
+          fileName: "report.txt",
+          mimeType: "text/plain",
+          sizeBytes: 13,
+        },
+      },
+    });
+    const savedPath = capturedMessage?.source?.document?.savedPath;
+    expect(savedPath).toBe(
+      join(
+        root,
+        "endpoints",
+        "private-telegram",
+        "conversations",
+        "telegram",
+        "42",
+        "sessions",
+        "session-1",
+        "attachments",
+        "100-report.txt",
+      ),
+    );
+    await expect(readFile(savedPath ?? "", "utf8")).resolves.toBe("file contents");
+  });
+
+  it("replies clearly when a telegram document exceeds the configured size limit", async () => {
+    const bot = createFakeBot();
+    const logger = createMockLogger();
+    const handler = {
+      handle: vi.fn(async () => {}),
+    };
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+        document: {
+          maxDownloadBytes: 4,
+        },
+      },
+      bot,
+      logger,
+    );
+
+    await transport.start(handler);
+    await bot.emitDocumentMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 101,
+        document: {
+          file_id: "doc-file",
+          file_name: "large.txt",
+          file_size: 5,
+        },
+      },
+    });
+
+    expect(handler.handle).not.toHaveBeenCalled();
+    expect(bot.reply).toHaveBeenCalledWith(
+      "Sorry, that document is too large. The current limit is 4 bytes.",
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      "telegram document exceeds configured download size limit",
+      expect.objectContaining({
+        endpointId: "private-telegram",
+        transport: "telegram",
+        conversationId: "42",
+        messageId: "101",
+      }),
+    );
+  });
+
   it("replies clearly when voice messages are disabled", async () => {
     const bot = createFakeBot();
     const handler = {
@@ -797,6 +955,14 @@ function createFakeBot(): {
           file_id: string;
           mime_type?: string;
         };
+        document?: {
+          file_id: string;
+          file_unique_id?: string;
+          file_name?: string;
+          mime_type?: string;
+          file_size?: number;
+        };
+        caption?: string;
       };
       from?: { id: number };
       reply(
@@ -829,6 +995,21 @@ function createFakeBot(): {
       };
     };
   }): Promise<void>;
+  emitDocumentMessage(input: {
+    chat: { id: number; type: string };
+    from: { id: number };
+    message: {
+      message_id: number;
+      caption?: string;
+      document: {
+        file_id: string;
+        file_unique_id?: string;
+        file_name?: string;
+        mime_type?: string;
+        file_size?: number;
+      };
+    };
+  }): Promise<void>;
   reply: ReturnType<
     typeof vi.fn<(text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }) => Promise<void>>
   >;
@@ -844,6 +1025,14 @@ function createFakeBot(): {
             file_id: string;
             mime_type?: string;
           };
+          document?: {
+            file_id: string;
+            file_unique_id?: string;
+            file_name?: string;
+            mime_type?: string;
+            file_size?: number;
+          };
+          caption?: string;
         };
         from?: { id: number };
         reply(
@@ -892,6 +1081,16 @@ function createFakeBot(): {
     async emitVoiceMessage(input) {
       if (!onVoiceMessage) {
         throw new Error("voice handler was not registered");
+      }
+
+      await onVoiceMessage({
+        ...input,
+        reply,
+      });
+    },
+    async emitDocumentMessage(input) {
+      if (!onVoiceMessage) {
+        throw new Error("message handler was not registered");
       }
 
       await onVoiceMessage({

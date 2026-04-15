@@ -20,6 +20,7 @@ export interface TelegramEndpointRuntimeConfig extends BaseTransportRuntimeConfi
   token: string;
   allowedUserIds: string[];
   voice?: TelegramVoiceRuntimeConfig;
+  document?: TelegramDocumentRuntimeConfig;
 }
 
 export interface CliEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
@@ -36,6 +37,10 @@ export interface TelegramTranscriptionRuntimeConfig {
   provider: "openai";
   model: string;
   language?: string;
+}
+
+export interface TelegramDocumentRuntimeConfig {
+  maxDownloadBytes: number;
 }
 
 export type TransportEndpointRuntimeConfig = TelegramEndpointRuntimeConfig | CliEndpointRuntimeConfig;

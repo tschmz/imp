@@ -52,6 +52,82 @@ describe("createMessageProcessor", () => {
     await Promise.all([first, second]);
   });
 
+  it("preserves conversation order when prepareMessage is async", async () => {
+    const prepareStarts: string[] = [];
+    const starts: string[] = [];
+    let releaseFirstPrepare: (() => void) | undefined;
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(message.messageId);
+        return {
+          conversation: message.conversation,
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    const processor = createMessageProcessor({
+      handler,
+      prepareEvent: (event) => ({
+        ...event,
+        message: {
+          ...event.message,
+          conversation: {
+            ...event.message.conversation,
+            sessionId: "session-1",
+          },
+        },
+      }),
+    });
+
+    const first = processor.handle(
+      createEvent(createIncomingMessage("1", "42"), {
+        prepareMessage: async (message) => {
+          prepareStarts.push(message.messageId);
+          await new Promise<void>((resolve) => {
+            releaseFirstPrepare = resolve;
+          });
+          return {
+            ...message,
+            text: "prepared-1",
+          };
+        },
+      }),
+    );
+    await tick();
+    const second = processor.handle(
+      createEvent(createIncomingMessage("2", "42"), {
+        prepareMessage: async (message) => {
+          prepareStarts.push(message.messageId);
+          return {
+            ...message,
+            text: "prepared-2",
+          };
+        },
+      }),
+    );
+
+    await tick();
+    await tick();
+
+    expect(prepareStarts).toEqual(["1"]);
+    expect(starts).toEqual([]);
+
+    releaseFirstPrepare?.();
+    await Promise.all([first, second]);
+
+    expect(prepareStarts).toEqual(["1", "2"]);
+    expect(starts).toEqual(["1", "2"]);
+    expect(handler.handle).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ messageId: "1", text: "prepared-1" }),
+    );
+    expect(handler.handle).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ messageId: "2", text: "prepared-2" }),
+    );
+  });
+
   it("never exceeds maxParallel while handing permits to waiting conversations", async () => {
     let active = 0;
     let maxActive = 0;
@@ -548,11 +624,13 @@ function createEvent(
   overrides: Partial<{
     deliver: (message: OutgoingMessage) => Promise<void>;
     deliverError: (error: unknown) => Promise<void>;
+    prepareMessage: (message: IncomingMessage) => Promise<IncomingMessage> | IncomingMessage;
     runWithProcessing: <T>(operation: () => Promise<T>) => Promise<T>;
   }> = {},
 ) {
   return {
     message,
+    prepareMessage: overrides.prepareMessage,
     deliver: overrides.deliver ?? vi.fn(async () => {}),
     deliverError: overrides.deliverError,
     runWithProcessing:

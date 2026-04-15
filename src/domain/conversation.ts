@@ -53,11 +53,22 @@ export type ConversationEvent =
   | ConversationToolResultMessage;
 
 export interface ConversationMessageSource {
-  kind: "text" | "telegram-voice-transcript";
+  kind: "text" | "telegram-voice-transcript" | "telegram-document";
   transcript?: {
     provider: string;
     model: string;
   };
+  document?: ConversationDocumentAttachment;
+}
+
+export interface ConversationDocumentAttachment {
+  fileId: string;
+  fileUniqueId?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  relativePath?: string;
+  savedPath?: string;
 }
 
 export interface ConversationState {

@@ -34,14 +34,16 @@ export function createMessageProcessor(
       const preparedEvent = await dependencies.prepareEvent?.(event) ?? event;
       if (shouldBypassConversationQueue(preparedEvent.message)) {
         await semaphore.withPermit(async () => {
-          await processEvent(preparedEvent, dependencies);
+          const readyEvent = await prepareTransportMessage(preparedEvent);
+          await processEvent(readyEvent, dependencies);
         });
         return;
       }
 
       await enqueueByConversation(preparedEvent, async () => {
         await semaphore.withPermit(async () => {
-          await processEvent(preparedEvent, dependencies);
+          const readyEvent = await prepareTransportMessage(preparedEvent);
+          await processEvent(readyEvent, dependencies);
         });
       });
     },
@@ -74,6 +76,18 @@ export function createMessageProcessor(
       }
     }
   }
+}
+
+async function prepareTransportMessage(event: TransportInboundEvent): Promise<TransportInboundEvent> {
+  const preparedMessage = await event.prepareMessage?.(event.message);
+  if (!preparedMessage) {
+    return event;
+  }
+
+  return {
+    ...event,
+    message: preparedMessage,
+  };
 }
 
 function shouldBypassConversationQueue(message: IncomingMessage): boolean {

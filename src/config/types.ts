@@ -67,6 +67,7 @@ export interface TelegramEndpointConfig extends BaseEndpointConfig {
   token: SecretValueConfig;
   access: TelegramAccessConfig;
   voice?: TelegramVoiceConfig;
+  document?: TelegramDocumentConfig;
 }
 
 export interface CliEndpointConfig extends BaseEndpointConfig {
@@ -88,6 +89,10 @@ export interface TelegramTranscriptionConfig {
   provider: "openai";
   model: string;
   language?: string;
+}
+
+export interface TelegramDocumentConfig {
+  maxDownloadBytes?: number;
 }
 
 export interface EndpointRoutingConfig {

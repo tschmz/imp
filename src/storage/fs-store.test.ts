@@ -1,6 +1,6 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ChatRef, ConversationContext } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
@@ -71,6 +71,162 @@ describe("createFsConversationStore", () => {
         version: 2,
       },
     });
+  });
+
+  it("persists and reloads telegram document attachment metadata", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const created = await store.create(createChatRef(), {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const savedPath = join(
+      root,
+      "conversations",
+      "telegram",
+      "42",
+      "sessions",
+      created.state.conversation.sessionId!,
+      "attachments",
+      "msg-1-report.txt",
+    );
+    const next: ConversationContext = {
+      state: {
+        ...created.state,
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+      messages: [
+        {
+          kind: "message",
+          id: "msg-1",
+          role: "user",
+          content: "Please inspect this report",
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
+          createdAt: "2026-04-05T00:01:00.000Z",
+          source: {
+            kind: "telegram-document",
+            document: {
+              fileId: "doc-file",
+              fileUniqueId: "doc-unique",
+              fileName: "report.txt",
+              mimeType: "text/plain",
+              sizeBytes: 13,
+              savedPath,
+            },
+          },
+        },
+      ],
+    };
+
+    await store.put(next);
+
+    await expect(store.get(created.state.conversation)).resolves.toMatchObject({
+      messages: [
+        {
+          source: {
+            kind: "telegram-document",
+            document: {
+              fileId: "doc-file",
+              fileUniqueId: "doc-unique",
+              fileName: "report.txt",
+              mimeType: "text/plain",
+              sizeBytes: 13,
+              relativePath: "attachments/msg-1-report.txt",
+              savedPath,
+            },
+          },
+        },
+      ],
+    });
+    const raw = await readFile(
+      join(
+        root,
+        "conversations",
+        "telegram",
+        "42",
+        "sessions",
+        created.state.conversation.sessionId!,
+        "conversation.json",
+      ),
+      "utf8",
+    );
+    expect(raw).toContain('"relativePath": "attachments/msg-1-report.txt"');
+    expect(raw).not.toContain(savedPath);
+  });
+
+  it("materializes telegram document saved paths after moving a conversation tree", async () => {
+    const sourceRoot = await createTempDir();
+    const sourceStore = createFsConversationStore(createRuntimePaths(sourceRoot));
+    const created = await sourceStore.create(createChatRef(), {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const sourceSavedPath = join(
+      sourceRoot,
+      "conversations",
+      "telegram",
+      "42",
+      "sessions",
+      created.state.conversation.sessionId!,
+      "attachments",
+      "msg-1-report.txt",
+    );
+    await mkdir(dirname(sourceSavedPath), { recursive: true });
+    await writeFile(sourceSavedPath, "file contents", "utf8");
+
+    await sourceStore.put({
+      state: {
+        ...created.state,
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+      messages: [
+        {
+          kind: "message",
+          id: "msg-1",
+          role: "user",
+          content: "Please inspect this report",
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
+          createdAt: "2026-04-05T00:01:00.000Z",
+          source: {
+            kind: "telegram-document",
+            document: {
+              fileId: "doc-file",
+              fileName: "report.txt",
+              relativePath: "attachments/msg-1-report.txt",
+              savedPath: sourceSavedPath,
+            },
+          },
+        },
+      ],
+    });
+
+    const targetRoot = await createTempDir();
+    await cp(join(sourceRoot, "conversations"), join(targetRoot, "conversations"), {
+      recursive: true,
+    });
+    const targetStore = createFsConversationStore(createRuntimePaths(targetRoot));
+    const targetConversation = await targetStore.get(created.state.conversation);
+    const targetSavedPath = join(
+      targetRoot,
+      "conversations",
+      "telegram",
+      "42",
+      "sessions",
+      created.state.conversation.sessionId!,
+      "attachments",
+      "msg-1-report.txt",
+    );
+
+    expect(targetConversation?.messages[0]).toMatchObject({
+      source: {
+        kind: "telegram-document",
+        document: {
+          relativePath: "attachments/msg-1-report.txt",
+          savedPath: targetSavedPath,
+        },
+      },
+    });
+    await expect(readFile(targetSavedPath, "utf8")).resolves.toBe("file contents");
   });
 
   it("persists and reloads native assistant tool history", async () => {

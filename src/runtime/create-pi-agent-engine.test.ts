@@ -617,6 +617,55 @@ describe("createPiAgentEngine", () => {
     expect(result.message.text).toBe("I may need clarification.");
   });
 
+  it("includes telegram document context in the current model prompt", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      (context) => {
+        const current = context.messages.at(-1);
+        const currentContent =
+          typeof current?.content === "string" ? current.content : JSON.stringify(current?.content);
+        expect(current).toMatchObject({
+          role: "user",
+        });
+        expect(currentContent).toContain("Telegram document uploaded");
+        expect(currentContent).toContain("Saved path: /var/lib/imp/report.txt");
+        expect(currentContent).toContain("File name: report.txt");
+        expect(currentContent).toContain("Please inspect this report");
+        return fauxAssistantMessage("I can inspect the saved file.");
+      },
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async () => "unused context",
+    });
+
+    const result = await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        text: "Please inspect this report",
+        source: {
+          kind: "telegram-document",
+          document: {
+            fileId: "doc-file",
+            fileName: "report.txt",
+            mimeType: "text/plain",
+            sizeBytes: 13,
+            savedPath: "/var/lib/imp/report.txt",
+          },
+        },
+      },
+    });
+
+    expect(result.message.text).toBe("I can inspect the saved file.");
+  });
+
   it("surfaces upstream agent errors instead of masking them as empty text", async () => {
     const registration = registerFauxProvider({
       provider: "faux",

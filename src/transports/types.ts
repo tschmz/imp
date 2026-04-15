@@ -7,6 +7,7 @@ export type TransportFactory<TConfig = unknown, TLogger = unknown> = (
 
 export interface TransportInboundEvent {
   message: IncomingMessage;
+  prepareMessage?(message: IncomingMessage): Promise<IncomingMessage> | IncomingMessage;
   runWithProcessing<T>(operation: () => Promise<T>): Promise<T>;
   deliver(message: OutgoingMessage): Promise<void>;
   deliverError?(error: unknown): Promise<void>;

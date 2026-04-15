@@ -263,6 +263,7 @@ Telegram fields:
 - `voice.transcription.provider`: STT backend, currently only `openai`
 - `voice.transcription.model`: OpenAI transcription model, for example `gpt-4o-mini-transcribe`
 - `voice.transcription.language`: optional ISO-639-1 language hint such as `en`
+- `document.maxDownloadBytes`: optional maximum Telegram document download size in bytes; defaults to `20971520`
 
 CLI endpoints do not have additional public config fields.
 
@@ -295,6 +296,13 @@ Voice transcription notes:
 - When enabled, voice messages are transcribed into plain text before they reach the application layer.
 - The transcript is shown in Telegram before the agent reply, but sessions remain text-centric and store the transcript text rather than the original audio.
 - OpenAI transcription requires `OPENAI_API_KEY` in the runtime environment or service environment.
+
+Telegram document notes:
+
+- Private Telegram `document` attachments from allowed users are downloaded to the active session's `attachments/` directory.
+- The user message remains text-centric. Captions are used as the message text, and messages without captions say that a document was uploaded.
+- The agent receives explicit document context with the original Telegram metadata and local saved path.
+- Photos and image understanding are not enabled by document support.
 
 ## Relative Paths
 

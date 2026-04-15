@@ -7,6 +7,8 @@ import type { Logger } from "../../logging/types.js";
 import type { Transport } from "../types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
 
+const defaultTelegramDocumentMaxDownloadBytes = 20 * 1024 * 1024;
+
 const endpointIdSchema = z
   .string()
   .min(1)
@@ -43,6 +45,11 @@ export const telegramTransportConfigSchema = z.object({
       }),
     })
     .optional(),
+  document: z
+    .object({
+      maxDownloadBytes: z.number().int().positive().optional(),
+    })
+    .optional(),
 }).strict();
 
 export function normalizeTelegramRuntimeConfig(
@@ -66,6 +73,9 @@ export function normalizeTelegramRuntimeConfig(
     token: endpoint.token,
     allowedUserIds: endpoint.access.allowedUserIds,
     ...(endpoint.voice ? { voice: endpoint.voice } : {}),
+    document: {
+      maxDownloadBytes: endpoint.document?.maxDownloadBytes ?? defaultTelegramDocumentMaxDownloadBytes,
+    },
     defaultAgentId: endpoint.routing?.defaultAgentId ?? options.defaultAgentId,
     paths: {
       dataRoot: options.dataRoot,

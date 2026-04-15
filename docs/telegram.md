@@ -33,3 +33,8 @@ Notes:
 - `/logs` reads the endpoint's daemon log file. If no log file exists yet, the command says so instead of inferring that the endpoint is live.
 - If `endpoints[].voice.enabled` is configured, private Telegram voice messages are accepted, transcribed, echoed back as a `Transcript` message, and then processed like normal user text.
 - Voice transcription V1 uses OpenAI only and requires `OPENAI_API_KEY` in the daemon environment.
+- Private Telegram document attachments from allowed users are downloaded into the active session under `attachments/`.
+- Document captions become the user message text. If no caption is present, imp sends the agent a text message that explicitly says a document was uploaded.
+- Document messages include explicit attachment context for the agent, including Telegram metadata and the local saved path.
+- Document downloads are limited by `endpoints[].document.maxDownloadBytes`, which defaults to `20971520` bytes.
+- Photos are not supported and are not treated as document or image-understanding input.

@@ -33,11 +33,22 @@ export interface IncomingMessage {
 }
 
 export interface IncomingMessageSource {
-  kind: "text" | "telegram-voice-transcript";
+  kind: "text" | "telegram-voice-transcript" | "telegram-document";
   transcript?: {
     provider: string;
     model: string;
   };
+  document?: IncomingMessageDocumentAttachment;
+}
+
+export interface IncomingMessageDocumentAttachment {
+  fileId: string;
+  fileUniqueId?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  relativePath?: string;
+  savedPath?: string;
 }
 
 export interface OutgoingMessage {

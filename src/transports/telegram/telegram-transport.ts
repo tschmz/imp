@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { isAbsolute } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, extname, isAbsolute, join } from "node:path";
 import { Bot, GrammyError } from "grammy";
 import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import type { TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
-import type { IncomingMessageCommand } from "../../domain/message.js";
+import type { IncomingMessage, IncomingMessageCommand } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
 import {
@@ -13,6 +13,14 @@ import {
   type VoiceTranscriber,
 } from "./openai-voice-transcriber.js";
 import { renderTelegramMessages } from "./render-telegram-message.js";
+
+const defaultTelegramDocumentMaxDownloadBytes = 20 * 1024 * 1024;
+
+type TelegramTransportRuntimeConfig = TelegramEndpointRuntimeConfig & {
+  paths?: {
+    conversationsDir?: string;
+  };
+};
 
 interface TelegramBotAdapter {
   api: {
@@ -34,6 +42,14 @@ interface TelegramFile {
   file_path?: string;
 }
 
+interface TelegramDocument {
+  file_id: string;
+  file_unique_id?: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+}
+
 interface TelegramMessage {
   entities?: Array<{
     type: string;
@@ -46,6 +62,8 @@ interface TelegramMessage {
     file_id: string;
     mime_type?: string;
   };
+  document?: TelegramDocument;
+  caption?: string;
 }
 
 interface TelegramMessageContext {
@@ -71,7 +89,7 @@ interface TelegramTransportDependencies {
 }
 
 export function createTelegramTransport(
-  config: TelegramEndpointRuntimeConfig,
+  config: TelegramTransportRuntimeConfig,
   bot: TelegramBotAdapter = new Bot(config.token),
   logger?: Logger,
   dependencies: TelegramTransportDependencies = {},
@@ -145,83 +163,125 @@ export function createTelegramTransport(
         }
 
         const voiceMessage = getTelegramVoiceMessage(safeContext.message);
-        if (!voiceMessage) {
-          return;
-        }
+        if (voiceMessage) {
+          const correlationId = randomUUID();
+          const messageId = String(voiceMessage.message_id);
+          const conversationId = String(safeContext.chat.id);
 
-        const correlationId = randomUUID();
-        const messageId = String(voiceMessage.message_id);
-        const conversationId = String(safeContext.chat.id);
-
-        if (!config.voice?.enabled || !voiceTranscriber) {
-          await logger?.debug("ignored telegram voice message because voice transcription is disabled", {
-            endpointId: config.id,
-            transport: "telegram",
-            conversationId,
-            messageId,
-            correlationId,
-          });
-          await safeContext.reply("Voice messages are not enabled for this endpoint.");
-          return;
-        }
-
-        try {
-          const transcript = await transcribeTelegramVoiceMessage(
-            voiceMessage,
-            config,
-            bot,
-            voiceTranscriber,
-            fetchImpl,
-          );
-          if (!transcript) {
-            throw new Error("Voice transcription returned empty text.");
-          }
-
-          await logger?.debug("transcribed telegram voice message", {
-            endpointId: config.id,
-            transport: "telegram",
-            conversationId,
-            messageId,
-            correlationId,
-          });
-
-          dispatchTelegramEvent(
-            handler,
-            createTelegramInboundEvent(
-              config.id,
-              correlationId,
-              safeContext,
-              bot,
-              {
-                text: transcript,
-                transcript,
-                source: {
-                  kind: "telegram-voice-transcript",
-                  transcript: {
-                    provider: config.voice.transcription.provider,
-                    model: config.voice.transcription.model,
-                  },
-                },
-              },
-              logger,
-            ),
-            logger,
-          );
-        } catch (error) {
-          await logger?.error(
-            "failed to transcribe telegram voice message",
-            {
+          if (!config.voice?.enabled || !voiceTranscriber) {
+            await logger?.debug("ignored telegram voice message because voice transcription is disabled", {
               endpointId: config.id,
               transport: "telegram",
               conversationId,
               messageId,
               correlationId,
-              errorType: error instanceof Error ? error.name : typeof error,
-            },
-            error,
-          );
-          await safeContext.reply("Sorry, I couldn't transcribe that voice message.");
+            });
+            await safeContext.reply("Voice messages are not enabled for this endpoint.");
+            return;
+          }
+
+          try {
+            const transcript = await transcribeTelegramVoiceMessage(
+              voiceMessage,
+              config,
+              bot,
+              voiceTranscriber,
+              fetchImpl,
+            );
+            if (!transcript) {
+              throw new Error("Voice transcription returned empty text.");
+            }
+
+            await logger?.debug("transcribed telegram voice message", {
+              endpointId: config.id,
+              transport: "telegram",
+              conversationId,
+              messageId,
+              correlationId,
+            });
+
+            dispatchTelegramEvent(
+              handler,
+              createTelegramInboundEvent(
+                config.id,
+                correlationId,
+                safeContext,
+                bot,
+                {
+                  text: transcript,
+                  transcript,
+                  source: {
+                    kind: "telegram-voice-transcript",
+                    transcript: {
+                      provider: config.voice.transcription.provider,
+                      model: config.voice.transcription.model,
+                    },
+                  },
+                },
+                logger,
+              ),
+              logger,
+            );
+          } catch (error) {
+            await logger?.error(
+              "failed to transcribe telegram voice message",
+              {
+                endpointId: config.id,
+                transport: "telegram",
+                conversationId,
+                messageId,
+                correlationId,
+                errorType: error instanceof Error ? error.name : typeof error,
+              },
+              error,
+            );
+            await safeContext.reply("Sorry, I couldn't transcribe that voice message.");
+          }
+          return;
         }
+
+        const documentMessage = getTelegramDocumentMessage(safeContext.message);
+        if (!documentMessage) {
+          return;
+        }
+
+        const correlationId = randomUUID();
+        const messageId = String(documentMessage.message_id);
+        const conversationId = String(safeContext.chat.id);
+        const sizeBytes = documentMessage.document.file_size;
+
+        const maxDownloadBytes = getTelegramDocumentMaxDownloadBytes(config);
+        if (typeof sizeBytes === "number" && sizeBytes > maxDownloadBytes) {
+          await logger?.error("telegram document exceeds configured download size limit", {
+            endpointId: config.id,
+            transport: "telegram",
+            conversationId,
+            messageId,
+            correlationId,
+          });
+          await safeContext.reply(
+            `Sorry, that document is too large. The current limit is ${maxDownloadBytes} bytes.`,
+          );
+          return;
+        }
+
+        dispatchTelegramEvent(
+          handler,
+          createTelegramInboundEvent(
+            config.id,
+            correlationId,
+            safeContext,
+            bot,
+            {
+              text: getTelegramDocumentUserText(documentMessage),
+              document: documentMessage.document,
+              config,
+              fetchImpl,
+            },
+            logger,
+          ),
+          logger,
+        );
       });
 
       await bot.start();
@@ -323,6 +383,23 @@ function getTelegramVoiceMessage(
     : undefined;
 }
 
+function getTelegramDocumentMessage(
+  message: TelegramMessage,
+): (TelegramMessage & { document: TelegramDocument }) | undefined {
+  return message.document?.file_id
+    ? (message as TelegramMessage & { document: TelegramDocument })
+    : undefined;
+}
+
+function getTelegramDocumentUserText(message: TelegramMessage & { document: TelegramDocument }): string {
+  const caption = message.caption?.trim();
+  if (caption) {
+    return caption;
+  }
+
+  return `A Telegram document was uploaded: ${message.document.file_name ?? "unnamed document"}.`;
+}
+
 async function transcribeTelegramVoiceMessage(
   message: TelegramMessage,
   config: TelegramEndpointRuntimeConfig,
@@ -373,6 +450,144 @@ async function downloadTelegramFile(
     bytes: new Uint8Array(await response.arrayBuffer()),
     mimeType: response.headers.get("content-type") ?? undefined,
   };
+}
+
+class TelegramDocumentPersistenceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TelegramDocumentPersistenceError";
+  }
+}
+
+async function persistTelegramDocument(input: {
+  message: IncomingMessage;
+  document: TelegramDocument;
+  config: TelegramTransportRuntimeConfig;
+  bot: TelegramBotAdapter;
+  fetchImpl: typeof fetch;
+}): Promise<IncomingMessage> {
+  if (!("sessionId" in input.message.conversation) || !input.message.conversation.sessionId) {
+    throw new TelegramDocumentPersistenceError(
+      "Telegram document cannot be stored before the conversation session is resolved.",
+    );
+  }
+
+  if (
+    typeof input.document.file_size === "number" &&
+    input.document.file_size > getTelegramDocumentMaxDownloadBytes(input.config)
+  ) {
+    throw new TelegramDocumentPersistenceError(
+      `Telegram document exceeds configured download size limit (${input.document.file_size} > ${getTelegramDocumentMaxDownloadBytes(input.config)}).`,
+    );
+  }
+
+  const file = await input.bot.api.getFile(input.document.file_id);
+  if (!file.file_path) {
+    throw new TelegramDocumentPersistenceError("Telegram document metadata did not include file_path.");
+  }
+
+  const downloadedDocument = await downloadTelegramFile(file.file_path, input.config.token, input.fetchImpl);
+  if (downloadedDocument.bytes.byteLength > getTelegramDocumentMaxDownloadBytes(input.config)) {
+    throw new TelegramDocumentPersistenceError(
+      `Telegram document download exceeded configured size limit (${downloadedDocument.bytes.byteLength} > ${getTelegramDocumentMaxDownloadBytes(input.config)}).`,
+    );
+  }
+
+  const savedPath = getTelegramDocumentSavedPath(input.config, input.message, input.document);
+  const relativePath = getTelegramDocumentRelativePath(input.message, input.document);
+  await mkdir(dirname(savedPath), { recursive: true });
+  await writeFile(savedPath, downloadedDocument.bytes);
+
+  return {
+    ...input.message,
+    source: {
+      kind: "telegram-document",
+      document: {
+        fileId: input.document.file_id,
+        ...(input.document.file_unique_id ? { fileUniqueId: input.document.file_unique_id } : {}),
+        ...(input.document.file_name ? { fileName: input.document.file_name } : {}),
+        ...(input.document.mime_type ?? downloadedDocument.mimeType
+          ? { mimeType: input.document.mime_type ?? downloadedDocument.mimeType }
+          : {}),
+        sizeBytes: input.document.file_size ?? downloadedDocument.bytes.byteLength,
+        relativePath,
+        savedPath,
+      },
+    },
+  };
+}
+
+function getTelegramDocumentSavedPath(
+  config: TelegramTransportRuntimeConfig,
+  message: IncomingMessage,
+  document: TelegramDocument,
+): string {
+  const sessionId =
+    "sessionId" in message.conversation && typeof message.conversation.sessionId === "string"
+      ? message.conversation.sessionId
+      : undefined;
+  if (!sessionId) {
+    throw new TelegramDocumentPersistenceError("Telegram document message did not include a session id.");
+  }
+
+  const fileName = document.file_name ?? `telegram-document-${message.messageId}${getDocumentExtension(document)}`;
+  return join(
+    getTelegramConversationsDir(config),
+    sanitizePathSegment(message.conversation.transport),
+    sanitizePathSegment(message.conversation.externalId),
+    "sessions",
+    sanitizePathSegment(sessionId),
+    "attachments",
+    `${sanitizePathSegment(message.messageId)}-${sanitizeFileName(fileName)}`,
+  );
+}
+
+function getTelegramDocumentRelativePath(
+  message: IncomingMessage,
+  document: TelegramDocument,
+): string {
+  const fileName = document.file_name ?? `telegram-document-${message.messageId}${getDocumentExtension(document)}`;
+  return join(
+    "attachments",
+    `${sanitizePathSegment(message.messageId)}-${sanitizeFileName(fileName)}`,
+  );
+}
+
+function getTelegramDocumentMaxDownloadBytes(config: TelegramTransportRuntimeConfig): number {
+  return config.document?.maxDownloadBytes ?? defaultTelegramDocumentMaxDownloadBytes;
+}
+
+function getTelegramConversationsDir(config: TelegramTransportRuntimeConfig): string {
+  if (!config.paths?.conversationsDir) {
+    throw new TelegramDocumentPersistenceError(
+      "Telegram document cannot be stored because the endpoint conversations directory is unavailable.",
+    );
+  }
+
+  return config.paths.conversationsDir;
+}
+
+function getDocumentExtension(document: TelegramDocument): string {
+  if (document.mime_type === "application/pdf") {
+    return ".pdf";
+  }
+
+  return "";
+}
+
+function sanitizeFileName(value: string): string {
+  const trimmed = value.trim();
+  const cleaned = trimmed.replace(/[/\\]/g, "_").replace(/[^A-Za-z0-9._ -]/g, "_");
+  const normalized = cleaned.replace(/^\.+/, "").slice(0, 160);
+  if (normalized) {
+    return normalized;
+  }
+
+  return `document${extname(trimmed)}`;
+}
+
+function sanitizePathSegment(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]/g, "_") || "unknown";
 }
 
 async function processTelegramEvent(
@@ -539,12 +754,15 @@ function createTelegramInboundEvent(
     text: string;
     transcript?: string;
     source?: {
-      kind: "text" | "telegram-voice-transcript";
+      kind: "text" | "telegram-voice-transcript" | "telegram-document";
       transcript?: {
         provider: string;
         model: string;
       };
     };
+    document?: TelegramDocument;
+    config?: TelegramTransportRuntimeConfig;
+    fetchImpl?: typeof fetch;
     options?: { command: IncomingMessageCommand; commandArgs?: string };
   },
   logger?: Logger,
@@ -564,6 +782,45 @@ function createTelegramInboundEvent(
       ...(payload.source ? { source: payload.source } : {}),
       ...(payload.options ? payload.options : {}),
     },
+    ...(payload.document && payload.config && payload.fetchImpl
+      ? {
+          async prepareMessage(message: IncomingMessage): Promise<IncomingMessage> {
+            try {
+              const prepared = await persistTelegramDocument({
+                message,
+                document: payload.document!,
+                config: payload.config!,
+                bot,
+                fetchImpl: payload.fetchImpl!,
+              });
+              await logger?.debug("stored telegram document", {
+                endpointId,
+                transport: "telegram",
+                conversationId: String(ctx.chat.id),
+                messageId: String(ctx.message.message_id),
+                correlationId,
+              });
+              return prepared;
+            } catch (error) {
+              await logger?.error(
+                "failed to store telegram document",
+                {
+                  endpointId,
+                  transport: "telegram",
+                  conversationId: String(ctx.chat.id),
+                  messageId: String(ctx.message.message_id),
+                  correlationId,
+                  errorType: error instanceof Error ? error.name : typeof error,
+                },
+                error,
+              );
+              throw error instanceof TelegramDocumentPersistenceError
+                ? error
+                : new TelegramDocumentPersistenceError("Telegram document could not be downloaded or stored.");
+            }
+          },
+        }
+      : {}),
     async runWithProcessing<T>(operation: () => Promise<T>): Promise<T> {
       const stopTyping = startTypingStatus(bot, ctx.chat.id);
       try {
@@ -587,7 +844,7 @@ function createTelegramInboundEvent(
         });
       }
     },
-    async deliverError(): Promise<void> {
+    async deliverError(error?: unknown): Promise<void> {
       await logger?.debug("sending telegram processing error response", {
         endpointId,
         transport: "telegram",
@@ -595,6 +852,11 @@ function createTelegramInboundEvent(
         messageId: String(ctx.message.message_id),
         correlationId,
       });
+      if (error instanceof TelegramDocumentPersistenceError) {
+        await ctx.reply("Sorry, I couldn't download or store that document.");
+        return;
+      }
+
       await ctx.reply("Sorry, something went wrong while processing your message.");
     },
   };

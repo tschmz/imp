@@ -123,6 +123,9 @@
           "provider": "openai",
           "model": "gpt-4o-mini-transcribe"
         }
+      },
+      "document": {
+        "maxDownloadBytes": 20971520
       }
     },
     {

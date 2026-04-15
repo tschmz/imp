@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import type {
   ToolResultMessage,
   UserMessage,
@@ -80,9 +80,16 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
             context.state.conversation,
           );
           const current = await readSessionSnapshot(context.state.conversation, paths.conversationsDir);
-          const nextSnapshot = resolveNextSnapshot(normalizeSnapshot(context), current);
+          const nextSnapshot = resolveNextSnapshot(normalizeSnapshot(context, {
+            conversationsDir: paths.conversationsDir,
+            conversation: context.state.conversation,
+            materializeAttachmentPaths: true,
+          }), current);
 
-          await writeFileAtomically(snapshotPath, JSON.stringify(nextSnapshot, null, 2));
+          await writeFileAtomically(
+            snapshotPath,
+            JSON.stringify(toStorageSnapshot(nextSnapshot, paths.conversationsDir), null, 2),
+          );
         });
       });
     },
@@ -200,7 +207,7 @@ function createEmptyConversationContext(
       version: 1,
     },
     messages: [],
-  });
+  }, { conversationsDir: "", conversation, materializeAttachmentPaths: false });
 }
 
 async function writeConversationSnapshot(
@@ -208,7 +215,10 @@ async function writeConversationSnapshot(
   context: ConversationContext,
 ): Promise<void> {
   const snapshotPath = getSessionSnapshotPath(conversationsDir, context.state.conversation);
-  await writeFileAtomically(snapshotPath, JSON.stringify(context, null, 2));
+  await writeFileAtomically(
+    snapshotPath,
+    JSON.stringify(toStorageSnapshot(context, conversationsDir), null, 2),
+  );
 }
 
 function pathsafeRef(ref: ChatRef, sessionId: string): ConversationRef {
@@ -243,7 +253,11 @@ async function readSessionSnapshot(
 
   try {
     const raw = await readFile(snapshotPath, "utf8");
-    return normalizeSnapshot(JSON.parse(raw) as ConversationContext);
+    return normalizeSnapshot(JSON.parse(raw) as ConversationContext, {
+      conversationsDir,
+      conversation: ref,
+      materializeAttachmentPaths: true,
+    });
   } catch (error: unknown) {
     if (isMissingFileError(error)) {
       return undefined;
@@ -294,14 +308,21 @@ async function writeFileAtomically(path: string, content: string): Promise<void>
   await rename(tempPath, path);
 }
 
-function normalizeSnapshot(snapshot: ConversationContext): ConversationContext {
+function normalizeSnapshot(
+  snapshot: ConversationContext,
+  options: {
+    conversationsDir: string;
+    conversation: ConversationRef;
+    materializeAttachmentPaths: boolean;
+  },
+): ConversationContext {
   return {
     ...snapshot,
     state: {
       ...snapshot.state,
       version: snapshot.state.version ?? 0,
     },
-    messages: snapshot.messages.map((message) => normalizeConversationEvent(message)),
+    messages: snapshot.messages.map((message) => normalizeConversationEvent(message, options)),
   };
 }
 
@@ -388,9 +409,16 @@ function areMessagesEqual(left: ConversationEvent, right: ConversationEvent): bo
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function normalizeConversationEvent(message: unknown): ConversationEvent {
+function normalizeConversationEvent(
+  message: unknown,
+  options: {
+    conversationsDir: string;
+    conversation: ConversationRef;
+    materializeAttachmentPaths: boolean;
+  },
+): ConversationEvent {
   if (isConversationUserMessage(message)) {
-    return normalizeConversationUserMessage(message);
+    return normalizeConversationUserMessage(message, options);
   }
 
   if (isConversationAssistantMessage(message)) {
@@ -406,12 +434,142 @@ function normalizeConversationEvent(message: unknown): ConversationEvent {
 
 function normalizeConversationUserMessage(
   message: ConversationUserMessage,
+  options: {
+    conversationsDir: string;
+    conversation: ConversationRef;
+    materializeAttachmentPaths: boolean;
+  },
 ): ConversationUserMessage {
+  const source = normalizeConversationMessageSource(message, options);
+
   return {
     ...message,
     kind: "message",
     content: normalizeUserContent(message.content),
+    ...(source ? { source } : {}),
   };
+}
+
+function normalizeConversationMessageSource(
+  message: ConversationUserMessage,
+  options: {
+    conversationsDir: string;
+    conversation: ConversationRef;
+    materializeAttachmentPaths: boolean;
+  },
+): ConversationUserMessage["source"] {
+  if (message.source?.kind !== "telegram-document" || !message.source.document) {
+    return message.source;
+  }
+
+  const document = message.source.document;
+  const relativePath = normalizeAttachmentRelativePath(
+    document.relativePath ?? inferAttachmentRelativePath(message, options.conversation),
+  );
+  const savedPath =
+    options.materializeAttachmentPaths && relativePath
+      ? materializeAttachmentPath(options.conversationsDir, options.conversation, relativePath)
+      : document.savedPath;
+
+  return {
+    ...message.source,
+    document: {
+      ...document,
+      ...(relativePath ? { relativePath } : {}),
+      ...(savedPath ? { savedPath } : {}),
+    },
+  };
+}
+
+function toStorageSnapshot(context: ConversationContext, conversationsDir: string): ConversationContext {
+  return {
+    ...context,
+    messages: context.messages.map((message) => {
+      if (message.role !== "user" || message.source?.kind !== "telegram-document" || !message.source.document) {
+        return message;
+      }
+
+      const relativePath = normalizeAttachmentRelativePath(
+        message.source.document.relativePath ??
+          getAttachmentRelativePathFromSavedPath(conversationsDir, context.state.conversation, message),
+      );
+      const document = {
+        ...message.source.document,
+        ...(relativePath ? { relativePath } : {}),
+      };
+      delete document.savedPath;
+
+      return {
+        ...message,
+        source: {
+          ...message.source,
+          document,
+        },
+      };
+    }),
+  };
+}
+
+function getAttachmentRelativePathFromSavedPath(
+  conversationsDir: string,
+  conversation: ConversationRef,
+  message: ConversationUserMessage,
+): string | undefined {
+  const savedPath = message.source?.document?.savedPath;
+  if (!savedPath || !isAbsolute(savedPath)) {
+    return savedPath;
+  }
+
+  const sessionDir = getSessionDir(conversationsDir, conversation);
+  const pathRelativeToSession = relative(sessionDir, savedPath);
+  if (pathRelativeToSession && !pathRelativeToSession.startsWith("..") && !isAbsolute(pathRelativeToSession)) {
+    return pathRelativeToSession;
+  }
+
+  return inferAttachmentRelativePath(message, conversation);
+}
+
+function inferAttachmentRelativePath(
+  message: ConversationUserMessage,
+  conversation: ConversationRef,
+): string | undefined {
+  const savedPath = message.source?.document?.savedPath;
+  if (!savedPath) {
+    return undefined;
+  }
+
+  const normalized = savedPath.replaceAll("\\", "/");
+  const marker = `/sessions/${conversation.sessionId}/`;
+  const markerIndex = normalized.lastIndexOf(marker);
+  if (markerIndex >= 0) {
+    return normalized.slice(markerIndex + marker.length);
+  }
+
+  return undefined;
+}
+
+function materializeAttachmentPath(
+  conversationsDir: string,
+  conversation: ConversationRef,
+  relativePath: string,
+): string {
+  return join(
+    getSessionDir(conversationsDir, conversation),
+    ...relativePath.split(/[\\/]+/).filter(Boolean),
+  );
+}
+
+function normalizeAttachmentRelativePath(relativePath: string | undefined): string | undefined {
+  if (!relativePath) {
+    return undefined;
+  }
+
+  const normalized = relativePath.replaceAll("\\", "/").replace(/^\/+/, "");
+  if (!normalized || normalized.split("/").some((segment) => segment === "..")) {
+    return undefined;
+  }
+
+  return normalized;
 }
 
 function normalizeConversationAssistantMessage(
