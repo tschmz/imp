@@ -33,6 +33,7 @@ describe("createPluginTransport", () => {
     await writeFile(
       join(config.paths.plugin!.inboxDir, "wake.json"),
       `${JSON.stringify({
+        schemaVersion: 1,
         id: "wake-1",
         conversationId: "kitchen",
         userId: "frontend",
@@ -79,6 +80,7 @@ describe("createPluginTransport", () => {
     const outbox = JSON.parse(await readFile(join(config.paths.plugin!.outboxDir, outboxFile), "utf8"));
 
     expect(outbox).toMatchObject({
+      schemaVersion: 1,
       eventId: "wake-1",
       conversationId: "kitchen",
       userId: "frontend",
@@ -166,6 +168,40 @@ describe("createPluginTransport", () => {
     const start = transport.start({
       handle: vi.fn(async () => {
         throw new Error("should not handle invalid event files");
+      }),
+    });
+
+    await waitForDirectoryEntry(config.paths.plugin!.failedDir, ".error.json");
+    expect(await readdir(config.paths.plugin!.processedDir)).toEqual([]);
+
+    await transport.stop?.();
+    await start;
+  });
+
+  it("rejects unsupported plugin event schema versions", async () => {
+    const root = await createTempDir();
+    const config = createPluginRuntimeConfig(root, {
+      response: {
+        type: "none",
+      },
+    });
+    const transport = createPluginTransport(config, createMockLogger(), {
+      deliveryRouter: createDeliveryRouter(),
+    });
+    await ensurePluginDirs(config);
+
+    await writeFile(
+      join(config.paths.plugin!.inboxDir, "future.json"),
+      `${JSON.stringify({
+        schemaVersion: 2,
+        text: "hello from the future",
+      })}\n`,
+      "utf8",
+    );
+
+    const start = transport.start({
+      handle: vi.fn(async () => {
+        throw new Error("should not handle unsupported event versions");
       }),
     });
 

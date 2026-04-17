@@ -10,6 +10,7 @@ import type { Transport, TransportContext, TransportHandler, TransportInboundEve
 type PluginTransportRuntimeConfig = PluginEndpointRuntimeConfig & ActiveEndpointRuntimeConfig;
 
 const pluginEventSchema = z.object({
+  schemaVersion: z.literal(1).optional(),
   id: z.string().min(1).optional(),
   correlationId: z.string().min(1).optional(),
   conversationId: z.string().min(1).optional(),
@@ -257,6 +258,7 @@ async function writePluginOutboxMessage(
     join(paths.outboxDir, fileName),
     `${JSON.stringify(
       {
+        schemaVersion: 1,
         id: randomUUID(),
         eventId: inbound.messageId,
         correlationId: inbound.correlationId,

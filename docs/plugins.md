@@ -93,6 +93,7 @@ Required field:
 
 Optional fields:
 
+- `schemaVersion`: plugin event schema version. Use `1`; omitted means legacy version `1`
 - `id`: event identifier; defaults to a value derived from the file name claimed by `imp`
 - `correlationId`: correlation identifier for logs and conversation records
 - `conversationId`: plugin conversation identifier; defaults to the plugin ID
@@ -104,6 +105,7 @@ Example event:
 
 ```json
 {
+  "schemaVersion": 1,
   "id": "wake-2026-04-17T00-15-30Z",
   "conversationId": "kitchen",
   "userId": "raspberry-pi",
@@ -169,6 +171,7 @@ Put channel-specific behavior, such as Telegram formatting or audio-friendly wor
 
 Outbox files include:
 
+- `schemaVersion`
 - `id`
 - `eventId`
 - `correlationId`
