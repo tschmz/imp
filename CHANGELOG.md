@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.5.0 - 2026-04-18
+
+### Added
+
+- Add external plugin endpoints with plugin protocol support for file handling and output controls.
+- Expose reply-channel context in prompts so agents can adapt responses to the active transport.
+- Support Telegram document uploads.
+- Allow plugin speech model configuration.
+
+### Fixed
+
+- Stop plugin polling cleanly after shutdown.
+
 ## 0.4.0 - 2026-04-13
 
 ### Added
