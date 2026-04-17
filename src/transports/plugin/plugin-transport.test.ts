@@ -172,6 +172,60 @@ describe("createPluginTransport", () => {
     await transport.stop?.();
     await start;
   });
+
+  it("does not continue polling when stopped during the initial inbox scan", async () => {
+    const root = await createTempDir();
+    const config = createPluginRuntimeConfig(root, {
+      response: {
+        type: "none",
+      },
+    });
+    const transport = createPluginTransport(config, createMockLogger(), {
+      deliveryRouter: createDeliveryRouter(),
+    });
+    await ensurePluginDirs(config);
+
+    await writeFile(
+      join(config.paths.plugin!.inboxDir, "first.json"),
+      `${JSON.stringify({
+        id: "first",
+        text: "first event",
+      })}\n`,
+      "utf8",
+    );
+
+    let releaseHandler: (() => void) | undefined;
+    let resolveHandlerStarted: (() => void) | undefined;
+    const handlerStarted = new Promise<void>((resolve) => {
+      resolveHandlerStarted = resolve;
+    });
+    const handle = vi.fn(async () => {
+      resolveHandlerStarted?.();
+      await new Promise<void>((release) => {
+        releaseHandler = release;
+      });
+    });
+    const start = transport.start({ handle });
+
+    await handlerStarted;
+    const stopped = transport.stop?.();
+    releaseHandler?.();
+    await stopped;
+    await start;
+
+    await writeFile(
+      join(config.paths.plugin!.inboxDir, "second.json"),
+      `${JSON.stringify({
+        id: "second",
+        text: "second event",
+      })}\n`,
+      "utf8",
+    );
+    await new Promise((resolve) => setTimeout(resolve, config.ingress.pollIntervalMs * 3));
+
+    expect(handle).toHaveBeenCalledTimes(1);
+    expect(await readdir(config.paths.plugin!.inboxDir)).toEqual(["second.json"]);
+  });
 });
 
 function createPluginRuntimeConfig(

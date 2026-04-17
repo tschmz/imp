@@ -55,12 +55,27 @@ export function createPluginTransport(
       });
 
       const scan = () => {
+        if (stopped) {
+          return;
+        }
+
         activeScan = activeScan
           .catch(() => undefined)
-          .then(() => scanPluginInbox(config, handler, context, logger));
+          .then(async () => {
+            if (stopped) {
+              return;
+            }
+
+            await scanPluginInbox(config, handler, context, logger);
+          });
       };
 
       scan();
+      await activeScan.catch(() => undefined);
+      if (stopped) {
+        return;
+      }
+
       timer = setInterval(scan, config.ingress.pollIntervalMs);
 
       await new Promise<void>((resolve) => {
