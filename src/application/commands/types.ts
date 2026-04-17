@@ -4,6 +4,7 @@ import type { IncomingMessage, IncomingMessageCommand, OutgoingMessage } from ".
 import type { LogLevel, Logger } from "../../logging/types.js";
 import { readRecentLogLines } from "../../logging/view-logs.js";
 import type { HookRegistration, InboundMessageLifecycleHooks } from "../../plugins/types.js";
+import type { ReplyChannelContext } from "../../runtime/context.js";
 import type { AgentEngine } from "../../runtime/types.js";
 import type { ModelResolver } from "../../runtime/model-resolution.js";
 import type { ConversationStore } from "../../storage/types.js";
@@ -15,6 +16,7 @@ export interface RuntimeCommandInfo {
   logFilePath: string;
   loggingLevel: LogLevel;
   activeEndpointIds: string[];
+  replyChannel?: ReplyChannelContext;
 }
 
 export interface HandleIncomingMessageDependencies {

@@ -531,6 +531,9 @@ describe("resolveRuntimeConfig", () => {
           },
           response: {
             type: "outbox",
+            replyChannel: {
+              kind: "audio",
+            },
           },
         },
       ],
@@ -549,6 +552,9 @@ describe("resolveRuntimeConfig", () => {
         },
         response: {
           type: "outbox",
+          replyChannel: {
+            kind: "audio",
+          },
         },
         defaultAgentId: "default",
         paths: {

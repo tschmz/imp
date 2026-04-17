@@ -31,6 +31,14 @@ const routingSchema = z
   })
   .optional();
 
+const replyChannelKindSchema = z
+  .string()
+  .min(1)
+  .regex(
+    /^[A-Za-z0-9_-]+$/,
+    "Reply channel kinds may only contain letters, numbers, hyphens, and underscores.",
+  );
+
 export const pluginTransportConfigSchema = z.object({
   id: endpointIdSchema,
   type: z.literal("plugin"),
@@ -57,6 +65,9 @@ export const pluginTransportConfigSchema = z.object({
     }),
     z.object({
       type: z.literal("outbox"),
+      replyChannel: z.object({
+        kind: replyChannelKindSchema,
+      }),
     }),
   ]),
 }).strict();

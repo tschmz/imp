@@ -50,7 +50,12 @@ export type PluginResponseRoutingRuntimeConfig =
         userId?: string;
       };
     }
-  | { type: "outbox" };
+  | {
+      type: "outbox";
+      replyChannel: {
+        kind: string;
+      };
+    };
 
 export interface TelegramVoiceRuntimeConfig {
   enabled: boolean;

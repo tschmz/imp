@@ -19,6 +19,9 @@ describe("createPluginTransport", () => {
     const config = createPluginRuntimeConfig(root, {
       response: {
         type: "outbox",
+        replyChannel: {
+          kind: "audio",
+        },
       },
     });
     const logger = createMockLogger();

@@ -50,7 +50,7 @@ Prompt files use Handlebars templating.
 
 - file-backed `prompt.base`, `prompt.instructions`, and `prompt.references` are templated
 - inline `text` sources are not templated
-- syntax includes variables, `if`/`else`, `unless`, `each`, and `with`
+- syntax includes variables, `if`/`else`, `unless`, `each`, `with`, and `eq`
 - unknown variables fail immediately with the file path in the error
 - documented variables with no runtime value render as an empty string
 - arbitrary JavaScript execution, custom user-defined helpers, defaults, and time-based variables are not supported
@@ -73,6 +73,9 @@ Available variables:
 - `agent.authFile`
 - `agent.workspace.cwd`
 - `transport.kind`
+- `reply.channel.kind`
+- `reply.channel.delivery`
+- `reply.channel.endpointId`
 - `imp.configPath`
 - `imp.dataRoot`
 - `skills`
@@ -89,7 +92,10 @@ Endpoint: {{endpoint.id}}
 Agent: {{agent.id}} using {{agent.model.provider}}/{{agent.model.modelId}}
 Workspace: {{agent.workspace.cwd}}
 Config: {{imp.configPath}}
+Reply channel: {{reply.channel.kind}}
 ```
+
+Use `reply.channel.kind` for channel-specific prompt behavior. For example, a prompt file can use `{{#if (eq reply.channel.kind "audio")}}` for spoken replies and `{{#if (eq reply.channel.kind "telegram")}}` for Telegram formatting. Keep those decisions in prompt files; the daemon exposes the context but does not inject hidden channel instructions.
 
 ## Using Workspace Files
 

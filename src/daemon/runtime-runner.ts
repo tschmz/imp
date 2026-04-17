@@ -4,6 +4,7 @@ import { createHandleIncomingMessage } from "../application/handle-incoming-mess
 import { createMessageProcessor } from "../application/message-processor.js";
 import { createAgentRegistry } from "../agents/registry.js";
 import { createDeliveryRouter, type DeliveryRouter } from "../transports/delivery-router.js";
+import type { ReplyChannelContext } from "../runtime/context.js";
 import type { Transport, TransportContext, TransportFactory } from "../transports/types.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
 import type { RuntimeControlAction } from "./runtime-shutdown.js";
@@ -31,6 +32,7 @@ export function createRuntimeEntries(
   };
 
   return runtimes.map((runtime) => {
+    const replyChannel = resolveReplyChannel(runtime.endpointConfig, runtimes);
     const handleIncomingMessage = createHandleIncomingMessage({
       agentRegistry: dependencies.agentRegistry,
       conversationStore: runtime.conversationStore,
@@ -43,6 +45,7 @@ export function createRuntimeEntries(
         logFilePath: runtime.endpointConfig.paths.logFilePath,
         loggingLevel: runtime.loggingLevel,
         activeEndpointIds: runtimes.map((entry) => entry.endpointConfig.id),
+        replyChannel,
       },
       logger: runtime.logger,
     });
@@ -144,6 +147,44 @@ export function createRuntimeEntries(
       },
     };
   });
+}
+
+function resolveReplyChannel(
+  endpoint: ActiveEndpointRuntimeConfig,
+  activeEndpoints: BootstrappedRuntime[],
+): ReplyChannelContext {
+  if (endpoint.type !== "plugin") {
+    return {
+      kind: endpoint.type,
+      delivery: "endpoint",
+      endpointId: endpoint.id,
+    };
+  }
+
+  const response = endpoint.response;
+  switch (response.type) {
+    case "none":
+      return {
+        kind: "none",
+        delivery: "none",
+      };
+    case "outbox":
+      return {
+        kind: response.replyChannel.kind,
+        delivery: "outbox",
+      };
+    case "endpoint": {
+      const targetEndpoint = activeEndpoints.find(
+        (runtime) => runtime.endpointConfig.id === response.endpointId,
+      )?.endpointConfig;
+
+      return {
+        kind: targetEndpoint?.type ?? response.endpointId,
+        delivery: "endpoint",
+        endpointId: response.endpointId,
+      };
+    }
+  }
 }
 
 export async function runRuntimeEntries(entries: RuntimeEntry[]): Promise<void> {

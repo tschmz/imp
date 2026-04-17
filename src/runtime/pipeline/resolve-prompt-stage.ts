@@ -26,6 +26,7 @@ export async function resolvePromptStage(
       agent: context.agent,
       endpointId: context.input.message.endpointId,
       transportKind: context.input.message.conversation.transport,
+      replyChannel: context.input.runtime?.replyChannel,
       configPath: context.input.runtime?.configPath,
       dataRoot: context.input.runtime?.dataRoot,
       availableSkills: context.input.runtime?.availableSkills,

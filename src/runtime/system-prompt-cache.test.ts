@@ -20,6 +20,7 @@ describe("SystemPromptCache", () => {
 
     expect(key).toContain('"files":["/workspace/AGENTS.md:/workspace/AGENTS.md:fp"]');
     expect(key).toContain('"endpoint":{"id":"private-telegram"}');
+    expect(key).toContain('"reply":{"channel":{"kind":"telegram","delivery":"endpoint","endpointId":"private-telegram"}}');
   });
 
   it("includes available skill metadata without full skill content in cache keys", async () => {
@@ -110,6 +111,13 @@ function createTemplateContext(): PromptTemplateContext {
     },
     transport: {
       kind: "telegram",
+    },
+    reply: {
+      channel: {
+        kind: "telegram",
+        delivery: "endpoint",
+        endpointId: "private-telegram",
+      },
     },
     imp: {
       configPath: "/etc/imp/config.json",

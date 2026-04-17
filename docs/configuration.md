@@ -190,13 +190,13 @@ Not templated:
 
 - inline `text` prompt sources
 
-Supported syntax includes normal variable paths such as `{{endpoint.id}}`, conditionals such as `{{#if skills.length}}...{{else}}...{{/if}}`, and loops such as `{{#each skills}}...{{/each}}`.
+Supported syntax includes normal variable paths such as `{{endpoint.id}}`, conditionals such as `{{#if skills.length}}...{{else}}...{{/if}}`, equality checks such as `{{#if (eq reply.channel.kind "audio")}}...{{/if}}`, and loops such as `{{#each skills}}...{{/each}}`.
 
 Constraints:
 
 - unknown variables fail hard during prompt assembly
 - documented variables with no runtime value render as an empty string
-- only the built-in `if`, `unless`, `each`, `with`, `instructionAttr`, and `instructionText` helpers are available by default
+- only the built-in `if`, `unless`, `each`, `with`, `eq`, `instructionAttr`, and `instructionText` helpers are available by default
 - `instructionAttr` escapes values for XML-like instruction tag attributes
 - `instructionText` escapes values for XML-like instruction tag text
 - arbitrary JavaScript execution, date/time variables, and custom user-defined helpers are not supported
@@ -218,6 +218,9 @@ Available variables:
 - `agent.authFile`
 - `agent.workspace.cwd`
 - `transport.kind`
+- `reply.channel.kind`
+- `reply.channel.delivery`
+- `reply.channel.endpointId`
 - `imp.configPath`
 - `imp.dataRoot`
 - `skills`
@@ -225,6 +228,8 @@ Available variables:
 - `skills[].description`
 - `skills[].directoryPath`
 - `skills[].filePath`
+
+Reply-channel context describes where the answer will go, not where the inbound message came from. Normal endpoint conversations use the current endpoint transport. Plugin endpoint responses with `response.type: "endpoint"` use the target endpoint transport and endpoint ID. Plugin outbox responses use the explicit `response.replyChannel.kind` value from config, and `none` responses use `reply.channel.kind` set to `none`. Channel-specific behavior belongs in prompt files, not in hidden daemon prompts.
 
 Example:
 
@@ -286,6 +291,7 @@ Plugin endpoint fields:
 - `response.endpointId`: for `endpoint` responses, the configured endpoint that receives agent replies
 - `response.target.conversationId`: for `endpoint` responses, the target conversation or chat identifier for that endpoint
 - `response.target.userId`: optional target user identifier for endpoints that need it
+- `response.replyChannel.kind`: required for `outbox` responses; declares the semantic reply channel exposed to prompt templates, such as `audio`
 
 Top-level plugin fields:
 

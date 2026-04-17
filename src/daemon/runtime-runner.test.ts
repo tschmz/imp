@@ -280,6 +280,296 @@ describe("createRuntimeEntries", () => {
       }),
     );
   });
+
+  it("passes current endpoint reply channel context into agent runs", async () => {
+    const runtime = createRuntime();
+    const transport = createCapturingTransport();
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([
+        {
+          id: "default",
+          name: "Default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.3",
+          },
+          tools: [],
+          extensions: [],
+        },
+      ]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+    await transport.handler.handle(
+      createEvent({
+        endpointId: "private-telegram",
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+        },
+        messageId: "101",
+        correlationId: "corr-101",
+        userId: "7",
+        text: "hello",
+        receivedAt: "2026-04-07T12:00:00.000Z",
+      }),
+    );
+
+    expect(runtime.engine.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          replyChannel: {
+            kind: "telegram",
+            delivery: "endpoint",
+            endpointId: "private-telegram",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("passes plugin endpoint target reply channel context into agent runs", async () => {
+    const telegramRuntime = createRuntime();
+    const pluginRuntime = createRuntime({
+      endpointConfig: {
+        id: "audio-ingress",
+        type: "plugin",
+        pluginId: "pi-audio",
+        ingress: {
+          pollIntervalMs: 250,
+          maxEventBytes: 65536,
+        },
+        response: {
+          type: "endpoint",
+          endpointId: "private-telegram",
+          target: {
+            conversationId: "42",
+          },
+        },
+        defaultAgentId: "default",
+        paths: {
+          dataRoot: "/tmp",
+          endpointRoot: "/tmp/endpoints/audio-ingress",
+          conversationsDir: "/tmp/endpoints/audio-ingress/conversations",
+          logsDir: "/tmp/logs/endpoints",
+          logFilePath: "/tmp/logs/endpoints/audio-ingress.log",
+          runtimeDir: "/tmp/runtime/endpoints",
+          runtimeStatePath: "/tmp/runtime/endpoints/audio-ingress.json",
+          plugin: {
+            rootDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress",
+            inboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox",
+            processingDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/processing",
+            processedDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/processed",
+            failedDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/failed",
+            outboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/outbox",
+          },
+        },
+      },
+    });
+    const telegramTransport = createCapturingTransport();
+    const pluginTransport = createCapturingTransport();
+    const entries = createRuntimeEntries([telegramRuntime, pluginRuntime], {
+      agentRegistry: createAgentRegistry([
+        {
+          id: "default",
+          name: "Default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.3",
+          },
+          tools: [],
+          extensions: [],
+        },
+      ]),
+      createTransport: vi.fn((config) =>
+        config.id === "audio-ingress" ? pluginTransport : telegramTransport,
+      ),
+    });
+
+    await Promise.all(entries.map((entry) => entry.start()));
+    await pluginTransport.handler.handle(
+      createEvent({
+        endpointId: "audio-ingress",
+        conversation: {
+          transport: "plugin",
+          externalId: "kitchen",
+        },
+        messageId: "wake-1",
+        correlationId: "corr-wake-1",
+        userId: "frontend",
+        text: "hello",
+        receivedAt: "2026-04-07T12:00:00.000Z",
+      }),
+    );
+
+    expect(pluginRuntime.engine.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          replyChannel: {
+            kind: "telegram",
+            delivery: "endpoint",
+            endpointId: "private-telegram",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("passes plugin outbox and none reply channel context into agent runs", async () => {
+    const outboxRuntime = createRuntime({
+      endpointConfig: {
+        id: "audio-ingress",
+        type: "plugin",
+        pluginId: "pi-audio",
+        ingress: {
+          pollIntervalMs: 250,
+          maxEventBytes: 65536,
+        },
+        response: {
+          type: "outbox",
+          replyChannel: {
+            kind: "audio",
+          },
+        },
+        defaultAgentId: "default",
+        paths: {
+          dataRoot: "/tmp",
+          endpointRoot: "/tmp/endpoints/audio-ingress",
+          conversationsDir: "/tmp/endpoints/audio-ingress/conversations",
+          logsDir: "/tmp/logs/endpoints",
+          logFilePath: "/tmp/logs/endpoints/audio-ingress.log",
+          runtimeDir: "/tmp/runtime/endpoints",
+          runtimeStatePath: "/tmp/runtime/endpoints/audio-ingress.json",
+          plugin: {
+            rootDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress",
+            inboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox",
+            processingDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/processing",
+            processedDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/processed",
+            failedDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/failed",
+            outboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/outbox",
+          },
+        },
+      },
+    });
+    const noneRuntime = createRuntime({
+      endpointConfig: {
+        id: "silent-ingress",
+        type: "plugin",
+        pluginId: "pi-audio",
+        ingress: {
+          pollIntervalMs: 250,
+          maxEventBytes: 65536,
+        },
+        response: {
+          type: "none",
+        },
+        defaultAgentId: "default",
+        paths: {
+          dataRoot: "/tmp",
+          endpointRoot: "/tmp/endpoints/silent-ingress",
+          conversationsDir: "/tmp/endpoints/silent-ingress/conversations",
+          logsDir: "/tmp/logs/endpoints",
+          logFilePath: "/tmp/logs/endpoints/silent-ingress.log",
+          runtimeDir: "/tmp/runtime/endpoints",
+          runtimeStatePath: "/tmp/runtime/endpoints/silent-ingress.json",
+          plugin: {
+            rootDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress",
+            inboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress/inbox",
+            processingDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress/processing",
+            processedDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress/processed",
+            failedDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress/failed",
+            outboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress/outbox",
+          },
+        },
+      },
+    });
+    const outboxTransport = createCapturingTransport();
+    const noneTransport = createCapturingTransport();
+    const entries = createRuntimeEntries([outboxRuntime, noneRuntime], {
+      agentRegistry: createAgentRegistry([
+        {
+          id: "default",
+          name: "Default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.3",
+          },
+          tools: [],
+          extensions: [],
+        },
+      ]),
+      createTransport: vi.fn((config) =>
+        config.id === "silent-ingress" ? noneTransport : outboxTransport,
+      ),
+    });
+
+    await Promise.all(entries.map((entry) => entry.start()));
+    await outboxTransport.handler.handle(
+      createEvent({
+        endpointId: "audio-ingress",
+        conversation: {
+          transport: "plugin",
+          externalId: "kitchen",
+        },
+        messageId: "wake-1",
+        correlationId: "corr-wake-1",
+        userId: "frontend",
+        text: "hello",
+        receivedAt: "2026-04-07T12:00:00.000Z",
+      }),
+    );
+    await noneTransport.handler.handle(
+      createEvent({
+        endpointId: "silent-ingress",
+        conversation: {
+          transport: "plugin",
+          externalId: "kitchen",
+        },
+        messageId: "wake-2",
+        correlationId: "corr-wake-2",
+        userId: "frontend",
+        text: "hello",
+        receivedAt: "2026-04-07T12:00:00.000Z",
+      }),
+    );
+
+    expect(outboxRuntime.engine.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          replyChannel: {
+            kind: "audio",
+            delivery: "outbox",
+          },
+        }),
+      }),
+    );
+    expect(noneRuntime.engine.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          replyChannel: {
+            kind: "none",
+            delivery: "none",
+          },
+        }),
+      }),
+    );
+  });
 });
 
 function createCapturingTransport(): {
@@ -312,9 +602,9 @@ function createEvent(message: IncomingMessage) {
   };
 }
 
-function createRuntime(): BootstrappedRuntime {
-  return {
-    endpointConfig: {
+function createRuntime(overrides: Partial<BootstrappedRuntime> = {}): BootstrappedRuntime {
+  const runtime: BootstrappedRuntime = {
+    endpointConfig: overrides.endpointConfig ?? {
       id: "private-telegram",
       type: "telegram",
       token: "123:abc",
@@ -330,14 +620,14 @@ function createRuntime(): BootstrappedRuntime {
         runtimeStatePath: "/tmp/runtime/endpoints/private-telegram.json",
       },
     },
-    configPath: "/tmp/config.json",
-    loggingLevel: "info",
-    logger: {
+    configPath: overrides.configPath ?? "/tmp/config.json",
+    loggingLevel: overrides.loggingLevel ?? "info",
+    logger: overrides.logger ?? {
       debug: vi.fn(async () => undefined),
       info: vi.fn(async () => undefined),
       error: vi.fn(async () => undefined),
     },
-    conversationStore: {
+    conversationStore: overrides.conversationStore ?? {
       get: vi.fn(async () => undefined),
       put: vi.fn(async () => undefined),
       listBackups: vi.fn(async () => []),
@@ -369,7 +659,7 @@ function createRuntime(): BootstrappedRuntime {
         messages: [],
       })),
     },
-    engine: {
+    engine: overrides.engine ?? {
       run: vi.fn(async () => ({
         message: {
           conversation: {
@@ -383,4 +673,6 @@ function createRuntime(): BootstrappedRuntime {
       close: vi.fn(async () => undefined),
     },
   };
+
+  return runtime;
 }

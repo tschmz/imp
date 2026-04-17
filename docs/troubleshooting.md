@@ -95,7 +95,7 @@ If templating fails, check:
 
 - the exact file path named in the error
 - whether the variable is one of the documented template variables
-- whether the helper is one of `if`, `unless`, `each`, `with`, `instructionAttr`, or `instructionText`
+- whether the helper is one of `if`, `unless`, `each`, `with`, `eq`, `instructionAttr`, or `instructionText`
 
 ## Need More Detail
 

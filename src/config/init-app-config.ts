@@ -165,6 +165,13 @@ function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
     transport: {
       kind: "",
     },
+    reply: {
+      channel: {
+        kind: "",
+        delivery: "none",
+        endpointId: "",
+      },
+    },
     imp: {
       configPath,
       dataRoot,

@@ -51,7 +51,7 @@ describe("resolveSystemPrompt", () => {
         }
 
         if (path === "/workspace/RUNBOOK.md") {
-          return "Config {{imp.configPath}} data {{imp.dataRoot}} transport {{transport.kind}}.";
+          return "Config {{imp.configPath}} data {{imp.dataRoot}} transport {{transport.kind}} reply {{reply.channel.kind}}.";
         }
 
         throw new Error(`unexpected path: ${path}`);
@@ -64,7 +64,7 @@ describe("resolveSystemPrompt", () => {
         "Endpoint private-telegram on linux for faux/faux-1.\n" +
         "</INSTRUCTIONS>\n\n" +
         '<REFERENCE from="/workspace/RUNBOOK.md">\n\n' +
-        "Config /etc/imp/config.json data /var/lib/imp transport telegram.\n" +
+        "Config /etc/imp/config.json data /var/lib/imp transport telegram reply telegram.\n" +
         "</REFERENCE>",
     );
   });
@@ -288,7 +288,71 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toContain("Agent: default");
     expect(prompt).toContain("Model: faux/faux-1");
     expect(prompt).toContain("Transport: telegram");
+    expect(prompt).toContain("Reply channel: telegram via endpoint (endpoint private-telegram)");
     expect(prompt).not.toContain("{{agent.id}}");
+  });
+
+  it("renders spoken-output guidance for audio reply channels in the built-in default prompt", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { builtIn: "default" },
+        },
+      },
+      undefined,
+      {
+        ...createTemplateContext(),
+        reply: {
+          channel: {
+            kind: "audio",
+            delivery: "outbox",
+            endpointId: "",
+          },
+        },
+      },
+      [],
+      async (path) => {
+        throw new Error(`unexpected path: ${path}`);
+      },
+    );
+
+    expect(prompt).toContain("Reply channel: audio via outbox");
+    expect(prompt).toContain("The reply will be spoken aloud.");
+    expect(prompt).toContain("preferably one or two short sentences");
+    expect(prompt).toContain("Avoid Markdown, lists, tables, code blocks, links");
+    expect(prompt).not.toContain("You are chatting through Telegram.");
+  });
+
+  it("renders neutral guidance for none reply channels in the built-in default prompt", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { builtIn: "default" },
+        },
+      },
+      undefined,
+      {
+        ...createTemplateContext(),
+        reply: {
+          channel: {
+            kind: "none",
+            delivery: "none",
+            endpointId: "",
+          },
+        },
+      },
+      [],
+      async (path) => {
+        throw new Error(`unexpected path: ${path}`);
+      },
+    );
+
+    expect(prompt).toContain("Reply channel: none via none");
+    expect(prompt).toContain("Format final responses for the configured reply channel.");
+    expect(prompt).not.toContain("You are chatting through Telegram.");
+    expect(prompt).not.toContain("The reply will be spoken aloud.");
   });
 
   it("injects available skill metadata before additional context files", async () => {
@@ -407,6 +471,13 @@ function createTemplateContext(): PromptTemplateContext {
     },
     transport: {
       kind: "telegram",
+    },
+    reply: {
+      channel: {
+        kind: "telegram",
+        delivery: "endpoint",
+        endpointId: "private-telegram",
+      },
     },
     imp: {
       configPath: "/etc/imp/config.json",

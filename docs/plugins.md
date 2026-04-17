@@ -148,12 +148,24 @@ Plugin endpoints choose one response route:
 ```json
 {
   "response": {
-    "type": "outbox"
+    "type": "outbox",
+    "replyChannel": {
+      "kind": "audio"
+    }
   }
 }
 ```
 
-`outbox` writes a JSON reply file to the plugin endpoint outbox. This keeps a future local speaker-output component outside the daemon process.
+`outbox` writes a JSON reply file to the plugin endpoint outbox. This keeps a local speaker-output component outside the daemon process. `replyChannel.kind` is required for prompt context and describes the semantic channel that will consume the outbox reply. Use `"audio"` for a Raspberry Pi voice playback component. `imp` does not infer audio from `outbox`.
+
+Prompt files receive explicit reply-channel context:
+
+- normal endpoint conversations set `reply.channel.kind` to the endpoint transport, such as `telegram` or `cli`
+- plugin `response.type: "endpoint"` sets `reply.channel.kind` from the target endpoint transport and `reply.channel.endpointId` from the target endpoint ID
+- plugin `response.type: "outbox"` sets `reply.channel.kind` from `response.replyChannel.kind`
+- plugin `response.type: "none"` sets `reply.channel.kind` to `none`
+
+Put channel-specific behavior, such as Telegram formatting or audio-friendly wording, in prompt files by checking `reply.channel.kind`. Do not rely on hidden daemon code to add channel instructions.
 
 Outbox files include:
 

@@ -164,10 +164,9 @@
         "maxEventBytes": 65536
       },
       "response": {
-        "type": "endpoint",
-        "endpointId": "private-telegram",
-        "target": {
-          "conversationId": "123456789"
+        "type": "outbox",
+        "replyChannel": {
+          "kind": "audio"
         }
       }
     }

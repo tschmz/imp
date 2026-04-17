@@ -119,6 +119,9 @@ export interface PluginEndpointResponseRoutingConfig {
 
 export interface PluginOutboxResponseRoutingConfig {
   type: "outbox";
+  replyChannel: {
+    kind: string;
+  };
 }
 
 export type EndpointConfig = TelegramEndpointConfig | CliEndpointConfig | PluginEndpointConfig;

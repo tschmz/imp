@@ -160,6 +160,81 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts plugin outbox response routing with an explicit reply channel kind", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      plugins: [
+        {
+          id: "pi-audio",
+          enabled: true,
+        },
+      ],
+      endpoints: [
+        {
+          id: "audio-ingress",
+          type: "plugin",
+          enabled: true,
+          pluginId: "pi-audio",
+          response: {
+            type: "outbox",
+            replyChannel: {
+              kind: "audio",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects plugin outbox response routing without an explicit reply channel kind", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      plugins: [
+        {
+          id: "pi-audio",
+          enabled: true,
+        },
+      ],
+      endpoints: [
+        {
+          id: "audio-ingress",
+          type: "plugin",
+          enabled: true,
+          pluginId: "pi-audio",
+          response: {
+            type: "outbox",
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["endpoints", 0, "response", "replyChannel"],
+        message: "Invalid input: expected object, received undefined",
+      }),
+    );
+  });
+
   it("rejects plugin endpoints that reference unknown plugins", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({

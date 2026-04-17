@@ -2,6 +2,7 @@ import { arch, homedir, hostname, platform, type, userInfo } from "node:os";
 import Handlebars from "handlebars";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { SkillDefinition } from "../skills/types.js";
+import type { ReplyChannelContext } from "./context.js";
 
 export interface PromptTemplateSystemContext {
   os: string;
@@ -31,6 +32,9 @@ export interface PromptTemplateContext {
   };
   transport: {
     kind: string;
+  };
+  reply: {
+    channel: ReplyChannelContext;
   };
   imp: {
     configPath?: string;
@@ -62,10 +66,17 @@ export function createPromptTemplateContext(options: {
   agent: AgentDefinition;
   endpointId: string;
   transportKind: string;
+  replyChannel?: ReplyChannelContext;
   configPath?: string;
   dataRoot?: string;
   availableSkills?: SkillDefinition[];
 }): PromptTemplateContext {
+  const replyChannel = options.replyChannel ?? {
+    kind: options.transportKind,
+    delivery: "endpoint" as const,
+    endpointId: options.endpointId,
+  };
+
   return {
     system: options.system,
     endpoint: {
@@ -85,6 +96,13 @@ export function createPromptTemplateContext(options: {
     },
     transport: {
       kind: options.transportKind,
+    },
+    reply: {
+      channel: {
+        kind: replyChannel.kind,
+        delivery: replyChannel.delivery,
+        endpointId: replyChannel.endpointId ?? "",
+      },
     },
     imp: {
       configPath: options.configPath ?? "",
@@ -122,6 +140,7 @@ export function renderPromptTemplate(
 const promptHandlebars = Handlebars.create();
 const PROMPT_TEMPLATE_KNOWN_HELPERS = {
   each: true,
+  eq: true,
   if: true,
   instructionAttr: true,
   instructionText: true,
@@ -135,6 +154,7 @@ promptHandlebars.registerHelper("instructionAttr", (value: unknown) =>
 promptHandlebars.registerHelper("instructionText", (value: unknown) =>
   escapeInstructionText(String(value ?? "")),
 );
+promptHandlebars.registerHelper("eq", (left: unknown, right: unknown) => left === right);
 
 function escapeInstructionAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");

@@ -7,6 +7,13 @@ export interface AgentRunRuntimeContext {
   configPath?: string;
   dataRoot?: string;
   availableSkills?: SkillDefinition[];
+  replyChannel?: ReplyChannelContext;
+}
+
+export interface ReplyChannelContext {
+  kind: string;
+  delivery: "endpoint" | "outbox" | "none";
+  endpointId?: string;
 }
 
 export interface AgentRunInput {
