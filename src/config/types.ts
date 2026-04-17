@@ -122,6 +122,16 @@ export interface PluginOutboxResponseRoutingConfig {
   replyChannel: {
     kind: string;
   };
+  priority?: "low" | "normal" | "high";
+  ttlMs?: number;
+  speech?: PluginOutboxSpeechConfig;
+}
+
+export interface PluginOutboxSpeechConfig {
+  enabled?: boolean;
+  language?: string;
+  voice?: string;
+  instructions?: string;
 }
 
 export type EndpointConfig = TelegramEndpointConfig | CliEndpointConfig | PluginEndpointConfig;

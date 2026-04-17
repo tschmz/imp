@@ -8,6 +8,9 @@ import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportContext, TransportHandler, TransportInboundEvent } from "../types.js";
 
 type PluginTransportRuntimeConfig = PluginEndpointRuntimeConfig & ActiveEndpointRuntimeConfig;
+type PluginOutboxRuntimeConfig = PluginTransportRuntimeConfig & {
+  response: Extract<PluginTransportRuntimeConfig["response"], { type: "outbox" }>;
+};
 
 const pluginEventSchema = z.object({
   schemaVersion: z.literal(1).optional(),
@@ -227,7 +230,7 @@ function createPluginInboundEvent(
         case "none":
           return;
         case "outbox":
-          await writePluginOutboxMessage(config, message, response.text);
+          await writePluginOutboxMessage(config as PluginOutboxRuntimeConfig, message, response.text);
           return;
         case "endpoint":
           await context.deliveryRouter.deliver({
@@ -248,7 +251,7 @@ function createPluginInboundEvent(
 }
 
 async function writePluginOutboxMessage(
-  config: PluginTransportRuntimeConfig,
+  config: PluginOutboxRuntimeConfig,
   inbound: IncomingMessage,
   text: string,
 ): Promise<void> {
@@ -264,6 +267,10 @@ async function writePluginOutboxMessage(
         correlationId: inbound.correlationId,
         conversationId: inbound.conversation.externalId,
         userId: inbound.userId,
+        replyChannel: config.response.replyChannel,
+        priority: config.response.priority ?? "normal",
+        ...(config.response.ttlMs ? { ttlMs: config.response.ttlMs } : {}),
+        ...(config.response.speech ? { speech: config.response.speech } : {}),
         text,
         createdAt: new Date().toISOString(),
       },

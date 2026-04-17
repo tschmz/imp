@@ -22,6 +22,12 @@ describe("createPluginTransport", () => {
         replyChannel: {
           kind: "audio",
         },
+        priority: "high",
+        ttlMs: 30000,
+        speech: {
+          voice: "ash",
+          instructions: "Use short spoken replies.",
+        },
       },
     });
     const logger = createMockLogger();
@@ -84,6 +90,15 @@ describe("createPluginTransport", () => {
       eventId: "wake-1",
       conversationId: "kitchen",
       userId: "frontend",
+      replyChannel: {
+        kind: "audio",
+      },
+      priority: "high",
+      ttlMs: 30000,
+      speech: {
+        voice: "ash",
+        instructions: "Use short spoken replies.",
+      },
       text: "lights are on",
     });
     expect(await readdir(config.paths.plugin!.failedDir)).toEqual([]);

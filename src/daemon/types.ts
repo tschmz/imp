@@ -55,6 +55,14 @@ export type PluginResponseRoutingRuntimeConfig =
       replyChannel: {
         kind: string;
       };
+      priority?: "low" | "normal" | "high";
+      ttlMs?: number;
+      speech?: {
+        enabled?: boolean;
+        language?: string;
+        voice?: string;
+        instructions?: string;
+      };
     };
 
 export interface TelegramVoiceRuntimeConfig {

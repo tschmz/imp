@@ -153,12 +153,27 @@ Plugin endpoints choose one response route:
     "type": "outbox",
     "replyChannel": {
       "kind": "audio"
+    },
+    "priority": "normal",
+    "ttlMs": 30000,
+    "speech": {
+      "enabled": true,
+      "language": "de",
+      "voice": "ash",
+      "instructions": "Use short spoken replies."
     }
   }
 }
 ```
 
 `outbox` writes a JSON reply file to the plugin endpoint outbox. This keeps a local speaker-output component outside the daemon process. `replyChannel.kind` is required for prompt context and describes the semantic channel that will consume the outbox reply. Use `"audio"` for a Raspberry Pi voice playback component. `imp` does not infer audio from `outbox`.
+
+Optional outbox controls:
+
+- `priority`: `low`, `normal`, or `high`; defaults to `normal`
+- `ttlMs`: advisory time-to-live for consumers that should skip stale replies
+- `speech.enabled`: set `false` when an audio consumer should not speak the reply
+- `speech.language`, `speech.voice`, and `speech.instructions`: advisory TTS hints for speech consumers
 
 Prompt files receive explicit reply-channel context:
 
@@ -177,6 +192,10 @@ Outbox files include:
 - `correlationId`
 - `conversationId`
 - `userId`
+- `replyChannel`
+- `priority`
+- `ttlMs`, when configured
+- `speech`, when configured
 - `text`
 - `createdAt`
 
