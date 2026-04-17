@@ -9,6 +9,7 @@ The top-level structure is:
 - `logging`: daemon log level
 - `defaults`: fallback routing
 - `agents`: one or more agent definitions
+- `plugins`: optional external local component definitions
 - `endpoints`: zero or more endpoint definitions
 
 ## Minimal Shape
@@ -138,14 +139,23 @@ dataRoot/
   runtime/
     endpoints/
       <endpoint-id>.json
+    plugins/
+      <plugin-id>/
+        endpoints/
+          <endpoint-id>/
+            inbox/
+            processing/
+            processed/
+            failed/
+            outbox/
   skills/
 ```
 
-Endpoint directories store conversation data. Endpoint logs and runtime lock/state files live under the central `logs/endpoints` and `runtime/endpoints` trees. Agent home directories default to `agents/<agent-id>`, and every direct `*.md` file in an agent home is loaded alphabetically as an instruction block before explicit `prompt.instructions` and the workspace `AGENTS.md`.
+Endpoint directories store conversation data. Endpoint logs and runtime lock/state files live under the central `logs/endpoints` and `runtime/endpoints` trees. Plugin endpoint file ingress and egress live under `runtime/plugins/<plugin-id>/endpoints/<endpoint-id>`. Agent home directories default to `agents/<agent-id>`, and every direct `*.md` file in an agent home is loaded alphabetically as an instruction block before explicit `prompt.instructions` and the workspace `AGENTS.md`.
 
 ## Secret References
 
-V1 secret references are currently supported for Telegram endpoint tokens via `endpoints[].token`.
+Secret references are supported for Telegram endpoint tokens via `endpoints[].token`.
 
 That field can be written in one of three forms:
 
@@ -267,6 +277,23 @@ Telegram fields:
 
 CLI endpoints do not have additional public config fields.
 
+Plugin endpoint fields:
+
+- `pluginId`: points to an enabled top-level `plugins[].id`
+- `ingress.pollIntervalMs`: optional inbox polling interval in milliseconds; defaults to `1000`
+- `ingress.maxEventBytes`: optional maximum JSON event file size in bytes; defaults to `262144`
+- `response.type`: `none`, `endpoint`, or `outbox`
+- `response.endpointId`: for `endpoint` responses, the configured endpoint that receives agent replies
+- `response.target.conversationId`: for `endpoint` responses, the target conversation or chat identifier for that endpoint
+- `response.target.userId`: optional target user identifier for endpoints that need it
+
+Top-level plugin fields:
+
+- `id`: unique plugin identifier
+- `enabled`: whether endpoints may bind to this plugin
+- `package.path`: optional operator-facing path to the local plugin package or component
+- `package.command`, `package.args`, `package.env`: optional launch metadata for operators and future service integration
+
 `imp chat` always has a local CLI endpoint available. If no CLI endpoint is configured, it uses `local-cli`. Configured CLI endpoints are optional named chat profiles for `imp chat --endpoint <id>`; they are not started by `imp start` or the service, and chat uses `defaults.agentId` rather than `routing.defaultAgentId`.
 
 Only enabled daemon endpoints are started by `imp start` and the service. At least one non-CLI endpoint must be enabled for daemon startup.
@@ -292,7 +319,7 @@ Skill discovery notes:
 
 Voice transcription notes:
 
-- V1 only accepts Telegram `voice` messages, not arbitrary audio uploads.
+- Voice support only accepts Telegram `voice` messages, not arbitrary audio uploads.
 - When enabled, voice messages are transcribed into plain text before they reach the application layer.
 - The transcript is shown in Telegram before the agent reply, but sessions remain text-centric and store the transcript text rather than the original audio.
 - OpenAI transcription requires `OPENAI_API_KEY` in the runtime environment or service environment.

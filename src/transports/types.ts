@@ -1,9 +1,15 @@
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
+import type { DeliveryRouter } from "./delivery-router.js";
 
 export type TransportFactory<TConfig = unknown, TLogger = unknown> = (
   config: TConfig,
   logger: TLogger,
+  context: TransportContext,
 ) => Transport;
+
+export interface TransportContext {
+  deliveryRouter: DeliveryRouter;
+}
 
 export interface TransportInboundEvent {
   message: IncomingMessage;

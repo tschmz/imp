@@ -1,0 +1,181 @@
+# Plugins
+
+Plugins are external local components that exchange files with `imp`. They are not loaded into the daemon process, and `imp` does not execute plugin code as part of message handling.
+
+The model is intentionally explicit:
+
+- declare each plugin under top-level `plugins`
+- bind a plugin to an endpoint with `type: "plugin"`
+- let the external component write JSON event files into the endpoint inbox
+- choose where agent replies go with `response`
+
+## Example: Audio Frontend To Telegram
+
+A Raspberry Pi audio frontend can run as its own local service, recognize speech, and write an event file into the `imp` inbox. `imp` routes the text to an agent and sends the reply to Telegram:
+
+```json
+{
+  "plugins": [
+    {
+      "id": "pi-audio",
+      "enabled": true,
+      "package": {
+        "path": "/opt/imp/plugins/pi-audio"
+      }
+    }
+  ],
+  "endpoints": [
+    {
+      "id": "private-telegram",
+      "type": "telegram",
+      "enabled": true,
+      "token": {
+        "env": "IMP_PRIVATE_TELEGRAM_BOT_TOKEN"
+      },
+      "access": {
+        "allowedUserIds": ["123456789"]
+      }
+    },
+    {
+      "id": "audio-ingress",
+      "type": "plugin",
+      "enabled": true,
+      "pluginId": "pi-audio",
+      "routing": {
+        "defaultAgentId": "default"
+      },
+      "ingress": {
+        "pollIntervalMs": 500,
+        "maxEventBytes": 65536
+      },
+      "response": {
+        "type": "endpoint",
+        "endpointId": "private-telegram",
+        "target": {
+          "conversationId": "123456789"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Runtime Directories
+
+For plugin endpoint `audio-ingress` bound to plugin `pi-audio`, the runtime files live at:
+
+```text
+<paths.dataRoot>/runtime/plugins/pi-audio/endpoints/audio-ingress/
+  inbox/
+  processing/
+  processed/
+  failed/
+  outbox/
+```
+
+Directory behavior:
+
+- `inbox`: the plugin writes event files here
+- `processing`: `imp` moves a claimed event here while it is being processed
+- `processed`: successfully handled event files end up here
+- `failed`: invalid or failed event files end up here with a sibling `.error.json` record
+- `outbox`: agent replies are written here when `response.type` is `outbox`
+
+`imp` creates these directories during daemon startup. Operators can inspect them directly to understand what happened to an event.
+
+## Event Files
+
+Plugin event files are UTF-8 JSON files with a `.json` suffix.
+
+Required field:
+
+- `text`: recognized text to send to the agent
+
+Optional fields:
+
+- `id`: event identifier; defaults to a value derived from the file name claimed by `imp`
+- `correlationId`: correlation identifier for logs and conversation records
+- `conversationId`: plugin conversation identifier; defaults to the plugin ID
+- `userId`: plugin user or device identifier; defaults to the plugin ID
+- `receivedAt`: ISO timestamp; defaults to the ingestion time
+- `metadata`: JSON object stored as source metadata on the inbound message
+
+Example event:
+
+```json
+{
+  "id": "wake-2026-04-17T00-15-30Z",
+  "conversationId": "kitchen",
+  "userId": "raspberry-pi",
+  "text": "turn on the kitchen lights",
+  "metadata": {
+    "confidence": 0.94,
+    "wakeWord": "computer"
+  }
+}
+```
+
+Write files atomically from the plugin side: write to a temporary file outside `inbox`, then rename it into `inbox` with a `.json` suffix.
+
+## Response Routing
+
+Plugin endpoints choose one response route:
+
+```json
+{
+  "response": {
+    "type": "none"
+  }
+}
+```
+
+`none` processes the inbound message and discards the agent reply.
+
+```json
+{
+  "response": {
+    "type": "endpoint",
+    "endpointId": "private-telegram",
+    "target": {
+      "conversationId": "123456789"
+    }
+  }
+}
+```
+
+`endpoint` sends the agent reply through an enabled endpoint that supports targeted delivery. Telegram supports this by sending to the configured chat ID.
+
+```json
+{
+  "response": {
+    "type": "outbox"
+  }
+}
+```
+
+`outbox` writes a JSON reply file to the plugin endpoint outbox. This keeps a future local speaker-output component outside the daemon process.
+
+Outbox files include:
+
+- `id`
+- `eventId`
+- `correlationId`
+- `conversationId`
+- `userId`
+- `text`
+- `createdAt`
+
+## Failure Records
+
+When an event file is invalid or processing fails, `imp` moves the event to `failed/` and writes `<event-file>.error.json` next to it.
+
+The error record includes:
+
+- original file name
+- endpoint ID
+- plugin ID
+- failure timestamp
+- error type
+- error message
+
+The endpoint log also records the failed path and error record path.

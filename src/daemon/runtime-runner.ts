@@ -3,7 +3,8 @@ import { priorityInboundCommands } from "../application/commands/priority-inboun
 import { createHandleIncomingMessage } from "../application/handle-incoming-message.js";
 import { createMessageProcessor } from "../application/message-processor.js";
 import { createAgentRegistry } from "../agents/registry.js";
-import type { Transport, TransportFactory } from "../transports/types.js";
+import { createDeliveryRouter, type DeliveryRouter } from "../transports/delivery-router.js";
+import type { Transport, TransportContext, TransportFactory } from "../transports/types.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
 import type { RuntimeControlAction } from "./runtime-shutdown.js";
 import type { ActiveEndpointRuntimeConfig } from "./types.js";
@@ -16,6 +17,7 @@ export interface RuntimeEntry {
 interface RuntimeRunnerDependencies {
   agentRegistry: ReturnType<typeof createAgentRegistry>;
   createTransport: TransportFactory<ActiveEndpointRuntimeConfig, BootstrappedRuntime["logger"]>;
+  deliveryRouter?: DeliveryRouter;
   requestControlAction?: (action: RuntimeControlAction) => Promise<void> | void;
 }
 
@@ -23,6 +25,11 @@ export function createRuntimeEntries(
   runtimes: BootstrappedRuntime[],
   dependencies: RuntimeRunnerDependencies,
 ): RuntimeEntry[] {
+  const deliveryRouter = dependencies.deliveryRouter ?? createDeliveryRouter();
+  const transportContext: TransportContext = {
+    deliveryRouter,
+  };
+
   return runtimes.map((runtime) => {
     const handleIncomingMessage = createHandleIncomingMessage({
       agentRegistry: dependencies.agentRegistry,
@@ -116,7 +123,7 @@ export function createRuntimeEntries(
           return;
         }
 
-        transport = dependencies.createTransport(runtime.endpointConfig, runtime.logger);
+        transport = dependencies.createTransport(runtime.endpointConfig, runtime.logger, transportContext);
         if (stopped) {
           await transport.stop?.();
           return;

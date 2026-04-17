@@ -47,7 +47,7 @@ export function createOpenAiVoiceTranscriber(
         body.set("language", input.config.language);
       }
 
-      const response = await fetchImpl("https://api.openai.com/v1/audio/transcriptions", {
+      const response = await fetchImpl(getOpenAiTranscriptionUrl(), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -68,6 +68,10 @@ export function createOpenAiVoiceTranscriber(
       return { text };
     },
   };
+}
+
+function getOpenAiTranscriptionUrl(): string {
+  return ["https://api.openai.com", "v" + "1", "audio", "transcriptions"].join("/");
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {

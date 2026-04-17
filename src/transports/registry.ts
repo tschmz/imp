@@ -3,7 +3,7 @@ import type { EndpointConfig } from "../config/types.js";
 import type { ActiveEndpointRuntimeConfig } from "../daemon/types.js";
 import { TransportResolutionError } from "../domain/errors.js";
 import type { Logger } from "../logging/types.js";
-import type { Transport } from "./types.js";
+import type { Transport, TransportContext } from "./types.js";
 import { ensureBuiltInTransportsRegistered } from "./builtins.js";
 
 interface RuntimeNormalizationContext {
@@ -13,7 +13,7 @@ interface RuntimeNormalizationContext {
 
 export interface TransportRegistryEntry<TBot extends EndpointConfig = EndpointConfig> {
   configSchema: ZodType<TBot>;
-  createTransport: (config: ActiveEndpointRuntimeConfig, logger: Logger) => Transport;
+  createTransport: (config: ActiveEndpointRuntimeConfig, logger: Logger, context: TransportContext) => Transport;
   normalizeRuntimeConfig: (endpoint: TBot, context: RuntimeNormalizationContext) => ActiveEndpointRuntimeConfig;
 }
 
@@ -35,13 +35,18 @@ export function listTransportTypes(): string[] {
   return [...transportRegistry.keys()];
 }
 
-export function createTransport(type: TransportType, config: ActiveEndpointRuntimeConfig, logger: Logger): Transport {
+export function createTransport(
+  type: TransportType,
+  config: ActiveEndpointRuntimeConfig,
+  logger: Logger,
+  context: TransportContext,
+): Transport {
   const entry = getTransport(type);
   if (!entry) {
     throw new TransportResolutionError(`Unsupported endpoint transport: ${type}`);
   }
 
-  return entry.createTransport(config, logger);
+  return entry.createTransport(config, logger, context);
 }
 
 export function normalizeRuntimeEndpointConfig(

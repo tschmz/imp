@@ -106,6 +106,15 @@
       }
     }
   ],
+  "plugins": [
+    {
+      "id": "pi-audio",
+      "enabled": false,
+      "package": {
+        "path": "/opt/imp/plugins/pi-audio"
+      }
+    }
+  ],
   "endpoints": [
     {
       "id": "private-telegram",
@@ -140,6 +149,26 @@
       },
       "routing": {
         "defaultAgentId": "ops"
+      }
+    },
+    {
+      "id": "audio-ingress",
+      "type": "plugin",
+      "enabled": false,
+      "pluginId": "pi-audio",
+      "routing": {
+        "defaultAgentId": "default"
+      },
+      "ingress": {
+        "pollIntervalMs": 500,
+        "maxEventBytes": 65536
+      },
+      "response": {
+        "type": "endpoint",
+        "endpointId": "private-telegram",
+        "target": {
+          "conversationId": "123456789"
+        }
       }
     }
   ]

@@ -56,6 +56,19 @@ export interface AgentConfig {
   skills?: AgentSkillsConfig;
 }
 
+export interface PluginConfig {
+  id: string;
+  enabled: boolean;
+  package?: PluginPackageConfig;
+}
+
+export interface PluginPackageConfig {
+  path: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
 interface BaseEndpointConfig {
   id: string;
   enabled: boolean;
@@ -74,7 +87,41 @@ export interface CliEndpointConfig extends BaseEndpointConfig {
   type: "cli";
 }
 
-export type EndpointConfig = TelegramEndpointConfig | CliEndpointConfig;
+export interface PluginEndpointConfig extends BaseEndpointConfig {
+  type: "plugin";
+  pluginId: string;
+  ingress?: PluginIngressConfig;
+  response: PluginResponseRoutingConfig;
+}
+
+export interface PluginIngressConfig {
+  pollIntervalMs?: number;
+  maxEventBytes?: number;
+}
+
+export type PluginResponseRoutingConfig =
+  | PluginNoOutputResponseRoutingConfig
+  | PluginEndpointResponseRoutingConfig
+  | PluginOutboxResponseRoutingConfig;
+
+export interface PluginNoOutputResponseRoutingConfig {
+  type: "none";
+}
+
+export interface PluginEndpointResponseRoutingConfig {
+  type: "endpoint";
+  endpointId: string;
+  target: {
+    conversationId: string;
+    userId?: string;
+  };
+}
+
+export interface PluginOutboxResponseRoutingConfig {
+  type: "outbox";
+}
+
+export type EndpointConfig = TelegramEndpointConfig | CliEndpointConfig | PluginEndpointConfig;
 
 export interface TelegramAccessConfig {
   allowedUserIds: string[];
@@ -105,5 +152,6 @@ export interface AppConfig {
   logging?: LoggingConfig;
   defaults: DefaultsConfig;
   agents: AgentConfig[];
+  plugins?: PluginConfig[];
   endpoints: EndpointConfig[];
 }

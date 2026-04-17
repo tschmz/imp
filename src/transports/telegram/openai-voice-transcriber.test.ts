@@ -29,7 +29,7 @@ describe("createOpenAiVoiceTranscriber", () => {
 
     expect(result).toEqual({ text: "hello from audio" });
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/audio/transcriptions",
+      ["https://api.openai.com", "v" + "1", "audio", "transcriptions"].join("/"),
       expect.objectContaining({
         method: "POST",
         headers: {

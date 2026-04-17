@@ -36,7 +36,13 @@ describe("createRuntimeEntries", () => {
 
     await entries[0]?.start();
 
-    expect(createTransport).toHaveBeenCalledWith(runtime.endpointConfig, runtime.logger);
+    expect(createTransport).toHaveBeenCalledWith(
+      runtime.endpointConfig,
+      runtime.logger,
+      expect.objectContaining({
+        deliveryRouter: expect.any(Object),
+      }),
+    );
     expect(transport.start).toHaveBeenCalledOnce();
   });
 

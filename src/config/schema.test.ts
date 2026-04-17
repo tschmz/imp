@@ -107,6 +107,95 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts plugin endpoints with explicit plugin configuration and endpoint response routing", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      plugins: [
+        {
+          id: "pi-audio",
+          enabled: true,
+          package: {
+            path: "/opt/imp/plugins/pi-audio",
+            command: "node",
+            args: ["server.js"],
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "replace-me",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+        {
+          id: "audio-ingress",
+          type: "plugin",
+          enabled: true,
+          pluginId: "pi-audio",
+          ingress: {
+            pollIntervalMs: 250,
+            maxEventBytes: 65536,
+          },
+          response: {
+            type: "endpoint",
+            endpointId: "private-telegram",
+            target: {
+              conversationId: "123456789",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects plugin endpoints that reference unknown plugins", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      plugins: [],
+      endpoints: [
+        {
+          id: "audio-ingress",
+          type: "plugin",
+          enabled: true,
+          pluginId: "pi-audio",
+          response: {
+            type: "none",
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["endpoints", 0, "pluginId"],
+        message: 'Unknown plugin id "pi-audio" for endpoint "audio-ingress".',
+      }),
+    );
+  });
+
   it("rejects agents without a model", () => {
     const result = appConfigSchema.safeParse(
       createConfig({

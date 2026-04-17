@@ -2075,8 +2075,8 @@ describe("createPiAgentEngine", () => {
   it("invalidates the cached system prompt when context fingerprints change", async () => {
     const readCalls: string[] = [];
     const contextByFingerprint = new Map([
-      ["mtime:1:size:100", "context v1"],
-      ["mtime:2:size:100", "context v2"],
+      ["mtime:1:size:100", "context alpha"],
+      ["mtime:2:size:100", "context beta"],
     ]);
     const fingerprints = ["mtime:1:size:100", "mtime:2:size:100"];
     const systemPrompts: string[] = [];
@@ -2116,8 +2116,8 @@ describe("createPiAgentEngine", () => {
       "/workspace/AGENTS.md",
     ]);
     expect(systemPrompts).toEqual([
-      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\ncontext v1\n</INSTRUCTIONS>',
-      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\ncontext v2\n</INSTRUCTIONS>',
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\ncontext alpha\n</INSTRUCTIONS>',
+      'You are concise.\n\n<INSTRUCTIONS from="/workspace/AGENTS.md">\n\ncontext beta\n</INSTRUCTIONS>',
     ]);
   });
 

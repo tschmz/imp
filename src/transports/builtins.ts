@@ -1,5 +1,5 @@
 import { registerTransport } from "./registry.js";
-import type { CliEndpointConfig, TelegramEndpointConfig } from "../config/types.js";
+import type { CliEndpointConfig, PluginEndpointConfig, TelegramEndpointConfig } from "../config/types.js";
 import {
   cliTransportConfigSchema,
   createCliTransportFromRuntimeConfig,
@@ -10,6 +10,11 @@ import {
   normalizeTelegramRuntimeConfig,
   telegramTransportConfigSchema,
 } from "./telegram/transport-adapter.js";
+import {
+  createPluginTransportFromRuntimeConfig,
+  normalizePluginRuntimeConfig,
+  pluginTransportConfigSchema,
+} from "./plugin/transport-adapter.js";
 
 let builtInTransportsRegistered = false;
 
@@ -30,6 +35,13 @@ export function ensureBuiltInTransportsRegistered(): void {
     createTransport: createCliTransportFromRuntimeConfig,
     normalizeRuntimeConfig: (endpoint, context) =>
       normalizeCliRuntimeConfig(endpoint as CliEndpointConfig, context),
+  });
+
+  registerTransport("plugin", {
+    configSchema: pluginTransportConfigSchema,
+    createTransport: createPluginTransportFromRuntimeConfig,
+    normalizeRuntimeConfig: (endpoint, context) =>
+      normalizePluginRuntimeConfig(endpoint as PluginEndpointConfig, context),
   });
 
   builtInTransportsRegistered = true;

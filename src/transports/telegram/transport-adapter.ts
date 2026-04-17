@@ -4,7 +4,7 @@ import { secretValueConfigSchema } from "../../config/secret-value.js";
 import type { TelegramEndpointConfig } from "../../config/types.js";
 import type { ActiveEndpointRuntimeConfig, TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { Logger } from "../../logging/types.js";
-import type { Transport } from "../types.js";
+import type { Transport, TransportContext } from "../types.js";
 import { createTelegramTransport } from "./telegram-transport.js";
 
 const defaultTelegramDocumentMaxDownloadBytes = 20 * 1024 * 1024;
@@ -92,10 +92,11 @@ export function normalizeTelegramRuntimeConfig(
 export function createTelegramTransportFromRuntimeConfig(
   config: ActiveEndpointRuntimeConfig,
   logger: Logger,
+  context: TransportContext,
 ): Transport {
   if (config.type !== "telegram") {
     throw new Error(`Expected Telegram endpoint runtime config, got "${config.type}".`);
   }
 
-  return createTelegramTransport(config as TelegramEndpointRuntimeConfig, undefined, logger);
+  return createTelegramTransport(config as TelegramEndpointRuntimeConfig, undefined, logger, {}, context);
 }

@@ -505,6 +505,73 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
+  it("maps enabled plugin endpoints into daemon runtime config", async () => {
+    const appConfig = createAppConfig({
+      plugins: [
+        {
+          id: "pi-audio",
+          enabled: true,
+          package: {
+            path: "/opt/imp/plugins/pi-audio",
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "audio-ingress",
+          type: "plugin",
+          enabled: true,
+          pluginId: "pi-audio",
+          routing: {
+            defaultAgentId: "default",
+          },
+          ingress: {
+            pollIntervalMs: 250,
+            maxEventBytes: 65536,
+          },
+          response: {
+            type: "outbox",
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.activeEndpoints).toEqual([
+      {
+        id: "audio-ingress",
+        type: "plugin",
+        pluginId: "pi-audio",
+        ingress: {
+          pollIntervalMs: 250,
+          maxEventBytes: 65536,
+        },
+        response: {
+          type: "outbox",
+        },
+        defaultAgentId: "default",
+        paths: {
+          dataRoot: "/var/lib/imp",
+          endpointRoot: "/var/lib/imp/endpoints/audio-ingress",
+          conversationsDir: "/var/lib/imp/endpoints/audio-ingress/conversations",
+          logsDir: "/var/lib/imp/logs/endpoints",
+          logFilePath: "/var/lib/imp/logs/endpoints/audio-ingress.log",
+          runtimeDir: "/var/lib/imp/runtime/endpoints",
+          runtimeStatePath: "/var/lib/imp/runtime/endpoints/audio-ingress.json",
+          plugin: {
+            rootDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress",
+            inboxDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox",
+            processingDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress/processing",
+            processedDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress/processed",
+            failedDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress/failed",
+            outboxDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress/outbox",
+          },
+        },
+      },
+    ]);
+  });
+
   it("defaults logging level to info when logging config is omitted", async () => {
     const appConfig = createAppConfig({
       logging: undefined,
@@ -834,6 +901,7 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
         },
       },
     ],
+    ...(overrides.plugins ? { plugins: overrides.plugins } : {}),
     endpoints: overrides.endpoints ?? [],
   };
 }

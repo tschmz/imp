@@ -7,6 +7,7 @@ Start here for setup and operations, then drill into the feature-specific pages.
 - [Running and service](./running-and-service.md)
 - [Customizing agents](./customizing-agents.md)
 - [Telegram commands](./telegram.md)
+- [Plugins](./plugins.md)
 - [Built-in tools](./tools.md)
 - [Backups](./backups.md)
 - [Troubleshooting](./troubleshooting.md)

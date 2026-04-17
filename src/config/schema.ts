@@ -140,6 +140,27 @@ const agentConfigSchema = z
     }
   });
 
+const pluginIdSchema = z
+  .string()
+  .min(1)
+  .regex(
+    /^[A-Za-z0-9_-]+$/,
+    "Plugin ids may only contain letters, numbers, hyphens, and underscores.",
+  );
+
+const pluginConfigSchema = z.object({
+  id: pluginIdSchema,
+  enabled: z.boolean(),
+  package: z
+    .object({
+      path: z.string().min(1),
+      command: z.string().min(1).optional(),
+      args: z.string().min(1).array().optional(),
+      env: z.record(z.string(), z.string()).optional(),
+    })
+    .optional(),
+}).strict();
+
 const transportSchemas = listTransportTypes().map((type) => {
   const entry = getTransport(type);
   if (!entry) {
@@ -177,6 +198,7 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
     agentId: z.string().min(1),
   }),
   agents: agentConfigSchema.array().min(1),
+  plugins: pluginConfigSchema.array().optional(),
   endpoints: endpointConfigSchema.array(),
 }).superRefine((config, ctx) => {
   const agentIds = new Set<string>();
@@ -197,6 +219,7 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   }
 
   const endpointIds = new Set<string>();
+  const enabledEndpointIds = new Set<string>();
   for (const [index, endpoint] of config.endpoints.entries()) {
     if (endpointIds.has(endpoint.id)) {
       ctx.addIssue({
@@ -208,6 +231,27 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
     }
 
     endpointIds.add(endpoint.id);
+    if (endpoint.enabled) {
+      enabledEndpointIds.add(endpoint.id);
+    }
+  }
+
+  const pluginIds = new Set<string>();
+  const enabledPluginIds = new Set<string>();
+  for (const [index, plugin] of (config.plugins ?? []).entries()) {
+    if (pluginIds.has(plugin.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["plugins", index, "id"],
+        message: `Duplicate plugin id "${plugin.id}". Plugin ids must be unique.`,
+      });
+      continue;
+    }
+
+    pluginIds.add(plugin.id);
+    if (plugin.enabled) {
+      enabledPluginIds.add(plugin.id);
+    }
   }
 
   if (!knownAgentIds.has(config.defaults.agentId)) {
@@ -229,6 +273,56 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
       path: ["endpoints", index, "routing", "defaultAgentId"],
       message: `Unknown default agent id "${defaultAgentId}" for endpoint "${endpoint.id}". Expected one of: ${formatKnownIds(knownAgentIds)}.`,
     });
+  }
+
+  for (const [index, endpoint] of config.endpoints.entries()) {
+    if (endpoint.type !== "plugin") {
+      continue;
+    }
+
+    if (!pluginIds.has(endpoint.pluginId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endpoints", index, "pluginId"],
+        message: `Unknown plugin id "${endpoint.pluginId}" for endpoint "${endpoint.id}".`,
+      });
+    }
+
+    if (endpoint.enabled && !enabledPluginIds.has(endpoint.pluginId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endpoints", index, "pluginId"],
+        message: `Plugin id "${endpoint.pluginId}" for endpoint "${endpoint.id}" must be enabled.`,
+      });
+    }
+
+    if (endpoint.response.type === "endpoint" && endpoint.response.endpointId === endpoint.id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endpoints", index, "response", "endpointId"],
+        message: "Plugin endpoint responses must target a different endpoint.",
+      });
+    }
+
+    if (endpoint.response.type === "endpoint" && !endpointIds.has(endpoint.response.endpointId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endpoints", index, "response", "endpointId"],
+        message: `Unknown response endpoint id "${endpoint.response.endpointId}" for plugin endpoint "${endpoint.id}".`,
+      });
+    }
+
+    if (
+      endpoint.response.type === "endpoint" &&
+      endpointIds.has(endpoint.response.endpointId) &&
+      !enabledEndpointIds.has(endpoint.response.endpointId)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endpoints", index, "response", "endpointId"],
+        message: `Response endpoint "${endpoint.response.endpointId}" for plugin endpoint "${endpoint.id}" must be enabled.`,
+      });
+    }
   }
 });
 

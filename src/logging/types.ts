@@ -2,6 +2,7 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface LogFields {
   endpointId?: string;
+  pluginId?: string;
   transport?: string;
   conversationId?: string;
   messageId?: string;
@@ -11,6 +12,15 @@ export interface LogFields {
   backupId?: string;
   durationMs?: number;
   errorType?: string;
+  fileName?: string;
+  failedPath?: string;
+  errorRecordPath?: string;
+  rootDir?: string;
+  inboxDir?: string;
+  processingDir?: string;
+  processedDir?: string;
+  failedDir?: string;
+  outboxDir?: string;
   hookName?: string;
   hookRegistrationName?: string;
   skillCount?: number;

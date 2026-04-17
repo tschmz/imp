@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createDeliveryRouter } from "../transports/delivery-router.js";
 import { getDefaultUserConfigPath } from "../config/discover-config-path.js";
 import { createServiceInstallPlan } from "../service/install-plan.js";
 import { resolveServiceDefinitionPath } from "../service/install-service.js";
@@ -118,9 +119,12 @@ describe("createRuntimeTransportFactory", () => {
       error: vi.fn(async () => undefined),
     };
 
-    const resolved = createRuntimeTransportFactory(endpointConfig, logger);
+    const context = {
+      deliveryRouter: createDeliveryRouter(),
+    };
+    const resolved = createRuntimeTransportFactory(endpointConfig, logger, context);
 
     expect(resolved).toBe(transport);
-    expect(createTransportMock).toHaveBeenCalledWith(endpointConfig.type, endpointConfig, logger);
+    expect(createTransportMock).toHaveBeenCalledWith(endpointConfig.type, endpointConfig, logger, context);
   });
 });

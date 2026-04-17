@@ -28,6 +28,30 @@ export interface CliEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
   userId: string;
 }
 
+export interface PluginEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
+  type: "plugin";
+  pluginId: string;
+  ingress: PluginIngressRuntimeConfig;
+  response: PluginResponseRoutingRuntimeConfig;
+}
+
+export interface PluginIngressRuntimeConfig {
+  pollIntervalMs: number;
+  maxEventBytes: number;
+}
+
+export type PluginResponseRoutingRuntimeConfig =
+  | { type: "none" }
+  | {
+      type: "endpoint";
+      endpointId: string;
+      target: {
+        conversationId: string;
+        userId?: string;
+      };
+    }
+  | { type: "outbox" };
+
 export interface TelegramVoiceRuntimeConfig {
   enabled: boolean;
   transcription: TelegramTranscriptionRuntimeConfig;
@@ -43,7 +67,10 @@ export interface TelegramDocumentRuntimeConfig {
   maxDownloadBytes: number;
 }
 
-export type TransportEndpointRuntimeConfig = TelegramEndpointRuntimeConfig | CliEndpointRuntimeConfig;
+export type TransportEndpointRuntimeConfig =
+  | TelegramEndpointRuntimeConfig
+  | CliEndpointRuntimeConfig
+  | PluginEndpointRuntimeConfig;
 
 export interface RuntimePaths {
   dataRoot: string;
@@ -53,6 +80,16 @@ export interface RuntimePaths {
   logFilePath: string;
   runtimeDir: string;
   runtimeStatePath: string;
+  plugin?: PluginRuntimePaths;
+}
+
+export interface PluginRuntimePaths {
+  rootDir: string;
+  inboxDir: string;
+  processingDir: string;
+  processedDir: string;
+  failedDir: string;
+  outboxDir: string;
 }
 
 export type ActiveEndpointRuntimeConfig = TransportEndpointRuntimeConfig & {

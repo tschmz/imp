@@ -6,10 +6,11 @@ import type { Logger } from "../logging/types.js";
 import { createServiceInstallPlan } from "../service/install-plan.js";
 import { resolveServiceDefinitionPath } from "../service/install-service.js";
 import { createTransport } from "../transports/registry.js";
-import type { Transport, TransportFactory } from "../transports/types.js";
+import type { Transport, TransportContext, TransportFactory } from "../transports/types.js";
 
 export const createRuntimeTransportFactory: TransportFactory<DaemonConfig["activeEndpoints"][number], Logger> =
-  (endpointConfig, logger): Transport => createTransport(endpointConfig.type, endpointConfig, logger);
+  (endpointConfig, logger, context: TransportContext): Transport =>
+    createTransport(endpointConfig.type, endpointConfig, logger, context);
 
 export async function resolveRuntimeTarget(options: { cliConfigPath?: string } = {}): Promise<{
   configPath: string;

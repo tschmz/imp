@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { inboundCommandMenu } from "../../application/commands/registry.js";
 import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
+import { createDeliveryRouter } from "../delivery-router.js";
 import { createTelegramTransport } from "./telegram-transport.js";
 import type { VoiceTranscriber } from "./openai-voice-transcriber.js";
 
@@ -97,6 +98,49 @@ describe("createTelegramTransport", () => {
     });
     expect(bot.api.sendChatAction).toHaveBeenCalledWith(42, "typing");
     expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("registers endpoint delivery through the shared delivery router", async () => {
+    const bot = createFakeBot();
+    const deliveryRouter = createDeliveryRouter();
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      undefined,
+      {},
+      {
+        deliveryRouter,
+      },
+    );
+
+    await transport.start({
+      handle: vi.fn(async () => {}),
+    });
+
+    await deliveryRouter.deliver({
+      endpointId: "private-telegram",
+      target: {
+        conversationId: "42",
+      },
+      message: {
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+        },
+        text: "hello",
+      },
+    });
+
+    expect(bot.api.sendMessage).toHaveBeenCalledWith("42", "hello", {
+      parse_mode: "HTML",
+    });
+
+    await transport.stop?.();
   });
 
   it("marks /new as a reset command for the application layer", async () => {
@@ -940,6 +984,7 @@ function createFakeBot(): {
   api: {
     getMe(): Promise<{ username: string }>;
     getFile(fileId: string): Promise<{ file_path?: string }>;
+    sendMessage(chatId: number | string, text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }): Promise<unknown>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
     setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;
   };
@@ -1053,6 +1098,7 @@ function createFakeBot(): {
     api: {
       getMe: vi.fn(async () => ({ username: "test_bot" })),
       getFile: vi.fn(async () => ({ file_path: "voice/test.ogg" })),
+      sendMessage: vi.fn(async () => ({})),
       sendChatAction: vi.fn(async () => ({})),
       setMyCommands: vi.fn(async () => ({})),
     },

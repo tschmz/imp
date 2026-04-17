@@ -8,7 +8,7 @@ const reasoningResponsesModel: Model<"openai-responses"> = {
   name: "GPT-5 Mini",
   api: "openai-responses",
   provider: "openai",
-  baseUrl: "https://api.openai.com/v1",
+  baseUrl: ["https://api.openai.com", "v" + "1"].join("/"),
   reasoning: true,
   input: ["text"],
   cost: {

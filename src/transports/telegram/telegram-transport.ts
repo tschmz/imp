@@ -7,7 +7,7 @@ import { inboundCommandMenu, inboundCommandNames } from "../../application/comma
 import type { TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessage, IncomingMessageCommand } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
-import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
+import type { Transport, TransportContext, TransportHandler, TransportInboundEvent } from "../types.js";
 import {
   createOpenAiVoiceTranscriber,
   type VoiceTranscriber,
@@ -26,6 +26,7 @@ interface TelegramBotAdapter {
   api: {
     getMe(): Promise<TelegramBotProfile>;
     getFile(fileId: string): Promise<TelegramFile>;
+    sendMessage(chatId: number | string, text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }): Promise<unknown>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
     setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;
   };
@@ -93,15 +94,27 @@ export function createTelegramTransport(
   bot: TelegramBotAdapter = new Bot(config.token),
   logger?: Logger,
   dependencies: TelegramTransportDependencies = {},
+  context?: TransportContext,
 ): Transport {
   const allowedUserIds = new Set(config.allowedUserIds);
   const fetchImpl = dependencies.fetch ?? fetch;
   const voiceTranscriber =
     dependencies.voiceTranscriber ??
     (config.voice?.enabled ? createOpenAiVoiceTranscriber() : undefined);
+  let registeredDeliveryCleanup: (() => void) | undefined;
 
   return {
     async start(handler: TransportHandler): Promise<void> {
+      registeredDeliveryCleanup = context?.deliveryRouter.register(config.id, {
+        async deliver(request): Promise<void> {
+          for (const chunk of renderTelegramMessages(request.message.text)) {
+            await bot.api.sendMessage(request.target.conversationId, chunk, {
+              parse_mode: "HTML",
+            });
+          }
+        },
+      });
+
       const profile = await getTelegramBotProfile(bot, config);
       await logger?.debug("validated telegram bot token", {
         endpointId: config.id,
@@ -287,6 +300,8 @@ export function createTelegramTransport(
       await bot.start();
     },
     async stop(): Promise<void> {
+      registeredDeliveryCleanup?.();
+      registeredDeliveryCleanup = undefined;
       bot.stop();
     },
   };
