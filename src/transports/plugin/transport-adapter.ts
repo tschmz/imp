@@ -74,6 +74,7 @@ export const pluginTransportConfigSchema = z.object({
         .object({
           enabled: z.boolean().optional(),
           language: z.string().min(1).optional(),
+          model: z.string().min(1).optional(),
           voice: z.string().min(1).optional(),
           instructions: z.string().min(1).optional(),
         })

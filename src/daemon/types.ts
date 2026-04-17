@@ -60,6 +60,7 @@ export type PluginResponseRoutingRuntimeConfig =
       speech?: {
         enabled?: boolean;
         language?: string;
+        model?: string;
         voice?: string;
         instructions?: string;
       };

@@ -130,6 +130,7 @@ export interface PluginOutboxResponseRoutingConfig {
 export interface PluginOutboxSpeechConfig {
   enabled?: boolean;
   language?: string;
+  model?: string;
   voice?: string;
   instructions?: string;
 }

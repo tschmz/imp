@@ -159,6 +159,7 @@ Plugin endpoints choose one response route:
     "speech": {
       "enabled": true,
       "language": "de",
+      "model": "gpt-4o-mini-tts",
       "voice": "ash",
       "instructions": "Use short spoken replies."
     }
@@ -173,7 +174,7 @@ Optional outbox controls:
 - `priority`: `low`, `normal`, or `high`; defaults to `normal`
 - `ttlMs`: advisory time-to-live for consumers that should skip stale replies
 - `speech.enabled`: set `false` when an audio consumer should not speak the reply
-- `speech.language`, `speech.voice`, and `speech.instructions`: advisory TTS hints for speech consumers
+- `speech.language`, `speech.model`, `speech.voice`, and `speech.instructions`: advisory TTS hints for speech consumers
 
 Prompt files receive explicit reply-channel context:
 
