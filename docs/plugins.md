@@ -213,3 +213,32 @@ The error record includes:
 - error message
 
 The endpoint log also records the failed path and error record path.
+
+## File Protocol Smoke Test
+
+With a running daemon and an enabled plugin endpoint, write one event into the endpoint inbox:
+
+```bash
+cat > <paths.dataRoot>/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox/smoke.json <<'JSON'
+{
+  "schemaVersion": 1,
+  "id": "smoke-1",
+  "conversationId": "smoke",
+  "userId": "smoke",
+  "text": "Say a short smoke-test reply.",
+  "receivedAt": "2026-04-18T00:00:00Z",
+  "metadata": {
+    "source": "manual-smoke-test"
+  }
+}
+JSON
+```
+
+Expected result:
+
+- the event file moves from `inbox/` to `processing/` and then `processed/`
+- invalid files move to `failed/` with a sibling `.error.json`
+- when `response.type` is `outbox`, a reply appears in `outbox/`
+- when `response.type` is `endpoint`, the configured endpoint receives the reply
+
+For Raspberry Pi audio frontends, the companion service can then process one outbox reply with its own `--once` mode.
