@@ -104,7 +104,9 @@ describe("plugin use cases", () => {
     expect(parseNpmPackageName("@tschmz/imp-voice@0.1.0")).toBe("@tschmz/imp-voice");
     expect(parseNpmPackageName("imp-voice@latest")).toBe("imp-voice");
     expect(parseNpmPackageName("npm:@tschmz/imp-voice")).toBe("@tschmz/imp-voice");
+    expect(parseNpmPackageName("imp-voice-local@npm:@tschmz/imp-voice@0.1.0")).toBe("imp-voice-local");
     expect(tryParseNpmPackageName("./tschmz-imp-voice-0.1.0.tgz")).toBeUndefined();
+    expect(tryParseNpmPackageName("github:tschmz/imp-voice")).toBeUndefined();
   });
 
   it("installs plugin manifests into an existing config", async () => {

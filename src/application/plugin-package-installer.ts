@@ -2,6 +2,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
+import npa from "npm-package-arg";
 import type { AppConfig } from "../config/types.js";
 import { resolveConfigPath as resolvePathRelativeToConfig } from "../config/secret-value.js";
 import { PLUGIN_MANIFEST_FILE } from "../plugins/manifest.js";
@@ -71,22 +72,16 @@ export function parseNpmPackageName(packageSpec: string): string {
     throw new Error("Plugin package spec must not be empty.");
   }
 
-  if (isPackagePathSpec(normalized)) {
+  const parsed = npa(normalized);
+  if (parsed.type === "directory" || parsed.type === "file") {
     throw new Error(`Package path specs do not encode a package name: ${packageSpec}`);
   }
 
-  if (normalized.startsWith("@")) {
-    const slashIndex = normalized.indexOf("/");
-    if (slashIndex === -1) {
-      throw new Error(`Invalid npm package spec "${packageSpec}". Scoped packages must include a package name.`);
-    }
-
-    const versionIndex = normalized.indexOf("@", slashIndex + 1);
-    return versionIndex === -1 ? normalized : normalized.slice(0, versionIndex);
+  if (!parsed.name) {
+    throw new Error(`Package spec does not encode an npm package name: ${packageSpec}`);
   }
 
-  const versionIndex = normalized.indexOf("@");
-  return versionIndex === -1 ? normalized : normalized.slice(0, versionIndex);
+  return parsed.name;
 }
 
 export function tryParseNpmPackageName(packageSpec: string): string | undefined {
@@ -160,13 +155,4 @@ async function resolveInstalledPackageRoot(options: {
   const packageRoot = join(options.storeRoot, packageEntry[0]);
   await access(join(packageRoot, PLUGIN_MANIFEST_FILE));
   return packageRoot;
-}
-
-function isPackagePathSpec(packageSpec: string): boolean {
-  return (
-    packageSpec.startsWith(".") ||
-    packageSpec.startsWith("/") ||
-    packageSpec.startsWith("file:") ||
-    packageSpec.endsWith(".tgz")
-  );
 }
