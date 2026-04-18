@@ -332,6 +332,9 @@ describe("imp CLI e2e", () => {
 
     await expect(stat(join(dataRoot, "logs", "endpoints"))).resolves.toBeDefined();
     await expect(stat(join(dataRoot, "runtime", "endpoints"))).resolves.toBeDefined();
+    await expect(stat(join(dataRoot, "endpoints"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
     await expect(readFile(logFilePath, "utf8")).resolves.toContain(
       "daemon failed to start",
     );

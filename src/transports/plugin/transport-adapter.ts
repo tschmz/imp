@@ -90,7 +90,6 @@ export function normalizePluginRuntimeConfig(
     defaultAgentId: string;
   },
 ): ActiveEndpointRuntimeConfig {
-  const endpointRoot = join(options.dataRoot, "endpoints", endpoint.id);
   const logsDir = join(options.dataRoot, "logs", "endpoints");
   const runtimeDir = join(options.dataRoot, "runtime", "endpoints");
   const pluginRoot = join(options.dataRoot, "runtime", "plugins", endpoint.pluginId, "endpoints", endpoint.id);
@@ -107,7 +106,6 @@ export function normalizePluginRuntimeConfig(
     defaultAgentId: endpoint.routing?.defaultAgentId ?? options.defaultAgentId,
     paths: {
       dataRoot: options.dataRoot,
-      endpointRoot,
       conversationsDir: join(options.dataRoot, "conversations"),
       logsDir,
       logFilePath: join(logsDir, `${endpoint.id}.log`),

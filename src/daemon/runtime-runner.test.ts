@@ -351,7 +351,6 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "grimoire",
         paths: {
           dataRoot: "/tmp",
-          endpointRoot: "/tmp/endpoints/imp.grimoire",
           conversationsDir: "/tmp/conversations",
           logsDir: "/tmp/logs/endpoints",
           logFilePath: "/tmp/logs/endpoints/imp.grimoire.log",
@@ -555,7 +554,6 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          endpointRoot: "/tmp/endpoints/audio-ingress",
           conversationsDir: "/tmp/endpoints/audio-ingress/conversations",
           logsDir: "/tmp/logs/endpoints",
           logFilePath: "/tmp/logs/endpoints/audio-ingress.log",
@@ -645,7 +643,6 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          endpointRoot: "/tmp/endpoints/audio-ingress",
           conversationsDir: "/tmp/endpoints/audio-ingress/conversations",
           logsDir: "/tmp/logs/endpoints",
           logFilePath: "/tmp/logs/endpoints/audio-ingress.log",
@@ -677,7 +674,6 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          endpointRoot: "/tmp/endpoints/silent-ingress",
           conversationsDir: "/tmp/endpoints/silent-ingress/conversations",
           logsDir: "/tmp/logs/endpoints",
           logFilePath: "/tmp/logs/endpoints/silent-ingress.log",
@@ -830,7 +826,6 @@ function createRuntime(overrides: Partial<BootstrappedRuntime> = {}): Bootstrapp
       defaultAgentId: "default",
       paths: {
         dataRoot: "/tmp",
-        endpointRoot: "/tmp/endpoints/private-telegram",
         conversationsDir: "/tmp/endpoints/private-telegram/conversations",
         logsDir: "/tmp/logs/endpoints",
         logFilePath: "/tmp/logs/endpoints/private-telegram.log",

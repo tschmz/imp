@@ -88,7 +88,6 @@ export type TransportEndpointRuntimeConfig =
 
 export interface RuntimePaths {
   dataRoot: string;
-  endpointRoot: string;
   conversationsDir: string;
   logsDir: string;
   logFilePath: string;

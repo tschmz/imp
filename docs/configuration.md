@@ -139,8 +139,6 @@ dataRoot/
       <transport>/
         <chat-id>/
           selected-agent.json
-  endpoints/
-    <endpoint-id>/
   logs/
     endpoints/
       <endpoint-id>.log

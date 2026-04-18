@@ -77,7 +77,6 @@ function createRuntimeConfig(): DaemonConfig {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          endpointRoot: "/tmp/endpoint-1",
           conversationsDir: "/tmp/endpoint-1/conversations",
           logsDir: "/tmp/logs/endpoints",
           logFilePath: "/tmp/logs/endpoints/endpoint-1.log",

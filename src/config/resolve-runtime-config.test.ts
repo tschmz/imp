@@ -127,7 +127,6 @@ describe("resolveRuntimeConfig", () => {
         defaultAgentId: "ops-agent",
         paths: {
           dataRoot: "/var/lib/imp",
-          endpointRoot: "/var/lib/imp/endpoints/private-telegram",
           conversationsDir: "/var/lib/imp/conversations",
           logsDir: "/var/lib/imp/logs/endpoints",
           logFilePath: "/var/lib/imp/logs/endpoints/private-telegram.log",
@@ -559,7 +558,6 @@ describe("resolveRuntimeConfig", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/var/lib/imp",
-          endpointRoot: "/var/lib/imp/endpoints/audio-ingress",
           conversationsDir: "/var/lib/imp/conversations",
           logsDir: "/var/lib/imp/logs/endpoints",
           logFilePath: "/var/lib/imp/logs/endpoints/audio-ingress.log",
@@ -708,7 +706,6 @@ describe("resolveRuntimeConfig", () => {
         defaultAgentId: typedContext.defaultAgentId,
         paths: {
           dataRoot: typedContext.dataRoot,
-          endpointRoot: "/var/lib/imp/endpoints/no-token",
           conversationsDir: "/var/lib/imp/conversations",
           logsDir: "/var/lib/imp/logs/endpoints",
           logFilePath: "/var/lib/imp/logs/endpoints/no-token.log",

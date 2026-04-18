@@ -306,7 +306,6 @@ function createPluginRuntimeConfig(
     defaultAgentId: "default",
     paths: {
       dataRoot: root,
-      endpointRoot: join(root, "endpoints", "audio-ingress"),
       conversationsDir: join(root, "endpoints", "audio-ingress", "conversations"),
       logsDir: join(root, "logs", "endpoints"),
       logFilePath: join(root, "logs", "endpoints", "audio-ingress.log"),

@@ -611,7 +611,6 @@ async function createBackupArchive(archivePath: string, files: Array<[archivePat
 function createRuntimePaths(dataRoot: string) {
   return {
     dataRoot,
-    endpointRoot: join(dataRoot, "endpoints", "private-telegram"),
     conversationsDir: join(dataRoot, "conversations"),
     logsDir: join(dataRoot, "logs", "endpoints"),
     logFilePath: join(dataRoot, "logs", "endpoints", "private-telegram.log"),

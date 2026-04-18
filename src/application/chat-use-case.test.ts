@@ -286,7 +286,6 @@ function createConversationStore(): ConversationStore {
 function createRuntimePaths(endpointId: string): DaemonConfig["activeEndpoints"][number]["paths"] {
   return {
     dataRoot: "/var/lib/imp",
-    endpointRoot: `/var/lib/imp/endpoints/${endpointId}`,
     conversationsDir: `/var/lib/imp/endpoints/${endpointId}/conversations`,
     logsDir: "/var/lib/imp/logs/endpoints",
     logFilePath: `/var/lib/imp/logs/endpoints/${endpointId}.log`,

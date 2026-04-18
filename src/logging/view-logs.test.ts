@@ -232,7 +232,6 @@ function createRuntimeConfig(root: string, endpointIds: string[]): DaemonConfig 
       defaultAgentId: "default",
       paths: {
         dataRoot: root,
-        endpointRoot: join(root, "endpoints", endpointId),
         conversationsDir: join(root, "endpoints", endpointId, "conversations"),
         logsDir: join(root, "logs", "endpoints"),
         logFilePath: join(root, "logs", "endpoints", `${endpointId}.log`),

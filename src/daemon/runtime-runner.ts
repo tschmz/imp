@@ -111,7 +111,6 @@ export function createRuntimeEntries(
           `starting daemon with default agent "${defaultAgent?.id ?? "unknown"}"`,
         );
         await runtime.logger.info(`data root: ${runtime.endpointConfig.paths.dataRoot}`);
-        await runtime.logger.info(`endpoint root: ${runtime.endpointConfig.paths.endpointRoot}`);
         await runtime.logger.info(`conversations dir: ${runtime.endpointConfig.paths.conversationsDir}`);
         await runtime.logger.info(`logs dir: ${runtime.endpointConfig.paths.logsDir}`);
         await runtime.logger.info(`log file: ${runtime.endpointConfig.paths.logFilePath}`);

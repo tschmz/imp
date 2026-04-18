@@ -105,7 +105,6 @@ describe("createRuntimeTransportFactory", () => {
       defaultAgentId: "default",
       paths: {
         dataRoot: "/tmp",
-        endpointRoot: "/tmp/endpoint",
         conversationsDir: "/tmp/endpoint/conversations",
         logsDir: "/tmp/logs/endpoints",
         logFilePath: "/tmp/logs/endpoints/private-telegram.log",

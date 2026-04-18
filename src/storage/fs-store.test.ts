@@ -671,7 +671,6 @@ async function createTempDir(): Promise<string> {
 function createRuntimePaths(root: string): RuntimePaths {
   return {
     dataRoot: root,
-    endpointRoot: join(root, "endpoint"),
     conversationsDir: join(root, "conversations"),
     logsDir: join(root, "logs"),
     logFilePath: join(root, "logs", "daemon.log"),
