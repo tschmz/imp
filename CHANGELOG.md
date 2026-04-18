@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.6.0 - 2026-04-18
+
+### Added
+
+- Add plugin manifest discovery, inspection, and install commands.
+- Support installing plugins from npm package specs.
+- Bundle the `imp-voice` voice frontend plugin package with the repository.
+- Support custom service install plans.
+- Share agent conversation sessions across endpoints.
+
+### Changed
+
+- Restrict audio outbox prompt output to the reply content.
+- Install the managed `imp-voice` plugin during local `just install` runs.
+
+### Fixed
+
+- Stop creating endpoint root directories.
+
 ## 0.5.0 - 2026-04-18
 
 ### Added
