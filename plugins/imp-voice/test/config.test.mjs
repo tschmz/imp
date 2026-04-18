@@ -23,6 +23,7 @@ describe("imp-voice config", () => {
     expect(config.speaker.statusFile).toBe(
       "/tmp/imp-config/runtime/plugins/imp-voice/endpoints/audio-ingress/speaker-status.json",
     );
+    expect(config.speaker.failFast).toBe(false);
     expect(config.speaker.tts).toMatchObject({
       fallbackModel: "gpt-4o-mini-tts",
       fallbackVoice: "nova",
