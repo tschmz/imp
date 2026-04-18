@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import type {
   ToolResultMessage,
   UserMessage,
 } from "@mariozechner/pi-ai";
+import { lock as lockFile } from "proper-lockfile";
 import type {
   ChatRef,
   ConversationAssistantMessage,
@@ -15,12 +16,12 @@ import type {
   ConversationUserMessage,
 } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
-import { isAlreadyExistsError, isMissingFileError } from "../files/node-error.js";
+import { isMissingFileError } from "../files/node-error.js";
 import type { ConversationBackupSummary, ConversationStore } from "./types.js";
 
 const conversationWriteQueues = new Map<string, Promise<void>>();
 // The critical section is intentionally short: read latest snapshot, compute next state, atomically rename.
-// A short-lived lock file guards that section across processes while the in-memory queue serializes writers locally.
+// A lock file guards that section across processes while the in-memory queue serializes writers locally.
 const lockTtlMs = 30_000;
 const lockRetryDelayMs = 25;
 const lockRetryCount = 400;
@@ -893,83 +894,39 @@ async function withAgentLock<T>(
 }
 
 async function acquireConversationLock(lockPath: string): Promise<() => Promise<void>> {
-  for (let attempt = 0; attempt < lockRetryCount; attempt += 1) {
-    try {
-      const lockHandle = await open(lockPath, "wx");
-      const lockPayload = {
-        pid: process.pid,
-        acquiredAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + lockTtlMs).toISOString(),
-      };
-      await lockHandle.writeFile(`${JSON.stringify(lockPayload, null, 2)}\n`, "utf8");
-      await lockHandle.close();
-
-      return async () => {
-        try {
-          await rm(lockPath);
-        } catch (error) {
-          if (!isMissingFileError(error)) {
-            throw error;
-          }
-        }
-      };
-    } catch (error) {
-      if (!isAlreadyExistsError(error)) {
-        throw error;
-      }
-
-      if (await tryCleanupExpiredLock(lockPath)) {
-        continue;
-      }
-
-      await delay(lockRetryDelayMs);
-    }
-  }
-
-  throw new Error(`Conversation write lock timed out: ${lockPath}`);
-}
-
-async function tryCleanupExpiredLock(lockPath: string): Promise<boolean> {
+  let compromisedError: Error | undefined;
   try {
-    const raw = await readFile(lockPath, "utf8");
-    const expiresAt = parseLockExpiry(raw);
-    if (expiresAt !== undefined && expiresAt > Date.now()) {
-      return false;
-    }
+    const release = await lockFile(lockPath, {
+      realpath: false,
+      stale: lockTtlMs,
+      update: Math.floor(lockTtlMs / 2),
+      retries: {
+        retries: lockRetryCount,
+        minTimeout: lockRetryDelayMs,
+        maxTimeout: lockRetryDelayMs,
+      },
+      onCompromised(error) {
+        compromisedError = error;
+      },
+    });
 
-    await rm(lockPath);
-    return true;
+    return async () => {
+      await release();
+      if (compromisedError) {
+        throw compromisedError;
+      }
+    };
   } catch (error) {
-    if (isMissingFileError(error)) {
-      return true;
-    }
-
-    if (isAlreadyExistsError(error)) {
-      return false;
+    if (isLockAcquisitionFailure(error)) {
+      throw new Error(`Conversation write lock timed out: ${lockPath}`);
     }
 
     throw error;
   }
 }
 
-function parseLockExpiry(raw: string): number | undefined {
-  try {
-    const parsed = JSON.parse(raw) as { expiresAt?: unknown };
-    if (typeof parsed.expiresAt !== "string") {
-      return undefined;
-    }
-
-    const expiresAt = Date.parse(parsed.expiresAt);
-    return Number.isNaN(expiresAt) ? undefined : expiresAt;
-  } catch {
-    return undefined;
-  }
-}
-
-async function delay(ms: number): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
+function isLockAcquisitionFailure(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ELOCKED";
 }
 
 function sanitizePathSegment(value: string): string {
