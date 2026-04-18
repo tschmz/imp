@@ -974,7 +974,8 @@ class WakePhraseRecorder:
 
     def timestamped_recording_path(self) -> Path:
         stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        return self.config.command_recording.output_dir / f"command-{stamp}.wav"
+        unique_suffix = time.time_ns()
+        return self.config.command_recording.output_dir / f"command-{stamp}-{unique_suffix}.wav"
 
     def write_imp_plugin_event(self, recording_path: Path, transcript: str, metadata: dict[str, Any]) -> Path:
         final_path = self.plugin_inbox_writer.write_event(recording_path, transcript, metadata)
