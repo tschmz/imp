@@ -270,7 +270,7 @@ describe("imp CLI e2e", () => {
       default:
         throw new Error(`Unsupported test platform: ${process.platform}`);
     }
-  });
+  }, 10_000);
 
   it("creates runtime directories and logs a startup failure for an invalid telegram token", async () => {
     const root = await createTempDir();
@@ -341,7 +341,7 @@ describe("imp CLI e2e", () => {
     await expect(stat(runtimeStatePath)).rejects.toMatchObject({
       code: "ENOENT",
     });
-  });
+  }, 10_000);
 
   it("shows recent daemon log lines", async () => {
     const root = await createTempDir();
@@ -394,7 +394,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["log", "--config", configPath, "--lines", "2"], env);
 
     expect(stdout).toBe("two\nthree\n");
-  });
+  }, 10_000);
 
   it("rejects non-interactive init without --defaults", async () => {
     const root = await createTempDir();

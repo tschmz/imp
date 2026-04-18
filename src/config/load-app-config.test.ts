@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadAppConfig } from "./load-app-config.js";
+import { LoadAppConfigError, loadAppConfig } from "./load-app-config.js";
 
 const tempDirs: string[] = [];
 
@@ -96,6 +96,28 @@ describe("loadAppConfig", () => {
     );
 
     await expect(loadAppConfig(configPath)).rejects.toThrow(`Invalid config file ${configPath}`);
+  });
+
+  it("exposes structured issues for schema validation failures", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    await writeRawFile(configPath, `${JSON.stringify({ invalid: true }, null, 2)}\n`);
+
+    const error = await loadAppConfig(configPath).catch((reason) => reason);
+    expect(error).toBeInstanceOf(LoadAppConfigError);
+    expect(error).toMatchObject({
+      configPath,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          path: ["instance"],
+          message: "Invalid input: expected object, received undefined",
+        }),
+        expect.objectContaining({
+          path: ["agents"],
+          message: "Invalid input: expected array, received undefined",
+        }),
+      ]),
+    });
   });
 });
 

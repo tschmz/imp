@@ -2,8 +2,8 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { parseConfigJson } from "../config/config-json.js";
 import { discoverConfigPath } from "../config/discover-config-path.js";
+import { loadAppConfig } from "../config/load-app-config.js";
 import { appConfigSchema } from "../config/schema.js";
 import type { AppConfig, EndpointConfig, PluginConfig, PluginEndpointConfig } from "../config/types.js";
 import { discoverPluginManifests, readPluginManifest, type DiscoveredPluginManifest } from "../plugins/discovery.js";
@@ -47,7 +47,6 @@ export type PluginPackageInstaller = (options: {
 export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {}) {
   const writeOutput = dependencies.writeOutput ?? ((text: string) => console.log(text));
   const discoverConfig = dependencies.discoverConfigPath ?? discoverConfigPath;
-  const readText = dependencies.readTextFile ?? ((path: string) => readFile(path, "utf8"));
   const writeText = dependencies.writeTextFile ?? ((path: string, content: string) => writeFile(path, content, "utf8"));
 
   return {
@@ -85,23 +84,11 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
       const { configPath } = await discoverConfig({
         cliConfigPath: options.configPath,
       });
-      const rawConfig = await readText(configPath);
-      const parsedConfig = parseConfigJson(rawConfig, {
-        errorPrefix: `Invalid config file ${configPath}`,
-      });
-      const configResult = appConfigSchema.safeParse(parsedConfig);
-      if (!configResult.success) {
-        throw new Error(
-          [
-            `Invalid config file ${configPath}`,
-            ...configResult.error.issues.map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`),
-          ].join("\n"),
-        );
-      }
+      const config = await loadAppConfig(configPath);
 
       if (options.servicesOnly) {
         const plugin = await installServicesForConfiguredPlugin({
-          config: configResult.data,
+          config,
           configPath,
           pluginId: options.id,
           root: options.root,
@@ -117,12 +104,12 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
 
       const plugin = await resolveInstallablePlugin({
         options,
-        config: configResult.data,
+        config,
         configPath,
         dependencies,
         writeOutput,
       });
-      const updatedConfig = installPluginIntoConfig(configResult.data, plugin);
+      const updatedConfig = installPluginIntoConfig(config, plugin);
       await writeText(configPath, `${JSON.stringify(updatedConfig, null, 2)}\n`);
       writeOutput(`Installed plugin "${plugin.manifest.id}" into ${configPath}`);
       if (plugin.manifest.endpoints?.length) {

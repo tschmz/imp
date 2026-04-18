@@ -624,6 +624,43 @@ describe("plugin use cases", () => {
       'Endpoint "audio-ingress" already exists in the config.',
     );
   });
+
+  it("reports malformed config JSON with the centralized error format", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    await writeManifest(root, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+    });
+    await writeFile(configPath, "{\n", "utf8");
+    const useCases = createPluginUseCases();
+
+    await expect(useCases.installPlugin({ root, configPath, id: "imp-voice" })).rejects.toThrow(
+      `Invalid config file ${configPath}\nMalformed JSON:`,
+    );
+  });
+
+  it("reports schema-invalid configs with issue details", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    await writeManifest(root, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+    });
+    await writeFile(configPath, `${JSON.stringify({ invalid: true }, null, 2)}\n`, "utf8");
+    const useCases = createPluginUseCases();
+
+    await expect(useCases.installPlugin({ root, configPath, id: "imp-voice" })).rejects.toThrow(
+      `Invalid config file ${configPath}`,
+    );
+    await expect(useCases.installPlugin({ root, configPath, id: "imp-voice" })).rejects.toThrow(
+      "instance: Invalid input: expected object, received undefined",
+    );
+  });
 });
 
 let tempRoots: string[] = [];

@@ -1,6 +1,6 @@
-import { access, readFile, writeFile } from "node:fs/promises";
+import { access, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { parseConfigJson } from "../config/config-json.js";
+import { loadAppConfig } from "../config/load-app-config.js";
 import { appConfigSchema } from "../config/schema.js";
 import { discoverConfigPath } from "../config/discover-config-path.js";
 import { setValueAtKeyPath } from "./config-key-path.js";
@@ -23,9 +23,9 @@ export function createSetConfigValueUseCase(
 
   return async ({ configPath, keyPath, value }) => {
     const resolvedConfigPath = await resolveWritableConfigPath(configPath);
-    const raw = await readFile(resolvedConfigPath, "utf8");
-    const parsed = parseConfigJson(raw, {
+    const parsed = await loadAppConfig(resolvedConfigPath, {
       errorPrefix: `Invalid input config file ${resolvedConfigPath}`,
+      validateSchema: false,
     });
 
     try {
