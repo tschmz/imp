@@ -11,22 +11,30 @@ The model is intentionally explicit:
 
 ## Installable Plugin Manifests
 
-Installable plugins live under a plugin root as direct subdirectories with a `plugin.json` manifest:
+Installable plugins are npm packages with a `plugin.json` manifest:
 
 ```text
-plugins/
-  imp-voice/
+@tschmz/imp-voice/
+  package.json
+  plugin.json
+```
+
+Local development plugins can still live under a plugin root as direct subdirectories:
+
+```text
+local-plugins/
+  my-plugin/
     plugin.json
 ```
 
-`imp` discovers bundled plugins from `plugins/` next to the installed package. Operators can scan another root with `--root`, add roots through `IMP_PLUGIN_PATH`, or install an npm package by passing a package spec.
+Operators normally install plugins by passing an npm package spec. Local plugin roots are only scanned when `--root` or `IMP_PLUGIN_PATH` is used.
 
 ```bash
 imp plugin list
 imp plugin list --root /opt/imp/plugins
-imp plugin inspect imp-voice
-imp plugin install imp-voice --config ~/.config/imp/config.json
+imp plugin inspect my-plugin --root /opt/imp/plugins
 imp plugin install @tschmz/imp-voice@0.1.0 --config ~/.config/imp/config.json
+imp plugin install ./my-plugin-0.1.0.tgz --config ~/.config/imp/config.json
 ```
 
 When no local manifest matches the install argument, `imp` treats it as an npm package spec and installs it into the configured data root:

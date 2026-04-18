@@ -78,15 +78,19 @@ describe("plugin use cases", () => {
     );
   });
 
-  it("uses IMP_PLUGIN_PATH before the bundled plugin root", () => {
+  it("uses IMP_PLUGIN_PATH as the default local plugin roots", () => {
     expect(
       getPluginSearchRoots(
         {},
         {
           IMP_PLUGIN_PATH: ["/opt/imp/plugins", "/home/me/plugins"].join(delimiter),
         },
-      ).slice(0, 2),
+      ),
     ).toEqual(["/opt/imp/plugins", "/home/me/plugins"]);
+  });
+
+  it("does not scan an implicit plugin root by default", () => {
+    expect(getPluginSearchRoots({}, {})).toEqual([]);
   });
 
   it("resolves package store roots below the configured data root", () => {

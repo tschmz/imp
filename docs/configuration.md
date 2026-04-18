@@ -310,10 +310,11 @@ Top-level plugin fields:
 
 Installable plugin manifests:
 
-- bundled or local installable plugins are discovered from direct subdirectories containing `plugin.json`
+- npm plugin packages are installed into `<paths.dataRoot>/plugins/npm`
+- local installable plugins are discovered from explicit plugin roots containing direct subdirectories with `plugin.json`
 - `imp plugin list` lists discovered manifests
 - `imp plugin inspect <id>` prints one manifest summary
-- `imp plugin install <id>` adds the manifest's plugin entry and endpoint defaults to a config
+- `imp plugin install <package-spec>` installs an npm package, then adds the manifest's plugin entry and endpoint defaults to a config
 - `--root <path>` scans an explicit plugin root
 - `IMP_PLUGIN_PATH` can provide additional plugin roots, separated with the platform path delimiter
 - manifest `schemaVersion` is currently `1`

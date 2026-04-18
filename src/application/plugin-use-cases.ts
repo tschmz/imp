@@ -1,6 +1,5 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { parseConfigJson } from "../config/config-json.js";
@@ -256,13 +255,7 @@ export function getPluginSearchRoots(
     return [resolve(options.root)];
   }
 
-  const roots = splitPluginPath(env.IMP_PLUGIN_PATH);
-  roots.push(getBundledPluginRoot());
-  return roots;
-}
-
-export function getBundledPluginRoot(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "plugins");
+  return splitPluginPath(env.IMP_PLUGIN_PATH);
 }
 
 export function getPluginPackageStoreRoot(config: AppConfig, configPath: string): string {
