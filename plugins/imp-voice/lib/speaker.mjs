@@ -27,30 +27,35 @@ export class SpeakerOutboxConsumer {
   async run() {
     await this.ensureDirs();
     await this.writeStatus("active");
-    let processedAny = false;
+    let foundAny = false;
+    let succeededAny = false;
+    let failedAny = false;
 
     while (true) {
       const filePath = await this.nextOutboxFile();
       if (!filePath) {
         if (this.once) {
-          if (!processedAny) {
+          if (!foundAny) {
             this.log("No outbox file found.");
+            return 0;
           }
-          return 0;
+          return failedAny && !succeededAny ? 1 : 0;
         }
         await sleep(this.config.pollIntervalMs);
         continue;
       }
 
-      processedAny = true;
+      foundAny = true;
       const ok = await this.processFile(filePath);
       if (!ok) {
+        failedAny = true;
         if (this.failFast) {
           return 1;
         }
         await this.writeStatus("active");
         continue;
       }
+      succeededAny = true;
       if (this.once) {
         return 0;
       }
