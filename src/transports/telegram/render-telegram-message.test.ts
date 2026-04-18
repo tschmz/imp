@@ -74,6 +74,13 @@ describe("renderTelegramMessage", () => {
     );
   });
 
+
+  it("renders valid links whose URL contains bracketed IPv6 literals", () => {
+    expect(renderTelegramMessage("Open [loopback](http://[::1]).")).toBe(
+      'Open <a href="http://[::1]">loopback</a>.',
+    );
+  });
+
   it("renders only links with allowed protocols", () => {
     expect(
       renderTelegramMessage(

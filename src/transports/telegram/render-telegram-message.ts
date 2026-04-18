@@ -329,13 +329,15 @@ function splitLinks(text: string): RichTextSegment[] {
 
     const label = text.slice(labelStart + 1, labelEnd);
     const href = text.slice(urlStart + 1, urlEnd).trim();
-    if (href.includes("[") || !label || !isSafeLinkTarget(href)) {
-      if (href.includes("[")) {
-        result.push({ type: "text", value: "[" });
-        cursor = labelStart + 1;
-        continue;
-      }
+    const safeHref = isSafeLinkTarget(href);
 
+    if (href.includes("[") && !safeHref) {
+      result.push({ type: "text", value: "[" });
+      cursor = labelStart + 1;
+      continue;
+    }
+
+    if (!label || !safeHref) {
       result.push({ type: "text", value: text.slice(labelStart, urlEnd + 1) });
     } else {
       result.push({ type: "link", label, href });
