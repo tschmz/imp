@@ -89,6 +89,40 @@ describe("imp-voice speaker outbox", () => {
     });
   });
 
+  it("returns non-zero in --once mode when all discovered files fail", async () => {
+    const root = await createTempRoot();
+    const config = normalizeConfig({ runtimeDir: join(root, "runtime") }, root);
+    await mkdir(config.outboxDir, { recursive: true });
+    await writeFile(join(config.outboxDir, "001-bad.json"), '{"schemaVersion":1,"text":', "utf8");
+
+    const consumer = new SpeakerOutboxConsumer(config, {
+      once: true,
+      playAudio: false,
+      fetchImpl: async () => {
+        throw new Error("fetch should not be called");
+      },
+      log: () => undefined,
+    });
+
+    await expect(consumer.run()).resolves.toBe(1);
+
+    expect(await readdir(config.outboxDir)).toEqual([]);
+    expect(await readdir(config.speaker.processedDir)).toEqual([]);
+    const failedEntries = await readdir(config.speaker.failedDir);
+    expect(failedEntries).toHaveLength(2);
+
+    const status = JSON.parse(await readFile(config.speaker.statusFile, "utf8"));
+    expect(status).toMatchObject({
+      service: "imp-voice-out",
+      status: "active",
+      lastError: {
+        file: expect.any(String),
+        message: expect.any(String),
+        failedAt: expect.any(String),
+      },
+    });
+  });
+
   it("sends outbox speech metadata to TTS before using local fallbacks", async () => {
     const root = await createTempRoot();
     const previousApiKey = process.env.OPENAI_API_KEY;
