@@ -41,7 +41,7 @@ By default, backups include:
 
 - the active config file
 - prompt and auth files referenced by the config
-- endpoint conversation stores under `paths.dataRoot`
+- the shared conversation store under `paths.dataRoot/conversations`
 
 Current backup behavior does **not** include Telegram token secret files referenced via `endpoints[].token.file`.
 Those files stay outside the archive and must be backed up separately if you use file-based token references.
@@ -74,7 +74,7 @@ imp restore /path/to/imp-backup.tar --only conversations --force
 
 ## Important Restore Behavior
 
-- conversation restores replace only the targeted conversation subtree
+- conversation restores replace the shared conversation subtree
 - unrelated runtime data under `paths.dataRoot` is left untouched
 - `--only agents` is stricter and requires either `config` to be restored too, or an already existing target config
 

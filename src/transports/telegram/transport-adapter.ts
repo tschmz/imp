@@ -80,7 +80,7 @@ export function normalizeTelegramRuntimeConfig(
     paths: {
       dataRoot: options.dataRoot,
       endpointRoot,
-      conversationsDir: join(endpointRoot, "conversations"),
+      conversationsDir: join(options.dataRoot, "conversations"),
       logsDir,
       logFilePath: join(logsDir, `${endpoint.id}.log`),
       runtimeDir,

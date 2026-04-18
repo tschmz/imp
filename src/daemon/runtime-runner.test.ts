@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAgentRegistry } from "../agents/registry.js";
+import type { AgentDefinition } from "../domain/agent.js";
+import type { ChatRef } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { TransportHandler } from "../transports/types.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
@@ -91,6 +93,7 @@ describe("createRuntimeEntries", () => {
       {
         transport: "telegram",
         externalId: "42",
+        endpointId: "private-telegram",
       },
       expect.objectContaining({
         agentId: "default",
@@ -143,10 +146,12 @@ describe("createRuntimeEntries", () => {
     expect(runtime.conversationStore.get).toHaveBeenCalledWith({
       transport: "telegram",
       externalId: "42",
+      endpointId: "private-telegram",
     });
     expect(runtime.conversationStore.listBackups).toHaveBeenCalledWith({
       transport: "telegram",
       externalId: "42",
+      endpointId: "private-telegram",
     });
     expect(runtime.engine.run).not.toHaveBeenCalled();
   });
@@ -197,7 +202,202 @@ describe("createRuntimeEntries", () => {
     expect(runtime.conversationStore.get).toHaveBeenCalledWith({
       transport: "telegram",
       externalId: "42",
+      endpointId: "private-telegram",
     });
+  });
+
+  it("continues a shared agent session while delivering the reply to the current surface", async () => {
+    const sharedConversation = {
+      state: {
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+          sessionId: "shared-session",
+        },
+        agentId: "default",
+        createdAt: "2026-04-07T11:00:00.000Z",
+        updatedAt: "2026-04-07T11:00:00.000Z",
+        version: 1,
+      },
+      messages: [],
+    };
+    const conversationStore = {
+      get: vi.fn(async () => sharedConversation),
+      put: vi.fn(async () => undefined),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      ensureActive: vi.fn(async () => sharedConversation),
+      create: vi.fn(async () => sharedConversation),
+      getSelectedAgent: vi.fn(async () => "default"),
+      ensureActiveForAgent: vi.fn(async () => sharedConversation),
+    };
+    const engine = {
+      run: vi.fn(async ({ message }: { message: IncomingMessage }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "reply to current surface",
+        },
+        conversationEvents: [],
+      })),
+      close: vi.fn(async () => undefined),
+    };
+    const runtime = createRuntime({ conversationStore, engine });
+    const transport = createCapturingTransport();
+    const event = createEvent({
+      endpointId: "audio-ingress",
+      conversation: {
+        transport: "plugin",
+        externalId: "kitchen",
+      },
+      messageId: "wake-1",
+      correlationId: "corr-wake-1",
+      userId: "frontend",
+      text: "continue",
+      receivedAt: "2026-04-07T12:00:00.000Z",
+    });
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([
+        {
+          id: "default",
+          name: "Default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.3",
+          },
+          tools: [],
+          extensions: [],
+        },
+      ]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+    await transport.handler.handle(event);
+
+    expect(conversationStore.ensureActiveForAgent).toHaveBeenCalledWith(
+      {
+        transport: "plugin",
+        externalId: "kitchen",
+        endpointId: "audio-ingress",
+      },
+      expect.objectContaining({ agentId: "default" }),
+    );
+    expect(engine.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation: sharedConversation,
+        message: expect.objectContaining({
+          conversation: {
+            transport: "plugin",
+            externalId: "kitchen",
+            endpointId: "audio-ingress",
+            sessionId: "shared-session",
+            agentId: "default",
+          },
+        }),
+      }),
+    );
+    expect(event.deliver).toHaveBeenCalledWith({
+      conversation: {
+        transport: "plugin",
+        externalId: "kitchen",
+        endpointId: "audio-ingress",
+        sessionId: "shared-session",
+        agentId: "default",
+      },
+      text: "reply to current surface",
+    });
+  });
+
+  it("uses the endpoint default agent when another endpoint selected an agent for the same local chat id", async () => {
+    const conversationStore = {
+      get: vi.fn(async () => undefined),
+      put: vi.fn(async () => undefined),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      create: vi.fn(async () => {
+        throw new Error("unexpected create fallback");
+      }),
+      ensureActive: vi.fn(async () => {
+        throw new Error("unexpected ensureActive fallback");
+      }),
+      getSelectedAgent: vi.fn(async (ref: { endpointId?: string }) =>
+        ref.endpointId === "imp.jarvis" || !ref.endpointId ? "jarvis" : undefined,
+      ),
+      ensureActiveForAgent: vi.fn(async (ref: ChatRef, options: { agentId: string; now: string }) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: `${options.agentId}-session`,
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+    };
+    const runtime = createRuntime({
+      conversationStore,
+      endpointConfig: {
+        id: "imp.grimoire",
+        type: "cli",
+        userId: "local",
+        defaultAgentId: "grimoire",
+        paths: {
+          dataRoot: "/tmp",
+          endpointRoot: "/tmp/endpoints/imp.grimoire",
+          conversationsDir: "/tmp/conversations",
+          logsDir: "/tmp/logs/endpoints",
+          logFilePath: "/tmp/logs/endpoints/imp.grimoire.log",
+          runtimeDir: "/tmp/runtime/endpoints",
+          runtimeStatePath: "/tmp/runtime/endpoints/imp.grimoire.json",
+        },
+      },
+    });
+    const transport = createCapturingTransport();
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([
+        createTestAgent("jarvis"),
+        createTestAgent("grimoire"),
+      ]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+    await transport.handler.handle(
+      createEvent({
+        endpointId: "imp.grimoire",
+        conversation: {
+          transport: "cli",
+          externalId: "local",
+        },
+        messageId: "local-1",
+        correlationId: "corr-local-1",
+        userId: "local",
+        text: "hello",
+        receivedAt: "2026-04-07T12:00:00.000Z",
+      }),
+    );
+
+    expect(conversationStore.getSelectedAgent).toHaveBeenCalledWith({
+      transport: "cli",
+      externalId: "local",
+      endpointId: "imp.grimoire",
+    });
+    expect(conversationStore.ensureActiveForAgent).toHaveBeenCalledWith(
+      {
+        transport: "cli",
+        externalId: "local",
+        endpointId: "imp.grimoire",
+      },
+      expect.objectContaining({ agentId: "grimoire" }),
+    );
   });
 
   it("closes the runtime engine when the entry stops", async () => {
@@ -599,6 +799,24 @@ function createEvent(message: IncomingMessage) {
     message,
     deliver: vi.fn(async () => undefined),
     runWithProcessing: async <T>(operation: () => Promise<T>): Promise<T> => operation(),
+  };
+}
+
+function createTestAgent(id: string): AgentDefinition {
+  return {
+    id,
+    name: id,
+    prompt: {
+      base: {
+        text: "You are concise.",
+      },
+    },
+    model: {
+      provider: "openai",
+      modelId: "gpt-5.3",
+    },
+    tools: [],
+    extensions: [],
   };
 }
 

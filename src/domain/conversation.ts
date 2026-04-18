@@ -11,10 +11,12 @@ import type {
 export interface ChatRef {
   transport: string;
   externalId: string;
+  endpointId?: string;
 }
 
 export interface ConversationRef extends ChatRef {
   sessionId?: string;
+  agentId?: string;
 }
 
 export interface ConversationEventBase {

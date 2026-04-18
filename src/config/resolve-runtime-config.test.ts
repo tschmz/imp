@@ -128,7 +128,7 @@ describe("resolveRuntimeConfig", () => {
         paths: {
           dataRoot: "/var/lib/imp",
           endpointRoot: "/var/lib/imp/endpoints/private-telegram",
-          conversationsDir: "/var/lib/imp/endpoints/private-telegram/conversations",
+          conversationsDir: "/var/lib/imp/conversations",
           logsDir: "/var/lib/imp/logs/endpoints",
           logFilePath: "/var/lib/imp/logs/endpoints/private-telegram.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",
@@ -560,7 +560,7 @@ describe("resolveRuntimeConfig", () => {
         paths: {
           dataRoot: "/var/lib/imp",
           endpointRoot: "/var/lib/imp/endpoints/audio-ingress",
-          conversationsDir: "/var/lib/imp/endpoints/audio-ingress/conversations",
+          conversationsDir: "/var/lib/imp/conversations",
           logsDir: "/var/lib/imp/logs/endpoints",
           logFilePath: "/var/lib/imp/logs/endpoints/audio-ingress.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",
@@ -709,7 +709,7 @@ describe("resolveRuntimeConfig", () => {
         paths: {
           dataRoot: typedContext.dataRoot,
           endpointRoot: "/var/lib/imp/endpoints/no-token",
-          conversationsDir: "/var/lib/imp/endpoints/no-token/conversations",
+          conversationsDir: "/var/lib/imp/conversations",
           logsDir: "/var/lib/imp/logs/endpoints",
           logFilePath: "/var/lib/imp/logs/endpoints/no-token.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",

@@ -81,6 +81,38 @@ export function createDependencies(
         },
         messages: [],
       }),
+      getSelectedAgent: async () => undefined,
+      setSelectedAgent: async () => {},
+      getActiveForAgent: async () => undefined,
+      listBackupsForAgent: async () => [],
+      restoreForAgent: async () => false,
+      ensureActiveForAgent: async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      }),
+      createForAgent: async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          ...(options.title ? { title: options.title } : {}),
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      }),
     },
     engine: {
       run: async () => ({
@@ -140,6 +172,75 @@ export function createMutableConversationStore(
       return current;
     },
     create: async (ref, options) => {
+      counter += 1;
+      current = {
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: `session-${counter}`,
+          },
+          agentId: options.agentId,
+          ...(options.title ? { title: options.title } : {}),
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      } satisfies ConversationContext;
+      return current;
+    },
+    getSelectedAgent: async () => current?.state.agentId,
+    setSelectedAgent: async (ref, agentId) => {
+      if (!current) {
+        current = {
+          state: {
+            conversation: {
+              ...ref,
+              sessionId: `session-${counter}`,
+            },
+            agentId,
+            createdAt: "2026-04-05T00:00:00.000Z",
+            updatedAt: "2026-04-05T00:00:00.000Z",
+            version: 1,
+          },
+          messages: [],
+        };
+        return;
+      }
+
+      current = {
+        ...current,
+        state: {
+          ...current.state,
+          agentId,
+        },
+      };
+    },
+    getActiveForAgent: async (agentId) => current?.state.agentId === agentId ? current : undefined,
+    listBackupsForAgent: async () => [],
+    restoreForAgent: async () => false,
+    ensureActiveForAgent: async (ref, options) => {
+      if (current?.state.agentId === options.agentId) {
+        return current;
+      }
+
+      counter += 1;
+      current = {
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: `session-${counter}`,
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      };
+      return current;
+    },
+    createForAgent: async (ref, options) => {
       counter += 1;
       current = {
         state: {

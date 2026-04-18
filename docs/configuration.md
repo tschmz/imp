@@ -130,9 +130,17 @@ dataRoot/
       AGENTS.md
       SOUL.md
       workspace/
+  conversations/
+    agents/
+      <agent-id>/
+        active.json
+        sessions/
+    chats/
+      <transport>/
+        <chat-id>/
+          selected-agent.json
   endpoints/
     <endpoint-id>/
-      conversations/
   logs/
     endpoints/
       <endpoint-id>.log
@@ -151,7 +159,7 @@ dataRoot/
   skills/
 ```
 
-Endpoint directories store conversation data. Endpoint logs and runtime lock/state files live under the central `logs/endpoints` and `runtime/endpoints` trees. Plugin endpoint file ingress and egress live under `runtime/plugins/<plugin-id>/endpoints/<endpoint-id>`. Agent home directories default to `agents/<agent-id>`, and every direct `*.md` file in an agent home is loaded alphabetically as an instruction block before explicit `prompt.instructions` and the workspace `AGENTS.md`.
+The shared `conversations/` tree stores one active session pointer per agent plus each chat's currently selected agent. Endpoint logs and runtime lock/state files live under the central `logs/endpoints` and `runtime/endpoints` trees. Plugin endpoint file ingress and egress live under `runtime/plugins/<plugin-id>/endpoints/<endpoint-id>`. Agent home directories default to `agents/<agent-id>`, and every direct `*.md` file in an agent home is loaded alphabetically as an instruction block before explicit `prompt.instructions` and the workspace `AGENTS.md`.
 
 ## Secret References
 

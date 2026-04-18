@@ -14,7 +14,12 @@ export const restoreCommandHandler: InboundCommandHandler = {
     return command === "restore";
   },
   async handle({ message, dependencies, logger }: InboundCommandContext) {
-    const backups = await dependencies.conversationStore.listBackups(message.conversation);
+    const agentId =
+      await dependencies.conversationStore.getSelectedAgent?.(message.conversation) ??
+      dependencies.defaultAgentId;
+    const backups = dependencies.conversationStore.listBackupsForAgent
+      ? await dependencies.conversationStore.listBackupsForAgent(agentId)
+      : await dependencies.conversationStore.listBackups(message.conversation);
     const selectedBackup = pickRestoreBackup(backups, message.commandArgs);
     if (!selectedBackup) {
       return {
@@ -23,7 +28,9 @@ export const restoreCommandHandler: InboundCommandHandler = {
       };
     }
 
-    const restored = await dependencies.conversationStore.restore(message.conversation, selectedBackup.id);
+    const restored = dependencies.conversationStore.restoreForAgent
+      ? await dependencies.conversationStore.restoreForAgent(agentId, selectedBackup.id)
+      : await dependencies.conversationStore.restore(message.conversation, selectedBackup.id);
     if (!restored) {
       return {
         conversation: message.conversation,

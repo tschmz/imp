@@ -26,63 +26,73 @@ const lockRetryDelayMs = 25;
 const lockRetryCount = 400;
 
 function getChatDir(conversationsDir: string, ref: ChatRef): string {
+  const endpointSegments = ref.endpointId
+    ? ["endpoints", sanitizePathSegment(ref.endpointId)]
+    : [];
+
   return join(
     conversationsDir,
+    "chats",
+    ...endpointSegments,
     sanitizePathSegment(ref.transport),
     sanitizePathSegment(ref.externalId),
   );
 }
 
-function getSessionsDir(conversationsDir: string, ref: ChatRef): string {
-  return join(getChatDir(conversationsDir, ref), "sessions");
+function getAgentDir(conversationsDir: string, agentId: string): string {
+  return join(conversationsDir, "agents", sanitizePathSegment(agentId));
 }
 
-function getSessionDir(conversationsDir: string, ref: ConversationRef): string {
+function getAgentSessionsDir(conversationsDir: string, agentId: string): string {
+  return join(getAgentDir(conversationsDir, agentId), "sessions");
+}
+
+function getSessionDir(conversationsDir: string, ref: ConversationRef, agentId: string): string {
   const sessionId = requireSessionId(ref);
-  return join(getSessionsDir(conversationsDir, ref), sanitizePathSegment(sessionId));
+  return join(getAgentSessionsDir(conversationsDir, agentId), sanitizePathSegment(sessionId));
 }
 
-function getSessionSnapshotPath(conversationsDir: string, ref: ConversationRef): string {
-  return join(getSessionDir(conversationsDir, ref), "conversation.json");
+function getSessionSnapshotPath(conversationsDir: string, ref: ConversationRef, agentId: string): string {
+  return join(getSessionDir(conversationsDir, ref, agentId), "conversation.json");
 }
 
-function getActiveSessionPath(conversationsDir: string, ref: ChatRef): string {
-  return join(getChatDir(conversationsDir, ref), "active.json");
+function getSelectedAgentPath(conversationsDir: string, ref: ChatRef): string {
+  return join(getChatDir(conversationsDir, ref), "selected-agent.json");
 }
 
-function getConversationLockPath(conversationsDir: string, ref: ChatRef): string {
-  return join(getChatDir(conversationsDir, ref), "conversation.lock");
+function getAgentActiveSessionPath(conversationsDir: string, agentId: string): string {
+  return join(getAgentDir(conversationsDir, agentId), "active.json");
+}
+
+function getAgentLockPath(conversationsDir: string, agentId: string): string {
+  return join(getAgentDir(conversationsDir, agentId), "conversation.lock");
 }
 
 export function createFsConversationStore(paths: RuntimePaths): ConversationStore {
   return {
     async get(ref) {
       if ("sessionId" in ref) {
-        return readSessionSnapshot(ref, paths.conversationsDir);
+        return readSessionSnapshotBySessionId(ref, paths.conversationsDir);
       }
 
-      return withConversationWriteQueue(ref, async () =>
-        withConversationLock(paths.conversationsDir, ref, async () => {
-          const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
-          if (!activeRef) {
-            return undefined;
-          }
-
-          return readSessionSnapshot(activeRef, paths.conversationsDir);
-        }),
-      );
+      const selectedAgentId = await readSelectedAgentId(paths.conversationsDir, ref);
+      return selectedAgentId
+        ? readActiveAgentConversation(paths.conversationsDir, selectedAgentId)
+        : undefined;
     },
     async put(context) {
-      await withConversationWriteQueue(context.state.conversation, async () => {
-        await withConversationLock(paths.conversationsDir, context.state.conversation, async () => {
+      await withAgentWriteQueue(context.state.agentId, async () => {
+        await withAgentLock(paths.conversationsDir, context.state.agentId, async () => {
           const snapshotPath = getSessionSnapshotPath(
             paths.conversationsDir,
             context.state.conversation,
+            context.state.agentId,
           );
-          const current = await readSessionSnapshot(context.state.conversation, paths.conversationsDir);
+          const current = await readSessionSnapshot(context.state.agentId, context.state.conversation, paths.conversationsDir);
           const nextSnapshot = resolveNextSnapshot(normalizeSnapshot(context, {
             conversationsDir: paths.conversationsDir,
             conversation: context.state.conversation,
+            agentId: context.state.agentId,
             materializeAttachmentPaths: true,
           }), current);
 
@@ -94,69 +104,63 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
       });
     },
     async listBackups(ref) {
-      return withConversationWriteQueue(ref, async () =>
-        withConversationLock(paths.conversationsDir, ref, async () => {
-          const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
-          return readInactiveSessions(paths.conversationsDir, ref, activeRef?.sessionId);
-        }),
-      );
+      const selectedAgentId = await readSelectedAgentId(paths.conversationsDir, ref);
+      return selectedAgentId ? readAgentInactiveSessions(paths.conversationsDir, selectedAgentId) : [];
     },
     async restore(ref, backupId) {
-      return withConversationWriteQueue(ref, async () =>
-        withConversationLock(paths.conversationsDir, ref, async () => {
-          const summaries = await readInactiveSessions(paths.conversationsDir, ref);
-          const selected = summaries.find((summary) => summary.id === backupId);
-          if (!selected) {
-            return false;
-          }
-
-          await writeActiveConversationRef(paths.conversationsDir, {
-            transport: ref.transport,
-            externalId: ref.externalId,
-            sessionId: selected.sessionId,
-          });
-          return true;
-        }),
-      );
+      const selectedAgentId = await readSelectedAgentId(paths.conversationsDir, ref);
+      return selectedAgentId
+        ? restoreAgentSession(paths.conversationsDir, selectedAgentId, backupId)
+        : false;
     },
     async create(ref, options) {
-      return withConversationWriteQueue(ref, async () =>
-        withConversationLock(paths.conversationsDir, ref, async () => {
-          const context = createEmptyConversationContext(ref, options);
-
-          await writeConversationSnapshot(paths.conversationsDir, context);
-          await writeActiveConversationRef(paths.conversationsDir, context.state.conversation);
-          return context;
-        }),
-      );
+      await writeSelectedAgentId(paths.conversationsDir, ref, options.agentId);
+      return createAgentSession(paths.conversationsDir, ref, options);
     },
     async ensureActive(ref, options) {
-      return withConversationWriteQueue(ref, async () =>
-        withConversationLock(paths.conversationsDir, ref, async () => {
-          const activeRef = await readActiveConversationRef(paths.conversationsDir, ref);
-          if (activeRef) {
-            const existing = await readSessionSnapshot(activeRef, paths.conversationsDir);
-            if (existing) {
-              return existing;
-            }
-          }
-
-          const created = createEmptyConversationContext(ref, options);
-          await writeConversationSnapshot(paths.conversationsDir, created);
-          await writeActiveConversationRef(paths.conversationsDir, created.state.conversation);
-          return created;
-        }),
-      );
+      const selectedAgentId = await readSelectedAgentId(paths.conversationsDir, ref) ?? options.agentId;
+      await writeSelectedAgentId(paths.conversationsDir, ref, selectedAgentId);
+      return ensureActiveAgentSession(paths.conversationsDir, ref, {
+        ...options,
+        agentId: selectedAgentId,
+      });
+    },
+    async getSelectedAgent(ref) {
+      return readSelectedAgentId(paths.conversationsDir, ref);
+    },
+    async setSelectedAgent(ref, agentId) {
+      await writeSelectedAgentId(paths.conversationsDir, ref, agentId);
+    },
+    async getActiveForAgent(agentId) {
+      return readActiveAgentConversation(paths.conversationsDir, agentId);
+    },
+    async listBackupsForAgent(agentId) {
+      return readAgentInactiveSessions(paths.conversationsDir, agentId);
+    },
+    async restoreForAgent(agentId, backupId) {
+      return restoreAgentSession(paths.conversationsDir, agentId, backupId);
+    },
+    async createForAgent(ref, options) {
+      await writeSelectedAgentId(paths.conversationsDir, ref, options.agentId);
+      return createAgentSession(paths.conversationsDir, ref, options);
+    },
+    async ensureActiveForAgent(ref, options) {
+      await writeSelectedAgentId(paths.conversationsDir, ref, options.agentId);
+      return ensureActiveAgentSession(paths.conversationsDir, ref, options);
     },
   };
 }
 
-async function readInactiveSessions(
+async function readAgentInactiveSessions(
   conversationsDir: string,
-  ref: ChatRef,
+  agentId: string,
   activeSessionId?: string,
 ): Promise<ConversationBackupSummary[]> {
-  const sessionsDir = getSessionsDir(conversationsDir, ref);
+  const activeRef = activeSessionId
+    ? undefined
+    : await readActiveAgentConversationRef(conversationsDir, agentId);
+  const sessionsDir = getAgentSessionsDir(conversationsDir, agentId);
+  const resolvedActiveSessionId = activeSessionId ?? activeRef?.sessionId;
   let entries;
 
   try {
@@ -173,11 +177,11 @@ async function readInactiveSessions(
       .filter((entry) => entry.isDirectory())
       .map(async (entry) => {
         const sessionId = entry.name;
-        if (activeSessionId && sessionId === activeSessionId) {
+        if (resolvedActiveSessionId && sessionId === resolvedActiveSessionId) {
           return undefined;
         }
 
-        const snapshot = await readSessionSnapshot(pathsafeRef(ref, sessionId), conversationsDir);
+        const snapshot = await readSessionSnapshotByAgentAndSessionId(agentId, sessionId, conversationsDir);
         return snapshot ? toBackupSummary(snapshot) : undefined;
       }),
   );
@@ -185,6 +189,68 @@ async function readInactiveSessions(
   return backups
     .filter((backup): backup is ConversationBackupSummary => backup !== undefined)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+async function createAgentSession(
+  conversationsDir: string,
+  ref: ChatRef,
+  options: { agentId: string; now: string; title?: string },
+): Promise<ConversationContext> {
+  return withAgentWriteQueue(options.agentId, async () =>
+    withAgentLock(conversationsDir, options.agentId, async () => {
+      const context = createEmptyConversationContext(ref, options);
+
+      await writeConversationSnapshot(conversationsDir, context);
+      await writeActiveAgentConversationRef(conversationsDir, context.state.agentId, context.state.conversation);
+      return context;
+    }),
+  );
+}
+
+async function ensureActiveAgentSession(
+  conversationsDir: string,
+  ref: ChatRef,
+  options: { agentId: string; now: string; title?: string },
+): Promise<ConversationContext> {
+  return withAgentWriteQueue(options.agentId, async () =>
+    withAgentLock(conversationsDir, options.agentId, async () => {
+      const activeRef = await readActiveAgentConversationRef(conversationsDir, options.agentId);
+      if (activeRef) {
+        const existing = await readSessionSnapshot(options.agentId, activeRef, conversationsDir);
+        if (existing) {
+          return existing;
+        }
+      }
+
+      const created = createEmptyConversationContext(ref, options);
+      await writeConversationSnapshot(conversationsDir, created);
+      await writeActiveAgentConversationRef(conversationsDir, options.agentId, created.state.conversation);
+      return created;
+    }),
+  );
+}
+
+async function restoreAgentSession(
+  conversationsDir: string,
+  agentId: string,
+  backupId: string,
+): Promise<boolean> {
+  return withAgentWriteQueue(agentId, async () =>
+    withAgentLock(conversationsDir, agentId, async () => {
+      const summaries = await readAgentInactiveSessions(conversationsDir, agentId);
+      const selected = summaries.find((summary) => summary.id === backupId);
+      if (!selected) {
+        return false;
+      }
+
+      await writeActiveAgentConversationRef(conversationsDir, agentId, {
+        transport: selected.transport ?? "_",
+        externalId: selected.externalId ?? "_",
+        sessionId: selected.sessionId,
+      });
+      return true;
+    }),
+  );
 }
 
 function createEmptyConversationContext(
@@ -207,26 +273,27 @@ function createEmptyConversationContext(
       version: 1,
     },
     messages: [],
-  }, { conversationsDir: "", conversation, materializeAttachmentPaths: false });
+  }, {
+    conversationsDir: "",
+    conversation,
+    agentId: options.agentId,
+    materializeAttachmentPaths: false,
+  });
 }
 
 async function writeConversationSnapshot(
   conversationsDir: string,
   context: ConversationContext,
 ): Promise<void> {
-  const snapshotPath = getSessionSnapshotPath(conversationsDir, context.state.conversation);
+  const snapshotPath = getSessionSnapshotPath(
+    conversationsDir,
+    context.state.conversation,
+    context.state.agentId,
+  );
   await writeFileAtomically(
     snapshotPath,
     JSON.stringify(toStorageSnapshot(context, conversationsDir), null, 2),
   );
-}
-
-function pathsafeRef(ref: ChatRef, sessionId: string): ConversationRef {
-  return {
-    transport: ref.transport,
-    externalId: ref.externalId,
-    sessionId,
-  };
 }
 
 function toBackupSummary(snapshot: ConversationContext): ConversationBackupSummary {
@@ -234,6 +301,8 @@ function toBackupSummary(snapshot: ConversationContext): ConversationBackupSumma
   return {
     id: sessionId,
     sessionId,
+    transport: snapshot.state.conversation.transport,
+    externalId: snapshot.state.conversation.externalId,
     ...(snapshot.state.title ? { title: snapshot.state.title } : {}),
     createdAt: snapshot.state.createdAt,
     updatedAt: snapshot.state.updatedAt,
@@ -246,16 +315,19 @@ function toBackupSummary(snapshot: ConversationContext): ConversationBackupSumma
 }
 
 async function readSessionSnapshot(
+  agentId: string,
   ref: ConversationRef,
   conversationsDir: string,
 ): Promise<ConversationContext | undefined> {
-  const snapshotPath = getSessionSnapshotPath(conversationsDir, ref);
+  const snapshotPath = getSessionSnapshotPath(conversationsDir, ref, agentId);
 
   try {
     const raw = await readFile(snapshotPath, "utf8");
-    return normalizeSnapshot(JSON.parse(raw) as ConversationContext, {
+    const parsed = JSON.parse(raw) as ConversationContext;
+    return normalizeSnapshot(parsed, {
       conversationsDir,
-      conversation: ref,
+      conversation: parsed.state?.conversation ?? ref,
+      agentId,
       materializeAttachmentPaths: true,
     });
   } catch (error: unknown) {
@@ -266,22 +338,112 @@ async function readSessionSnapshot(
   }
 }
 
-async function readActiveConversationRef(
+async function readSessionSnapshotByAgentAndSessionId(
+  agentId: string,
+  sessionId: string,
+  conversationsDir: string,
+): Promise<ConversationContext | undefined> {
+  return readSessionSnapshot(agentId, {
+    transport: "_",
+    externalId: "_",
+    sessionId,
+  }, conversationsDir);
+}
+
+async function readSessionSnapshotBySessionId(
+  ref: ConversationRef,
+  conversationsDir: string,
+): Promise<ConversationContext | undefined> {
+  const sessionId = requireSessionId(ref);
+  let entries;
+
+  try {
+    entries = await readdir(join(conversationsDir, "agents"), { withFileTypes: true });
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return undefined;
+    }
+    throw error;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const snapshot = await readSessionSnapshotByAgentAndSessionId(entry.name, sessionId, conversationsDir);
+    if (snapshot) {
+      return snapshot;
+    }
+  }
+
+  return undefined;
+}
+
+async function readSelectedAgentId(
   conversationsDir: string,
   ref: ChatRef,
+): Promise<string | undefined> {
+  const selectedAgentPath = getSelectedAgentPath(conversationsDir, ref);
+
+  try {
+    const raw = await readFile(selectedAgentPath, "utf8");
+    const parsed = JSON.parse(raw) as { agentId?: unknown };
+    if (typeof parsed.agentId !== "string" || parsed.agentId.length === 0) {
+      return undefined;
+    }
+
+    return parsed.agentId;
+  } catch (error: unknown) {
+    if (isMissingFileError(error)) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function writeSelectedAgentId(
+  conversationsDir: string,
+  ref: ChatRef,
+  agentId: string,
+): Promise<void> {
+  const selectedAgentPath = getSelectedAgentPath(conversationsDir, ref);
+  await writeFileAtomically(selectedAgentPath, `${JSON.stringify({ agentId }, null, 2)}\n`);
+}
+
+async function readActiveAgentConversation(
+  conversationsDir: string,
+  agentId: string,
+): Promise<ConversationContext | undefined> {
+  const activeRef = await readActiveAgentConversationRef(conversationsDir, agentId);
+  return activeRef ? readSessionSnapshot(agentId, activeRef, conversationsDir) : undefined;
+}
+
+async function readActiveAgentConversationRef(
+  conversationsDir: string,
+  agentId: string,
 ): Promise<ConversationRef | undefined> {
-  const activePath = getActiveSessionPath(conversationsDir, ref);
+  const activePath = getAgentActiveSessionPath(conversationsDir, agentId);
 
   try {
     const raw = await readFile(activePath, "utf8");
-    const parsed = JSON.parse(raw) as { sessionId?: unknown };
-    if (typeof parsed.sessionId !== "string" || parsed.sessionId.length === 0) {
+    const parsed = JSON.parse(raw) as {
+      transport?: unknown;
+      externalId?: unknown;
+      sessionId?: unknown;
+    };
+    if (
+      typeof parsed.transport !== "string" ||
+      typeof parsed.externalId !== "string" ||
+      typeof parsed.sessionId !== "string" ||
+      parsed.sessionId.length === 0
+    ) {
       return undefined;
     }
 
     return {
-      transport: ref.transport,
-      externalId: ref.externalId,
+      transport: parsed.transport,
+      externalId: parsed.externalId,
       sessionId: parsed.sessionId,
     };
   } catch (error: unknown) {
@@ -292,12 +454,20 @@ async function readActiveConversationRef(
   }
 }
 
-async function writeActiveConversationRef(
+async function writeActiveAgentConversationRef(
   conversationsDir: string,
+  agentId: string,
   ref: ConversationRef,
 ): Promise<void> {
-  const activePath = getActiveSessionPath(conversationsDir, ref);
-  await writeFileAtomically(activePath, `${JSON.stringify({ sessionId: ref.sessionId }, null, 2)}\n`);
+  const activePath = getAgentActiveSessionPath(conversationsDir, agentId);
+  await writeFileAtomically(
+    activePath,
+    `${JSON.stringify({
+      transport: ref.transport,
+      externalId: ref.externalId,
+      sessionId: ref.sessionId,
+    }, null, 2)}\n`,
+  );
 }
 
 async function writeFileAtomically(path: string, content: string): Promise<void> {
@@ -313,6 +483,7 @@ function normalizeSnapshot(
   options: {
     conversationsDir: string;
     conversation: ConversationRef;
+    agentId: string;
     materializeAttachmentPaths: boolean;
   },
 ): ConversationContext {
@@ -414,6 +585,7 @@ function normalizeConversationEvent(
   options: {
     conversationsDir: string;
     conversation: ConversationRef;
+    agentId: string;
     materializeAttachmentPaths: boolean;
   },
 ): ConversationEvent {
@@ -437,6 +609,7 @@ function normalizeConversationUserMessage(
   options: {
     conversationsDir: string;
     conversation: ConversationRef;
+    agentId: string;
     materializeAttachmentPaths: boolean;
   },
 ): ConversationUserMessage {
@@ -455,6 +628,7 @@ function normalizeConversationMessageSource(
   options: {
     conversationsDir: string;
     conversation: ConversationRef;
+    agentId: string;
     materializeAttachmentPaths: boolean;
   },
 ): ConversationUserMessage["source"] {
@@ -468,7 +642,7 @@ function normalizeConversationMessageSource(
   );
   const savedPath =
     options.materializeAttachmentPaths && relativePath
-      ? materializeAttachmentPath(options.conversationsDir, options.conversation, relativePath)
+      ? materializeAttachmentPath(options.conversationsDir, options.conversation, options.agentId, relativePath)
       : document.savedPath;
 
   return {
@@ -491,7 +665,12 @@ function toStorageSnapshot(context: ConversationContext, conversationsDir: strin
 
       const relativePath = normalizeAttachmentRelativePath(
         message.source.document.relativePath ??
-          getAttachmentRelativePathFromSavedPath(conversationsDir, context.state.conversation, message),
+          getAttachmentRelativePathFromSavedPath(
+            conversationsDir,
+            context.state.conversation,
+            context.state.agentId,
+            message,
+          ),
       );
       const document = {
         ...message.source.document,
@@ -513,6 +692,7 @@ function toStorageSnapshot(context: ConversationContext, conversationsDir: strin
 function getAttachmentRelativePathFromSavedPath(
   conversationsDir: string,
   conversation: ConversationRef,
+  agentId: string,
   message: ConversationUserMessage,
 ): string | undefined {
   const savedPath = message.source?.document?.savedPath;
@@ -520,7 +700,7 @@ function getAttachmentRelativePathFromSavedPath(
     return savedPath;
   }
 
-  const sessionDir = getSessionDir(conversationsDir, conversation);
+  const sessionDir = getSessionDir(conversationsDir, conversation, agentId);
   const pathRelativeToSession = relative(sessionDir, savedPath);
   if (pathRelativeToSession && !pathRelativeToSession.startsWith("..") && !isAbsolute(pathRelativeToSession)) {
     return pathRelativeToSession;
@@ -551,10 +731,11 @@ function inferAttachmentRelativePath(
 function materializeAttachmentPath(
   conversationsDir: string,
   conversation: ConversationRef,
+  agentId: string,
   relativePath: string,
 ): string {
   return join(
-    getSessionDir(conversationsDir, conversation),
+    getSessionDir(conversationsDir, conversation, agentId),
     ...relativePath.split(/[\\/]+/).filter(Boolean),
   );
 }
@@ -664,11 +845,17 @@ function pickLatestTimestamp(left: string, right: string): string {
   return rightTime >= leftTime ? right : left;
 }
 
-async function withConversationWriteQueue<T>(
-  ref: ChatRef | ConversationRef,
+async function withAgentWriteQueue<T>(
+  agentId: string,
   action: () => Promise<T>,
 ): Promise<T> {
-  const queueKey = getConversationKey(ref);
+  return withWriteQueue(`agent/${agentId}`, action);
+}
+
+async function withWriteQueue<T>(
+  queueKey: string,
+  action: () => Promise<T>,
+): Promise<T> {
   const previous = conversationWriteQueues.get(queueKey) ?? Promise.resolve();
   let releaseQueue: (() => void) | undefined;
   const current = new Promise<void>((resolve) => {
@@ -689,12 +876,12 @@ async function withConversationWriteQueue<T>(
   }
 }
 
-async function withConversationLock<T>(
+async function withAgentLock<T>(
   conversationsDir: string,
-  ref: ChatRef,
+  agentId: string,
   action: () => Promise<T>,
 ): Promise<T> {
-  const lockPath = getConversationLockPath(conversationsDir, ref);
+  const lockPath = getAgentLockPath(conversationsDir, agentId);
   await mkdir(dirname(lockPath), { recursive: true });
   const release = await acquireConversationLock(lockPath);
 
@@ -783,12 +970,6 @@ async function delay(ms: number): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
-}
-
-function getConversationKey(ref: ChatRef | ConversationRef): string {
-  return "sessionId" in ref
-    ? `${ref.transport}/${ref.externalId}/${ref.sessionId}`
-    : `${ref.transport}/${ref.externalId}`;
 }
 
 function sanitizePathSegment(value: string): string {

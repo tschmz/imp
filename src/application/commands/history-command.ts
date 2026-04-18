@@ -11,9 +11,14 @@ export const historyCommandHandler: InboundCommandHandler = {
     return command === "history";
   },
   async handle({ message, dependencies }: InboundCommandContext) {
+    const agentId =
+      await dependencies.conversationStore.getSelectedAgent?.(message.conversation) ??
+      dependencies.defaultAgentId;
     const [conversation, backups] = await Promise.all([
-      dependencies.conversationStore.get(message.conversation),
-      dependencies.conversationStore.listBackups(message.conversation),
+      dependencies.conversationStore.getActiveForAgent?.(agentId) ??
+        dependencies.conversationStore.get(message.conversation),
+      dependencies.conversationStore.listBackupsForAgent?.(agentId) ??
+        dependencies.conversationStore.listBackups(message.conversation),
     ]);
     const agent = conversation ? dependencies.agentRegistry.get(conversation.state.agentId) : undefined;
 

@@ -55,7 +55,7 @@ export function createMessageProcessor(
   ): Promise<void> {
     const key =
       "sessionId" in event.message.conversation && event.message.conversation.sessionId
-        ? `${event.message.conversation.transport}/${event.message.conversation.externalId}/${event.message.conversation.sessionId}`
+        ? `session/${event.message.conversation.sessionId}`
         : `${event.message.conversation.transport}/${event.message.conversation.externalId}`;
     const previous = conversationQueues.get(key) ?? Promise.resolve();
     let release: (() => void) | undefined;

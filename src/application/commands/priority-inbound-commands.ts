@@ -9,6 +9,7 @@ export const priorityInboundCommands = new Set<IncomingMessageCommand>([
   "ping",
   "whoami",
   "config",
+  "agent",
   "logs",
   "rename",
   "reset",

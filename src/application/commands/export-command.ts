@@ -11,7 +11,12 @@ export const exportCommandHandler: InboundCommandHandler = {
     return command === "export";
   },
   async handle({ message, dependencies }: InboundCommandContext) {
-    const conversation = await dependencies.conversationStore.get(message.conversation);
+    const agentId =
+      await dependencies.conversationStore.getSelectedAgent?.(message.conversation) ??
+      dependencies.defaultAgentId;
+    const conversation =
+      await dependencies.conversationStore.getActiveForAgent?.(agentId) ??
+      await dependencies.conversationStore.get(message.conversation);
     if (!conversation) {
       return {
         conversation: message.conversation,

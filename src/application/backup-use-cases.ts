@@ -243,19 +243,15 @@ async function stageBackup(options: {
   if (selection.conversations) {
     manifest.conversations = [];
 
-    for (const endpoint of appConfig.endpoints) {
-      const relativeToDataRoot = join("endpoints", endpoint.id, "conversations");
-      const sourcePath = join(appConfig.paths.dataRoot, relativeToDataRoot);
-      if (!(await pathExists(sourcePath))) {
-        continue;
-      }
-
-      const archivePath = join("conversations", endpoint.id);
+    const relativeToDataRoot = "conversations";
+    const sourcePath = join(appConfig.paths.dataRoot, relativeToDataRoot);
+    if (await pathExists(sourcePath)) {
+      const archivePath = "conversations";
       await cp(sourcePath, join(archiveRoot, archivePath), { recursive: true });
       manifest.conversations.push({
-        archivePath: toPortablePath(archivePath),
-        endpointId: endpoint.id,
-        relativeToDataRoot: toPortablePath(relativeToDataRoot),
+        archivePath,
+        endpointId: "global",
+        relativeToDataRoot,
       });
     }
   }

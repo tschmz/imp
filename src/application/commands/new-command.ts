@@ -14,9 +14,13 @@ export const newCommandHandler: InboundCommandHandler = {
   },
   async handle({ message, dependencies, logger }: InboundCommandContext) {
     const title = normalizeCommandArgument(message.commandArgs);
+    const agentId =
+      await dependencies.conversationStore.getSelectedAgent?.(message.conversation) ??
+      dependencies.defaultAgentId;
+    const create = dependencies.conversationStore.createForAgent ?? dependencies.conversationStore.create;
 
-    await dependencies.conversationStore.create(message.conversation, {
-      agentId: dependencies.defaultAgentId,
+    await create(message.conversation, {
+      agentId,
       now: message.receivedAt,
       ...(title ? { title } : {}),
     });
@@ -27,7 +31,7 @@ export const newCommandHandler: InboundCommandHandler = {
       messageId: message.messageId,
       correlationId: message.correlationId,
       command: message.command,
-      agentId: dependencies.defaultAgentId,
+      agentId,
     });
 
     return {

@@ -92,8 +92,8 @@ describe("createDaemon", () => {
       await readFile(
         join(
           endpointConfig.paths.conversationsDir,
-          "telegram",
-          "42",
+          "agents",
+          "default",
           "sessions",
           runInputs[1]!.conversation.state.conversation.sessionId!,
           "conversation.json",

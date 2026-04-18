@@ -9,6 +9,7 @@ import type { Transport, TransportContext, TransportFactory } from "../transport
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
 import type { RuntimeControlAction } from "./runtime-shutdown.js";
 import type { ActiveEndpointRuntimeConfig } from "./types.js";
+import type { ChatRef } from "../domain/conversation.js";
 
 export interface RuntimeEntry {
   start(): Promise<void>;
@@ -53,38 +54,48 @@ export function createRuntimeEntries(
       handler: handleIncomingMessage,
       logger: runtime.logger,
       prepareEvent: async (event) => {
-        if (event.message.command && priorityInboundCommands.has(event.message.command)) {
-          return event;
+        const scopedEvent = withEndpointScopedConversation(event);
+        if (scopedEvent.message.command && priorityInboundCommands.has(scopedEvent.message.command)) {
+          return scopedEvent;
         }
 
-        if (!event.message.command) {
-          const command = parseInboundCommand(event.message.text, {
+        if (!scopedEvent.message.command) {
+          const command = parseInboundCommand(scopedEvent.message.text, {
             allowedCommands: priorityInboundCommands,
           });
           if (command) {
             return {
-              ...event,
+              ...scopedEvent,
               message: {
-                ...event.message,
+                ...scopedEvent.message,
                 ...command,
               },
             };
           }
         }
 
-        const conversation = await runtime.conversationStore.ensureActive(
-          event.message.conversation,
+        const selectedAgentId =
+          await runtime.conversationStore.getSelectedAgent?.(scopedEvent.message.conversation) ??
+          runtime.endpointConfig.defaultAgentId;
+        const ensureActive =
+          runtime.conversationStore.ensureActiveForAgent ?? runtime.conversationStore.ensureActive;
+        const conversation = await ensureActive(
+          scopedEvent.message.conversation,
           {
-            agentId: runtime.endpointConfig.defaultAgentId,
-            now: event.message.receivedAt,
+            agentId: selectedAgentId,
+            now: scopedEvent.message.receivedAt,
           },
         );
 
         return {
-          ...event,
+          ...scopedEvent,
           message: {
-            ...event.message,
-            conversation: conversation.state.conversation,
+            ...scopedEvent.message,
+            conversation: {
+              ...scopedEvent.message.conversation,
+              sessionId: conversation.state.conversation.sessionId,
+              agentId: selectedAgentId,
+            },
           },
         };
       },
@@ -147,6 +158,21 @@ export function createRuntimeEntries(
       },
     };
   });
+}
+
+function withEndpointScopedConversation<TEvent extends { message: { endpointId: string; conversation: ChatRef } }>(
+  event: TEvent,
+): TEvent {
+  return {
+    ...event,
+    message: {
+      ...event.message,
+      conversation: {
+        ...event.message.conversation,
+        endpointId: event.message.endpointId,
+      },
+    },
+  };
 }
 
 function resolveReplyChannel(

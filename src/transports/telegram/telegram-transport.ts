@@ -541,15 +541,22 @@ function getTelegramDocumentSavedPath(
     "sessionId" in message.conversation && typeof message.conversation.sessionId === "string"
       ? message.conversation.sessionId
       : undefined;
+  const agentId =
+    "agentId" in message.conversation && typeof message.conversation.agentId === "string"
+      ? message.conversation.agentId
+      : undefined;
   if (!sessionId) {
     throw new TelegramDocumentPersistenceError("Telegram document message did not include a session id.");
+  }
+  if (!agentId) {
+    throw new TelegramDocumentPersistenceError("Telegram document message did not include an agent id.");
   }
 
   const fileName = document.file_name ?? `telegram-document-${message.messageId}${getDocumentExtension(document)}`;
   return join(
     getTelegramConversationsDir(config),
-    sanitizePathSegment(message.conversation.transport),
-    sanitizePathSegment(message.conversation.externalId),
+    "agents",
+    sanitizePathSegment(agentId),
     "sessions",
     sanitizePathSegment(sessionId),
     "attachments",

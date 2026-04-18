@@ -11,7 +11,12 @@ export const resetCommandHandler: InboundCommandHandler = {
     return command === "reset";
   },
   async handle({ message, dependencies }: InboundCommandContext) {
-    const existing = await dependencies.conversationStore.get(message.conversation);
+    const agentId =
+      await dependencies.conversationStore.getSelectedAgent?.(message.conversation) ??
+      dependencies.defaultAgentId;
+    const existing =
+      await dependencies.conversationStore.getActiveForAgent?.(agentId) ??
+      await dependencies.conversationStore.get(message.conversation);
     if (!existing) {
       return {
         conversation: message.conversation,

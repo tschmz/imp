@@ -24,7 +24,7 @@ describe("backup use cases", () => {
     const dataRoot = join(root, "state");
     const promptPath = join(root, "config", "prompts", "SYSTEM.md");
     const authPath = join(root, "config", "oauth.json");
-    const conversationPath = join(dataRoot, "endpoints", "private-telegram", "conversations", "telegram", "42", "conversation.json");
+    const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "conversation.json");
     const logPath = join(dataRoot, "logs", "endpoints", "private-telegram.log");
     const backupPath = join(root, "backup.tar");
     const extractDir = join(root, "extract");
@@ -61,7 +61,7 @@ describe("backup use cases", () => {
     expect(manifest.conversations).toHaveLength(1);
     await expect(readFile(join(extractDir, manifest.agentFiles?.[0]?.archivePath ?? ""), "utf8")).resolves.toBeDefined();
     await expect(
-      readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "telegram", "42", "conversation.json"), "utf8"),
+      readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "chats", "telegram", "42", "conversation.json"), "utf8"),
     ).resolves.toContain('"id":"1"');
     await expect(readFile(join(extractDir, "logs", "endpoints", "private-telegram.log"), "utf8")).rejects.toThrow();
   });
@@ -74,7 +74,7 @@ describe("backup use cases", () => {
 
     await writeConfig(sourceConfigPath, sourceDataRoot);
     await writeTextFile(
-      join(sourceDataRoot, "endpoints", "private-telegram", "conversations", "telegram", "42", "conversation.json"),
+      join(sourceDataRoot, "conversations", "chats", "telegram", "42", "conversation.json"),
       "{\"messages\":[{\"id\":\"source\"}]}\n",
     );
 
@@ -92,7 +92,7 @@ describe("backup use cases", () => {
     const targetRoot = await createTempDir();
     const targetDataRoot = join(targetRoot, "state");
     await writeTextFile(
-      join(targetDataRoot, "endpoints", "private-telegram", "conversations", "telegram", "42", "conversation.json"),
+      join(targetDataRoot, "conversations", "chats", "telegram", "42", "conversation.json"),
       "{\"messages\":[{\"id\":\"old\"}]}\n",
     );
     await writeTextFile(
@@ -120,7 +120,7 @@ describe("backup use cases", () => {
 
     await expect(
       readFile(
-        join(targetDataRoot, "endpoints", "private-telegram", "conversations", "telegram", "42", "conversation.json"),
+        join(targetDataRoot, "conversations", "chats", "telegram", "42", "conversation.json"),
         "utf8",
       ),
     ).resolves.toContain('"source"');
@@ -139,7 +139,7 @@ describe("backup use cases", () => {
     const sourceRoot = await createTempDir();
     const sourceConfigPath = join(sourceRoot, "config", "config.json");
     const sourceDataRoot = join(sourceRoot, "state");
-    const sourceConversationsDir = join(sourceDataRoot, "endpoints", "private-telegram", "conversations");
+    const sourceConversationsDir = join(sourceDataRoot, "conversations");
     const sourceStore = createFsConversationStore(createRuntimePaths(sourceDataRoot));
     const created = await sourceStore.create({ transport: "telegram", externalId: "42" }, {
       agentId: "default",
@@ -147,8 +147,8 @@ describe("backup use cases", () => {
     });
     const sourceAttachmentPath = join(
       sourceConversationsDir,
-      "telegram",
-      "42",
+      "agents",
+      "default",
       "sessions",
       created.state.conversation.sessionId!,
       "attachments",
@@ -207,11 +207,9 @@ describe("backup use cases", () => {
     const restored = await targetStore.get(created.state.conversation);
     const targetAttachmentPath = join(
       targetDataRoot,
-      "endpoints",
-      "private-telegram",
       "conversations",
-      "telegram",
-      "42",
+      "agents",
+      "default",
       "sessions",
       created.state.conversation.sessionId!,
       "attachments",
@@ -232,11 +230,9 @@ describe("backup use cases", () => {
       readFile(
         join(
           targetDataRoot,
-          "endpoints",
-          "private-telegram",
           "conversations",
-          "telegram",
-          "42",
+          "agents",
+          "default",
           "sessions",
           created.state.conversation.sessionId!,
           "conversation.json",
@@ -478,7 +474,7 @@ describe("backup use cases", () => {
 
     await writeConfig(sourceConfigPath, sourceDataRoot);
     await writeTextFile(
-      join(sourceDataRoot, "endpoints", "private-telegram", "conversations", "telegram", "42", "conversation.json"),
+      join(sourceDataRoot, "conversations", "chats", "telegram", "42", "conversation.json"),
       "{\"messages\":[{\"id\":\"source\"}]}\n",
     );
     await useCases.createBackup({
@@ -616,7 +612,7 @@ function createRuntimePaths(dataRoot: string) {
   return {
     dataRoot,
     endpointRoot: join(dataRoot, "endpoints", "private-telegram"),
-    conversationsDir: join(dataRoot, "endpoints", "private-telegram", "conversations"),
+    conversationsDir: join(dataRoot, "conversations"),
     logsDir: join(dataRoot, "logs", "endpoints"),
     logFilePath: join(dataRoot, "logs", "endpoints", "private-telegram.log"),
     runtimeDir: join(dataRoot, "runtime", "endpoints"),

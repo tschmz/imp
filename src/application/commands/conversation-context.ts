@@ -9,7 +9,12 @@ export async function getOrCreateConversationContext(
   conversationStore: ConversationStore,
   logger?: Logger,
 ): Promise<ConversationContext> {
-  const existing = await conversationStore.get(message.conversation);
+  const selectedAgentId =
+    await conversationStore.getSelectedAgent?.(message.conversation) ??
+    defaultAgentId;
+  const existing =
+    await conversationStore.getActiveForAgent?.(selectedAgentId) ??
+    await conversationStore.get(message.conversation);
   if (existing) {
     await logger?.debug("loaded existing conversation", {
       endpointId: message.endpointId,
@@ -22,7 +27,7 @@ export async function getOrCreateConversationContext(
     return existing;
   }
 
-  return createConversationContext(message, defaultAgentId, conversationStore, logger);
+  return createConversationContext(message, selectedAgentId, conversationStore, logger);
 }
 
 export async function createConversationContext(
@@ -31,7 +36,8 @@ export async function createConversationContext(
   conversationStore: ConversationStore,
   logger?: Logger,
 ): Promise<ConversationContext> {
-  const createdContext = await conversationStore.create(message.conversation, {
+  const createActive = conversationStore.createForAgent ?? conversationStore.create;
+  const createdContext = await createActive(message.conversation, {
     agentId: defaultAgentId,
     now: message.receivedAt,
   });

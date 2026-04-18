@@ -65,7 +65,7 @@ Interactive `imp init` still prompts for Telegram settings and writes one Telegr
 
 Runtime data under the state directory uses this layout:
 
-- endpoint conversations: `endpoints/<endpoint-id>/conversations`
+- conversations and selected-agent state: `conversations/`
 - endpoint logs: `logs/endpoints/<endpoint-id>.log`
 - endpoint runtime state: `runtime/endpoints/<endpoint-id>.json`
 - agent-managed files, when you keep them in the data root: `agents/<agent-id>/...`

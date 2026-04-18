@@ -128,6 +128,59 @@ describe("createMessageProcessor", () => {
     );
   });
 
+  it("serializes messages with the same shared session id across surfaces", async () => {
+    const starts: string[] = [];
+    const releases = new Map<string, () => void>();
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(`${message.messageId}:${message.conversation.transport}`);
+        await new Promise<void>((resolve) => {
+          releases.set(message.messageId, resolve);
+        });
+        return {
+          conversation: message.conversation,
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    const processor = createMessageProcessor({
+      handler,
+      maxParallel: 2,
+      prepareEvent: (event) => ({
+        ...event,
+        message: {
+          ...event.message,
+          conversation: {
+            ...event.message.conversation,
+            sessionId: "shared-session",
+          },
+        },
+      }),
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
+    const second = processor.handle(
+      createEvent({
+        ...createIncomingMessage("2", "plugin-chat"),
+        conversation: {
+          transport: "plugin",
+          externalId: "plugin-chat",
+        },
+      }),
+    );
+
+    await tick();
+
+    expect(starts).toEqual(["1:telegram"]);
+    releases.get("1")?.();
+    await tick();
+    expect(starts).toEqual(["1:telegram", "2:plugin"]);
+
+    releases.get("2")?.();
+    await Promise.all([first, second]);
+  });
+
   it("never exceeds maxParallel while handing permits to waiting conversations", async () => {
     let active = 0;
     let maxActive = 0;
@@ -478,7 +531,7 @@ describe("createMessageProcessor", () => {
     await Promise.all([first, rename, third]);
   });
 
-  it("lets safe local commands bypass the active session queue", async () => {
+  it("lets /agent bypass the active session queue as a lightweight surface switch", async () => {
     const starts: string[] = [];
     const releases = new Map<string, () => void>();
     const handler = {
@@ -535,10 +588,10 @@ describe("createMessageProcessor", () => {
 
     const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
     await tick();
-    const status = processor.handle(
+    const agent = processor.handle(
       createEvent({
         ...createIncomingMessage("2", "42"),
-        text: "/status",
+        text: "/agent ops",
       }),
     );
     const third = processor.handle(createEvent(createIncomingMessage("3", "42")));
@@ -546,14 +599,14 @@ describe("createMessageProcessor", () => {
     await tick();
     await tick();
 
-    expect(starts).toEqual(["1:session-1", "2:status"]);
+    expect(starts).toEqual(["1:session-1", "2:agent"]);
 
     releases.get("1")?.();
     await tick();
-    expect(starts).toEqual(["1:session-1", "2:status", "3:session-1"]);
+    expect(starts).toEqual(["1:session-1", "2:agent", "3:session-1"]);
 
     releases.get("3")?.();
-    await Promise.all([first, status, third]);
+    await Promise.all([first, agent, third]);
   });
 
   it("retries through central hooks before surfacing a terminal error response", async () => {

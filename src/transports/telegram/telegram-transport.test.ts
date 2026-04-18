@@ -745,7 +745,7 @@ describe("createTelegramTransport", () => {
           maxDownloadBytes: 1024,
         },
         paths: {
-          conversationsDir: join(root, "endpoints", "private-telegram", "conversations"),
+          conversationsDir: join(root, "conversations"),
         },
       },
       bot,
@@ -782,7 +782,8 @@ describe("createTelegramTransport", () => {
       conversation: {
         ...capturedEvent.message.conversation,
         sessionId: "session-1",
-      } as IncomingMessage["conversation"] & { sessionId: string },
+        agentId: "default",
+      } as IncomingMessage["conversation"] & { sessionId: string; agentId: string },
     });
 
     expect(fetchImpl).toHaveBeenCalledWith("https://api.telegram.org/file/bottelegram-token/documents/report.txt");
@@ -803,11 +804,9 @@ describe("createTelegramTransport", () => {
     expect(savedPath).toBe(
       join(
         root,
-        "endpoints",
-        "private-telegram",
         "conversations",
-        "telegram",
-        "42",
+        "agents",
+        "default",
         "sessions",
         "session-1",
         "attachments",

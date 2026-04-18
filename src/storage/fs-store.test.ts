@@ -83,8 +83,8 @@ describe("createFsConversationStore", () => {
     const savedPath = join(
       root,
       "conversations",
-      "telegram",
-      "42",
+      "agents",
+      "default",
       "sessions",
       created.state.conversation.sessionId!,
       "attachments",
@@ -142,8 +142,8 @@ describe("createFsConversationStore", () => {
       join(
         root,
         "conversations",
-        "telegram",
-        "42",
+        "agents",
+        "default",
         "sessions",
         created.state.conversation.sessionId!,
         "conversation.json",
@@ -164,8 +164,8 @@ describe("createFsConversationStore", () => {
     const sourceSavedPath = join(
       sourceRoot,
       "conversations",
-      "telegram",
-      "42",
+      "agents",
+      "default",
       "sessions",
       created.state.conversation.sessionId!,
       "attachments",
@@ -209,8 +209,8 @@ describe("createFsConversationStore", () => {
     const targetSavedPath = join(
       targetRoot,
       "conversations",
-      "telegram",
-      "42",
+      "agents",
+      "default",
       "sessions",
       created.state.conversation.sessionId!,
       "attachments",
@@ -346,8 +346,8 @@ describe("createFsConversationStore", () => {
       join(
         root,
         "conversations",
-        "telegram_web",
-        "user_123",
+        "agents",
+        "default",
         "sessions",
         created.state.conversation.sessionId!,
         "conversation.json",
@@ -379,7 +379,7 @@ describe("createFsConversationStore", () => {
     await store.put(context);
 
     await expect(
-      readFile(join(root, "conversations", "telegram", "42", "sessions", "_", "conversation.json"), "utf8"),
+      readFile(join(root, "conversations", "agents", "default", "sessions", "_", "conversation.json"), "utf8"),
     ).resolves.toContain('"sessionId": ".."');
   });
 
@@ -431,6 +431,8 @@ describe("createFsConversationStore", () => {
       {
         id: first.state.conversation.sessionId!,
         sessionId: first.state.conversation.sessionId!,
+        transport: "telegram",
+        externalId: "42",
         title: "Earlier session",
         createdAt: "2026-04-05T00:00:00.000Z",
         updatedAt: "2026-04-05T00:02:00.000Z",
@@ -557,6 +559,98 @@ describe("createFsConversationStore", () => {
         messageCount: 1,
       },
     ]);
+  });
+
+  it("shares one active session per agent across chats", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const telegramChat = createChatRef();
+    const pluginChat = { transport: "plugin", externalId: "audio" };
+
+    const telegramSession = await store.ensureActiveForAgent!(telegramChat, {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const pluginSession = await store.ensureActiveForAgent!(pluginChat, {
+      agentId: "default",
+      now: "2026-04-05T00:01:00.000Z",
+    });
+
+    expect(pluginSession.state.conversation.sessionId).toBe(telegramSession.state.conversation.sessionId);
+    await expect(store.get(pluginChat)).resolves.toEqual(telegramSession);
+  });
+
+  it("tracks selected agents per chat without mutating existing sessions", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const chat = createChatRef();
+
+    const defaultSession = await store.ensureActiveForAgent!(chat, {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const opsSession = await store.ensureActiveForAgent!(chat, {
+      agentId: "ops",
+      now: "2026-04-05T00:01:00.000Z",
+    });
+
+    expect(defaultSession.state.agentId).toBe("default");
+    expect(opsSession.state.agentId).toBe("ops");
+    expect(opsSession.state.conversation.sessionId).not.toBe(defaultSession.state.conversation.sessionId);
+    await expect(store.get(chat)).resolves.toEqual(opsSession);
+    await expect(store.getActiveForAgent!("default")).resolves.toEqual(defaultSession);
+  });
+
+  it("tracks selected agents per endpoint chat when endpoints share the same transport identity", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const jarvisChat = { transport: "cli", externalId: "local", endpointId: "imp.jarvis" };
+    const grimoireChat = { transport: "cli", externalId: "local", endpointId: "imp.grimoire" };
+
+    const jarvisSession = await store.ensureActiveForAgent!(jarvisChat, {
+      agentId: "jarvis",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const grimoireSession = await store.ensureActiveForAgent!(grimoireChat, {
+      agentId: "grimoire",
+      now: "2026-04-05T00:01:00.000Z",
+    });
+
+    expect(jarvisSession.state.agentId).toBe("jarvis");
+    expect(grimoireSession.state.agentId).toBe("grimoire");
+    await expect(store.get(jarvisChat)).resolves.toEqual(jarvisSession);
+    await expect(store.get(grimoireChat)).resolves.toEqual(grimoireSession);
+  });
+
+  it("keeps history agent-specific", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const chat = createChatRef();
+
+    const defaultOld = await store.createForAgent!(chat, {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+      title: "Default old",
+    });
+    await store.createForAgent!(chat, {
+      agentId: "default",
+      now: "2026-04-05T00:01:00.000Z",
+      title: "Default active",
+    });
+    await store.createForAgent!(chat, {
+      agentId: "ops",
+      now: "2026-04-05T00:02:00.000Z",
+      title: "Ops active",
+    });
+
+    await expect(store.listBackupsForAgent!("default")).resolves.toMatchObject([
+      {
+        id: defaultOld.state.conversation.sessionId,
+        title: "Default old",
+        agentId: "default",
+      },
+    ]);
+    await expect(store.listBackupsForAgent!("ops")).resolves.toEqual([]);
   });
 
 });

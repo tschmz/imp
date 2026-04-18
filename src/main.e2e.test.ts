@@ -100,7 +100,7 @@ describe("imp CLI e2e", () => {
     const backupPath = join(root, "backup.tar");
     const promptPath = join(dataRoot, "SYSTEM.md");
     const authPath = join(dataRoot, "auth.json");
-    const conversationPath = join(dataRoot, "endpoints", "private-telegram", "conversations", "telegram", "42", "conversation.json");
+    const conversationPath = join(dataRoot, "conversations", "agents", "default", "sessions", "session-1", "conversation.json");
 
     await runCli(["init", "--defaults"], env);
     await overwriteConfig(configPath, {
