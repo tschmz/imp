@@ -1,0 +1,31 @@
+{
+  "name": "@tschmz/imp-voice",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Local voice and audio file-protocol frontend for imp",
+  "files": [
+    "plugin.json",
+    "README.md",
+    "bin",
+    "lib",
+    "config",
+    "requirements.txt"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "imp-voice-in": "bin/wake-phrase",
+    "imp-voice-out": "bin/speaker-outbox.mjs",
+    "imp-voice-speaker-outbox": "bin/speaker-outbox.mjs",
+    "imp-voice-text-ingress": "bin/text-ingress.mjs",
+    "imp-voice-write-event": "bin/write-event.mjs"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "test": "vitest run test/*.test.mjs"
+  }
+}

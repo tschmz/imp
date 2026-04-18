@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+plugin_root="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+if [[ -n "${IMP_VOICE_PYTHON:-}" ]]; then
+  python_bin="$IMP_VOICE_PYTHON"
+elif [[ -x "$plugin_root/.venv/bin/python" ]]; then
+  python_bin="$plugin_root/.venv/bin/python"
+else
+  python_bin="python3"
+fi
+
+export PYTHONPATH="$plugin_root/lib${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONDONTWRITEBYTECODE=1
+
+"$python_bin" - <<'PY'
+import importlib.util
+import sys
+
+missing = [
+    name
+    for name in ("numpy", "openai", "openwakeword", "vosk")
+    if importlib.util.find_spec(name) is None
+]
+if missing:
+    print(
+        "imp-voice-in is missing Python dependencies: " + ", ".join(missing),
+        file=sys.stderr,
+    )
+    print(
+        "Install them with: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PY
+
+exec "$python_bin" "$plugin_root/bin/wake-phrase-daemon.py" "$@"

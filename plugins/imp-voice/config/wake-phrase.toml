@@ -1,0 +1,71 @@
+[audio]
+device = "default"
+sample_rate = 16000
+channels = 1
+chunk_ms = 80
+
+[wake_capture]
+start_threshold_rms = 1800
+start_chunks = 2
+stop_threshold_rms = 800
+silence_ms = 700
+pre_roll_ms = 250
+min_seconds = 0.8
+max_seconds = 2.4
+cooldown_seconds = 1.5
+
+[wake_phrase]
+display_name = "hey jarvis"
+model_name = "hey_jarvis"
+threshold = 0.9
+log_threshold = 0.05
+command_timeout_seconds = 5.0
+command_start_delay_ms = 500
+no_command_cooldown_seconds = 15.0
+
+[command_recording]
+start_threshold_rms = 900
+start_chunks = 1
+stop_threshold_rms = 900
+silence_ms = 1200
+pre_roll_ms = 600
+min_seconds = 1.0
+max_seconds = 20.0
+output_dir = "${IMP_VOICE_RECORDINGS_DIR}"
+write_metadata = true
+
+[command_transcription]
+enabled = true
+provider = "openai"
+openai_model = "gpt-4o-mini-transcribe"
+openai_prompt = "Transcribe the spoken command exactly and concisely. Return only the spoken command, without comments."
+fallback_to_vosk = false
+model_path = "${IMP_VOICE_VOSK_MODEL_PATH}"
+write_text_file = true
+
+[imp_plugin]
+enabled = true
+inbox_dir = "${IMP_VOICE_RUNTIME_DIR}/inbox"
+conversation_id = "imp-voice"
+user_id = "imp-voice"
+
+[conversation]
+enabled = true
+follow_up_timeout_seconds = 5.0
+response_wait_timeout_seconds = 60.0
+
+[speaker_feedback]
+enabled = true
+status_file = "${IMP_VOICE_RUNTIME_DIR}/speaker-status.json"
+quiet_after_ms = 1000
+max_status_age_seconds = 120.0
+
+[feedback_tones]
+enabled = true
+device = "default"
+sample_rate = 16000
+quiet_after_ms = 150
+close_rearm_ms = 1500
+
+[health]
+status_file = "${IMP_VOICE_RUNTIME_DIR}/wake-status.json"

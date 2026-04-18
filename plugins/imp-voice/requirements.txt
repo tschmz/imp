@@ -1,0 +1,4 @@
+numpy
+openai
+openwakeword==0.4.0
+vosk==0.3.45

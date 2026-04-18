@@ -1,0 +1,25 @@
+{
+  "pluginId": "imp-voice",
+  "endpointId": "audio-ingress",
+  "runtimeDir": "./runtime/plugins/imp-voice/endpoints/audio-ingress",
+  "conversationId": "imp-voice",
+  "userId": "imp-voice",
+  "pollIntervalMs": 250,
+  "speaker": {
+    "processingDir": "speaker-processing",
+    "processedDir": "speaker-processed",
+    "failedDir": "speaker-failed",
+    "statusFile": "speaker-status.json",
+    "playback": {
+      "command": "aplay",
+      "args": ["-q"]
+    },
+    "tts": {
+      "provider": "openai",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "fallbackModel": "gpt-4o-mini-tts",
+      "fallbackVoice": "nova",
+      "fallbackFormat": "wav"
+    }
+  }
+}

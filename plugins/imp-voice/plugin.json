@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "id": "imp-voice",
+  "name": "imp Voice",
+  "version": "0.1.0",
+  "description": "Local voice and audio file-protocol frontend for imp.",
+  "capabilities": ["endpoint", "service", "audio", "voice", "wake-word", "speech-output"],
+  "endpoints": [
+    {
+      "id": "audio-ingress",
+      "description": "Receives local voice/text events and returns spoken replies through the plugin outbox.",
+      "ingress": {
+        "pollIntervalMs": 500,
+        "maxEventBytes": 65536
+      },
+      "response": {
+        "type": "outbox",
+        "replyChannel": {
+          "kind": "audio"
+        },
+        "speech": {
+          "enabled": true,
+          "language": "en",
+          "model": "gpt-4o-mini-tts",
+          "voice": "nova"
+        }
+      }
+    }
+  ],
+  "services": [
+    {
+      "id": "in",
+      "description": "Listens for a local wake phrase and writes transcribed commands into the imp inbox.",
+      "autoStart": true,
+      "command": "bash",
+      "cwd": ".",
+      "args": ["bin/wake-phrase", "--config", "config/wake-phrase.toml"],
+      "env": {
+        "IMP_VOICE_RUNTIME_DIR": "{{endpoint.audio-ingress.runtimeDir}}",
+        "IMP_VOICE_RECORDINGS_DIR": "{{paths.dataRoot}}/runtime/plugins/{{plugin.id}}/recordings",
+        "IMP_VOICE_PYTHON": "{{setup.python.venvPython}}",
+        "OPENAI_API_KEY": "required"
+      }
+    },
+    {
+      "id": "out",
+      "description": "Consumes imp outbox reply files and speaks them locally.",
+      "autoStart": true,
+      "command": "node",
+      "cwd": ".",
+      "args": ["bin/speaker-outbox.mjs", "--config", "config/default.json"],
+      "env": {
+        "IMP_VOICE_RUNTIME_DIR": "{{endpoint.audio-ingress.runtimeDir}}",
+        "OPENAI_API_KEY": "required"
+      }
+    },
+    {
+      "id": "text-ingress",
+      "description": "Development ingress that turns newline-delimited stdin text into imp voice events.",
+      "autoStart": false,
+      "command": "node",
+      "cwd": ".",
+      "args": ["bin/text-ingress.mjs", "--config", "config/default.json"]
+    }
+  ],
+  "setup": {
+    "python": {
+      "requirements": "requirements.txt"
+    }
+  },
+  "init": {
+    "configTemplate": "config/default.json",
+    "postInstallMessage": "Set OPENAI_API_KEY in the imp-voice service environments before starting voice services."
+  }
+}
