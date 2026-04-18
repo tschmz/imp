@@ -157,7 +157,7 @@ describe("tar archive", () => {
     await writeFile(archivePath, archive);
 
     await expect(extractTarArchive(archivePath, extractDir)).rejects.toThrow(
-      "Invalid backup archive: tar header checksum mismatch",
+      "Invalid backup archive: Invalid tar header",
     );
   });
 
@@ -177,7 +177,7 @@ describe("tar archive", () => {
     await writeFile(archivePath, archive);
 
     await expect(extractTarArchive(archivePath, extractDir)).rejects.toThrow(
-      "Invalid backup archive: malformed tar numeric field",
+      "Invalid backup archive: Invalid tar header",
     );
   });
 
@@ -194,7 +194,7 @@ describe("tar archive", () => {
     await writeFile(archivePath, archive.subarray(0, 515));
 
     await expect(extractTarArchive(archivePath, extractDir)).rejects.toThrow(
-      "Invalid backup archive: truncated tar entry for file.txt",
+      "Invalid backup archive: truncated tar entry",
     );
   });
 

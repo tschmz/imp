@@ -39,12 +39,14 @@
     "grammy": "^1.42.0",
     "handlebars": "4.7.9",
     "npm-package-arg": "12.0.2",
+    "tar-stream": "3.1.8",
     "yaml": "2.8.3",
     "zod": "^4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
     "@types/npm-package-arg": "6.1.4",
+    "@types/tar-stream": "3.1.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.29.1",
     "vitest": "^3.2.4"
