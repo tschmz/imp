@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join } from "node:path";
-import { Bot, GrammyError } from "grammy";
+import { Bot, GrammyError, InputFile } from "grammy";
 import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import type { TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
-import type { IncomingMessage, IncomingMessageCommand } from "../../domain/message.js";
+import type { IncomingMessage, IncomingMessageCommand, OutgoingMessage } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportContext, TransportHandler, TransportInboundEvent } from "../types.js";
 import {
@@ -27,6 +27,11 @@ interface TelegramBotAdapter {
     getMe(): Promise<TelegramBotProfile>;
     getFile(fileId: string): Promise<TelegramFile>;
     sendMessage(chatId: number | string, text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }): Promise<unknown>;
+    sendDocument(
+      chatId: number | string,
+      document: InputFile,
+      other?: { caption?: string },
+    ): Promise<unknown>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
     setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;
   };
@@ -112,6 +117,7 @@ export function createTelegramTransport(
               parse_mode: "HTML",
             });
           }
+          await sendTelegramAttachments(bot, request.target.conversationId, request.message);
         },
       });
 
@@ -865,6 +871,7 @@ function createTelegramInboundEvent(
           parse_mode: "HTML",
         });
       }
+      await sendTelegramAttachments(bot, ctx.chat.id, message);
     },
     async deliverError(error?: unknown): Promise<void> {
       await logger?.debug("sending telegram processing error response", {
@@ -882,6 +889,22 @@ function createTelegramInboundEvent(
       await ctx.reply("Sorry, something went wrong while processing your message.");
     },
   };
+}
+
+async function sendTelegramAttachments(
+  bot: TelegramBotAdapter,
+  chatId: number | string,
+  message: OutgoingMessage,
+): Promise<void> {
+  for (const attachment of message.attachments ?? []) {
+    await bot.api.sendDocument(
+      chatId,
+      new InputFile(attachment.path, attachment.fileName),
+      {
+        caption: attachment.fileName ?? "Export file",
+      },
+    );
+  }
 }
 
 async function getTelegramBotProfile(

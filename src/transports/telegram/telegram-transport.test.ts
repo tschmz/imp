@@ -404,6 +404,99 @@ describe("createTelegramTransport", () => {
     expect(bot.reply).toHaveBeenNthCalledWith(2, "x".repeat(904), { parse_mode: "HTML" });
   });
 
+  it("sends endpoint delivery file attachments as Telegram documents", async () => {
+    const bot = createFakeBot();
+    const deliveryRouter = createDeliveryRouter();
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      undefined,
+      {},
+      { deliveryRouter },
+    );
+
+    await transport.start({ handle: vi.fn(async () => {}) });
+    await deliveryRouter.deliver({
+      endpointId: "private-telegram",
+      target: {
+        conversationId: "42",
+      },
+      message: {
+        conversation: { transport: "telegram", externalId: "42" },
+        text: "Export created.",
+        attachments: [
+          {
+            kind: "file",
+            path: "/tmp/export.html",
+            fileName: "conversation-readable.html",
+            mimeType: "text/html",
+          },
+        ],
+      },
+    });
+
+    expect(bot.api.sendMessage).toHaveBeenCalledWith("42", "Export created.", { parse_mode: "HTML" });
+    expect(bot.api.sendDocument).toHaveBeenCalledWith(
+      "42",
+      expect.objectContaining({ fileData: "/tmp/export.html", filename: "conversation-readable.html" }),
+      { caption: "conversation-readable.html" },
+    );
+  });
+
+  it("sends outgoing file attachments as Telegram documents", async () => {
+    const bot = createFakeBot();
+    const logger = createMockLogger();
+    const handler = {
+      handle: vi.fn(async (event) => {
+        await event.runWithProcessing(async () => {
+          await event.deliver({
+            conversation: event.message.conversation,
+            text: "Export created.",
+            attachments: [
+              {
+                kind: "file",
+                path: "/tmp/export.html",
+                fileName: "conversation-readable.html",
+                mimeType: "text/html",
+              },
+            ],
+          });
+        });
+      }),
+    };
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      logger,
+    );
+
+    await transport.start(handler);
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "/export" },
+    });
+
+    expect(bot.reply).toHaveBeenCalledWith("Export created.", { parse_mode: "HTML" });
+    expect(bot.api.sendDocument).toHaveBeenCalledTimes(1);
+    expect(bot.api.sendDocument).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({ fileData: "/tmp/export.html", filename: "conversation-readable.html" }),
+      { caption: "conversation-readable.html" },
+    );
+  });
+
   it("replies with a stable error message through the error delivery hook", async () => {
     const bot = createFakeBot();
     const logger = createMockLogger();
@@ -984,6 +1077,11 @@ function createFakeBot(): {
     getMe(): Promise<{ username: string }>;
     getFile(fileId: string): Promise<{ file_path?: string }>;
     sendMessage(chatId: number | string, text: string, other?: { parse_mode?: "HTML" | "MarkdownV2" }): Promise<unknown>;
+    sendDocument(
+      chatId: number | string,
+      document: unknown,
+      other?: { caption?: string },
+    ): Promise<unknown>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
     setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;
   };
@@ -1098,6 +1196,7 @@ function createFakeBot(): {
       getMe: vi.fn(async () => ({ username: "test_bot" })),
       getFile: vi.fn(async () => ({ file_path: "voice/test.ogg" })),
       sendMessage: vi.fn(async () => ({})),
+      sendDocument: vi.fn(async () => ({})),
       sendChatAction: vi.fn(async () => ({})),
       setMyCommands: vi.fn(async () => ({})),
     },

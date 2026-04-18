@@ -54,6 +54,14 @@ export const exportCommandHandler: InboundCommandHandler = {
         `Path: ${result.path}`,
         `Link: ${result.fileUrl}`,
       ].join("\n"),
+      attachments: [
+        {
+          kind: "file",
+          path: result.path,
+          fileName: `conversation-${result.mode}.${result.format}`,
+          mimeType: "text/html",
+        },
+      ],
     };
   },
 };

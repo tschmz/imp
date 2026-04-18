@@ -62,5 +62,13 @@ export interface IncomingMessageDocumentAttachment {
 export interface OutgoingMessage {
   conversation: ChatRef;
   text: string;
+  attachments?: OutgoingMessageAttachment[];
   deliveryAction?: OutgoingMessageDeliveryAction;
+}
+
+export interface OutgoingMessageAttachment {
+  kind: "file";
+  path: string;
+  fileName?: string;
+  mimeType?: string;
 }
