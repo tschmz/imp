@@ -42,13 +42,8 @@ class AudioConfig:
 
 @dataclass(slots=True)
 class WakeCaptureConfig:
-    start_threshold_rms: int = 1800
     start_chunks: int = 2
-    stop_threshold_rms: int = 800
-    silence_ms: int = 700
     pre_roll_ms: int = 250
-    min_seconds: float = 0.8
-    max_seconds: float = 2.4
     cooldown_seconds: float = 1.5
 
 
@@ -160,7 +155,6 @@ class WakePhraseRecorder:
 
         self.wake_pre_roll_chunks = max(1, self.config.wake_capture.pre_roll_ms // self.config.audio.chunk_ms)
         self.command_pre_roll_chunks = max(1, self.config.command_recording.pre_roll_ms // self.config.audio.chunk_ms)
-        self.wake_silence_chunks = max(1, self.config.wake_capture.silence_ms // self.config.audio.chunk_ms)
         self.command_silence_chunks = max(1, self.config.command_recording.silence_ms // self.config.audio.chunk_ms)
 
         self.wake_pre_roll_buffer: deque[bytes] = deque(maxlen=self.wake_pre_roll_chunks)
@@ -181,10 +175,8 @@ class WakePhraseRecorder:
 
         self.wake_trigger_streak = 0
         self.command_trigger_streak = 0
-        self.wake_silence_streak = 0
         self.command_silence_streak = 0
 
-        self.wake_chunks: list[bytes] = []
         self.command_chunks: list[bytes] = []
         self.command_chunk_count = 0
         self.command_start_ts = 0.0
@@ -490,23 +482,6 @@ class WakePhraseRecorder:
                 self.arm_command_recording(wake_score)
             return
 
-        if self.state == "capturing_wake":
-            self.wake_chunks.append(chunk)
-            duration = len(self.wake_chunks) * self.config.audio.chunk_ms / 1000
-
-            if rms < self.config.wake_capture.stop_threshold_rms:
-                self.wake_silence_streak += 1
-            else:
-                self.wake_silence_streak = 0
-
-            if duration >= self.config.wake_capture.max_seconds:
-                self.finish_wake_capture(reason="max-duration")
-                return
-
-            if duration >= self.config.wake_capture.min_seconds and self.wake_silence_streak >= self.wake_silence_chunks:
-                self.finish_wake_capture(reason="silence")
-            return
-
         if self.state == "armed":
             if now > self.command_armed_until:
                 if self.awaiting_follow_up:
@@ -634,15 +609,6 @@ class WakePhraseRecorder:
             self.command_listen_after = max(self.command_listen_after, self.speaker_blocked_until)
             self.command_armed_until = max(self.command_armed_until, self.speaker_blocked_until + timeout)
 
-    def start_wake_capture(self) -> None:
-        self.state = "capturing_wake"
-        self.clear_listen_ready_status()
-        self.wake_chunks = list(self.wake_pre_roll_buffer)
-        self.wake_trigger_streak = 0
-        self.wake_silence_streak = 0
-        self.write_runtime_status("checking_wake", can_speak=False)
-        self.log(f"Speech start detected, checking wake phrase '{self.config.wake_phrase.display_name}'.")
-
     def predict_wake_score(self, chunk: bytes) -> float:
         audio = np.frombuffer(chunk, dtype="<i2").copy()
         scores = self.wake_model.predict(audio)
@@ -714,49 +680,6 @@ class WakePhraseRecorder:
             "Waiting for the speaker response before opening the follow-up window "
             f"({self.config.conversation.response_wait_timeout_seconds:.1f}s timeout)."
         )
-
-    def finish_wake_capture(self, reason: str) -> None:
-        audio = b"".join(self.wake_chunks)
-        text = self.transcribe_wake_audio(audio)
-        matched = self.match_wake_text(text)
-        self.log(f"Wake check finished ({reason}): recognized='{text or '-'}' match='{matched or '-'}'")
-
-        self.wake_chunks = []
-        self.wake_silence_streak = 0
-        self.wake_pre_roll_buffer.clear()
-
-        if matched:
-            self.state = "armed"
-            self.awaiting_follow_up = False
-            self.command_armed_until = time.monotonic() + self.config.wake_phrase.command_timeout_seconds
-            self.command_pre_roll_buffer.clear()
-            self.command_trigger_streak = 0
-            self.wake_result_text = text
-            self.wake_match_text = matched
-            self.schedule_listen_ready_status("awaiting_command")
-            self.write_runtime_status("awaiting_command", can_speak=False)
-            self.log("Wake phrase detected. Waiting for the command.")
-        else:
-            self.reset_to_idle(cooldown=False, closed_reason="wake-not-confirmed")
-
-    def transcribe_wake_audio(self, audio: bytes) -> str:
-        recognizer = KaldiRecognizer(self.wake_model, self.config.audio.sample_rate, self.grammar_json)
-        recognizer.SetWords(False)
-        offset = 0
-        frame_bytes = self.chunk_bytes * 4
-        while offset < len(audio):
-            recognizer.AcceptWaveform(audio[offset : offset + frame_bytes])
-            offset += frame_bytes
-        result = json.loads(recognizer.FinalResult())
-        return self.normalize_text(result.get("text", ""))
-
-    def match_wake_text(self, text: str) -> str:
-        if not text or text == "unk":
-            return ""
-        normalized_candidates = [self.normalize_text(item) for item in self.config.wake_phrase.accepted_results]
-        if text in normalized_candidates:
-            return text
-        return ""
 
     def transcribe_command_audio(self, audio: bytes) -> str:
         if not self.config.command_transcription.enabled:
@@ -942,9 +865,7 @@ class WakePhraseRecorder:
         self.command_armed_until = 0.0
         self.wake_trigger_streak = 0
         self.command_trigger_streak = 0
-        self.wake_silence_streak = 0
         self.command_silence_streak = 0
-        self.wake_chunks = []
         self.command_chunks = []
         self.command_chunk_count = 0
         self.wake_result_text = ""
@@ -1085,15 +1006,8 @@ def load_config(path: Path) -> RuntimeConfig:
             chunk_ms=int(audio_data.get("chunk_ms", audio_defaults.chunk_ms)),
         ),
         wake_capture=WakeCaptureConfig(
-            start_threshold_rms=int(
-                wake_capture_data.get("start_threshold_rms", wake_capture_defaults.start_threshold_rms)
-            ),
             start_chunks=int(wake_capture_data.get("start_chunks", wake_capture_defaults.start_chunks)),
-            stop_threshold_rms=int(wake_capture_data.get("stop_threshold_rms", wake_capture_defaults.stop_threshold_rms)),
-            silence_ms=int(wake_capture_data.get("silence_ms", wake_capture_defaults.silence_ms)),
             pre_roll_ms=int(wake_capture_data.get("pre_roll_ms", wake_capture_defaults.pre_roll_ms)),
-            min_seconds=float(wake_capture_data.get("min_seconds", wake_capture_defaults.min_seconds)),
-            max_seconds=float(wake_capture_data.get("max_seconds", wake_capture_defaults.max_seconds)),
             cooldown_seconds=float(wake_capture_data.get("cooldown_seconds", wake_capture_defaults.cooldown_seconds)),
         ),
         wake_phrase=wake_phrase,
