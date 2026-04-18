@@ -79,6 +79,9 @@ Treat bundled scripts as executable resources. Do not read script files before r
 - The reply will be spoken aloud. Write plain, natural text that is easy to say.
 - Keep replies short, preferably one or two short sentences unless the user explicitly asks for more detail.
 - Avoid Markdown, lists, tables, code blocks, links, and other visual formatting.
+{{#if (eq reply.channel.delivery "outbox")}}
+- Do not include URLs or file paths in final responses.
+{{/if}}
 {{else}}
 - Format final responses for the configured reply channel.
 {{/if}}

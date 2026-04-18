@@ -292,7 +292,7 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).not.toContain("{{agent.id}}");
   });
 
-  it("renders spoken-output guidance for audio reply channels in the built-in default prompt", async () => {
+  it("renders spoken-output guidance for audio outbox reply channels in the built-in default prompt", async () => {
     const prompt = await buildSystemPrompt(
       {
         ...createAgent(),
@@ -321,7 +321,38 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toContain("The reply will be spoken aloud.");
     expect(prompt).toContain("preferably one or two short sentences");
     expect(prompt).toContain("Avoid Markdown, lists, tables, code blocks, links");
+    expect(prompt).toContain("Do not include URLs or file paths in final responses.");
     expect(prompt).not.toContain("You are chatting through Telegram.");
+  });
+
+  it("does not add URL or file-path restrictions for non-outbox audio reply channels in the built-in default prompt", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { builtIn: "default" },
+        },
+      },
+      undefined,
+      {
+        ...createTemplateContext(),
+        reply: {
+          channel: {
+            kind: "audio",
+            delivery: "endpoint",
+            endpointId: "speaker-room",
+          },
+        },
+      },
+      [],
+      async (path) => {
+        throw new Error(`unexpected path: ${path}`);
+      },
+    );
+
+    expect(prompt).toContain("Reply channel: audio via endpoint (endpoint speaker-room)");
+    expect(prompt).toContain("The reply will be spoken aloud.");
+    expect(prompt).not.toContain("Do not include URLs or file paths in final responses.");
   });
 
   it("renders neutral guidance for none reply channels in the built-in default prompt", async () => {
