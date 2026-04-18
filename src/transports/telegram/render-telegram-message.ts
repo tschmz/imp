@@ -1,14 +1,14 @@
+import { fromMarkdown } from "mdast-util-from-markdown";
+import type { PhrasingContent, RootContent } from "mdast";
+
 type Segment =
   | { type: "text"; value: string }
   | { type: "codeBlock"; value: string; language?: string }
   | { type: "blockquote"; value: string };
 
-type InlineSegment =
-  | { type: "text"; value: string }
-  | { type: "inlineCode"; value: string };
-
 type RichTextSegment =
   | { type: "text"; value: string }
+  | { type: "inlineCode"; value: string }
   | { type: "bold"; value: string }
   | { type: "italic"; value: string }
   | { type: "link"; label: string; href: string };
@@ -124,62 +124,12 @@ function renderSegmentUnits(segment: Segment, maxLength: number): string[] {
 function splitRenderedText(text: string, maxLength: number): string[] {
   const units: string[] = [];
 
-  for (const segment of splitInlineCode(text)) {
+  for (const segment of parseRichText(text)) {
     if (segment.type === "inlineCode") {
       units.push(...splitInlineCodeUnit(segment.value, maxLength));
       continue;
     }
 
-    units.push(...splitRenderedRichText(segment.value, maxLength));
-  }
-
-  return units;
-}
-
-function splitInlineCode(text: string): InlineSegment[] {
-  const result: InlineSegment[] = [];
-  let cursor = 0;
-
-  while (cursor < text.length) {
-    const codeStart = text.indexOf("`", cursor);
-    if (codeStart === -1) {
-      result.push({ type: "text", value: text.slice(cursor) });
-      break;
-    }
-
-    const codeEnd = text.indexOf("`", codeStart + 1);
-    if (codeEnd === -1 || text.slice(codeStart + 1, codeEnd).includes("\n")) {
-      result.push({ type: "text", value: text.slice(cursor) });
-      break;
-    }
-
-    if (codeStart > cursor) {
-      result.push({ type: "text", value: text.slice(cursor, codeStart) });
-    }
-
-    result.push({ type: "inlineCode", value: text.slice(codeStart + 1, codeEnd) });
-    cursor = codeEnd + 1;
-  }
-
-  return result;
-}
-
-function renderInlineCode(text: string): string {
-  return splitInlineCode(text)
-    .map((segment) => {
-      if (segment.type === "inlineCode") {
-        return `<code>${escapeHtml(segment.value)}</code>`;
-      }
-
-      return renderRichText(segment.value);
-    })
-    .join("");
-}
-
-function splitRenderedRichText(text: string, maxLength: number): string[] {
-  const units: string[] = [];
-
-  for (const segment of splitRichText(text)) {
     if (segment.type === "bold") {
       units.push(...splitWrappedUnit(segment.value, maxLength, "<b>", "</b>", "bold"));
       continue;
@@ -201,9 +151,13 @@ function splitRenderedRichText(text: string, maxLength: number): string[] {
   return units;
 }
 
-function renderRichText(text: string): string {
-  return splitRichText(text)
+function renderInlineCode(text: string): string {
+  return parseRichText(text)
     .map((segment) => {
+      if (segment.type === "inlineCode") {
+        return `<code>${escapeHtml(segment.value)}</code>`;
+      }
+
       if (segment.type === "bold") {
         return `<b>${escapeHtml(segment.value)}</b>`;
       }
@@ -221,132 +175,87 @@ function renderRichText(text: string): string {
     .join("");
 }
 
-function splitRichText(text: string): RichTextSegment[] {
+function parseRichText(text: string): RichTextSegment[] {
   const segments: RichTextSegment[] = [];
+  const tree = fromMarkdown(text);
+  let cursor = 0;
 
-  for (const linkSegment of splitLinks(text)) {
-    if (linkSegment.type === "link") {
-      segments.push(linkSegment);
-      continue;
+  for (const child of tree.children) {
+    const start = getStartOffset(child);
+    const end = getEndOffset(child);
+    if (start !== undefined && start > cursor) {
+      segments.push({ type: "text", value: text.slice(cursor, start) });
     }
 
-    for (const emphasisSegment of splitEmphasis(linkSegment.value)) {
-      segments.push(emphasisSegment);
+    segments.push(...renderMarkdownNodeAsSegments(child, text));
+    if (end !== undefined) {
+      cursor = end;
     }
+  }
+
+  if (cursor < text.length) {
+    segments.push({ type: "text", value: text.slice(cursor) });
   }
 
   return segments;
 }
 
-function splitEmphasis(text: string): RichTextSegment[] {
-  const result: RichTextSegment[] = [];
-  let cursor = 0;
-
-  while (cursor < text.length) {
-    const boldStart = text.indexOf("**", cursor);
-    const italicStart = findItalicStart(text, cursor);
-    const nextToken = pickNextToken(boldStart, italicStart);
-
-    if (!nextToken) {
-      result.push({ type: "text", value: text.slice(cursor) });
-      break;
-    }
-
-    if (nextToken.start > cursor) {
-      result.push({ type: "text", value: text.slice(cursor, nextToken.start) });
-    }
-
-    if (nextToken.type === "bold") {
-      const boldEnd = text.indexOf("**", nextToken.start + 2);
-      if (boldEnd === -1) {
-        result.push({ type: "text", value: text.slice(nextToken.start) });
-        break;
-      }
-
-      const boldValue = text.slice(nextToken.start + 2, boldEnd);
-      if (!boldValue) {
-        result.push({ type: "text", value: text.slice(nextToken.start, boldEnd + 2) });
-      } else {
-        result.push({ type: "bold", value: boldValue });
-      }
-      cursor = boldEnd + 2;
-      continue;
-    }
-
-    const italicEnd = findItalicEnd(text, nextToken.start + 1);
-    if (italicEnd === -1) {
-      result.push({ type: "text", value: text.slice(nextToken.start) });
-      break;
-    }
-
-    const italicValue = text.slice(nextToken.start + 1, italicEnd);
-    if (!italicValue) {
-      result.push({ type: "text", value: text.slice(nextToken.start, italicEnd + 1) });
-    } else {
-      result.push({ type: "italic", value: italicValue });
-    }
-    cursor = italicEnd + 1;
+function renderMarkdownNodeAsSegments(node: RootContent, source: string): RichTextSegment[] {
+  switch (node.type) {
+    case "paragraph":
+    case "heading":
+      return renderPhrasingNodesAsSegments(node.children, source);
+    case "text":
+      return [{ type: "text", value: node.value }];
+    case "inlineCode":
+      return [{ type: "inlineCode", value: node.value }];
+    case "emphasis":
+      return [{ type: "italic", value: renderPhrasingNodesAsPlainText(node.children) }];
+    case "strong":
+      return [{ type: "bold", value: renderPhrasingNodesAsPlainText(node.children) }];
+    case "link":
+      return isSafeLinkTarget(node.url)
+        ? [{ type: "link", label: renderPhrasingNodesAsPlainText(node.children), href: node.url }]
+        : [{ type: "text", value: source.slice(getStartOffset(node) ?? 0, getEndOffset(node) ?? source.length) }];
+    case "break":
+      return [{ type: "text", value: "\n" }];
+    default:
+      return [{ type: "text", value: source.slice(getStartOffset(node) ?? 0, getEndOffset(node) ?? source.length) }];
   }
-
-  return result;
 }
 
-function splitLinks(text: string): RichTextSegment[] {
-  const result: RichTextSegment[] = [];
-  let cursor = 0;
-
-  while (cursor < text.length) {
-    const labelStart = text.indexOf("[", cursor);
-    if (labelStart === -1) {
-      result.push({ type: "text", value: text.slice(cursor) });
-      break;
-    }
-
-    if (labelStart > cursor) {
-      result.push({ type: "text", value: text.slice(cursor, labelStart) });
-    }
-
-    const labelEnd = text.indexOf("]", labelStart + 1);
-    if (labelEnd === -1) {
-      result.push({ type: "text", value: "[" });
-      cursor = labelStart + 1;
-      continue;
-    }
-
-    if (text[labelEnd + 1] !== "(") {
-      result.push({ type: "text", value: text.slice(labelStart, labelEnd + 1) });
-      cursor = labelEnd + 1;
-      continue;
-    }
-
-    const urlStart = labelEnd + 1;
-    const urlEnd = text.indexOf(")", urlStart + 1);
-    if (urlEnd === -1) {
-      result.push({ type: "text", value: "[" });
-      cursor = labelStart + 1;
-      continue;
-    }
-
-    const label = text.slice(labelStart + 1, labelEnd);
-    const href = text.slice(urlStart + 1, urlEnd).trim();
-    const safeHref = isSafeLinkTarget(href);
-
-    if (href.includes("[") && !safeHref) {
-      result.push({ type: "text", value: "[" });
-      cursor = labelStart + 1;
-      continue;
-    }
-
-    if (!label || !safeHref) {
-      result.push({ type: "text", value: text.slice(labelStart, urlEnd + 1) });
-    } else {
-      result.push({ type: "link", label, href });
-    }
-
-    cursor = urlEnd + 1;
+function renderPhrasingNodesAsSegments(nodes: PhrasingContent[], source: string): RichTextSegment[] {
+  const segments: RichTextSegment[] = [];
+  for (const node of nodes) {
+    segments.push(...renderMarkdownNodeAsSegments(node, source));
   }
+  return segments;
+}
 
-  return result;
+function renderPhrasingNodesAsPlainText(nodes: PhrasingContent[]): string {
+  return nodes.map((node) => {
+    switch (node.type) {
+      case "text":
+      case "inlineCode":
+        return node.value;
+      case "emphasis":
+      case "strong":
+      case "link":
+        return renderPhrasingNodesAsPlainText(node.children);
+      case "break":
+        return "\n";
+      default:
+        return "";
+    }
+  }).join("");
+}
+
+function getStartOffset(node: RootContent | PhrasingContent): number | undefined {
+  return node.position?.start.offset;
+}
+
+function getEndOffset(node: RootContent | PhrasingContent): number | undefined {
+  return node.position?.end.offset;
 }
 
 function splitBlockQuotes(text: string): Segment[] {
@@ -525,69 +434,6 @@ function escapedCharLength(value: string): number {
 
 function isPreferredBreakCharacter(value: string): boolean {
   return value === "\n" || value === " " || value === "\t";
-}
-
-function pickNextToken(
-  boldStart: number,
-  italicStart: number,
-): { type: "bold" | "italic"; start: number } | undefined {
-  if (boldStart === -1 && italicStart === -1) {
-    return undefined;
-  }
-
-  if (boldStart !== -1 && (italicStart === -1 || boldStart <= italicStart)) {
-    return { type: "bold", start: boldStart };
-  }
-
-  return { type: "italic", start: italicStart };
-}
-
-function findItalicStart(text: string, fromIndex: number): number {
-  let cursor = fromIndex;
-
-  while (cursor < text.length) {
-    const start = text.indexOf("_", cursor);
-    if (start === -1) {
-      return -1;
-    }
-
-    if (isValidItalicBoundary(text, start - 1) && findItalicEnd(text, start + 1) !== -1) {
-      return start;
-    }
-
-    cursor = start + 1;
-  }
-
-  return -1;
-}
-
-function findItalicEnd(text: string, fromIndex: number): number {
-  let cursor = fromIndex;
-
-  while (cursor < text.length) {
-    const end = text.indexOf("_", cursor);
-    if (end === -1) {
-      return -1;
-    }
-
-    const content = text.slice(fromIndex, end);
-    if (content && !content.includes("\n") && isValidItalicBoundary(text, end + 1)) {
-      return end;
-    }
-
-    cursor = end + 1;
-  }
-
-  return -1;
-}
-
-function isValidItalicBoundary(text: string, index: number): boolean {
-  if (index < 0 || index >= text.length) {
-    return true;
-  }
-
-  const value = text[index]!;
-  return !/[a-z0-9]/i.test(value);
 }
 
 function isSafeLinkTarget(value: string): boolean {

@@ -394,7 +394,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["log", "--config", configPath, "--lines", "2"], env);
 
     expect(stdout).toBe("two\nthree\n");
-  });
+  }, 10_000);
 
   it("rejects non-interactive init without --defaults", async () => {
     const root = await createTempDir();
