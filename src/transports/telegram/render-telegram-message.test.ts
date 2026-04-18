@@ -58,6 +58,32 @@ describe("renderTelegramMessage", () => {
     );
   });
 
+  it("continues parsing when an invalid link is followed by a valid link", () => {
+    expect(renderTelegramMessage("Broken [link](oops and [docs](https://example.com).")).toBe(
+      'Broken [link](oops and <a href="https://example.com">docs</a>.',
+    );
+  });
+
+  it("continues after nested or partially broken brackets and still renders later valid links", () => {
+    expect(
+      renderTelegramMessage(
+        "Messy [outer [inner] text and [docs](https://example.com/docs?a=1&b=2)",
+      ),
+    ).toBe(
+      'Messy [outer [inner] text and <a href="https://example.com/docs?a=1&amp;b=2">docs</a>',
+    );
+  });
+
+  it("renders only links with allowed protocols", () => {
+    expect(
+      renderTelegramMessage(
+        "Links [http](http://example.com) [https](https://example.com) [mail](mailto:test@example.com) [tg](tg://resolve?domain=example) [ftp](ftp://example.com)",
+      ),
+    ).toBe(
+      'Links <a href="http://example.com">http</a> <a href="https://example.com">https</a> <a href="mailto:test@example.com">mail</a> <a href="tg://resolve?domain=example">tg</a> [ftp](ftp://example.com)',
+    );
+  });
+
   it("renders blockquotes as Telegram HTML", () => {
     expect(renderTelegramMessage("> first line\n> second line")).toBe(
       "<blockquote>first line\nsecond line</blockquote>",

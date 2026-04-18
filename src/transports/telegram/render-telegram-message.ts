@@ -302,22 +302,40 @@ function splitLinks(text: string): RichTextSegment[] {
       break;
     }
 
-    const labelEnd = text.indexOf("]", labelStart + 1);
-    const urlStart = labelEnd === -1 ? -1 : text.indexOf("(", labelEnd + 1);
-    const urlEnd = urlStart === -1 ? -1 : text.indexOf(")", urlStart + 1);
-
-    if (labelEnd === -1 || urlStart !== labelEnd + 1 || urlEnd === -1) {
-      result.push({ type: "text", value: text.slice(cursor) });
-      break;
-    }
-
     if (labelStart > cursor) {
       result.push({ type: "text", value: text.slice(cursor, labelStart) });
     }
 
+    const labelEnd = text.indexOf("]", labelStart + 1);
+    if (labelEnd === -1) {
+      result.push({ type: "text", value: "[" });
+      cursor = labelStart + 1;
+      continue;
+    }
+
+    if (text[labelEnd + 1] !== "(") {
+      result.push({ type: "text", value: text.slice(labelStart, labelEnd + 1) });
+      cursor = labelEnd + 1;
+      continue;
+    }
+
+    const urlStart = labelEnd + 1;
+    const urlEnd = text.indexOf(")", urlStart + 1);
+    if (urlEnd === -1) {
+      result.push({ type: "text", value: "[" });
+      cursor = labelStart + 1;
+      continue;
+    }
+
     const label = text.slice(labelStart + 1, labelEnd);
     const href = text.slice(urlStart + 1, urlEnd).trim();
-    if (!label || !isSafeLinkTarget(href)) {
+    if (href.includes("[") || !label || !isSafeLinkTarget(href)) {
+      if (href.includes("[")) {
+        result.push({ type: "text", value: "[" });
+        cursor = labelStart + 1;
+        continue;
+      }
+
       result.push({ type: "text", value: text.slice(labelStart, urlEnd + 1) });
     } else {
       result.push({ type: "link", label, href });
