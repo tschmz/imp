@@ -42,6 +42,53 @@ describe("imp-voice speaker outbox", () => {
     });
   });
 
+  it("continues after a failed outbox file and processes the next one", async () => {
+    const root = await createTempRoot();
+    const config = normalizeConfig({ runtimeDir: join(root, "runtime") }, root);
+    await mkdir(config.outboxDir, { recursive: true });
+    await writeFile(join(config.outboxDir, "001-bad.json"), '{"schemaVersion":1,"text":', "utf8");
+    await writeFile(
+      join(config.outboxDir, "002-good.json"),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        text: "Process me.",
+        speech: {
+          enabled: false,
+        },
+      })}\n`,
+      "utf8",
+    );
+    const consumer = new SpeakerOutboxConsumer(config, {
+      once: true,
+      playAudio: false,
+      fetchImpl: async () => {
+        throw new Error("fetch should not be called");
+      },
+      log: () => undefined,
+    });
+
+    await expect(consumer.run()).resolves.toBe(0);
+
+    expect(await readdir(config.outboxDir)).toEqual([]);
+    expect(await readdir(config.speaker.processedDir)).toHaveLength(1);
+
+    const failedEntries = await readdir(config.speaker.failedDir);
+    expect(failedEntries).toHaveLength(2);
+    expect(failedEntries.some((entry) => entry.endsWith(".error.json"))).toBe(true);
+
+    const status = JSON.parse(await readFile(config.speaker.statusFile, "utf8"));
+    expect(status).toMatchObject({
+      service: "imp-voice-out",
+      status: "processed",
+      text: "Process me.",
+      lastError: {
+        file: expect.any(String),
+        message: expect.any(String),
+        failedAt: expect.any(String),
+      },
+    });
+  });
+
   it("sends outbox speech metadata to TTS before using local fallbacks", async () => {
     const root = await createTempRoot();
     const previousApiKey = process.env.OPENAI_API_KEY;

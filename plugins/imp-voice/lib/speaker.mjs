@@ -7,6 +7,8 @@ import { ensureDirs, readJson, writeJsonAtomic, buildClaimedFileName } from "./f
 export class SpeakerOutboxConsumer {
   constructor(config, options = {}) {
     this.config = config;
+    this.failFast = config.speaker.failFast ?? false;
+    this.lastError = undefined;
     this.once = options.once ?? false;
     this.playAudio = options.playAudio ?? true;
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
@@ -43,7 +45,11 @@ export class SpeakerOutboxConsumer {
       processedAny = true;
       const ok = await this.processFile(filePath);
       if (!ok) {
-        return 1;
+        if (this.failFast) {
+          return 1;
+        }
+        await this.writeStatus("active");
+        continue;
       }
       if (this.once) {
         return 0;
@@ -80,16 +86,22 @@ export class SpeakerOutboxConsumer {
       });
       return true;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const failedName = claimedPath.split("/").at(-1);
       const failedPath = join(this.config.speaker.failedDir, failedName);
       await rename(claimedPath, failedPath).catch(() => undefined);
       await writeJsonAtomic(`${failedPath}.error.json`, {
         failedAt: new Date().toISOString(),
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       });
+      this.lastError = {
+        file: failedName,
+        message: errorMessage,
+        failedAt: new Date().toISOString(),
+      };
       await this.writeStatus("failed", {
         file: failedName,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       });
       return false;
     }
@@ -179,6 +191,7 @@ export class SpeakerOutboxConsumer {
       service: "imp-voice-out",
       status,
       updatedAt: new Date().toISOString(),
+      ...(this.lastError ? { lastError: this.lastError } : {}),
       ...fields,
     });
   }

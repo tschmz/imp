@@ -26,6 +26,7 @@ export function normalizeConfig(input, configDir = process.cwd()) {
     userId: stringValue(input.userId, "imp-voice"),
     pollIntervalMs: numberValue(input.pollIntervalMs, 250),
     speaker: {
+      failFast: booleanValue(speaker.failFast, false),
       processingDir: resolveMaybeRelative(speaker.processingDir ?? "speaker-processing", runtimeDir),
       processedDir: resolveMaybeRelative(speaker.processedDir ?? "speaker-processed", runtimeDir),
       failedDir: resolveMaybeRelative(speaker.failedDir ?? "speaker-failed", runtimeDir),
@@ -69,4 +70,8 @@ function numberValue(value, fallback) {
 
 function arrayValue(value, fallback) {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string") ? value : fallback;
+}
+
+function booleanValue(value, fallback) {
+  return typeof value === "boolean" ? value : fallback;
 }
