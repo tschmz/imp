@@ -9,6 +9,120 @@ The model is intentionally explicit:
 - let the external component write JSON event files into the endpoint inbox
 - choose where agent replies go with `response`
 
+## Installable Plugin Manifests
+
+Installable plugins live under a plugin root as direct subdirectories with a `plugin.json` manifest:
+
+```text
+plugins/
+  imp-voice/
+    plugin.json
+```
+
+`imp` discovers bundled plugins from `plugins/` next to the installed package. Operators can scan another root with `--root`, add roots through `IMP_PLUGIN_PATH`, or install an npm package by passing a package spec.
+
+```bash
+imp plugin list
+imp plugin list --root /opt/imp/plugins
+imp plugin inspect imp-voice
+imp plugin install imp-voice --config ~/.config/imp/config.json
+imp plugin install @tschmz/imp-voice@0.1.0 --config ~/.config/imp/config.json
+```
+
+When no local manifest matches the install argument, `imp` treats it as an npm package spec and installs it into the configured data root:
+
+```text
+<paths.dataRoot>/plugins/npm/
+  package.json
+  node_modules/
+    @tschmz/imp-voice/
+      plugin.json
+```
+
+Relative `paths.dataRoot` values are resolved against the config file directory. The installed config still stores `package.path` as the concrete package directory so service installation can read the manifest without consulting npm.
+
+The manifest schema is versioned separately from the runtime file protocol:
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "imp-voice",
+  "name": "imp Voice",
+  "version": "0.1.0",
+  "description": "Local voice frontend for imp.",
+  "capabilities": ["voice", "audio", "wake-word", "speech-output"],
+  "endpoints": [
+    {
+      "id": "audio-ingress",
+      "ingress": {
+        "pollIntervalMs": 500,
+        "maxEventBytes": 65536
+      },
+      "response": {
+        "type": "outbox",
+        "replyChannel": {
+          "kind": "audio"
+        }
+      }
+    }
+  ],
+  "services": [
+    {
+      "id": "wake",
+      "command": "node",
+      "args": ["dist/wake-service.js"],
+      "env": {
+        "OPENAI_API_KEY": "required"
+      }
+    },
+    {
+      "id": "speaker",
+      "command": "node",
+      "args": ["dist/speaker-service.js"],
+      "env": {
+        "OPENAI_API_KEY": "required"
+      }
+    }
+  ],
+  "init": {
+    "configTemplate": "templates/config.default.json"
+  }
+}
+```
+
+The install command writes the manifest defaults into an existing config:
+
+- adds a top-level `plugins[]` entry with `enabled: true`
+- sets `package.path` to the discovered plugin directory
+- adds each manifest endpoint as an enabled `type: "plugin"` endpoint
+- fails if the plugin ID or any endpoint ID already exists
+
+This manifest API defines plugin identity, default endpoint bindings, companion services, and init metadata so `imp init` and service-install flows can install a plugin without loading plugin code into the daemon process.
+
+Plugins can declare a Python setup for companion services:
+
+```json
+{
+  "setup": {
+    "python": {
+      "requirements": "requirements.txt"
+    }
+  },
+  "services": [
+    {
+      "id": "wake",
+      "command": "bash",
+      "args": ["bin/wake-phrase"],
+      "env": {
+        "IMP_VOICE_PYTHON": "{{setup.python.venvPython}}"
+      }
+    }
+  ]
+}
+```
+
+Before service installation, `imp` creates the environment under `<paths.dataRoot>/plugins/state/<plugin-id>/python/.venv` and installs the requirements file from the plugin package. Services can reference the prepared interpreter with `{{setup.python.venvPython}}`.
+
 ## Example: Audio Frontend To Telegram
 
 A Raspberry Pi audio frontend can run as its own local service, recognize speech, and write an event file into the `imp` inbox. `imp` routes the text to an agent and sends the reply to Telegram:

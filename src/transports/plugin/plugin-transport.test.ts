@@ -25,6 +25,8 @@ describe("createPluginTransport", () => {
         priority: "high",
         ttlMs: 30000,
         speech: {
+          enabled: true,
+          language: "en",
           model: "gpt-4o-mini-tts",
           voice: "ash",
           instructions: "Use short spoken replies.",
@@ -97,6 +99,8 @@ describe("createPluginTransport", () => {
       priority: "high",
       ttlMs: 30000,
       speech: {
+        enabled: true,
+        language: "en",
         model: "gpt-4o-mini-tts",
         voice: "ash",
         instructions: "Use short spoken replies.",

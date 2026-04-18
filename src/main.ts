@@ -3,6 +3,7 @@ import { createBackupUseCases } from "./application/backup-use-cases.js";
 import { createChatUseCase } from "./application/chat-use-case.js";
 import { createGetConfigValueUseCase } from "./application/get-config-value-use-case.js";
 import { createInitConfigUseCase } from "./application/init-config-use-case.js";
+import { createPluginUseCases } from "./application/plugin-use-cases.js";
 import { createReloadConfigUseCase } from "./application/reload-config-use-case.js";
 import { createRunDaemonUseCase, type RunDaemonOutcome } from "./application/run-daemon-use-case.js";
 import { createServiceUseCases } from "./application/service-use-cases.js";
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
   const runDaemonUseCase = createRunDaemonUseCase({ startupFailureReporter });
   const validateConfigUseCase = createValidateConfigUseCase();
   const backupUseCases = createBackupUseCases();
+  const pluginUseCases = createPluginUseCases();
   const cli = createCli({
     startDaemon: async (options) => {
       const outcome = await runDaemonUseCase(options);
@@ -46,6 +48,9 @@ async function main(): Promise<void> {
     initConfig: createInitConfigUseCase(),
     createBackup: backupUseCases.createBackup,
     restoreBackup: backupUseCases.restoreBackup,
+    listPlugins: pluginUseCases.listPlugins,
+    inspectPlugin: pluginUseCases.inspectPlugin,
+    installPlugin: pluginUseCases.installPlugin,
     installService: serviceUseCases.installService,
     uninstallService: serviceUseCases.uninstallService,
     startService: serviceUseCases.startService,
@@ -110,6 +115,14 @@ function normalizeCliError(error: unknown): { label: string; message: string; ex
   }
 
   if (error instanceof Error) {
+    if (isUserFacingUsageError(error)) {
+      return {
+        label: "Configuration error",
+        message: error.message,
+        exitCode: EXIT_CODES.configuration,
+      };
+    }
+
     return {
       label: "Unexpected error",
       message: error.message,
@@ -122,6 +135,17 @@ function normalizeCliError(error: unknown): { label: string; message: string; ex
     message: String(error),
     exitCode: EXIT_CODES.unknown,
   };
+}
+
+function isUserFacingUsageError(error: Error): boolean {
+  return (
+    error.message.includes("already exists:") ||
+    error.message.includes("already configured.") ||
+    error.message.includes("is not configured.") ||
+    error.message.includes("does not have a package path") ||
+    error.message.includes("Re-run with --force") ||
+    error.message.includes("was not found.")
+  );
 }
 
 main().catch((error: unknown) => {

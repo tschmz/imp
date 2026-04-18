@@ -27,6 +27,16 @@ export interface CliDependencies {
     only?: string;
     force: boolean;
   }) => Promise<void>;
+  listPlugins: (options: { root?: string }) => Promise<void>;
+  inspectPlugin: (options: { root?: string; id: string }) => Promise<void>;
+  installPlugin: (options: {
+    configPath?: string;
+    root?: string;
+    id: string;
+    autoStartServices?: boolean;
+    servicesOnly?: boolean;
+    force?: boolean;
+  }) => Promise<void>;
   installService: (options: { configPath?: string; dryRun: boolean; force: boolean }) => Promise<void>;
   uninstallService: (options: { configPath?: string }) => Promise<void>;
   startService: (options: { configPath?: string }) => Promise<void>;
@@ -190,6 +200,54 @@ export function createCli(dependencies: CliDependencies): Command {
         dataRoot: options.dataRoot,
         inputPath,
         only: options.only,
+        force: options.force ?? false,
+      });
+    });
+
+  const pluginCommand = program.command("plugin").description("Inspect installable imp plugins");
+
+  pluginCommand
+    .command("list")
+    .description("List installable plugins")
+    .option("--root <path>", "Plugin root directory to scan")
+    .action(async function action(this: Command, options: { root?: string }) {
+      await dependencies.listPlugins({
+        root: options.root,
+      });
+    });
+
+  pluginCommand
+    .command("inspect")
+    .description("Show an installable plugin manifest")
+    .argument("<id>", "Plugin ID")
+    .option("--root <path>", "Plugin root directory to scan")
+    .action(async function action(this: Command, id: string, options: { root?: string }) {
+      await dependencies.inspectPlugin({
+        root: options.root,
+        id,
+      });
+    });
+
+  pluginCommand
+    .command("install")
+    .description("Install a plugin manifest into the config")
+    .argument("<id>", "Plugin ID or npm package spec")
+    .option("-c, --config <path>", "Path to the config file")
+    .option("--root <path>", "Plugin root directory to scan")
+    .option("--no-services", "Do not install or start plugin services")
+    .option("--services-only", "Reinstall and start services for an already configured plugin")
+    .option("-f, --force", "Overwrite existing plugin service definitions")
+    .action(async function action(
+      this: Command,
+      id: string,
+      options: { config?: string; root?: string; services?: boolean; servicesOnly?: boolean; force?: boolean },
+    ) {
+      await dependencies.installPlugin({
+        configPath: options.config,
+        root: options.root,
+        id,
+        autoStartServices: options.services ?? true,
+        servicesOnly: options.servicesOnly ?? false,
         force: options.force ?? false,
       });
     });

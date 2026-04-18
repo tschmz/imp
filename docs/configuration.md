@@ -308,6 +308,16 @@ Top-level plugin fields:
 - `package.path`: optional operator-facing path to the local plugin package or component
 - `package.command`, `package.args`, `package.env`: optional launch metadata for operators and future service integration
 
+Installable plugin manifests:
+
+- bundled or local installable plugins are discovered from direct subdirectories containing `plugin.json`
+- `imp plugin list` lists discovered manifests
+- `imp plugin inspect <id>` prints one manifest summary
+- `imp plugin install <id>` adds the manifest's plugin entry and endpoint defaults to a config
+- `--root <path>` scans an explicit plugin root
+- `IMP_PLUGIN_PATH` can provide additional plugin roots, separated with the platform path delimiter
+- manifest `schemaVersion` is currently `1`
+
 `imp chat` always has a local CLI endpoint available. If no CLI endpoint is configured, it uses `local-cli`. Configured CLI endpoints are optional named chat profiles for `imp chat --endpoint <id>`; they are not started by `imp start` or the service, and chat uses `defaults.agentId` rather than `routing.defaultAgentId`.
 
 Only enabled daemon endpoints are started by `imp start` and the service. At least one non-CLI endpoint must be enabled for daemon startup.

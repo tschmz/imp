@@ -36,6 +36,7 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("init");
     expect(stdout).toContain("backup");
     expect(stdout).toContain("restore");
+    expect(stdout).toContain("plugin");
     expect(stdout).toContain("service");
   });
 
