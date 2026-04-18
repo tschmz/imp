@@ -414,12 +414,7 @@ describe("resolveSystemPrompt", () => {
         if (path === "/workspace/SYSTEM.md") {
           return (
             "{{#if skills.length}}" +
-            "You have access to the following skills.\n" +
-            "Treat this list as a catalog, not as full skill instructions.\n" +
-            "Use the load_skill tool when a listed skill is relevant to the user's request.\n" +
-            "Use exact skill names when loading or referring to skills.\n" +
-            "The catalog lists each skill's name, description, and SKILL.md location only.\n\n" +
-            "Treat bundled scripts as executable resources. Do not read script files before running them unless the loaded SKILL.md explicitly tells you to inspect them, required arguments are missing, or execution fails.\n\n" +
+            "Skills are a catalog. Use load_skill for relevant SKILL.md instructions and bundled scripts.\n\n" +
             "<available_skills>\n" +
             "{{#each skills}}<skill>\n" +
             "<name>\n{{instructionText name}}\n</name>\n" +
@@ -440,13 +435,11 @@ describe("resolveSystemPrompt", () => {
         throw new Error(`unexpected path: ${path}`);
       },
     );
-
     expect(prompt).toContain("<available_skills>");
-    expect(prompt).toContain("You have access to the following skills.");
-    expect(prompt).toContain("Treat this list as a catalog, not as full skill instructions.");
-    expect(prompt).toContain("Use the load_skill tool when a listed skill is relevant to the user's request.");
-    expect(prompt).toContain("Use exact skill names when loading or referring to skills.");
-    expect(prompt).toContain("Treat bundled scripts as executable resources.");
+    expect(prompt).toContain("load_skill");
+    expect(prompt).toContain("catalog");
+    expect(prompt).toContain("SKILL.md");
+    expect(prompt).toContain("bundled scripts");
     expect(prompt).toContain(
       "<skill>\n" +
         "<name>\ncommit\n</name>\n" +
