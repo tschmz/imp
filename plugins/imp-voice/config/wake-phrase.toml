@@ -5,13 +5,8 @@ channels = 1
 chunk_ms = 80
 
 [wake_capture]
-start_threshold_rms = 1800
 start_chunks = 2
-stop_threshold_rms = 800
-silence_ms = 700
 pre_roll_ms = 250
-min_seconds = 0.8
-max_seconds = 2.4
 cooldown_seconds = 1.5
 
 [wake_phrase]
