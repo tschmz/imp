@@ -19,6 +19,8 @@ export function createPluginServiceOrchestrator(dependencies: PluginServiceOrche
       findPluginOrThrow: (options: InspectPluginOptions) => Promise<DiscoveredPluginManifest>;
       writeOutput: (text: string) => void;
     }): Promise<DiscoveredPluginManifest> {
+      assertPluginIsConfigured(options.config, options.pluginId);
+
       const plugin = options.root
         ? await options.findPluginOrThrow({ id: options.pluginId, root: options.root })
         : await findConfiguredPluginManifest({
@@ -70,4 +72,11 @@ export function createPluginServiceOrchestrator(dependencies: PluginServiceOrche
       });
     },
   };
+}
+
+function assertPluginIsConfigured(config: AppConfig, pluginId: string): void {
+  const configuredPlugin = (config.plugins ?? []).find((plugin) => plugin.id === pluginId);
+  if (!configuredPlugin) {
+    throw new Error(`Plugin "${pluginId}" is not configured.`);
+  }
 }

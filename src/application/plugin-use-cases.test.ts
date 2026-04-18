@@ -574,6 +574,35 @@ describe("plugin use cases", () => {
     );
   });
 
+  it("requires configured plugin for services-only installs even when root is provided", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    await writeManifest(root, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+      services: [
+        {
+          id: "out",
+          command: "node",
+          args: ["bin/speaker-outbox.mjs"],
+        },
+      ],
+    });
+    await writeFile(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`, "utf8");
+    const useCases = createPluginUseCases();
+
+    await expect(
+      useCases.installPlugin({
+        root,
+        configPath,
+        id: "imp-voice",
+        servicesOnly: true,
+      }),
+    ).rejects.toThrow('Plugin "imp-voice" is not configured.');
+  });
+
   it("rejects duplicate plugin ids during install", async () => {
     const root = await createPluginRoot();
     const configPath = join(root, "config.json");
