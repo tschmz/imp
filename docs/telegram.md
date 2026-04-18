@@ -15,7 +15,7 @@ Current commands:
 - `/status` shows the current agent's active session details, including title, agent, message count, timestamps, working directory, and how many previous sessions are available.
 - `/history` lists previous sessions for the current agent and their transcript entry counts.
 - `/restore <n>` switches the current agent to session `n` from `/history`.
-- `/export` renders the current agent's active session transcript as plain text, including tool calls and tool results.
+- `/export` writes the current agent's active session transcript to an HTML file and replies with the file path and link. Use `/export full` to include complete tool arguments, tool output, and technical details; the default readable export keeps tool details compact.
 - `/ping` returns a simple liveness response.
 - `/config` shows runtime and config details for the current endpoint, including instance name, config path, data root, logging level, enabled endpoints, and the endpoint's default agent.
 - `/agent` shows the chat's currently selected agent details, including provider, model, base prompt, home, auth file, instructions, references, workspace, skills, tools, and available agent IDs.
