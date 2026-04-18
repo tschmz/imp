@@ -64,6 +64,25 @@ describe("renderTelegramMessage", () => {
     );
   });
 
+  it("preserves newline when transitioning from text to blockquote", () => {
+    expect(renderTelegramMessage("hello\n> quote")).toBe("hello\n<blockquote>quote</blockquote>");
+  });
+
+  it("preserves newline when transitioning from blockquote to text", () => {
+    expect(renderTelegramMessage("hello\n> quote\nworld")).toBe(
+      "hello\n<blockquote>quote</blockquote>\nworld",
+    );
+  });
+
+  it("preserves blank lines between blockquote blocks", () => {
+    expect(renderTelegramMessage("hello\n\n> quote")).toBe(
+      "hello\n\n<blockquote>quote</blockquote>",
+    );
+    expect(renderTelegramMessage("> first\n\n> second")).toBe(
+      "<blockquote>first</blockquote>\n\n<blockquote>second</blockquote>",
+    );
+  });
+
   it("renders fenced code blocks as Telegram HTML", () => {
     expect(renderTelegramMessage("Before\n```const x = 1 < 2;\n```\nAfter")).toBe(
       "Before\n<pre><code>const x = 1 &lt; 2;\n</code></pre>\nAfter",

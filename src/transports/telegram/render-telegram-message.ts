@@ -331,38 +331,29 @@ function splitLinks(text: string): RichTextSegment[] {
 
 function splitBlockQuotes(text: string): Segment[] {
   const segments: Segment[] = [];
-  let textBuffer = "";
-  const lines = text.split("\n");
-  let index = 0;
+  const blockQuoteRegex = /^>.*(?:\n>.*)*/gm;
+  let cursor = 0;
+  let match = blockQuoteRegex.exec(text);
 
-  while (index < lines.length) {
-    const line = lines[index]!;
+  while (match) {
+    const blockStart = match.index;
+    const blockValue = match[0]!;
 
-    if (!line.startsWith(">")) {
-      if (textBuffer || index > 0) {
-        textBuffer += "\n";
-      }
-      textBuffer += line;
-      index += 1;
-      continue;
+    if (blockStart > cursor) {
+      segments.push({ type: "text", value: text.slice(cursor, blockStart) });
     }
 
-    if (textBuffer) {
-      segments.push({ type: "text", value: textBuffer });
-      textBuffer = "";
-    }
-
-    const quoteLines: string[] = [];
-    while (index < lines.length && lines[index]!.startsWith(">")) {
-      const quoteLine = lines[index]!;
-      quoteLines.push(quoteLine.slice(quoteLine.startsWith("> ") ? 2 : 1));
-      index += 1;
-    }
+    const quoteLines = blockValue
+      .split("\n")
+      .map((line) => line.slice(line.startsWith("> ") ? 2 : 1));
     segments.push({ type: "blockquote", value: quoteLines.join("\n") });
+
+    cursor = blockStart + blockValue.length;
+    match = blockQuoteRegex.exec(text);
   }
 
-  if (textBuffer) {
-    segments.push({ type: "text", value: textBuffer });
+  if (cursor < text.length) {
+    segments.push({ type: "text", value: text.slice(cursor) });
   }
 
   return segments;
