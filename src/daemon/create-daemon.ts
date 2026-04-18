@@ -20,9 +20,11 @@ import {
 } from "./runtime-runner.js";
 import {
   createRuntimeShutdown,
+  type RuntimeControlAction,
   type RuntimeLifecycleProcess,
 } from "./runtime-shutdown.js";
 import { cleanupRuntimeState } from "./runtime-state.js";
+import { createDeferredActionController } from "./deferred-action-controller.js";
 import type { ActiveEndpointRuntimeConfig, Daemon, DaemonConfig } from "./types.js";
 
 interface DaemonDependencies extends RuntimeBootstrapDependencies {
@@ -61,14 +63,12 @@ export function createDaemon(
         );
         throw error;
       }
-      const runtimeControl = {
-        requestAction: (() => {}) as (action: "reload" | "restart") => void,
-      };
+      const runtimeControl = createDeferredActionController<RuntimeControlAction>();
       const runtimeEntries = createRuntimeEntries(runtimes, {
         agentRegistry,
         createTransport: dependencies.createTransport,
         requestControlAction: (action) => {
-          runtimeControl.requestAction(action);
+          runtimeControl.request(action);
         },
       });
       const shutdown = createRuntimeShutdown(
@@ -76,9 +76,9 @@ export function createDaemon(
         runtimes.map((runtime) => runtime.endpointConfig.paths.runtimeStatePath),
         dependencies.runtimeProcess,
       );
-      runtimeControl.requestAction = (action) => {
+      runtimeControl.setHandler((action) => {
         shutdown.requestControlAction(action);
-      };
+      });
       const registeredSignals = shutdown.registerSignalHandlers();
 
       try {
