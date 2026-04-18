@@ -15,7 +15,7 @@ imp plugin install @tschmz/imp-voice --config ~/.config/imp/config.json
 For local development from the `imp` repository:
 
 ```bash
-imp plugin install imp-voice --config ~/.config/imp/config.json
+imp plugin install imp-voice --root plugins --config ~/.config/imp/config.json
 ```
 
 Package installs are stored below the active config's `paths.dataRoot` at `plugins/npm`.
