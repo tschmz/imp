@@ -325,7 +325,44 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).not.toContain("You are chatting through Telegram.");
   });
 
-  it("does not add URL or file-path restrictions for non-outbox audio reply channels in the built-in default prompt", async () => {
+  it("renders CLI Markdown guidance in the built-in default prompt", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { builtIn: "default" },
+        },
+      },
+      undefined,
+      {
+        ...createTemplateContext(),
+        transport: {
+          kind: "cli",
+        },
+        reply: {
+          channel: {
+            kind: "cli",
+            delivery: "endpoint",
+            endpointId: "local-cli",
+          },
+        },
+      },
+      [],
+      async (path) => {
+        throw new Error(`unexpected path: ${path}`);
+      },
+    );
+
+    expect(prompt).toContain("Reply channel: cli via endpoint (endpoint local-cli)");
+    expect(prompt).toContain("You are chatting through the interactive CLI.");
+    expect(prompt).toContain("Strikethrough with double tildes");
+    expect(prompt).toContain("Simple GitHub-flavored Markdown tables");
+    expect(prompt).toContain("Avoid task lists, images, raw HTML, footnotes");
+    expect(prompt).not.toContain("You are chatting through Telegram.");
+    expect(prompt).not.toContain("The reply will be spoken aloud.");
+  });
+
+  it("renders the same spoken-output restrictions for all audio reply channels in the built-in default prompt", async () => {
     const prompt = await buildSystemPrompt(
       {
         ...createAgent(),
@@ -352,7 +389,7 @@ describe("resolveSystemPrompt", () => {
 
     expect(prompt).toContain("Reply channel: audio via endpoint (endpoint speaker-room)");
     expect(prompt).toContain("The reply will be spoken aloud.");
-    expect(prompt).not.toContain("Do not include URLs or file paths in final responses.");
+    expect(prompt).toContain("Do not include URLs or file paths in final responses.");
   });
 
   it("renders neutral guidance for none reply channels in the built-in default prompt", async () => {
@@ -381,8 +418,9 @@ describe("resolveSystemPrompt", () => {
     );
 
     expect(prompt).toContain("Reply channel: none via none");
-    expect(prompt).toContain("Format final responses for the configured reply channel.");
+    expect(prompt).toContain("Keep responses compact by default.");
     expect(prompt).not.toContain("You are chatting through Telegram.");
+    expect(prompt).not.toContain("You are chatting through the interactive CLI.");
     expect(prompt).not.toContain("The reply will be spoken aloud.");
   });
 
