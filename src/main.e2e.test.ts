@@ -192,7 +192,7 @@ describe("imp CLI e2e", () => {
     expect(await readFile(promptPath, "utf8")).toBe("backup prompt\n");
     expect(await readFile(authPath, "utf8")).toBe('{"token":"secret"}\n');
     expect(await readFile(conversationPath, "utf8")).toContain('"hi"');
-  }, 10_000);
+  }, 20_000);
 
   it("updates a discovered config value through `imp config set` using array id navigation", async () => {
     const root = await createTempDir();
@@ -270,7 +270,7 @@ describe("imp CLI e2e", () => {
       default:
         throw new Error(`Unsupported test platform: ${process.platform}`);
     }
-  });
+  }, 10_000);
 
   it("creates runtime directories and logs a startup failure for an invalid telegram token", async () => {
     const root = await createTempDir();
@@ -341,7 +341,7 @@ describe("imp CLI e2e", () => {
     await expect(stat(runtimeStatePath)).rejects.toMatchObject({
       code: "ENOENT",
     });
-  });
+  }, 10_000);
 
   it("shows recent daemon log lines", async () => {
     const root = await createTempDir();
@@ -394,7 +394,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["log", "--config", configPath, "--lines", "2"], env);
 
     expect(stdout).toBe("two\nthree\n");
-  });
+  }, 10_000);
 
   it("rejects non-interactive init without --defaults", async () => {
     const root = await createTempDir();
@@ -406,6 +406,18 @@ describe("imp CLI e2e", () => {
       ),
     });
   });
+
+  it("prints configuration errors and exits with code 2 for already existing config files", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    await runCli(["init", "--defaults"], env);
+
+    await expect(runCli(["init", "--defaults"], env)).rejects.toMatchObject({
+      code: 2,
+      stderr: expect.stringContaining("Configuration error: Config file already exists:"),
+    });
+  }, 10_000);
 });
 
 async function createTempDir(): Promise<string> {

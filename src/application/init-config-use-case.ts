@@ -1,6 +1,7 @@
 import { assertInitConfigCanBeCreated, initAppConfig } from "../config/init-app-config.js";
 import { createDefaultAppConfig } from "../config/default-app-config.js";
 import { promptForInitialAppConfig } from "../config/prompt-init-config.js";
+import { ConfigAlreadyExistsError } from "../domain/errors.js";
 import { installConfiguredPluginServices } from "./plugin-service-installer.js";
 import { installService } from "../service/install-service.js";
 
@@ -21,7 +22,12 @@ export function createInitConfigUseCase(
   };
 
   return async ({ configPath, force, defaults }) => {
-    const resolvedConfigPath = await assertInitConfigCanBeCreated({ configPath, force });
+    let resolvedConfigPath: string;
+    try {
+      resolvedConfigPath = await assertInitConfigCanBeCreated({ configPath, force });
+    } catch (error) {
+      throw mapInitConfigError(error);
+    }
     const initSetup = defaults
       ? {
           config: undefined,
@@ -53,6 +59,16 @@ export function createInitConfigUseCase(
       },
     });
   };
+}
+
+function mapInitConfigError(error: unknown): unknown {
+  if (error instanceof Error && error.message.startsWith("Config file already exists: ")) {
+    const [line] = error.message.split("\n");
+    const configPath = line.slice("Config file already exists: ".length);
+    return new ConfigAlreadyExistsError(configPath, { cause: error });
+  }
+
+  return error;
 }
 
 async function resolveInitConfig() {

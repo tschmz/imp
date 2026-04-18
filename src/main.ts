@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { pathToFileURL } from "node:url";
 import { createBackupUseCases } from "./application/backup-use-cases.js";
 import { createChatUseCase } from "./application/chat-use-case.js";
 import { createGetConfigValueUseCase } from "./application/get-config-value-use-case.js";
@@ -12,7 +13,12 @@ import { createValidateConfigUseCase } from "./application/validate-config-use-c
 import { createViewLogsUseCase } from "./application/view-logs-use-case.js";
 import { createCli } from "./cli/create-cli.js";
 import {
+  ConfigAlreadyExistsError,
   ConfigurationError,
+  MissingPluginPackagePathError,
+  PluginAlreadyConfiguredError,
+  PluginNotConfiguredError,
+  PluginNotFoundError,
   RuntimeStateError,
   TransportResolutionError,
   UnsupportedPlatformError,
@@ -81,7 +87,7 @@ function presentCliError(error: unknown): void {
   process.exitCode = normalizedError.exitCode;
 }
 
-function normalizeCliError(error: unknown): { label: string; message: string; exitCode: number } {
+export function normalizeCliError(error: unknown): { label: string; message: string; exitCode: number } {
   if (error instanceof ConfigurationError) {
     return {
       label: "Configuration error",
@@ -114,15 +120,21 @@ function normalizeCliError(error: unknown): { label: string; message: string; ex
     };
   }
 
-  if (error instanceof Error) {
-    if (isUserFacingUsageError(error)) {
-      return {
-        label: "Configuration error",
-        message: error.message,
-        exitCode: EXIT_CODES.configuration,
-      };
-    }
+  if (
+    error instanceof PluginNotFoundError ||
+    error instanceof PluginAlreadyConfiguredError ||
+    error instanceof PluginNotConfiguredError ||
+    error instanceof MissingPluginPackagePathError ||
+    error instanceof ConfigAlreadyExistsError
+  ) {
+    return {
+      label: "Configuration error",
+      message: error.message,
+      exitCode: EXIT_CODES.configuration,
+    };
+  }
 
+  if (error instanceof Error) {
     return {
       label: "Unexpected error",
       message: error.message,
@@ -137,17 +149,12 @@ function normalizeCliError(error: unknown): { label: string; message: string; ex
   };
 }
 
-function isUserFacingUsageError(error: Error): boolean {
-  return (
-    error.message.includes("already exists:") ||
-    error.message.includes("already configured.") ||
-    error.message.includes("is not configured.") ||
-    error.message.includes("does not have a package path") ||
-    error.message.includes("Re-run with --force") ||
-    error.message.includes("was not found.")
-  );
+export async function runCliEntryPoint(): Promise<void> {
+  await main();
 }
 
-main().catch((error: unknown) => {
-  presentCliError(error);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runCliEntryPoint().catch((error: unknown) => {
+    presentCliError(error);
+  });
+}

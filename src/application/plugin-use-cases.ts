@@ -6,6 +6,12 @@ import { parseConfigJson } from "../config/config-json.js";
 import { discoverConfigPath } from "../config/discover-config-path.js";
 import { appConfigSchema } from "../config/schema.js";
 import type { AppConfig, EndpointConfig, PluginConfig, PluginEndpointConfig } from "../config/types.js";
+import {
+  MissingPluginPackagePathError,
+  PluginAlreadyConfiguredError,
+  PluginNotConfiguredError,
+  PluginNotFoundError,
+} from "../domain/errors.js";
 import { discoverPluginManifests, readPluginManifest, type DiscoveredPluginManifest } from "../plugins/discovery.js";
 import { PLUGIN_MANIFEST_FILE } from "../plugins/manifest.js";
 import { installPluginServices, type PluginServiceInstallDependencies } from "./plugin-service-installer.js";
@@ -72,10 +78,7 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
       const plugin = result.plugins.find((candidate) => candidate.manifest.id === options.id);
       if (!plugin) {
         const known = result.plugins.map((candidate) => candidate.manifest.id).sort();
-        throw new Error(
-          `Plugin "${options.id}" was not found.` +
-            (known.length > 0 ? ` Known plugins: ${known.map((id) => `"${id}"`).join(", ")}.` : ""),
-        );
+        throw new PluginNotFoundError(options.id, known);
       }
 
       writeOutput(renderPluginDetails(plugin));
@@ -227,7 +230,7 @@ async function findConfiguredPluginManifest(options: {
 }): Promise<DiscoveredPluginManifest> {
   const configuredPlugin = (options.config.plugins ?? []).find((plugin) => plugin.id === options.pluginId);
   if (!configuredPlugin) {
-    throw new Error(`Plugin "${options.pluginId}" is not configured.`);
+    throw new PluginNotConfiguredError(options.pluginId);
   }
 
   if (options.root) {
@@ -235,7 +238,7 @@ async function findConfiguredPluginManifest(options: {
   }
 
   if (!configuredPlugin.package?.path) {
-    throw new Error(`Plugin "${options.pluginId}" does not have a package path in the config.`);
+    throw new MissingPluginPackagePathError(options.pluginId);
   }
 
   const pluginRoot = resolvePathRelativeToConfig(configuredPlugin.package.path, dirname(options.configPath));
@@ -304,10 +307,7 @@ async function findPluginOrThrow(
   const plugin = result.plugins.find((candidate) => candidate.manifest.id === options.id);
   if (!plugin) {
     const known = result.plugins.map((candidate) => candidate.manifest.id).sort();
-    throw new Error(
-      `Plugin "${options.id}" was not found.` +
-        (known.length > 0 ? ` Known plugins: ${known.map((id) => `"${id}"`).join(", ")}.` : ""),
-    );
+    throw new PluginNotFoundError(options.id, known);
   }
 
   return plugin;
@@ -447,9 +447,7 @@ function isPackagePathSpec(packageSpec: string): boolean {
 
 function assertPluginCanBeInstalled(config: AppConfig, plugin: DiscoveredPluginManifest): void {
   if ((config.plugins ?? []).some((entry) => entry.id === plugin.manifest.id)) {
-    throw new Error(
-      `Plugin "${plugin.manifest.id}" is already configured.\nRe-run with --services-only to reinstall plugin services.`,
-    );
+    throw new PluginAlreadyConfiguredError(plugin.manifest.id);
   }
 
   const endpointIds = new Set(config.endpoints.map((endpoint: EndpointConfig) => endpoint.id));
