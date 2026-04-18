@@ -98,7 +98,22 @@ describe("createCli", () => {
     await cli.parseAsync(["node", "imp", "plugin", "list", "--root", "/tmp/plugins"]);
     await cli.parseAsync(["node", "imp", "plugin", "inspect", "imp-voice", "--root", "/tmp/plugins"]);
     await cli.parseAsync(["node", "imp", "plugin", "install", "imp-voice", "--config", "/tmp/imp.json", "--root", "/tmp/plugins"]);
+    await cli.parseAsync([
+      "node",
+      "imp",
+      "plugin",
+      "install",
+      "imp-voice",
+      "--config",
+      "/tmp/imp.json",
+      "--root",
+      "/tmp/plugins",
+      "--no-services",
+      "--services-only",
+      "--force",
+    ]);
     await cli.parseAsync(["node", "imp", "service", "install", "--config", "/tmp/imp.json", "--dry-run"]);
+    await cli.parseAsync(["node", "imp", "init", "--config", "/tmp/imp.json"]);
 
     expect(dependencies.viewLogs).toHaveBeenCalledWith({
       endpointId: "ops",
@@ -137,11 +152,42 @@ describe("createCli", () => {
       servicesOnly: false,
       force: false,
     });
+    expect(dependencies.installPlugin).toHaveBeenCalledWith({
+      configPath: "/tmp/imp.json",
+      root: "/tmp/plugins",
+      id: "imp-voice",
+      autoStartServices: false,
+      servicesOnly: true,
+      force: true,
+    });
     expect(dependencies.installService).toHaveBeenCalledWith({
       configPath: "/tmp/imp.json",
       dryRun: true,
       force: false,
     });
+    expect(dependencies.initConfig).toHaveBeenCalledWith({
+      configPath: "/tmp/imp.json",
+      force: false,
+      defaults: false,
+    });
+  });
+
+  it("keeps a stable top-level command surface", () => {
+    const cli = createCli(createDependencies());
+
+    expect(cli.commands.map((command) => command.name())).toMatchInlineSnapshot(`
+      [
+        "start",
+        "chat",
+        "log",
+        "init",
+        "config",
+        "backup",
+        "restore",
+        "plugin",
+        "service",
+      ]
+    `);
   });
 
   it("rejects invalid log line counts strictly", () => {
