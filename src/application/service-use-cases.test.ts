@@ -12,6 +12,7 @@ describe("createServiceUseCases", () => {
       platform: "linux-systemd-user" as const,
       serviceName: "imp",
       serviceLabel: "dev.imp",
+      description: "imp daemon",
       configPath: "/tmp/config.json",
       workingDirectory: "/tmp",
       command: "/usr/bin/node",

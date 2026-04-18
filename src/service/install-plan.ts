@@ -9,6 +9,7 @@ export interface ServiceInstallPlan {
   platform: ServicePlatform;
   serviceName: string;
   serviceLabel: string;
+  description: string;
   configPath: string;
   workingDirectory: string;
   command: string;
@@ -22,21 +23,33 @@ export function createServiceInstallPlan(options: {
   execPath?: string;
   platform?: ServicePlatformInput;
   environmentPath?: string;
+  serviceName?: string;
+  serviceLabel?: string;
+  description?: string;
+  workingDirectory?: string;
+  command?: string;
+  args?: string[];
 }): ServiceInstallPlan {
   const configPath = resolve(options.configPath);
   const platform = detectServicePlatform(options.platform);
-  const commandLine = resolveServiceCommandLine({
-    argv: options.argv,
-    execPath: options.execPath,
-    configPath,
-  });
+  const commandLine = options.command
+    ? {
+        command: options.command,
+        args: options.args ?? [],
+      }
+    : resolveServiceCommandLine({
+        argv: options.argv,
+        execPath: options.execPath,
+        configPath,
+      });
 
   return {
     platform,
-    serviceName: "imp",
-    serviceLabel: "dev.imp",
+    serviceName: options.serviceName ?? "imp",
+    serviceLabel: options.serviceLabel ?? "dev.imp",
+    description: options.description ?? "imp daemon",
     configPath,
-    workingDirectory: dirname(configPath),
+    workingDirectory: resolve(options.workingDirectory ?? dirname(configPath)),
     command: commandLine.command,
     args: commandLine.args,
     environmentPath:

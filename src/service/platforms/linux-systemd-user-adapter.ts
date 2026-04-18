@@ -14,7 +14,7 @@ export const linuxSystemdUserAdapter: ServicePlatformAdapter = {
   renderDefinition(plan: ServiceInstallPlan): string {
     return [
       "[Unit]",
-      "Description=imp daemon",
+      `Description=${plan.description}`,
       "After=network-online.target",
       "Wants=network-online.target",
       "",

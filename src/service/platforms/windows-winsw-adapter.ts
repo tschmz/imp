@@ -9,7 +9,7 @@ export const windowsWinSwAdapter: ServicePlatformAdapter = {
       "<service>",
       `  <id>${escapeXml(plan.serviceName)}</id>`,
       `  <name>${escapeXml(plan.serviceName)}</name>`,
-      "  <description>imp daemon</description>",
+      `  <description>${escapeXml(plan.description)}</description>`,
       `  <executable>${escapeXml(plan.command)}</executable>`,
       `  <arguments>${escapeXml(plan.args.join(" "))}</arguments>`,
       `  <workingdirectory>${escapeXml(plan.workingDirectory)}</workingdirectory>`,

@@ -3,6 +3,7 @@ import {
   createServiceInstallPlan,
   type ServiceInstallPlan,
   type ServicePlatform,
+  type ServicePlatformInput,
   renderServiceDefinition,
 } from "./install-plan.js";
 import { renderLinuxServiceEnvironment } from "./linux-service-environment.js";
@@ -25,19 +26,33 @@ export async function installService(options: {
   configPath: string;
   argv?: string[];
   execPath?: string;
-  platform?: NodeJS.Platform;
+  platform?: ServicePlatformInput;
   homeDir?: string;
   uid?: number;
   installer?: ServiceInstaller;
   force?: boolean;
   now?: Date;
   serviceEnvironment?: NodeJS.ProcessEnv;
+  serviceName?: string;
+  serviceLabel?: string;
+  description?: string;
+  workingDirectory?: string;
+  command?: string;
+  args?: string[];
+  environmentPath?: string;
 }): Promise<ServiceInstallResult> {
   const plan = createServiceInstallPlan({
     configPath: options.configPath,
     argv: options.argv,
     execPath: options.execPath,
     platform: options.platform,
+    serviceName: options.serviceName,
+    serviceLabel: options.serviceLabel,
+    description: options.description,
+    workingDirectory: options.workingDirectory,
+    command: options.command,
+    args: options.args,
+    environmentPath: options.environmentPath,
   });
   const platformAdapter = getServicePlatformAdapter(plan.platform);
   const definitionPath = platformAdapter.resolveDefinitionPath({
