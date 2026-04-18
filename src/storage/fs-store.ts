@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import type {
   ToolResultMessage,
   UserMessage,
 } from "@mariozechner/pi-ai";
 import { lock as lockFile } from "proper-lockfile";
+import writeFileAtomic from "write-file-atomic";
 import type {
   ChatRef,
   ConversationAssistantMessage,
@@ -472,11 +473,8 @@ async function writeActiveAgentConversationRef(
 }
 
 async function writeFileAtomically(path: string, content: string): Promise<void> {
-  const tempPath = `${path}.${process.pid}.tmp`;
-
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(tempPath, content, "utf8");
-  await rename(tempPath, path);
+  await writeFileAtomic(path, content, { encoding: "utf8" });
 }
 
 function normalizeSnapshot(
