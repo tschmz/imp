@@ -392,6 +392,63 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toContain("Do not include URLs or file paths in final responses.");
   });
 
+  it("renders a minimal phone prompt without technical default sections", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { builtIn: "default" },
+        },
+      },
+      undefined,
+      {
+        ...createTemplateContext(),
+        conversation: {
+          kind: "phone-call",
+          metadata: {
+            contact_name: "Thomas",
+            contact_uri: "+10000000000",
+          },
+        },
+        reply: {
+          channel: {
+            kind: "phone",
+            delivery: "outbox",
+            endpointId: "",
+          },
+        },
+      },
+      [
+        {
+          name: "commit",
+          description: "Stage and commit changes.",
+          directoryPath: "/skills/commit",
+          filePath: "/skills/commit/SKILL.md",
+          body: "\nUse focused commits.",
+          content: "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+          references: [],
+          scripts: [],
+        },
+      ],
+      async (path) => {
+        throw new Error(`unexpected path: ${path}`);
+      },
+    );
+
+    expect(prompt).toContain("You are a helpful assistant in a live phone call.");
+    expect(prompt).toContain("You are speaking with Thomas.");
+    expect(prompt).toContain("Speak naturally, personally, and calmly.");
+    expect(prompt).toContain("end your reply with a question");
+    expect(prompt).not.toContain("Runtime Context");
+    expect(prompt).not.toContain("Tooling And Execution");
+    expect(prompt).not.toContain("Skills");
+    expect(prompt).not.toContain("available_skills");
+    expect(prompt).not.toContain("Reply channel");
+    expect(prompt).not.toContain("Workspace");
+    expect(prompt).not.toContain("final answer");
+    expect(prompt).not.toContain("{{conversation.metadata.contact_name}}");
+  });
+
   it("renders neutral guidance for none reply channels in the built-in default prompt", async () => {
     const prompt = await buildSystemPrompt(
       {
