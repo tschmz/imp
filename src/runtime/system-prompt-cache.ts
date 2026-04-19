@@ -37,6 +37,13 @@ export interface SystemPromptCacheKeyInput {
   promptFiles: string[];
   templateContext: PromptTemplateContext;
   availableSkills?: SkillDefinition[];
+  runtimeUsage?: PromptTemplateRuntimeUsage;
+}
+
+export interface PromptTemplateRuntimeUsage {
+  exactNow: boolean;
+  minuteNow: boolean;
+  dateNow: boolean;
 }
 
 export class SystemPromptCache {
@@ -44,6 +51,7 @@ export class SystemPromptCache {
   readonly #readTextFile: (path: string) => Promise<string>;
   readonly #strategy: CacheStrategy<string>;
   readonly #latestCacheKeyByAgentId = new Map<string, string>();
+  readonly #runtimeUsageByStableCacheKey = new Map<string, PromptTemplateRuntimeUsage>();
 
   constructor(dependencies: SystemPromptCacheDependencies) {
     this.#getContextFileFingerprint = dependencies.getContextFileFingerprint;
@@ -69,7 +77,7 @@ export class SystemPromptCache {
       }),
     );
 
-    return JSON.stringify({
+    const stablePayload = {
       agentId: input.agent.id,
       prompt: serializePromptSource(input.agent.prompt.base),
       instructions: (input.agent.prompt.instructions ?? []).map(serializePromptSource),
@@ -83,6 +91,19 @@ export class SystemPromptCache {
         description: skill.description,
       })),
       files: fileFingerprints,
+    };
+    const stableCacheKey = JSON.stringify(stablePayload);
+    const runtimeUsage = mergeRuntimeUsages(
+      input.runtimeUsage,
+      this.#runtimeUsageByStableCacheKey.get(stableCacheKey),
+    );
+    if (runtimeUsage && runtimeUsageHasValues(input.runtimeUsage)) {
+      this.#runtimeUsageByStableCacheKey.set(stableCacheKey, runtimeUsage);
+    }
+
+    return JSON.stringify({
+      ...stablePayload,
+      templateContext: createCacheTemplateContext(input.templateContext, runtimeUsage),
     });
   }
 
@@ -104,14 +125,47 @@ export class SystemPromptCache {
 
 function createCacheTemplateContext(
   context: PromptTemplateContext,
-): Omit<PromptTemplateContext, "runtime"> & { runtime: Pick<PromptTemplateContext["runtime"], "timezone"> } {
+  runtimeUsage?: PromptTemplateRuntimeUsage,
+): Omit<PromptTemplateContext, "runtime"> & { runtime: Record<string, unknown> } {
   const { runtime, ...stableContext } = context;
+  const cacheRuntime: Record<string, unknown> = {
+    timezone: runtime.timezone,
+  };
+  if (runtimeUsage?.exactNow) {
+    cacheRuntime.now = runtime.now;
+  } else if (runtimeUsage?.minuteNow) {
+    cacheRuntime.now = {
+      date: runtime.now.date,
+      timeMinute: runtime.now.timeMinute,
+      localMinute: runtime.now.localMinute,
+    };
+  } else if (runtimeUsage?.dateNow) {
+    cacheRuntime.now = {
+      date: runtime.now.date,
+    };
+  }
   return {
     ...stableContext,
-    runtime: {
-      timezone: runtime.timezone,
-    },
+    runtime: cacheRuntime,
   };
+}
+
+function mergeRuntimeUsages(
+  first: PromptTemplateRuntimeUsage | undefined,
+  second: PromptTemplateRuntimeUsage | undefined,
+): PromptTemplateRuntimeUsage | undefined {
+  if (!first && !second) {
+    return undefined;
+  }
+  return {
+    exactNow: Boolean(first?.exactNow || second?.exactNow),
+    minuteNow: Boolean(first?.minuteNow || second?.minuteNow),
+    dateNow: Boolean(first?.dateNow || second?.dateNow),
+  };
+}
+
+function runtimeUsageHasValues(runtimeUsage: PromptTemplateRuntimeUsage | undefined): boolean {
+  return Boolean(runtimeUsage?.exactNow || runtimeUsage?.minuteNow || runtimeUsage?.dateNow);
 }
 
 function serializePromptSource(source: PromptSource): Record<string, string> {

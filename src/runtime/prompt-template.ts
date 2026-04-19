@@ -18,7 +18,9 @@ export interface PromptTemplateRuntimeNowContext {
   iso: string;
   date: string;
   time: string;
+  timeMinute: string;
   local: string;
+  localMinute: string;
 }
 
 export interface PromptTemplateContext {
@@ -147,12 +149,15 @@ function createPromptTemplateRuntimeContext(
 ): PromptTemplateContext["runtime"] {
   const date = formatDatePart(now, timezone);
   const time = formatTimePart(now, timezone);
+  const timeMinute = time.slice(0, 5);
   return {
     now: {
       iso: now.toISOString(),
       date,
       time,
+      timeMinute,
       local: `${date} ${time} ${timezone}`,
+      localMinute: `${date} ${timeMinute} ${timezone}`,
     },
     timezone,
   };

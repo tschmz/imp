@@ -94,7 +94,7 @@ describe("createPromptTemplateContext", () => {
     });
 
     const rendered = renderPromptTemplate(
-      "{{runtime.now.iso}} | {{runtime.now.date}} | {{runtime.now.time}} | {{runtime.now.local}} | {{runtime.timezone}}",
+      "{{runtime.now.iso}} | {{runtime.now.date}} | {{runtime.now.time}} | {{runtime.now.timeMinute}} | {{runtime.now.local}} | {{runtime.now.localMinute}} | {{runtime.timezone}}",
       {
         filePath: "/workspace/SYSTEM.md",
         context,
@@ -102,7 +102,7 @@ describe("createPromptTemplateContext", () => {
     );
 
     expect(rendered).toBe(
-      "2026-04-19T12:34:56.000Z | 2026-04-19 | 14:34:56 | 2026-04-19 14:34:56 Europe/Berlin | Europe/Berlin",
+      "2026-04-19T12:34:56.000Z | 2026-04-19 | 14:34:56 | 14:34 | 2026-04-19 14:34:56 Europe/Berlin | 2026-04-19 14:34 Europe/Berlin | Europe/Berlin",
     );
   });
 });

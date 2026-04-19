@@ -4,7 +4,7 @@ import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js"
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
 import type { SkillDefinition } from "../skills/types.js";
 import { renderPromptTemplate, type PromptTemplateContext } from "./prompt-template.js";
-import type { SystemPromptCache } from "./system-prompt-cache.js";
+import type { PromptTemplateRuntimeUsage, SystemPromptCache } from "./system-prompt-cache.js";
 
 export interface SystemPromptResolutionOptions {
   agent: AgentDefinition;
@@ -34,10 +34,6 @@ export interface SystemPromptSourceSummary {
   configuredReferenceFiles: string[];
 }
 
-interface PromptRuntimeUsage {
-  now: boolean;
-}
-
 export async function resolveSystemPrompt(
   options: SystemPromptResolutionOptions,
 ): Promise<SystemPromptResolutionResult> {
@@ -50,20 +46,25 @@ export async function resolveSystemPrompt(
     options.promptWorkingDirectory,
     agentHomeMarkdownFiles,
   );
-  const promptFiles = [
-    ...resolvePromptFileSources(
-      options.agent,
-      options.promptWorkingDirectory,
-      agentHomeMarkdownFiles,
-    ).map((source) => source.path),
-  ];
+  const promptFileSources = resolvePromptFileSources(
+    options.agent,
+    options.promptWorkingDirectory,
+    agentHomeMarkdownFiles,
+  );
+  const promptFiles = promptFileSources.map((source) => source.path);
 
+  const staticRuntimeUsage = mergeRuntimeUsages([
+    detectRuntimeUsageInPromptSource(options.agent.prompt.base),
+    ...(options.agent.prompt.instructions ?? []).map(detectRuntimeUsageInPromptSource),
+    ...(options.agent.prompt.references ?? []).map(detectRuntimeUsageInPromptSource),
+  ]);
   const cacheKey = await options.cache.buildCacheKey({
     agent: options.agent,
     promptWorkingDirectory: options.promptWorkingDirectory,
     promptFiles,
     templateContext: options.templateContext,
     availableSkills: options.availableSkills,
+    runtimeUsage: staticRuntimeUsage,
   });
 
   const cachedPrompt = options.cache.get(cacheKey);
@@ -84,8 +85,19 @@ export async function resolveSystemPrompt(
     agentHomeMarkdownFiles,
   );
 
-  if (!result.runtimeUsage.now) {
-    options.cache.set(options.agent.id, cacheKey, result.systemPrompt);
+  const finalCacheKey = staticRuntimeUsageEquals(staticRuntimeUsage, result.runtimeUsage)
+    ? cacheKey
+    : await options.cache.buildCacheKey({
+        agent: options.agent,
+        promptWorkingDirectory: options.promptWorkingDirectory,
+        promptFiles,
+        templateContext: options.templateContext,
+        availableSkills: options.availableSkills,
+        runtimeUsage: result.runtimeUsage,
+      });
+
+  if (!result.runtimeUsage.exactNow) {
+    options.cache.set(options.agent.id, finalCacheKey, result.systemPrompt);
   }
 
   return {
@@ -175,9 +187,13 @@ async function buildSystemPromptWithRuntimeUsage(
   availableSkills: SkillDefinition[],
   readTextFile: (path: string) => Promise<string>,
   agentHomeMarkdownFiles: string[] = [],
-): Promise<{ systemPrompt: string; runtimeUsage: PromptRuntimeUsage }> {
+): Promise<{ systemPrompt: string; runtimeUsage: PromptTemplateRuntimeUsage }> {
   const sections: string[] = [];
-  const runtimeUsage = { now: false };
+  const runtimeUsage = mergeRuntimeUsages([
+    detectRuntimeUsageInPromptSource(agent.prompt.base),
+    ...(agent.prompt.instructions ?? []).map(detectRuntimeUsageInPromptSource),
+    ...(agent.prompt.references ?? []).map(detectRuntimeUsageInPromptSource),
+  ]);
   const promptTemplateContext: PromptTemplateContext = {
     ...templateContext,
     skills: availableSkills.map((skill) => ({
@@ -331,7 +347,7 @@ async function resolvePromptSourceContent(
     optional?: boolean;
     templateFileContent: boolean;
     templateContext: PromptTemplateContext;
-    runtimeUsage?: PromptRuntimeUsage;
+    runtimeUsage?: PromptTemplateRuntimeUsage;
   },
 ): Promise<string | undefined> {
   if (source.text !== undefined) {
@@ -393,11 +409,58 @@ async function resolvePromptSourceContent(
   return trimmedContent;
 }
 
-function recordPromptRuntimeUsage(content: string, runtimeUsage: PromptRuntimeUsage | undefined): void {
+function recordPromptRuntimeUsage(content: string, runtimeUsage: PromptTemplateRuntimeUsage | undefined): void {
   if (!runtimeUsage) {
     return;
   }
-  runtimeUsage.now ||= content.includes("runtime.now");
+  mergeRuntimeUsageInto(runtimeUsage, detectRuntimeUsageInText(content));
+}
+
+function detectRuntimeUsageInPromptSource(source: PromptSource): PromptTemplateRuntimeUsage {
+  if (source.text !== undefined) {
+    return detectRuntimeUsageInText(source.text);
+  }
+  if (source.builtIn === "default") {
+    return detectRuntimeUsageInText(DEFAULT_AGENT_SYSTEM_PROMPT);
+  }
+  return createEmptyRuntimeUsage();
+}
+
+function detectRuntimeUsageInText(content: string): PromptTemplateRuntimeUsage {
+  return {
+    exactNow: /\bruntime\.now\.(iso|time|local)\b/.test(content),
+    minuteNow: /\bruntime\.now\.(timeMinute|localMinute)\b/.test(content),
+    dateNow: /\bruntime\.now\.date\b/.test(content),
+  };
+}
+
+function mergeRuntimeUsages(usages: PromptTemplateRuntimeUsage[]): PromptTemplateRuntimeUsage {
+  const result = createEmptyRuntimeUsage();
+  for (const usage of usages) {
+    mergeRuntimeUsageInto(result, usage);
+  }
+  return result;
+}
+
+function mergeRuntimeUsageInto(target: PromptTemplateRuntimeUsage, source: PromptTemplateRuntimeUsage): void {
+  target.exactNow ||= source.exactNow;
+  target.minuteNow ||= source.minuteNow;
+  target.dateNow ||= source.dateNow;
+}
+
+function staticRuntimeUsageEquals(
+  left: PromptTemplateRuntimeUsage,
+  right: PromptTemplateRuntimeUsage,
+): boolean {
+  return left.exactNow === right.exactNow && left.minuteNow === right.minuteNow && left.dateNow === right.dateNow;
+}
+
+function createEmptyRuntimeUsage(): PromptTemplateRuntimeUsage {
+  return {
+    exactNow: false,
+    minuteNow: false,
+    dateNow: false,
+  };
 }
 
 function extractFileSources(sources: PromptSource[]): Array<{ path: string; optional: boolean }> {

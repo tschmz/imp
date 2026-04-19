@@ -71,6 +71,59 @@ describe("resolveSystemPrompt", () => {
     expect(reads).toBe(2);
   });
 
+  it("caches prompts that render minute-precision runtime clock values for the current minute", async () => {
+    let reads = 0;
+    const readTextFile = async () => {
+      reads += 1;
+      return "Current minute: {{runtime.now.localMinute}}.";
+    };
+    const cache = new SystemPromptCache({
+      getContextFileFingerprint: async () => "1:1",
+      readTextFile,
+    });
+    const agent = {
+      ...createAgent(),
+      prompt: {
+        ...createAgent().prompt,
+        instructions: [{ file: "/workspace/AGENTS.md" }],
+      },
+    };
+
+    const first = await resolveSystemPrompt({
+      agent,
+      promptWorkingDirectory: "/workspace",
+      templateContext: createTemplateContext(),
+      readTextFile,
+      cache,
+    });
+
+    const second = await resolveSystemPrompt({
+      agent,
+      promptWorkingDirectory: "/workspace",
+      templateContext: createTemplateContext(),
+      readTextFile,
+      cache,
+    });
+
+    const nextMinute = await resolveSystemPrompt({
+      agent,
+      promptWorkingDirectory: "/workspace",
+      templateContext: createTemplateContext({
+        time: "14:35:01",
+        timeMinute: "14:35",
+        local: "2026-04-19 14:35:01 Europe/Berlin",
+        localMinute: "2026-04-19 14:35 Europe/Berlin",
+      }),
+      readTextFile,
+      cache,
+    });
+
+    expect(first.cacheHit).toBe(false);
+    expect(second.cacheHit).toBe(true);
+    expect(nextMinute.cacheHit).toBe(false);
+    expect(reads).toBe(2);
+  });
+
   it("renders curated template variables for file-backed instructions and references", async () => {
     const prompt = await buildSystemPrompt(
       {
@@ -603,7 +656,9 @@ function createAgent(): AgentDefinition {
   };
 }
 
-function createTemplateContext(): PromptTemplateContext {
+function createTemplateContext(
+  now: Partial<PromptTemplateContext["runtime"]["now"]> = {},
+): PromptTemplateContext {
   return {
     system: {
       os: "Linux",
@@ -618,7 +673,10 @@ function createTemplateContext(): PromptTemplateContext {
         iso: "2026-04-19T12:34:56.000Z",
         date: "2026-04-19",
         time: "14:34:56",
+        timeMinute: "14:34",
         local: "2026-04-19 14:34:56 Europe/Berlin",
+        localMinute: "2026-04-19 14:34 Europe/Berlin",
+        ...now,
       },
       timezone: "Europe/Berlin",
     },

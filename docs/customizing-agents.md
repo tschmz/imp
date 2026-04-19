@@ -54,7 +54,8 @@ Prompt files use Handlebars templating.
 - unknown variables fail immediately with the file path in the error
 - documented variables with no runtime value render as an empty string
 - arbitrary JavaScript execution, custom user-defined helpers, and defaults are not supported
-- runtime clock values are included in the prompt cache key only when a prompt references `runtime.now` or `runtime.timezone`
+- second-precision runtime clock values such as `runtime.now.iso`, `runtime.now.time`, and `runtime.now.local` are not cached
+- minute-precision values such as `runtime.now.timeMinute` and `runtime.now.localMinute` are cached per minute
 - `instructionAttr` escapes values for XML-like instruction tag attributes
 - `instructionText` escapes values for XML-like instruction tag text
 
@@ -69,7 +70,9 @@ Available variables:
 - `runtime.now.iso`
 - `runtime.now.date`
 - `runtime.now.time`
+- `runtime.now.timeMinute`
 - `runtime.now.local`
+- `runtime.now.localMinute`
 - `runtime.timezone`
 - `endpoint.id`
 - `agent.id`
