@@ -2245,6 +2245,7 @@ describe("createPiAgentEngine", () => {
   it("reuses the cached system prompt when context file fingerprints are unchanged", async () => {
     const readCalls: string[] = [];
     const fingerprintCalls: string[] = [];
+    const onSystemPromptResolved = vi.fn(async () => undefined);
 
     const engine = createPiAgentEngine({
       resolveModel: () =>
@@ -2268,11 +2269,13 @@ describe("createPiAgentEngine", () => {
       agent: createAgent(),
       conversation: createConversation(),
       message: createIncomingMessage(),
+      onSystemPromptResolved,
     });
     await engine.run({
       agent: createAgent(),
       conversation: createConversation(),
       message: createIncomingMessage(),
+      onSystemPromptResolved,
     });
 
     expect(fingerprintCalls).toEqual([
@@ -2280,6 +2283,10 @@ describe("createPiAgentEngine", () => {
       "/workspace/AGENTS.md",
     ]);
     expect(readCalls).toEqual(["/workspace/AGENTS.md"]);
+    expect(onSystemPromptResolved).toHaveBeenCalledOnce();
+    expect(onSystemPromptResolved).toHaveBeenCalledWith(expect.objectContaining({
+      cacheHit: false,
+    }));
   });
 
   it("invalidates the cached system prompt when stable template context changes", async () => {
