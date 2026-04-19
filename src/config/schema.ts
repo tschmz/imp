@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import type { AppConfig, EndpointConfig } from "./types.js";
+import type { AgentConfig, AgentToolsConfig, AppConfig, EndpointConfig, PluginEndpointConfig } from "./types.js";
 import { getTransport, listTransportTypes } from "../transports/registry.js";
+
+type RefinementContext<T> = z.core.$RefinementCtx<T>;
 
 const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
 const modelConfigSchema = z.object({
@@ -75,25 +77,7 @@ const agentToolsConfigSchema = z
         .optional(),
     }),
   ])
-  .superRefine((tools, ctx) => {
-    if (Array.isArray(tools)) {
-      return;
-    }
-
-    const serverIds = new Set<string>();
-    for (const [index, server] of (tools.mcp?.servers ?? []).entries()) {
-      if (serverIds.has(server.id)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["mcp", "servers", index, "id"],
-          message: `Duplicate MCP server id "${server.id}". MCP server ids must be unique per agent.`,
-        });
-        continue;
-      }
-
-      serverIds.add(server.id);
-    }
-  });
+  .superRefine(validateAgentToolsConfig);
 
 const agentConfigSchema = z
   .object({
@@ -108,37 +92,7 @@ const agentConfigSchema = z
     skills: agentSkillsConfigSchema.optional(),
     tools: agentToolsConfigSchema.optional(),
   })
-  .superRefine((agent, ctx) => {
-    if (!agent.model) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["model"],
-        message: "Agent model is required.",
-      });
-    }
-
-    if (!agent.authFile) {
-      return;
-    }
-
-    const provider = agent.model?.provider;
-    if (!provider) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["authFile"],
-        message: "`authFile` requires `model.provider` to be set to an OAuth-capable provider.",
-      });
-      return;
-    }
-
-    if (!getOAuthProvider(provider)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["authFile"],
-        message: `\`authFile\` is not supported for provider \`${provider}\`.`,
-      });
-    }
-  });
+  .superRefine(validateAgentConfig);
 
 const pluginIdSchema = z
   .string()
@@ -161,26 +115,7 @@ const pluginConfigSchema = z.object({
     .optional(),
 }).strict();
 
-const transportSchemas = listTransportTypes().map((type) => {
-  const entry = getTransport(type);
-  if (!entry) {
-    throw new Error(`Unsupported endpoint transport: ${type}`);
-  }
-
-  return entry.configSchema as z.ZodType<EndpointConfig>;
-});
-
-if (transportSchemas.length === 0) {
-  throw new Error("No endpoint transports registered.");
-}
-
-const endpointConfigSchema =
-  transportSchemas.length === 1
-    ? transportSchemas[0]
-    : (z.discriminatedUnion("type", [
-        transportSchemas[0] as z.core.$ZodTypeDiscriminable,
-        ...(transportSchemas.slice(1) as z.core.$ZodTypeDiscriminable[]),
-      ]) as unknown as z.ZodType<EndpointConfig>);
+const endpointConfigSchema = createEndpointConfigSchema();
 
 export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   instance: z.object({
@@ -200,7 +135,86 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   agents: agentConfigSchema.array().min(1),
   plugins: pluginConfigSchema.array().optional(),
   endpoints: endpointConfigSchema.array(),
-}).superRefine((config, ctx) => {
+}).superRefine(validateAppConfig);
+
+function createEndpointConfigSchema(): z.ZodType<EndpointConfig> {
+  const transportSchemas = listTransportTypes().map((type) => {
+    const entry = getTransport(type);
+    if (!entry) {
+      throw new Error(`Unsupported endpoint transport: ${type}`);
+    }
+
+    return entry.configSchema as z.ZodType<EndpointConfig>;
+  });
+
+  if (transportSchemas.length === 0) {
+    throw new Error("No endpoint transports registered.");
+  }
+
+  return transportSchemas.length === 1
+    ? transportSchemas[0]!
+    : (z.discriminatedUnion("type", [
+        transportSchemas[0] as z.core.$ZodTypeDiscriminable,
+        ...(transportSchemas.slice(1) as z.core.$ZodTypeDiscriminable[]),
+      ]) as unknown as z.ZodType<EndpointConfig>);
+}
+
+function validateAgentToolsConfig(
+  tools: AgentToolsConfig,
+  ctx: RefinementContext<AgentToolsConfig>,
+): void {
+  if (Array.isArray(tools)) {
+    return;
+  }
+
+  const serverIds = new Set<string>();
+  for (const [index, server] of (tools.mcp?.servers ?? []).entries()) {
+    if (serverIds.has(server.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mcp", "servers", index, "id"],
+        message: `Duplicate MCP server id "${server.id}". MCP server ids must be unique per agent.`,
+      });
+      continue;
+    }
+
+    serverIds.add(server.id);
+  }
+}
+
+function validateAgentConfig(agent: AgentConfig, ctx: RefinementContext<AgentConfig>): void {
+  if (!agent.model) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["model"],
+      message: "Agent model is required.",
+    });
+  }
+
+  if (!agent.authFile) {
+    return;
+  }
+
+  const provider = agent.model?.provider;
+  if (!provider) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["authFile"],
+      message: "`authFile` requires `model.provider` to be set to an OAuth-capable provider.",
+    });
+    return;
+  }
+
+  if (!getOAuthProvider(provider)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["authFile"],
+      message: `\`authFile\` is not supported for provider \`${provider}\`.`,
+    });
+  }
+}
+
+function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>): void {
   const agentIds = new Set<string>();
   const knownAgentIds = new Set<string>();
 
@@ -254,14 +268,32 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
     }
   }
 
-  if (!knownAgentIds.has(config.defaults.agentId)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["defaults", "agentId"],
-      message: `Unknown default agent id "${config.defaults.agentId}". Expected one of: ${formatKnownIds(knownAgentIds)}.`,
-    });
+  validateDefaultAgent(config, knownAgentIds, ctx);
+  validateEndpointDefaultAgents(config, knownAgentIds, ctx);
+  validatePluginEndpoints(config, endpointIds, enabledEndpointIds, pluginIds, enabledPluginIds, ctx);
+}
+
+function validateDefaultAgent(
+  config: AppConfig,
+  knownAgentIds: Set<string>,
+  ctx: RefinementContext<AppConfig>,
+): void {
+  if (knownAgentIds.has(config.defaults.agentId)) {
+    return;
   }
 
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ["defaults", "agentId"],
+    message: `Unknown default agent id "${config.defaults.agentId}". Expected one of: ${formatKnownIds(knownAgentIds)}.`,
+  });
+}
+
+function validateEndpointDefaultAgents(
+  config: AppConfig,
+  knownAgentIds: Set<string>,
+  ctx: RefinementContext<AppConfig>,
+): void {
   for (const [index, endpoint] of config.endpoints.entries()) {
     const defaultAgentId = endpoint.routing?.defaultAgentId;
     if (!defaultAgentId || knownAgentIds.has(defaultAgentId)) {
@@ -274,57 +306,90 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
       message: `Unknown default agent id "${defaultAgentId}" for endpoint "${endpoint.id}". Expected one of: ${formatKnownIds(knownAgentIds)}.`,
     });
   }
+}
 
+function validatePluginEndpoints(
+  config: AppConfig,
+  endpointIds: Set<string>,
+  enabledEndpointIds: Set<string>,
+  pluginIds: Set<string>,
+  enabledPluginIds: Set<string>,
+  ctx: RefinementContext<AppConfig>,
+): void {
   for (const [index, endpoint] of config.endpoints.entries()) {
     if (endpoint.type !== "plugin") {
       continue;
     }
 
-    if (!pluginIds.has(endpoint.pluginId)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["endpoints", index, "pluginId"],
-        message: `Unknown plugin id "${endpoint.pluginId}" for endpoint "${endpoint.id}".`,
-      });
+    validatePluginEndpointPluginReference(endpoint, index, pluginIds, enabledPluginIds, ctx);
+
+    if (endpoint.response.type !== "endpoint") {
+      continue;
     }
 
-    if (endpoint.enabled && !enabledPluginIds.has(endpoint.pluginId)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["endpoints", index, "pluginId"],
-        message: `Plugin id "${endpoint.pluginId}" for endpoint "${endpoint.id}" must be enabled.`,
-      });
-    }
-
-    if (endpoint.response.type === "endpoint" && endpoint.response.endpointId === endpoint.id) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["endpoints", index, "response", "endpointId"],
-        message: "Plugin endpoint responses must target a different endpoint.",
-      });
-    }
-
-    if (endpoint.response.type === "endpoint" && !endpointIds.has(endpoint.response.endpointId)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["endpoints", index, "response", "endpointId"],
-        message: `Unknown response endpoint id "${endpoint.response.endpointId}" for plugin endpoint "${endpoint.id}".`,
-      });
-    }
-
-    if (
-      endpoint.response.type === "endpoint" &&
-      endpointIds.has(endpoint.response.endpointId) &&
-      !enabledEndpointIds.has(endpoint.response.endpointId)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["endpoints", index, "response", "endpointId"],
-        message: `Response endpoint "${endpoint.response.endpointId}" for plugin endpoint "${endpoint.id}" must be enabled.`,
-      });
-    }
+    validatePluginEndpointResponseTarget(endpoint, index, endpointIds, enabledEndpointIds, ctx);
   }
-});
+}
+
+function validatePluginEndpointPluginReference(
+  endpoint: PluginEndpointConfig,
+  index: number,
+  pluginIds: Set<string>,
+  enabledPluginIds: Set<string>,
+  ctx: RefinementContext<AppConfig>,
+): void {
+  if (!pluginIds.has(endpoint.pluginId)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["endpoints", index, "pluginId"],
+      message: `Unknown plugin id "${endpoint.pluginId}" for endpoint "${endpoint.id}".`,
+    });
+  }
+
+  if (endpoint.enabled && !enabledPluginIds.has(endpoint.pluginId)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["endpoints", index, "pluginId"],
+      message: `Plugin id "${endpoint.pluginId}" for endpoint "${endpoint.id}" must be enabled.`,
+    });
+  }
+}
+
+function validatePluginEndpointResponseTarget(
+  endpoint: PluginEndpointConfig,
+  index: number,
+  endpointIds: Set<string>,
+  enabledEndpointIds: Set<string>,
+  ctx: RefinementContext<AppConfig>,
+): void {
+  if (endpoint.response.type !== "endpoint") {
+    return;
+  }
+
+  if (endpoint.response.endpointId === endpoint.id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["endpoints", index, "response", "endpointId"],
+      message: "Plugin endpoint responses must target a different endpoint.",
+    });
+  }
+
+  if (!endpointIds.has(endpoint.response.endpointId)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["endpoints", index, "response", "endpointId"],
+      message: `Unknown response endpoint id "${endpoint.response.endpointId}" for plugin endpoint "${endpoint.id}".`,
+    });
+  }
+
+  if (endpointIds.has(endpoint.response.endpointId) && !enabledEndpointIds.has(endpoint.response.endpointId)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["endpoints", index, "response", "endpointId"],
+      message: `Response endpoint "${endpoint.response.endpointId}" for plugin endpoint "${endpoint.id}" must be enabled.`,
+    });
+  }
+}
 
 function formatKnownIds(ids: Set<string>): string {
   return [...ids].sort().map((id) => `"${id}"`).join(", ");
