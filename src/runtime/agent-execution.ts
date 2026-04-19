@@ -8,6 +8,7 @@ import type { Api as AiApi, AssistantMessage, Model } from "@mariozechner/pi-ai"
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationEvent } from "../domain/conversation.js";
 import type { ToolDefinition } from "../tools/types.js";
+import type { ReplyChannelContext } from "./context.js";
 import { getAssistantText, toAgentMessages, toConversationEvents } from "./message-mapping.js";
 import type { WorkingDirectoryState } from "./tool-resolution.js";
 
@@ -41,6 +42,7 @@ export interface ExecuteAgentOptions {
   };
   parentMessageId: string;
   correlationId: string;
+  replyChannel?: ReplyChannelContext;
   onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
   continueFromContext?: boolean;
 }
@@ -155,7 +157,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
   }
 
   const responseText = getAssistantText(assistantMessage);
-  if (!responseText.trim()) {
+  if (!responseText.trim() && options.replyChannel?.delivery !== "none") {
     throw new Error(`Agent "${options.agent.id}" produced an assistant message without text content.`);
   }
 

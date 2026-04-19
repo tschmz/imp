@@ -658,6 +658,34 @@ describe("createPiAgentEngine", () => {
     );
   });
 
+  it("allows an empty assistant response for no-reply channels", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([fauxAssistantMessage([])]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async () => "unused context",
+    });
+
+    const result = await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+      runtime: {
+        replyChannel: {
+          kind: "none",
+          delivery: "none",
+        },
+      },
+    });
+
+    expect(result.message.text).toBe("");
+  });
+
   it("marks transcribed voice messages in model input so the agent can clarify", async () => {
     const registration = registerFauxProvider({
       provider: "faux",
