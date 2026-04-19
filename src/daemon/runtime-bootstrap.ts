@@ -35,10 +35,19 @@ export async function bootstrapRuntime(
     preparedRuntime = await acquireRuntimeState(config, endpointConfig);
 
     const components = buildRuntimeComponents(config, endpointConfig, dependencies);
+    const interruptedRunCount = await components.conversationStore.markInterruptedRuns?.(
+      new Date().toISOString(),
+    ) ?? 0;
 
     await components.logger.debug("initialized endpoint runtime state", {
       endpointId: endpointConfig.id,
     });
+    if (interruptedRunCount > 0) {
+      await components.logger.info("marked interrupted conversation runs", {
+        endpointId: endpointConfig.id,
+        interruptedRunCount,
+      });
+    }
 
     return {
       endpointConfig,

@@ -50,6 +50,7 @@ export interface LogFields {
   initialWorkingDirectory?: string;
   configuredBuiltInTools?: string[];
   resolvedBuiltInTools?: string[];
+  interruptedRunCount?: number;
   missingBuiltInTools?: string[];
   configuredMcpServers?: string[];
   initializedMcpServers?: string[];

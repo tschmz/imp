@@ -126,6 +126,9 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
         ),
       );
     },
+    async markInterruptedRuns(now) {
+      return markInterruptedAgentRuns(paths.conversationsDir, now);
+    },
     async listBackups(ref) {
       const selectedAgentId = await readSelectedAgentId(paths.conversationsDir, ref);
       return selectedAgentId ? readAgentInactiveSessions(paths.conversationsDir, selectedAgentId) : [];
@@ -172,6 +175,81 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
       return ensureActiveAgentSession(paths.conversationsDir, ref, options);
     },
   };
+}
+
+async function markInterruptedAgentRuns(
+  conversationsDir: string,
+  now: string,
+): Promise<number> {
+  let entries;
+
+  try {
+    entries = await readdir(join(conversationsDir, "agents"), { withFileTypes: true });
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return 0;
+    }
+    throw error;
+  }
+
+  const counts = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => markInterruptedRunsForAgent(conversationsDir, entry.name, now)),
+  );
+
+  return counts.reduce((total, count) => total + count, 0);
+}
+
+async function markInterruptedRunsForAgent(
+  conversationsDir: string,
+  agentId: string,
+  now: string,
+): Promise<number> {
+  return withAgentWriteQueue(agentId, async () =>
+    withAgentLock(conversationsDir, agentId, async () => {
+      const sessionsDir = getAgentSessionsDir(conversationsDir, agentId);
+      let entries;
+
+      try {
+        entries = await readdir(sessionsDir, { withFileTypes: true });
+      } catch (error) {
+        if (isMissingFileError(error)) {
+          return 0;
+        }
+        throw error;
+      }
+
+      let interruptedCount = 0;
+      for (const entry of entries) {
+        if (!entry.isDirectory()) {
+          continue;
+        }
+
+        const meta = await readSessionMetaByAgentAndSessionId(agentId, entry.name, conversationsDir);
+        if (meta?.run?.status !== "running") {
+          continue;
+        }
+
+        await writeSessionMeta(conversationsDir, {
+          state: {
+            ...toConversationState(meta),
+            updatedAt: now,
+            version: (meta.version ?? 0) + 1,
+            run: {
+              ...meta.run,
+              status: "interrupted",
+              updatedAt: now,
+            },
+          },
+          messages: await readSessionEvents(conversationsDir, meta.conversation, agentId),
+        });
+        interruptedCount += 1;
+      }
+
+      return interruptedCount;
+    }),
+  );
 }
 
 async function readAgentInactiveSessions(

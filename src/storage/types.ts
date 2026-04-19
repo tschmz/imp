@@ -24,6 +24,7 @@ export interface ConversationStore {
   put(context: ConversationContext): Promise<void>;
   appendEvents?(context: ConversationContext, events: ConversationEvent[]): Promise<ConversationContext>;
   updateState?(context: ConversationContext, patch: Partial<ConversationState>): Promise<ConversationContext>;
+  markInterruptedRuns?(now: string): Promise<number>;
   listBackups(ref: ChatRef): Promise<ConversationBackupSummary[]>;
   restore(ref: ChatRef, backupId: string, options?: { now?: Date }): Promise<boolean>;
   ensureActive(ref: ChatRef, options: { agentId: string; now: string; title?: string }): Promise<ConversationContext>;

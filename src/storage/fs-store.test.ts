@@ -564,6 +564,41 @@ describe("createFsConversationStore", () => {
     ]);
   });
 
+  it("marks running sessions as interrupted on startup", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const created = await store.create(createChatRef(), {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+
+    await store.updateState!(created, {
+      updatedAt: "2026-04-05T00:01:00.000Z",
+      run: {
+        status: "running",
+        messageId: "msg-1",
+        correlationId: "corr-1",
+        startedAt: "2026-04-05T00:01:00.000Z",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+    });
+
+    await expect(store.markInterruptedRuns!("2026-04-05T00:02:00.000Z")).resolves.toBe(1);
+    await expect(store.get(created.state.conversation)).resolves.toMatchObject({
+      state: {
+        updatedAt: "2026-04-05T00:02:00.000Z",
+        run: {
+          status: "interrupted",
+          messageId: "msg-1",
+          correlationId: "corr-1",
+          startedAt: "2026-04-05T00:01:00.000Z",
+          updatedAt: "2026-04-05T00:02:00.000Z",
+        },
+      },
+    });
+    await expect(store.markInterruptedRuns!("2026-04-05T00:03:00.000Z")).resolves.toBe(0);
+  });
+
   it("shares one active session per agent across chats", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
