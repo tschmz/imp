@@ -53,7 +53,7 @@ function createBaseBuiltInTools(workingDirectory: string, agent?: AgentDefinitio
   const toolOptions = resolveBuiltInToolOptions(agent);
   return [
     ...createCodingTools(workingDirectory, toolOptions),
-    ...createPhoneCallTools(agent?.phone),
+    ...createPhoneCallTools(agent?.phone, { agentId: agent?.id }),
     createGrepTool(workingDirectory),
     createFindTool(workingDirectory),
     createLsTool(workingDirectory),

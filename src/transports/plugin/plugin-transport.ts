@@ -21,6 +21,7 @@ const pluginEventSchema = z.object({
     .object({
       mode: z.literal("detached"),
       id: z.string().min(1),
+      agentId: z.string().min(1).optional(),
       kind: z.string().min(1).optional(),
       title: z.string().min(1).optional(),
       metadata: z.record(z.string(), z.unknown()).optional(),

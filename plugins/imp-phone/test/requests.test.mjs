@@ -22,6 +22,7 @@ describe("imp-phone call requests", () => {
       contactId: "thomas",
       contactName: "Thomas",
       uri: "+10000000000",
+      agentId: "imp.telebot",
       purpose: "Test call",
     });
 
@@ -35,8 +36,35 @@ describe("imp-phone call requests", () => {
         name: "Thomas",
         uri: "+10000000000",
       },
+      agentId: "imp.telebot",
       purpose: "Test call",
     });
     expect(payload.requestedAt).toEqual(expect.any(String));
+  });
+
+  it("uses the phone agent environment variable when no agent id argument is provided", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-request-"));
+    tempDirs.push(root);
+    const previous = process.env.IMP_PHONE_AGENT_ID;
+    process.env.IMP_PHONE_AGENT_ID = "imp.telebot";
+
+    try {
+      const path = await writeCallRequest({
+        requestsDir: root,
+        id: "call-1",
+        contactId: "thomas",
+        contactName: "Thomas",
+        uri: "+10000000000",
+      });
+
+      const payload = JSON.parse(await readFile(path, "utf8"));
+      expect(payload.agentId).toBe("imp.telebot");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.IMP_PHONE_AGENT_ID;
+      } else {
+        process.env.IMP_PHONE_AGENT_ID = previous;
+      }
+    }
   });
 });

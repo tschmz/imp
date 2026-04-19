@@ -2,7 +2,7 @@
 import { parseRequestCliArgs, writeCallRequest } from "../lib/requests.mjs";
 
 function printHelp() {
-  console.log(`Usage: imp-phone-request-call --requests-dir DIR --contact-id ID --contact-name NAME --uri URI [--purpose TEXT]
+  console.log(`Usage: imp-phone-request-call --requests-dir DIR --contact-id ID --contact-name NAME --uri URI [--purpose TEXT] [--agent-id ID]
 
 Writes a call request JSON file for the imp-phone controller.`);
 }

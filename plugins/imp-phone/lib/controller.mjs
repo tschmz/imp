@@ -97,6 +97,7 @@ export class PhoneController {
 
   async processRequest(request) {
     const contact = parseContact(request);
+    const requestedAgentId = parseRequestedAgentId(request);
     const requestId = typeof request.id === "string" && request.id.length > 0 ? request.id : randomUUID();
     const conversationId = `${this.config.conversationIdPrefix}-${sanitizeFileName(requestId)}`;
     const callProcess = this.startCall(contact);
@@ -193,6 +194,7 @@ export class PhoneController {
         const event = await this.writeIngressEvent({
           requestId,
           conversationId,
+          requestedAgentId,
           contact,
           turn,
           transcript,
@@ -281,10 +283,12 @@ export class PhoneController {
       session: {
         mode: "detached",
         id: input.conversationId,
+        ...(input.requestedAgentId ? { agentId: input.requestedAgentId } : {}),
         kind: "phone-call",
         title: `Phone call: ${input.contact.name}`,
         metadata: {
           source: "imp-phone",
+          ...(input.requestedAgentId ? { agent_id: input.requestedAgentId } : {}),
           request_id: input.requestId,
           contact_id: input.contact.id,
           contact_name: input.contact.name,
@@ -296,6 +300,7 @@ export class PhoneController {
       receivedAt: new Date().toISOString(),
       metadata: {
         source: "imp-phone",
+        ...(input.requestedAgentId ? { agent_id: input.requestedAgentId } : {}),
         request_id: input.requestId,
         contact_id: input.contact.id,
         contact_name: input.contact.name,
@@ -524,6 +529,19 @@ export function parseContact(request) {
     name: contact.name,
     uri: contact.uri,
   };
+}
+
+export function parseRequestedAgentId(request) {
+  if (typeof request !== "object" || request === null || !("agentId" in request)) {
+    return undefined;
+  }
+  if (request.agentId === undefined || request.agentId === null || request.agentId === "") {
+    return undefined;
+  }
+  if (typeof request.agentId !== "string") {
+    throw new Error("Call request agentId must be a string when provided.");
+  }
+  return request.agentId;
 }
 
 export function parseCallFailureReason(text) {

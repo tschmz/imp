@@ -5,15 +5,18 @@ import type { ToolDefinition } from "../tools/types.js";
 const defaultPhoneCommand = "baresip";
 const defaultPhoneArgs = ["-e", "/dial {uri}"];
 
-export function createPhoneCallTools(config: AgentPhoneCallConfig | undefined): ToolDefinition[] {
+export function createPhoneCallTools(
+  config: AgentPhoneCallConfig | undefined,
+  options: { agentId?: string } = {},
+): ToolDefinition[] {
   if (!config) {
     return [];
   }
 
-  return [createPhoneCallTool(config)];
+  return [createPhoneCallTool(config, options)];
 }
 
-function createPhoneCallTool(config: AgentPhoneCallConfig): ToolDefinition {
+function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: string }): ToolDefinition {
   const contacts = new Map(config.contacts.map((contact) => [contact.id, contact]));
   const parameters = {
     type: "object",
@@ -52,7 +55,7 @@ function createPhoneCallTool(config: AgentPhoneCallConfig): ToolDefinition {
         throw new Error(`Unknown phone contact: ${contactId}. Available contacts: ${[...contacts.keys()].join(", ")}`);
       }
 
-      const result = await runPhoneCommand(config, contact, signal);
+      const result = await runPhoneCommand(config, contact, signal, options.agentId);
       return {
         content: [
           {
@@ -115,6 +118,7 @@ function runPhoneCommand(
   config: AgentPhoneCallConfig,
   contact: AgentPhoneContactConfig,
   signal: AbortSignal | undefined,
+  agentId: string | undefined,
 ): Promise<PhoneCommandResult> {
   const command = renderTemplate(config.command ?? defaultPhoneCommand, contact);
   const args = (config.args ?? defaultPhoneArgs).map((arg) => renderTemplate(arg, contact));
@@ -125,6 +129,7 @@ function runPhoneCommand(
       env: {
         ...process.env,
         ...(config.env ?? {}),
+        ...(agentId ? { IMP_PHONE_AGENT_ID: agentId } : {}),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

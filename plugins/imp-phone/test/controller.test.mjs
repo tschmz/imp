@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isCallReadyOutput, parseCallFailureReason, parseCallProgress, parseContact } from "../lib/controller.mjs";
+import {
+  isCallReadyOutput,
+  parseCallFailureReason,
+  parseCallProgress,
+  parseContact,
+  parseRequestedAgentId,
+} from "../lib/controller.mjs";
 
 describe("imp-phone controller", () => {
   it("parses call request contacts", () => {
@@ -21,6 +27,14 @@ describe("imp-phone controller", () => {
   it("rejects malformed contacts", () => {
     expect(() => parseContact({ contact: { id: "thomas" } })).toThrow(
       "Call request contact.name must be a non-empty string.",
+    );
+  });
+
+  it("parses requested agent ids", () => {
+    expect(parseRequestedAgentId({ agentId: "imp.telebot" })).toBe("imp.telebot");
+    expect(parseRequestedAgentId({})).toBeUndefined();
+    expect(() => parseRequestedAgentId({ agentId: 42 })).toThrow(
+      "Call request agentId must be a string when provided.",
     );
   });
 

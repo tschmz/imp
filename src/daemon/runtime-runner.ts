@@ -82,9 +82,10 @@ export function createRuntimeEntries(
           await runtime.conversationStore.getSelectedAgent?.(scopedEvent.message.conversation) ??
           runtime.endpointConfig.defaultAgentId;
         const detachedSession = getDetachedSessionRequest(scopedEvent.message);
+        const resolvedAgentId = resolveDetachedAgentId(detachedSession, dependencies.agentRegistry) ?? selectedAgentId;
         const conversation = detachedSession && scopedEvent.message.conversation.sessionId
-          ? await ensureDetachedConversation(runtime, scopedEvent.message, selectedAgentId, detachedSession)
-          : await ensureActiveConversation(runtime, scopedEvent.message, selectedAgentId);
+          ? await ensureDetachedConversation(runtime, scopedEvent.message, resolvedAgentId, detachedSession)
+          : await ensureActiveConversation(runtime, scopedEvent.message, resolvedAgentId);
 
         return {
           ...scopedEvent,
@@ -93,7 +94,7 @@ export function createRuntimeEntries(
             conversation: {
               ...scopedEvent.message.conversation,
               sessionId: conversation.state.conversation.sessionId,
-              agentId: selectedAgentId,
+              agentId: resolvedAgentId,
             },
           },
         };
@@ -227,6 +228,7 @@ async function ensureDetachedConversation(
 interface DetachedSessionRequest {
   mode: "detached";
   id: string;
+  agentId?: string;
   kind?: string;
   title?: string;
   metadata?: Record<string, unknown>;
@@ -244,10 +246,21 @@ function getDetachedSessionRequest(message: IncomingMessage): DetachedSessionReq
   return {
     mode: "detached",
     id: candidate.id,
+    ...(typeof candidate.agentId === "string" ? { agentId: candidate.agentId } : {}),
     ...(typeof candidate.kind === "string" ? { kind: candidate.kind } : {}),
     ...(typeof candidate.title === "string" ? { title: candidate.title } : {}),
     ...(isRecord(candidate.metadata) ? { metadata: candidate.metadata } : {}),
   };
+}
+
+function resolveDetachedAgentId(
+  detachedSession: DetachedSessionRequest | undefined,
+  agentRegistry: ReturnType<typeof createAgentRegistry>,
+): string | undefined {
+  if (!detachedSession?.agentId) {
+    return undefined;
+  }
+  return agentRegistry.get(detachedSession.agentId) ? detachedSession.agentId : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

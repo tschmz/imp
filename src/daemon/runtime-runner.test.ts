@@ -322,7 +322,7 @@ describe("createRuntimeEntries", () => {
           endpointId: "phone-ingress",
           sessionId: "imp-phone-call-1",
         },
-        agentId: "default",
+        agentId: "imp.telebot",
         kind: "phone-call",
         createdAt: "2026-04-07T12:00:00.000Z",
         updatedAt: "2026-04-07T12:00:00.000Z",
@@ -418,6 +418,7 @@ describe("createRuntimeEntries", () => {
             session: {
               mode: "detached",
               id: "imp-phone-call-1",
+              agentId: "imp.telebot",
               kind: "phone-call",
               title: "Phone call: Thomas",
               metadata: {
@@ -429,7 +430,7 @@ describe("createRuntimeEntries", () => {
       },
     });
     const entries = createRuntimeEntries([runtime], {
-      agentRegistry: createAgentRegistry([createTestAgent("default")]),
+      agentRegistry: createAgentRegistry([createTestAgent("default"), createTestAgent("imp.telebot")]),
       createTransport: vi.fn(() => transport),
     });
 
@@ -444,7 +445,7 @@ describe("createRuntimeEntries", () => {
         endpointId: "phone-ingress",
       },
       {
-        agentId: "default",
+        agentId: "imp.telebot",
         now: "2026-04-07T12:00:00.000Z",
         kind: "phone-call",
         title: "Phone call: Thomas",
@@ -460,7 +461,7 @@ describe("createRuntimeEntries", () => {
         message: expect.objectContaining({
           conversation: expect.objectContaining({
             sessionId: "imp-phone-call-1",
-            agentId: "default",
+            agentId: "imp.telebot",
           }),
         }),
       }),

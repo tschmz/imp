@@ -7,6 +7,7 @@ export async function writeCallRequest(options) {
   const contactId = requiredString(options.contactId, "contactId");
   const contactName = requiredString(options.contactName ?? options.name, "contactName");
   const uri = requiredString(options.uri, "uri");
+  const agentId = optionalString(options.agentId ?? process.env.IMP_PHONE_AGENT_ID, "agentId");
   const requestId = options.id ?? `call-${new Date().toISOString().replace(/[:.]/g, "-")}`;
   const fileName = `${sanitizeFileName(requestId)}-${process.hrtime.bigint().toString()}.json`;
   const path = join(requestsDir, fileName);
@@ -19,6 +20,7 @@ export async function writeCallRequest(options) {
       name: contactName,
       uri,
     },
+    ...(agentId ? { agentId } : {}),
     purpose: typeof options.purpose === "string" && options.purpose.length > 0 ? options.purpose : undefined,
     requestedAt: new Date().toISOString(),
   };
@@ -41,6 +43,8 @@ export function parseRequestCliArgs(argv) {
       parsed.uri = argv[++index];
     } else if (arg === "--purpose") {
       parsed.purpose = argv[++index];
+    } else if (arg === "--agent-id") {
+      parsed.agentId = argv[++index];
     } else if (arg === "--id") {
       parsed.id = argv[++index];
     } else if (arg === "--correlation-id") {
@@ -57,6 +61,16 @@ export function parseRequestCliArgs(argv) {
 function requiredString(value, name) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${name} must be a non-empty string.`);
+  }
+  return value;
+}
+
+function optionalString(value, name) {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`${name} must be a string when provided.`);
   }
   return value;
 }

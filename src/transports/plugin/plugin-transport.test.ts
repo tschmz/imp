@@ -48,6 +48,7 @@ describe("createPluginTransport", () => {
         session: {
           mode: "detached",
           id: "phone-call-1",
+          agentId: "imp.telebot",
           kind: "phone-call",
           title: "Phone call: Kitchen",
           metadata: {
@@ -86,6 +87,7 @@ describe("createPluginTransport", () => {
                 session: {
                   mode: "detached",
                   id: "phone-call-1",
+                  agentId: "imp.telebot",
                   kind: "phone-call",
                   title: "Phone call: Kitchen",
                   metadata: {

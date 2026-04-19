@@ -1738,12 +1738,13 @@ describe("createPiAgentEngine", () => {
     tempDirs.push(root);
     const registry = createBuiltInToolRegistry(root, {
       ...createAgent(),
+      id: "imp.telebot",
       tools: ["phone_call"],
       phone: {
         command: process.execPath,
         args: [
           "-e",
-          "console.log(process.argv.slice(1).join('|'))",
+          "console.log([process.env.IMP_PHONE_AGENT_ID, ...process.argv.slice(1)].join('|'))",
           "{contactId}",
           "{contactName}",
           "{uri}",
@@ -1779,14 +1780,14 @@ describe("createPiAgentEngine", () => {
     expect(output).toContain("Phone call command for Office (office) completed successfully.");
     expect(output).toContain("it does not confirm ringing, connection, or call audio");
     expect(output).toContain("Purpose: Test call");
-    expect(output).toContain("office|Office|sip:+491234567@example.com");
+    expect(output).toContain("imp.telebot|office|Office|sip:+491234567@example.com");
     expect(result.details).toMatchObject({
       contactId: "office",
       contactName: "Office",
       command: process.execPath,
       args: [
         "-e",
-        "console.log(process.argv.slice(1).join('|'))",
+        "console.log([process.env.IMP_PHONE_AGENT_ID, ...process.argv.slice(1)].join('|'))",
         "office",
         "Office",
         "sip:+491234567@example.com",
