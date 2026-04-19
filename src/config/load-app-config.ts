@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import type { AppConfig } from "./types.js";
 import { appConfigSchema } from "./schema.js";
 import { parseConfigJson } from "./config-json.js";
+import { resolveConfigPath } from "./secret-value.js";
 
 export async function loadAppConfig(configPath: string): Promise<AppConfig> {
   const absolutePath = resolve(configPath);
@@ -17,5 +18,17 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
     throw new Error(`Invalid config file ${absolutePath}\n${details}`);
   }
 
-  return result.data;
+  return resolveLoadedAppConfig(result.data, absolutePath);
+}
+
+function resolveLoadedAppConfig(config: AppConfig, configPath: string): AppConfig {
+  const configDir = dirname(configPath);
+
+  return {
+    ...config,
+    paths: {
+      ...config.paths,
+      dataRoot: resolveConfigPath(config.paths.dataRoot, configDir),
+    },
+  };
 }

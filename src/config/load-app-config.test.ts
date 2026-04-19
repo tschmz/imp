@@ -71,6 +71,41 @@ describe("loadAppConfig", () => {
     });
   });
 
+  it("resolves relative paths.dataRoot against the config directory", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config", "config.json");
+
+    await writeAppConfig(configPath, {
+      paths: {
+        dataRoot: "./state",
+      },
+    });
+
+    await expect(loadAppConfig(configPath)).resolves.toMatchObject({
+      paths: {
+        dataRoot: join(root, "config", "state"),
+      },
+    });
+  });
+
+  it("preserves absolute paths.dataRoot values", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    const dataRoot = join(root, "state");
+
+    await writeAppConfig(configPath, {
+      paths: {
+        dataRoot,
+      },
+    });
+
+    await expect(loadAppConfig(configPath)).resolves.toMatchObject({
+      paths: {
+        dataRoot,
+      },
+    });
+  });
+
   it("rejects malformed json with the resolved path", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
@@ -108,4 +143,58 @@ async function createTempDir(): Promise<string> {
 async function writeRawFile(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, content, "utf8");
+}
+
+async function writeAppConfig(
+  path: string,
+  overrides: {
+    paths?: {
+      dataRoot: string;
+    };
+  } = {},
+): Promise<void> {
+  await writeRawFile(
+    path,
+    `${JSON.stringify(
+      {
+        instance: {
+          name: "default",
+        },
+        paths: {
+          dataRoot: "/tmp/imp",
+          ...overrides.paths,
+        },
+        defaults: {
+          agentId: "default",
+        },
+        agents: [
+          {
+            id: "default",
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+            prompt: {
+              base: {
+                text: "You are concise.",
+              },
+            },
+          },
+        ],
+        endpoints: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: {
+              allowedUserIds: [],
+            },
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }

@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { appConfigSchema } from "./schema.js";
+import { loadAppConfig } from "./load-app-config.js";
 import { resolveRuntimeConfig } from "./resolve-runtime-config.js";
 import type { AppConfig } from "./types.js";
 import { registerTransport } from "../transports/registry.js";
@@ -323,6 +324,45 @@ describe("resolveRuntimeConfig", () => {
       cwd: "/etc/imp/workspace",
     });
     expect(result.agents[0]?.tools).toEqual(["read", "bash"]);
+  });
+
+  it("uses config-directory-resolved paths.dataRoot from loaded config", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config", "imp.json");
+    await writeRawFile(
+      configPath,
+      `${JSON.stringify(
+        createAppConfig({
+          paths: {
+            dataRoot: "./state",
+          },
+          endpoints: [
+            {
+              id: "private-telegram",
+              type: "telegram",
+              enabled: true,
+              token: "telegram-token",
+              access: {
+                allowedUserIds: [],
+              },
+            },
+          ],
+        }),
+        null,
+        2,
+      )}\n`,
+    );
+
+    const result = await resolveRuntimeConfig(await loadAppConfig(configPath), configPath);
+
+    const dataRoot = join(root, "config", "state");
+    expect(result.agents[0]?.home).toBe(join(dataRoot, "agents", "default"));
+    expect(result.activeEndpoints[0]?.paths).toMatchObject({
+      dataRoot,
+      conversationsDir: join(dataRoot, "conversations"),
+      logsDir: join(dataRoot, "logs", "endpoints"),
+      runtimeDir: join(dataRoot, "runtime", "endpoints"),
+    });
   });
 
   it("resolves explicit agent home relative to the config directory", async () => {

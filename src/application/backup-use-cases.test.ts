@@ -66,6 +66,43 @@ describe("backup use cases", () => {
     await expect(readFile(join(extractDir, "logs", "endpoints", "private-telegram.log"), "utf8")).rejects.toThrow();
   });
 
+  it("creates backups from paths.dataRoot resolved against the config directory", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config", "config.json");
+    const dataRoot = join(root, "config", "state");
+    const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
+    const backupPath = join(root, "backup.tar");
+    const extractDir = join(root, "extract");
+
+    await writeConfig(configPath, "./state");
+    await writeTextFile(join(root, "config", "prompts", "SYSTEM.md"), "prompt\n");
+    await writeTextFile(join(root, "config", "oauth.json"), "{\"token\":\"secret\"}\n");
+    await writeTextFile(conversationPath, "{\"messages\":[{\"id\":\"relative-root\"}]}\n");
+
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await useCases.createBackup({
+      configPath,
+      outputPath: backupPath,
+      only: "conversations",
+      force: false,
+    });
+
+    await extractTarArchive(backupPath, extractDir);
+    const manifest = JSON.parse(await readFile(join(extractDir, "manifest.json"), "utf8")) as {
+      source: { dataRoot: string };
+      conversations?: Array<{ archivePath: string }>;
+    };
+
+    expect(manifest.source.dataRoot).toBe(dataRoot);
+    expect(manifest.conversations).toHaveLength(1);
+    await expect(
+      readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "chats", "telegram", "42", "meta.json"), "utf8"),
+    ).resolves.toContain("relative-root");
+  });
+
   it("restores only the targeted conversations subtree and preserves unrelated data-root content", async () => {
     const sourceRoot = await createTempDir();
     const sourceConfigPath = join(sourceRoot, "config", "config.json");
