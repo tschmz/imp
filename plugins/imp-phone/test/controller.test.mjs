@@ -9,8 +9,10 @@ import {
   parseCallProgress,
   parseContact,
   parsePurpose,
+  parseRequestResultPath,
   parseRequestedAgentId,
 } from "../lib/controller.mjs";
+import { writeJsonAtomic } from "../lib/files.mjs";
 
 const tempDirs = [];
 
@@ -57,6 +59,94 @@ describe("imp-phone controller", () => {
     expect(() => parsePurpose({ purpose: 42 })).toThrow("Call request purpose must be a string when provided.");
   });
 
+  it("parses call request result paths", () => {
+    expect(parseRequestResultPath({ resultPath: "/tmp/result.json" })).toBe("/tmp/result.json");
+    expect(parseRequestResultPath({})).toBeUndefined();
+    expect(() => parseRequestResultPath({ resultPath: 42 })).toThrow(
+      "Call request resultPath must be a string when provided.",
+    );
+  });
+
+  it("writes call request results", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
+    tempDirs.push(root);
+    const controller = new PhoneController({
+      inboxDir: join(root, "inbox"),
+      outboxDir: join(root, "outbox"),
+      requestsDir: join(root, "requests"),
+      requestProcessingDir: join(root, "request-processing"),
+      requestProcessedDir: join(root, "request-processed"),
+      requestFailedDir: join(root, "request-failed"),
+      controlDir: join(root, "control"),
+      recordingsDir: join(root, "recordings"),
+      statusFile: join(root, "status.json"),
+      userId: "imp-phone",
+    });
+    controller.activeCall = {
+      requestId: "call-1",
+      conversationId: "imp-phone-call-1",
+      requestedAgentId: "imp.telebot",
+      purpose: "Ask about the appointment.",
+      contact: {
+        id: "thomas",
+        name: "Thomas",
+        uri: "+10000000000",
+        comment: "work colleague",
+      },
+      answered: false,
+      finalEventWritten: false,
+      requestResultPath: join(root, "results", "call-1.json"),
+      requestResultWritten: false,
+    };
+
+    await controller.writeRequestResult("answered");
+    await controller.writeRequestResult("failed", { reason: "should not overwrite" });
+
+    const payload = JSON.parse(await readFile(join(root, "results", "call-1.json"), "utf8"));
+    expect(payload).toMatchObject({
+      schemaVersion: 1,
+      requestId: "call-1",
+      conversationId: "imp-phone-call-1",
+      status: "answered",
+      contact: {
+        id: "thomas",
+        name: "Thomas",
+        comment: "work colleague",
+      },
+      agentId: "imp.telebot",
+      purpose: "Ask about the appointment.",
+    });
+    expect(payload.reason).toBeUndefined();
+  });
+
+  it("consumes hangup control commands", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
+    tempDirs.push(root);
+    const controller = new PhoneController({
+      inboxDir: join(root, "inbox"),
+      outboxDir: join(root, "outbox"),
+      requestsDir: join(root, "requests"),
+      requestProcessingDir: join(root, "request-processing"),
+      requestProcessedDir: join(root, "request-processed"),
+      requestFailedDir: join(root, "request-failed"),
+      controlDir: join(root, "control"),
+      recordingsDir: join(root, "recordings"),
+      statusFile: join(root, "status.json"),
+      userId: "imp-phone",
+    });
+
+    await writeJsonAtomic(join(root, "control", "hangup.json"), {
+      schemaVersion: 1,
+      type: "hangup",
+      reason: "conversation complete",
+    });
+
+    await expect(controller.consumeHangupCommand()).resolves.toEqual({
+      reason: "conversation complete",
+    });
+    await expect(controller.consumeHangupCommand()).resolves.toBeUndefined();
+  });
+
   it("writes a final no-response ingress event when an answered call closes", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
     tempDirs.push(root);
@@ -67,6 +157,7 @@ describe("imp-phone controller", () => {
       requestProcessingDir: join(root, "request-processing"),
       requestProcessedDir: join(root, "request-processed"),
       requestFailedDir: join(root, "request-failed"),
+      controlDir: join(root, "control"),
       recordingsDir: join(root, "recordings"),
       statusFile: join(root, "status.json"),
       userId: "imp-phone",

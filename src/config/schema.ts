@@ -88,6 +88,7 @@ const phoneCallConfigSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().min(1).optional(),
   timeoutMs: z.number().int().positive().optional(),
+  controlDir: z.string().min(1).optional(),
 });
 
 const agentToolsConfigSchema = z

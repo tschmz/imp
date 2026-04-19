@@ -179,6 +179,7 @@ function resolveAgentPhoneCallConfig(
   return {
     ...phone,
     ...(phone.cwd ? { cwd: resolveConfigPath(phone.cwd, configDir) } : {}),
+    ...(phone.controlDir ? { controlDir: resolveConfigPath(phone.controlDir, configDir) } : {}),
   };
 }
 

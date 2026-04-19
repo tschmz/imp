@@ -51,6 +51,7 @@ export interface AgentPhoneCallConfig {
   env?: Record<string, string>;
   cwd?: string;
   timeoutMs?: number;
+  controlDir?: string;
 }
 
 export interface ModelRef {

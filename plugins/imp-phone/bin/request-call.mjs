@@ -2,7 +2,7 @@
 import { parseRequestCliArgs, writeCallRequest } from "../lib/requests.mjs";
 
 function printHelp() {
-  console.log(`Usage: imp-phone-request-call --requests-dir DIR --contact-id ID --contact-name NAME --uri URI [--comment TEXT] [--purpose TEXT] [--agent-id ID]
+  console.log(`Usage: imp-phone-request-call --requests-dir DIR --contact-id ID --contact-name NAME --uri URI [--comment TEXT] [--purpose TEXT] [--agent-id ID] [--wait]
 
 Writes a call request JSON file for the imp-phone controller.`);
 }
@@ -14,8 +14,12 @@ try {
     process.exit(0);
   }
 
-  const path = await writeCallRequest(args);
-  console.log(path);
+  const result = await writeCallRequest(args);
+  if (args.wait) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(result);
+  }
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { writeCallRequest } from "../lib/requests.mjs";
+import { writeJsonAtomic } from "../lib/files.mjs";
 
 const tempDirs = [];
 
@@ -32,6 +33,7 @@ describe("imp-phone call requests", () => {
       schemaVersion: 1,
       id: "call-1",
       correlationId: "corr-1",
+      resultPath: join(root, "results", "call-1.json"),
       contact: {
         id: "thomas",
         name: "Thomas",
@@ -42,6 +44,32 @@ describe("imp-phone call requests", () => {
       purpose: "Test call",
     });
     expect(payload.requestedAt).toEqual(expect.any(String));
+  });
+
+  it("waits for the controller call result when requested", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-request-"));
+    tempDirs.push(root);
+
+    const promise = writeCallRequest({
+      requestsDir: root,
+      id: "call-1",
+      contactId: "thomas",
+      contactName: "Thomas",
+      uri: "+10000000000",
+      wait: true,
+      pollIntervalMs: 10,
+    });
+
+    await writeJsonAtomic(join(root, "results", "call-1.json"), {
+      schemaVersion: 1,
+      requestId: "call-1",
+      status: "answered",
+    });
+
+    await expect(promise).resolves.toMatchObject({
+      requestId: "call-1",
+      status: "answered",
+    });
   });
 
   it("uses the phone agent environment variable when no agent id argument is provided", async () => {

@@ -24,6 +24,7 @@ Additional built-in tools are available when configured:
 | `pwd` | Show the current working directory used by filesystem and shell tools.      |
 | `cd`  | Change the working directory used by subsequent filesystem and shell tools. |
 | `phone_call` | Start an allowlisted SIP phone call through a configured local command. |
+| `phone_hangup` | End the currently active imp-phone call through a control command. |
 
 When an agent has available skills from configured `skills.paths`, `paths.dataRoot/skills`, `agent.home/.skills`, or workspace `.skills`, `imp` also enables `load_skill` automatically for that turn. It loads the skill's `SKILL.md` instructions, reports the absolute skill directory, and lists bundled files under `scripts/` and `references/` without reading their contents.
 
@@ -48,7 +49,7 @@ That means `workspace.shellPath` is agent-local runtime configuration, while ser
 
 The tool never accepts arbitrary phone numbers from the model. The model can only choose one of the configured contact IDs.
 
-Example with a preconfigured `baresip` account:
+Example with an `imp-phone` controller:
 
 ```json
 {
@@ -56,10 +57,24 @@ Example with a preconfigured `baresip` account:
     {
       "id": "default",
       "tools": {
-        "builtIn": ["read", "bash", "phone_call"],
+        "builtIn": ["read", "bash", "phone_call", "phone_hangup"],
         "phone": {
-          "command": "baresip",
-          "args": ["-e", "/dial {uri}"],
+          "command": "node",
+          "controlDir": "/home/thomas/.local/state/imp/runtime/plugins/imp-phone/requests/control",
+          "args": [
+            "/home/thomas/.local/state/imp/plugins/npm/node_modules/@tschmz/imp-phone/bin/request-call.mjs",
+            "--requests-dir",
+            "/home/thomas/.local/state/imp/runtime/plugins/imp-phone/requests",
+            "--contact-id",
+            "{contactId}",
+            "--contact-name",
+            "{contactName}",
+            "--uri",
+            "{uri}",
+            "--purpose",
+            "{purpose}",
+            "--wait"
+          ],
           "contacts": [
             {
               "id": "office",
@@ -79,11 +94,13 @@ Supported command placeholders:
 - `{uri}`: the configured SIP URI
 - `{contactId}`: the allowlist contact ID
 - `{contactName}`: the display name
+- `{purpose}`: the detailed call purpose produced by the agent
 
 Optional fields:
 
 - `cwd`: working directory for the phone command; relative paths resolve from the config file directory
 - `env`: environment variables for the phone command
-- `timeoutMs`: maximum call command runtime before `imp` sends `SIGTERM`
+- `timeoutMs`: maximum command runtime before `imp` sends `SIGTERM`; when using `--wait`, keep this above the controller's registration and answer timeouts, or omit it
+- `controlDir`: directory where `phone_hangup` writes control commands; when omitted, `imp` derives it from `--requests-dir` as `<requestsDir>/control`
 
-When `command` and `args` are omitted, `imp` defaults to `baresip -e "/dial {uri}"`.
+When `command` and `args` are omitted, `imp` defaults to the legacy direct command `baresip -e "/dial {uri}"`. That mode only confirms that the command exited; use the `imp-phone` request helper with `--wait` when the agent should learn whether the call was answered, timed out, or failed.

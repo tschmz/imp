@@ -64,6 +64,8 @@ The install command does not add phone contacts to an agent. Contacts are allowl
 The controller watches `requestsDir` for request files. The `phone_call` tool can be wired to create those files by running `bin/request-call.mjs` from the installed package.
 The tool automatically passes the calling agent id through `IMP_PHONE_AGENT_ID`, so phone call sessions stay attached to the agent that initiated the call. Optional contact comments are passed through `IMP_PHONE_CONTACT_COMMENT`.
 When configured with `--purpose "{purpose}"`, the tool passes the call purpose into the detached phone session as `conversation.metadata.phone_call_purpose`.
+When configured with `--wait`, the tool waits until the controller reports whether the call was answered, timed out, or failed. The controller still owns the call timing through `call.registerTimeoutMs` and `call.answerTimeoutMs`; the tool only waits for the controller result.
+Agents can also use the `phone_hangup` built-in tool when it is enabled. It writes a control command to `controlDir`, and the controller ends the active call after the current agent reply has been played.
 
 When an answered call ends, the controller writes one final `call_closed` event into the same detached phone session with `"response": { "type": "none" }`. This gives the agent one internal turn to update contact notes without producing another phone reply or leaving an outbox message.
 
@@ -83,7 +85,8 @@ Example `agents[].tools.phone` config:
     "--uri",
     "{uri}",
     "--purpose",
-    "{purpose}"
+    "{purpose}",
+    "--wait"
   ],
   "contacts": [
     {
@@ -96,7 +99,7 @@ Example `agents[].tools.phone` config:
 }
 ```
 
-Adjust the paths to your active `paths.dataRoot`. For local development from this repository, use the repository path to `plugins/imp-phone/bin/request-call.mjs` instead.
+Enable both `phone_call` and `phone_hangup` in `agents[].tools.builtIn` when an agent should be able to start and end calls. Adjust the paths to your active `paths.dataRoot`. For local development from this repository, use the repository path to `plugins/imp-phone/bin/request-call.mjs` instead.
 
 ## Audio Bridge
 
@@ -166,7 +169,8 @@ node bin/request-call.mjs \
   --contact-name Thomas \
   --uri +10000000000 \
   --comment "work colleague" \
-  --agent-id imp.telebot
+  --agent-id imp.telebot \
+  --wait
 ```
 
 ## Development

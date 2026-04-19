@@ -4,6 +4,7 @@
   "endpointId": "phone-ingress",
   "runtimeDir": "./runtime/plugins/imp-phone/endpoints/phone-ingress",
   "requestsDir": "./runtime/plugins/imp-phone/requests",
+  "controlDir": "./runtime/plugins/imp-phone/requests/control",
   "recordingsDir": "./runtime/plugins/imp-phone/recordings",
   "conversationIdPrefix": "imp-phone",
   "userId": "imp-phone",

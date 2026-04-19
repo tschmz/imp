@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
+import { mkdir, rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { AgentPhoneCallConfig, AgentPhoneContactConfig } from "../domain/agent.js";
 import type { ToolDefinition } from "../tools/types.js";
 
@@ -13,7 +16,7 @@ export function createPhoneCallTools(
     return [];
   }
 
-  return [createPhoneCallTool(config, options)];
+  return [createPhoneCallTool(config, options), createPhoneHangupTool(config, options)];
 }
 
 function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: string }): ToolDefinition {
@@ -72,8 +75,61 @@ function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: 
           signal: result.signal,
           stdout: result.stdout,
           stderr: result.stderr,
+          ...(result.callResult ? { callResult: result.callResult } : {}),
         },
         ...(result.exitCode === 0 ? {} : { isError: true }),
+      };
+    },
+  };
+}
+
+function createPhoneHangupTool(config: AgentPhoneCallConfig, options: { agentId?: string }): ToolDefinition {
+  const parameters = {
+    type: "object",
+    properties: {
+      reason: {
+        type: "string",
+        minLength: 1,
+        description: "Optional short reason for ending the current phone call.",
+      },
+    },
+    additionalProperties: false,
+  } as unknown as ToolDefinition["parameters"];
+
+  return {
+    name: "phone_hangup",
+    label: "phone_hangup",
+    description:
+      "End the currently active imp-phone call. Use this after a brief goodbye when the phone conversation is done.",
+    parameters,
+    async execute(_toolCallId, params) {
+      const reason = parsePhoneHangupParams(params).reason ?? "agent-hangup";
+      const controlDir = resolvePhoneControlDir(config);
+      if (!controlDir) {
+        throw new Error("phone_hangup requires agents[].tools.phone.controlDir or request-call args with --requests-dir.");
+      }
+
+      const commandPath = await writePhoneControlCommand(controlDir, {
+        schemaVersion: 1,
+        type: "hangup",
+        id: `hangup-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}`,
+        ...(options.agentId ? { agentId: options.agentId } : {}),
+        reason,
+        requestedAt: new Date().toISOString(),
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Phone hangup requested. Reason: ${reason}.`,
+          },
+        ],
+        details: {
+          controlDir,
+          commandPath,
+          reason,
+        },
       };
     },
   };
@@ -84,6 +140,10 @@ interface PhoneCallParams {
   purpose?: string;
 }
 
+interface PhoneHangupParams {
+  reason?: string;
+}
+
 interface PhoneCommandResult {
   command: string;
   args: string[];
@@ -91,6 +151,58 @@ interface PhoneCommandResult {
   signal: NodeJS.Signals | null;
   stdout: string;
   stderr: string;
+  callResult?: PhoneCallResult;
+}
+
+function parsePhoneHangupParams(params: unknown): PhoneHangupParams {
+  if (params === undefined || params === null) {
+    return {};
+  }
+  if (typeof params !== "object") {
+    throw new Error("phone_hangup requires an object parameter when provided.");
+  }
+
+  const reason = "reason" in params ? params.reason : undefined;
+  if (reason !== undefined && (typeof reason !== "string" || reason.length === 0)) {
+    throw new Error("phone_hangup reason must be a non-empty string when provided.");
+  }
+
+  return {
+    ...(reason ? { reason } : {}),
+  };
+}
+
+async function writePhoneControlCommand(controlDir: string, payload: Record<string, unknown>): Promise<string> {
+  await mkdir(controlDir, { recursive: true });
+  const path = join(controlDir, `${sanitizeFileName(String(payload.id))}.json`);
+  const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await rename(tempPath, path);
+  return path;
+}
+
+function resolvePhoneControlDir(config: AgentPhoneCallConfig): string | undefined {
+  if (config.controlDir) {
+    return config.controlDir;
+  }
+  const requestDir = findArgValue(config.args ?? [], "--requests-dir");
+  return requestDir ? join(requestDir, "control") : undefined;
+}
+
+function findArgValue(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+}
+
+function sanitizeFileName(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]/g, "_");
+}
+
+interface PhoneCallResult {
+  status: string;
+  requestId?: string;
+  conversationId?: string;
+  reason?: string;
 }
 
 function parsePhoneCallParams(params: unknown): PhoneCallParams {
@@ -181,6 +293,7 @@ function runPhoneCommand(
         signal: closeSignal,
         stdout: stdout.trimEnd(),
         stderr: stderr.trimEnd(),
+        callResult: parsePhoneCallResult(stdout),
       });
     });
 
@@ -216,6 +329,10 @@ function renderPhoneCallResult(
   result: PhoneCommandResult,
   purpose: string | undefined,
 ): string {
+  if (result.callResult) {
+    return renderPhoneCallStatusResult(contact, result.callResult, purpose, result);
+  }
+
   const status = result.exitCode === 0 ? "completed successfully" : "failed";
   return [
     `Phone call command for ${contact.name} (${contact.id}) ${status}.`,
@@ -226,4 +343,67 @@ function renderPhoneCallResult(
     ...(result.stderr ? [`stderr:\n${result.stderr}`] : []),
     ...(result.stdout ? [`stdout:\n${result.stdout}`] : []),
   ].join("\n");
+}
+
+function renderPhoneCallStatusResult(
+  contact: AgentPhoneContactConfig,
+  callResult: PhoneCallResult,
+  purpose: string | undefined,
+  commandResult: PhoneCommandResult,
+): string {
+  const statusText = (() => {
+    switch (callResult.status) {
+      case "answered":
+        return `Phone call to ${contact.name} (${contact.id}) was answered.`;
+      case "timeout":
+        return `Phone call to ${contact.name} (${contact.id}) was not answered before the configured timeout.`;
+      case "failed":
+        return `Phone call to ${contact.name} (${contact.id}) failed.`;
+      default:
+        return `Phone call to ${contact.name} (${contact.id}) finished with status "${callResult.status}".`;
+    }
+  })();
+
+  return [
+    statusText,
+    ...(callResult.reason ? [`Reason: ${callResult.reason}.`] : []),
+    ...(callResult.conversationId ? [`Conversation id: ${callResult.conversationId}.`] : []),
+    ...(callResult.requestId ? [`Request id: ${callResult.requestId}.`] : []),
+    ...(purpose ? [`Purpose: ${purpose}`] : []),
+    `Exit code: ${commandResult.exitCode ?? "none"}.`,
+    ...(commandResult.signal ? [`Signal: ${commandResult.signal}.`] : []),
+    ...(commandResult.stderr ? [`stderr:\n${commandResult.stderr}`] : []),
+  ].join("\n");
+}
+
+function parsePhoneCallResult(stdout: string): PhoneCallResult | undefined {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (typeof parsed !== "object" || parsed === null || !("status" in parsed)) {
+      return undefined;
+    }
+    const status = parsed.status;
+    if (typeof status !== "string" || status.length === 0) {
+      return undefined;
+    }
+
+    return {
+      status,
+      ...readOptionalString(parsed, "requestId"),
+      ...readOptionalString(parsed, "conversationId"),
+      ...readOptionalString(parsed, "reason"),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function readOptionalString(value: object, key: keyof PhoneCallResult): Partial<PhoneCallResult> {
+  const entry = (value as Record<string, unknown>)[key];
+  return typeof entry === "string" && entry.length > 0 ? { [key]: entry } : {};
 }

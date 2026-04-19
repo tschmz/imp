@@ -38,6 +38,7 @@
       "env": {
         "IMP_PHONE_RUNTIME_DIR": "{{endpoint.phone-ingress.runtimeDir}}",
         "IMP_PHONE_REQUESTS_DIR": "{{paths.dataRoot}}/runtime/plugins/{{plugin.id}}/requests",
+        "IMP_PHONE_CONTROL_DIR": "{{paths.dataRoot}}/runtime/plugins/{{plugin.id}}/requests/control",
         "IMP_PHONE_RECORDINGS_DIR": "{{paths.dataRoot}}/runtime/plugins/{{plugin.id}}/recordings",
         "OPENAI_API_KEY": "required"
       }

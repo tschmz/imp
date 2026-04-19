@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { writeJsonAtomic, sanitizeFileName } from "./files.mjs";
 
 export async function writeCallRequest(options) {
   const requestsDir = requiredString(options.requestsDir, "requestsDir");
+  const resultsDir = optionalString(options.resultsDir, "resultsDir") ?? join(requestsDir, "results");
   const contactId = requiredString(options.contactId, "contactId");
   const contactName = requiredString(options.contactName ?? options.name, "contactName");
   const uri = requiredString(options.uri, "uri");
@@ -12,10 +14,12 @@ export async function writeCallRequest(options) {
   const requestId = options.id ?? `call-${new Date().toISOString().replace(/[:.]/g, "-")}`;
   const fileName = `${sanitizeFileName(requestId)}-${process.hrtime.bigint().toString()}.json`;
   const path = join(requestsDir, fileName);
+  const resultPath = join(resultsDir, `${sanitizeFileName(requestId)}.json`);
   const payload = {
     schemaVersion: 1,
     id: requestId,
     correlationId: options.correlationId ?? randomUUID(),
+    resultPath,
     contact: {
       id: contactId,
       name: contactName,
@@ -28,6 +32,9 @@ export async function writeCallRequest(options) {
   };
 
   await writeJsonAtomic(path, payload);
+  if (options.wait) {
+    return await waitForCallRequestResult(resultPath, options.pollIntervalMs);
+  }
   return path;
 }
 
@@ -37,6 +44,8 @@ export function parseRequestCliArgs(argv) {
     const arg = argv[index];
     if (arg === "--requests-dir") {
       parsed.requestsDir = argv[++index];
+    } else if (arg === "--results-dir") {
+      parsed.resultsDir = argv[++index];
     } else if (arg === "--contact-id") {
       parsed.contactId = argv[++index];
     } else if (arg === "--contact-name" || arg === "--name") {
@@ -53,6 +62,8 @@ export function parseRequestCliArgs(argv) {
       parsed.id = argv[++index];
     } else if (arg === "--correlation-id") {
       parsed.correlationId = argv[++index];
+    } else if (arg === "--wait") {
+      parsed.wait = true;
     } else if (arg === "--help" || arg === "-h") {
       parsed.help = true;
     } else {
@@ -60,6 +71,27 @@ export function parseRequestCliArgs(argv) {
     }
   }
   return parsed;
+}
+
+async function waitForCallRequestResult(resultPath, pollIntervalMs = 250) {
+  while (true) {
+    try {
+      return JSON.parse(await readFile(resultPath, "utf8"));
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
+      await sleep(pollIntervalMs);
+    }
+  }
+}
+
+function isMissingFileError(error) {
+  return typeof error === "object" && error !== null && error.code === "ENOENT";
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function requiredString(value, name) {

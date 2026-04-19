@@ -24,6 +24,7 @@ describe("imp-phone config", () => {
     expect(config.outboxDir).toBe("/tmp/imp-phone/runtime/plugins/imp-phone/endpoints/phone-ingress/outbox");
     expect(config.requestsDir).toBe("/tmp/imp-phone/requests");
     expect(config.requestProcessingDir).toBe("/tmp/imp-phone/requests/processing");
+    expect(config.controlDir).toBe("/tmp/imp-phone/requests/control");
     expect(config.recordingsDir).toBe("/tmp/imp-phone/recordings");
     expect(config.statusFile).toBe("/tmp/imp-phone/runtime/plugins/imp-phone/endpoints/phone-ingress/status.json");
     expect(config.call).toMatchObject({

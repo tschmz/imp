@@ -19,6 +19,11 @@ export function normalizeConfig(input, configDir = process.cwd()) {
     process.env.IMP_PHONE_REQUESTS_DIR || input.requestsDir ? configDir : runtimeDir,
     "requestsDir",
   );
+  const controlDir = resolveConfigPath(
+    process.env.IMP_PHONE_CONTROL_DIR ?? input.controlDir ?? "control",
+    process.env.IMP_PHONE_CONTROL_DIR || input.controlDir ? configDir : requestsDir,
+    "controlDir",
+  );
   const recordingsDir = resolveConfigPath(
     process.env.IMP_PHONE_RECORDINGS_DIR ?? input.recordingsDir ?? "phone-recordings",
     process.env.IMP_PHONE_RECORDINGS_DIR || input.recordingsDir ? configDir : runtimeDir,
@@ -42,6 +47,7 @@ export function normalizeConfig(input, configDir = process.cwd()) {
     requestProcessingDir: join(requestsDir, "processing"),
     requestProcessedDir: join(requestsDir, "processed"),
     requestFailedDir: join(requestsDir, "failed"),
+    controlDir,
     recordingsDir,
     conversationIdPrefix: stringValue(input.conversationIdPrefix, "imp-phone"),
     userId: stringValue(input.userId, "imp-phone"),

@@ -1767,17 +1767,18 @@ describe("createPiAgentEngine", () => {
     const registry = createBuiltInToolRegistry(root, {
       ...createAgent(),
       id: "imp.telebot",
-      tools: ["phone_call"],
+      tools: ["phone_call", "phone_hangup"],
       phone: {
         command: process.execPath,
         args: [
           "-e",
-          "console.log([process.env.IMP_PHONE_AGENT_ID, ...process.argv.slice(1)].join('|'))",
+          "console.log(JSON.stringify({schemaVersion:1,status:'answered',requestId:'call-1',conversationId:'imp-phone-call-1'}))",
           "{contactId}",
           "{contactName}",
           "{uri}",
           "{purpose}",
         ],
+        controlDir: join(root, "control"),
         contacts: [
           {
             id: "office",
@@ -1789,8 +1790,10 @@ describe("createPiAgentEngine", () => {
       },
     });
     const phoneCall = registry.get("phone_call");
+    const phoneHangup = registry.get("phone_hangup");
 
     expect(phoneCall).toBeDefined();
+    expect(phoneHangup).toBeDefined();
     expect(phoneCall?.parameters).toMatchObject({
       properties: {
         contactId: {
@@ -1807,12 +1810,16 @@ describe("createPiAgentEngine", () => {
       .flatMap((item) => (item.type === "text" ? [item.text] : []))
       .join("\n");
 
-    expect(output).toContain("Phone call command for Office (office) completed successfully.");
-    expect(output).toContain("it does not confirm ringing, connection, or call audio");
+    expect(output).toContain("Phone call to Office (office) was answered.");
+    expect(output).toContain("Conversation id: imp-phone-call-1.");
     expect(output).toContain("Purpose: Test call");
-    expect(output).toContain("imp.telebot|office|Office|sip:+491234567@example.com|Test call");
     expect(result.details).toMatchObject({
       contactComment: "work colleague",
+      callResult: {
+        status: "answered",
+        requestId: "call-1",
+        conversationId: "imp-phone-call-1",
+      },
     });
     expect(result.details).toMatchObject({
       contactId: "office",
@@ -1820,13 +1827,26 @@ describe("createPiAgentEngine", () => {
       command: process.execPath,
       args: [
         "-e",
-        "console.log([process.env.IMP_PHONE_AGENT_ID, ...process.argv.slice(1)].join('|'))",
+        "console.log(JSON.stringify({schemaVersion:1,status:'answered',requestId:'call-1',conversationId:'imp-phone-call-1'}))",
         "office",
         "Office",
         "sip:+491234567@example.com",
         "Test call",
       ],
       exitCode: 0,
+    });
+
+    const hangupResult = await phoneHangup!.execute("2", {
+      reason: "conversation complete",
+    });
+    const hangupOutput = hangupResult.content
+      .flatMap((item) => (item.type === "text" ? [item.text] : []))
+      .join("\n");
+
+    expect(hangupOutput).toContain("Phone hangup requested.");
+    expect(hangupResult.details).toMatchObject({
+      controlDir: join(root, "control"),
+      reason: "conversation complete",
     });
   });
 

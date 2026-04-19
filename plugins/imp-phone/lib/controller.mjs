@@ -53,6 +53,7 @@ export class PhoneController {
       this.config.requestProcessingDir,
       this.config.requestProcessedDir,
       this.config.requestFailedDir,
+      this.config.controlDir,
       this.config.recordingsDir,
     ]);
   }
@@ -100,6 +101,7 @@ export class PhoneController {
     const contact = parseContact(request);
     const requestedAgentId = parseRequestedAgentId(request);
     const purpose = parsePurpose(request);
+    const requestResultPath = parseRequestResultPath(request);
     const requestId = typeof request.id === "string" && request.id.length > 0 ? request.id : randomUUID();
     const conversationId = `${this.config.conversationIdPrefix}-${sanitizeFileName(requestId)}`;
     const callProcess = this.startCall(contact);
@@ -111,6 +113,8 @@ export class PhoneController {
       contact,
       answered: false,
       finalEventWritten: false,
+      requestResultPath,
+      requestResultWritten: false,
     };
     this.lastCall = {
       requestId,
@@ -132,6 +136,7 @@ export class PhoneController {
     try {
       const dialFailure = await callProcess.waitUntilRegisteredAndDial(this.config.call.registerTimeoutMs);
       if (dialFailure) {
+        await this.writeRequestResult("failed", { reason: dialFailure });
         await this.closeCall("call-failed", { error: dialFailure });
         return;
       }
@@ -143,18 +148,29 @@ export class PhoneController {
         }
       });
       if (answerResult.status === "failed") {
+        await this.writeRequestResult("failed", { reason: answerResult.reason });
         await this.closeCall("call-failed", { error: answerResult.reason });
         return;
       }
       if (answerResult.status === "timeout") {
+        await this.writeRequestResult("timeout", { reason: "answer-timeout" });
         await this.closeCall("answer-timeout");
         return;
       }
 
       await this.writeRuntimeStatus("answered", false);
       this.activeCall.answered = true;
+      await this.writeRequestResult("answered");
 
       for (let turn = 1; turn <= this.config.call.maxTurns && !this.stopped; turn += 1) {
+        const hangupCommand = await this.consumeHangupCommand();
+        if (hangupCommand) {
+          await this.closeCall("agent-hangup", {
+            reason: hangupCommand.reason ?? "agent-hangup",
+          });
+          break;
+        }
+
         const turnFailure = await callProcess.waitForFailure(0);
         if (turnFailure) {
           await this.closeCall("call-failed", { error: turnFailure });
@@ -239,6 +255,14 @@ export class PhoneController {
           await this.play(audioPath, contact);
         } finally {
           await rm(dirname(audioPath), { recursive: true, force: true });
+        }
+
+        const postReplyHangupCommand = await this.consumeHangupCommand();
+        if (postReplyHangupCommand) {
+          await this.closeCall("agent-hangup", {
+            reason: postReplyHangupCommand.reason ?? "agent-hangup",
+          });
+          break;
         }
       }
       if (!this.stopped && this.lastCall?.phase !== "conversation_closed") {
@@ -366,6 +390,36 @@ export class PhoneController {
     return candidate ? join(this.config.outboxDir, candidate) : undefined;
   }
 
+  async consumeHangupCommand() {
+    const filePath = await this.nextControlFile();
+    if (!filePath) {
+      return undefined;
+    }
+
+    const processingPath = join(dirname(filePath), `${basename(filePath)}.processing`);
+    await rename(filePath, processingPath);
+    try {
+      const payload = JSON.parse(await readFile(processingPath, "utf8"));
+      if (payload.type !== "hangup") {
+        return undefined;
+      }
+      return {
+        reason: typeof payload.reason === "string" && payload.reason.length > 0 ? payload.reason : undefined,
+      };
+    } finally {
+      await rm(processingPath, { force: true });
+    }
+  }
+
+  async nextControlFile() {
+    const entries = await readdir(this.config.controlDir, { withFileTypes: true }).catch(() => []);
+    const candidate = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map((entry) => entry.name)
+      .sort()[0];
+    return candidate ? join(this.config.controlDir, candidate) : undefined;
+  }
+
   async transcribe(audioPath) {
     assertOpenAi("transcription", this.config.transcription.provider, this.config.transcription.apiKeyEnv);
     const apiKey = process.env[this.config.transcription.apiKeyEnv];
@@ -482,6 +536,29 @@ export class PhoneController {
       ...fields,
     });
     await this.writeFinalIngressEvent(reason, fields);
+  }
+
+  async writeRequestResult(status, fields = {}) {
+    const activeCall = this.activeCall;
+    if (!activeCall?.requestResultPath || activeCall.requestResultWritten) {
+      return;
+    }
+    activeCall.requestResultWritten = true;
+    await writeJsonAtomic(activeCall.requestResultPath, {
+      schemaVersion: 1,
+      requestId: activeCall.requestId,
+      conversationId: activeCall.conversationId,
+      status,
+      contact: {
+        id: activeCall.contact.id,
+        name: activeCall.contact.name,
+        ...(activeCall.contact.comment ? { comment: activeCall.contact.comment } : {}),
+      },
+      ...(activeCall.requestedAgentId ? { agentId: activeCall.requestedAgentId } : {}),
+      ...(activeCall.purpose ? { purpose: activeCall.purpose } : {}),
+      updatedAt: new Date().toISOString(),
+      ...fields,
+    });
   }
 
   async writeFinalIngressEvent(reason, fields = {}) {
@@ -617,6 +694,19 @@ export function parsePurpose(request) {
     throw new Error("Call request purpose must be a string when provided.");
   }
   return request.purpose;
+}
+
+export function parseRequestResultPath(request) {
+  if (typeof request !== "object" || request === null || !("resultPath" in request)) {
+    return undefined;
+  }
+  if (request.resultPath === undefined || request.resultPath === null || request.resultPath === "") {
+    return undefined;
+  }
+  if (typeof request.resultPath !== "string") {
+    throw new Error("Call request resultPath must be a string when provided.");
+  }
+  return request.resultPath;
 }
 
 function createPhoneCallMetadata(input) {
