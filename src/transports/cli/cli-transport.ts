@@ -20,6 +20,7 @@ import { parseInboundCommand } from "../../application/commands/parse-inbound-co
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import type { CliEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessageCommand } from "../../domain/message.js";
+import type { OutgoingMessageReplayItem } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
 
@@ -262,6 +263,7 @@ function createCliInboundEvent(
       options.chatContainer.addChild(new Text(cyan("imp"), 0, 0));
       options.chatContainer.addChild(new Markdown(message.text, 1, 0, markdownTheme));
       options.chatContainer.addChild(new Spacer(1));
+      renderCliReplay(message.replay ?? [], options.chatContainer);
       options.ui.requestRender();
     },
     async deliverError(error): Promise<void> {
@@ -279,6 +281,22 @@ function createCliInboundEvent(
       options.ui.requestRender();
     },
   };
+}
+
+function renderCliReplay(
+  replay: OutgoingMessageReplayItem[],
+  chatContainer: Container,
+): void {
+  for (const item of replay) {
+    if (item.role === "user") {
+      chatContainer.addChild(new Text(green("You"), 0, 0));
+      chatContainer.addChild(new Text(item.text, 1, 0));
+    } else {
+      chatContainer.addChild(new Text(cyan("imp"), 0, 0));
+      chatContainer.addChild(new Markdown(item.text, 1, 0, markdownTheme));
+    }
+    chatContainer.addChild(new Spacer(1));
+  }
 }
 
 function createCliAutocompleteProvider(): CombinedAutocompleteProvider {

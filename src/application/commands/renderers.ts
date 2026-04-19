@@ -110,7 +110,7 @@ export function renderStatusMessage(
     return [
       "No active session.",
       `Sessions in history: ${backups.length}`,
-      backups.length > 0 ? "Use /history to inspect them or /restore <n> to switch to one." : "",
+      backups.length > 0 ? "Use /history to inspect them or /resume <n> to switch to one." : "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -172,16 +172,16 @@ export function renderHistoryMessage(
   }
 
   lines.push("");
-  lines.push("Use /restore <n> to switch sessions.");
+  lines.push("Use /resume <n> to switch sessions.");
   return lines.join("\n");
 }
 
-export function renderRestoreUsage(backupCount: number): string {
+export function renderResumeUsage(backupCount: number): string {
   if (backupCount === 0) {
     return "No previous sessions are available yet. Use /new to start another session, then /history to inspect earlier ones.";
   }
 
-  return ["Usage: /restore <n>", "Choose a numbered session from /history.", "Example: /restore 1"].join(
+  return ["Usage: /resume <n>", "Choose a numbered session from /history.", "Example: /resume 1"].join(
     "\n",
   );
 }

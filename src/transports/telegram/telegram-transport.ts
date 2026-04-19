@@ -5,7 +5,12 @@ import { Bot, GrammyError, InputFile } from "grammy";
 import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import type { TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
-import type { IncomingMessage, IncomingMessageCommand, OutgoingMessage } from "../../domain/message.js";
+import type {
+  IncomingMessage,
+  IncomingMessageCommand,
+  OutgoingMessage,
+  OutgoingMessageReplayItem,
+} from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportContext, TransportHandler, TransportInboundEvent } from "../types.js";
 import {
@@ -118,6 +123,7 @@ export function createTelegramTransport(
             });
           }
           await sendTelegramAttachments(bot, request.target.conversationId, request.message);
+          await sendTelegramReplay(bot, request.target.conversationId, request.message);
         },
       });
 
@@ -872,6 +878,7 @@ function createTelegramInboundEvent(
         });
       }
       await sendTelegramAttachments(bot, ctx.chat.id, message);
+      await sendTelegramReplay(bot, ctx.chat.id, message);
     },
     async deliverError(error?: unknown): Promise<void> {
       await logger?.debug("sending telegram processing error response", {
@@ -889,6 +896,25 @@ function createTelegramInboundEvent(
       await ctx.reply("Sorry, something went wrong while processing your message.");
     },
   };
+}
+
+async function sendTelegramReplay(
+  bot: TelegramBotAdapter,
+  chatId: number | string,
+  message: OutgoingMessage,
+): Promise<void> {
+  for (const item of message.replay ?? []) {
+    for (const chunk of renderTelegramMessages(renderReplayItem(item))) {
+      await bot.api.sendMessage(chatId, chunk, {
+        parse_mode: "HTML",
+      });
+    }
+  }
+}
+
+function renderReplayItem(item: OutgoingMessageReplayItem): string {
+  const label = item.role === "user" ? "You" : "imp";
+  return `**${label}**\n${item.text}`;
 }
 
 async function sendTelegramAttachments(

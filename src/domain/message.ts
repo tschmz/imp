@@ -5,7 +5,7 @@ export type IncomingMessageCommand =
   | "help"
   | "status"
   | "history"
-  | "restore"
+  | "resume"
   | "whoami"
   | "rename"
   | "reset"
@@ -63,6 +63,7 @@ export interface OutgoingMessage {
   conversation: ChatRef;
   text: string;
   attachments?: OutgoingMessageAttachment[];
+  replay?: OutgoingMessageReplayItem[];
   deliveryAction?: OutgoingMessageDeliveryAction;
 }
 
@@ -71,4 +72,10 @@ export interface OutgoingMessageAttachment {
   path: string;
   fileName?: string;
   mimeType?: string;
+}
+
+export interface OutgoingMessageReplayItem {
+  role: "user" | "assistant";
+  text: string;
+  createdAt: string;
 }

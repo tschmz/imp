@@ -10,7 +10,7 @@ import { pingCommandHandler } from "./ping-command.js";
 import { reloadCommandHandler } from "./reload-command.js";
 import { renameCommandHandler } from "./rename-command.js";
 import { restartCommandHandler } from "./restart-command.js";
-import { restoreCommandHandler } from "./restore-command.js";
+import { resumeCommandHandler } from "./resume-command.js";
 import { statusCommandHandler } from "./status-command.js";
 import type { InboundCommandHandler } from "./types.js";
 import { whoamiCommandHandler } from "./whoami-command.js";
@@ -24,7 +24,7 @@ export const inboundCommandHandlers: InboundCommandHandler[] = [
   renameCommandHandler,
   resetCommandHandler,
   historyCommandHandler,
-  restoreCommandHandler,
+  resumeCommandHandler,
   exportCommandHandler,
   configCommandHandler,
   agentCommandHandler,

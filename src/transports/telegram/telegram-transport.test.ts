@@ -197,7 +197,7 @@ describe("createTelegramTransport", () => {
     expect(capturedMessage?.command).toBe("new");
   });
 
-  it("captures command arguments for /restore", async () => {
+  it("captures command arguments for /resume", async () => {
     const bot = createFakeBot();
     let capturedMessage: IncomingMessage | undefined;
     const transport = createTelegramTransport(
@@ -218,10 +218,10 @@ describe("createTelegramTransport", () => {
     await bot.emitTextMessage({
       chat: { id: 42, type: "private" },
       from: { id: 7 },
-      message: { message_id: 99, text: "/restore@test_bot 2" },
+      message: { message_id: 99, text: "/resume@test_bot 2" },
     });
 
-    expect(capturedMessage?.command).toBe("restore");
+    expect(capturedMessage?.command).toBe("resume");
     expect(capturedMessage?.commandArgs).toBe("2");
   });
 
@@ -248,12 +248,12 @@ describe("createTelegramTransport", () => {
       from: { id: 7 },
       message: {
         message_id: 99,
-        text: "/restore@test_bot 2",
-        entities: [{ type: "bot_command", offset: 0, length: 17 }],
+        text: "/resume@test_bot 2",
+        entities: [{ type: "bot_command", offset: 0, length: 16 }],
       },
     });
 
-    expect(capturedMessage?.command).toBe("restore");
+    expect(capturedMessage?.command).toBe("resume");
     expect(capturedMessage?.commandArgs).toBe("2");
   });
 
@@ -495,6 +495,64 @@ describe("createTelegramTransport", () => {
       expect.objectContaining({ fileData: "/tmp/export.html", filename: "conversation-readable.html" }),
       { caption: "conversation-readable.html" },
     );
+  });
+
+  it("sends outgoing replay items as rendered Telegram messages", async () => {
+    const bot = createFakeBot();
+    const logger = createMockLogger();
+    const handler = {
+      handle: vi.fn(async (event) => {
+        await event.runWithProcessing(async () => {
+          await event.deliver({
+            conversation: event.message.conversation,
+            text: "Resumed session 1: deploy prep",
+            replay: [
+              {
+                role: "user",
+                text: "old question",
+                createdAt: "2026-04-05T00:00:10.000Z",
+              },
+              {
+                role: "assistant",
+                text: "old answer",
+                createdAt: "2026-04-05T00:00:20.000Z",
+              },
+            ],
+          });
+        });
+      }),
+    };
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      logger,
+    );
+
+    await transport.start(handler);
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "/resume 1" },
+    });
+
+    expect(bot.reply).toHaveBeenCalledWith("Resumed session 1: deploy prep", { parse_mode: "HTML" });
+    await waitForAsync(
+      () =>
+        ((bot.api.sendMessage as unknown as { mock: { calls: unknown[][] } }).mock.calls.length) ===
+        2,
+    );
+    expect(bot.api.sendMessage).toHaveBeenNthCalledWith(1, 42, "<b>You</b>\nold question", {
+      parse_mode: "HTML",
+    });
+    expect(bot.api.sendMessage).toHaveBeenNthCalledWith(2, 42, "<b>imp</b>\nold answer", {
+      parse_mode: "HTML",
+    });
   });
 
   it("replies with a stable error message through the error delivery hook", async () => {

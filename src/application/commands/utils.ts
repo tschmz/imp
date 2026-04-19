@@ -23,7 +23,7 @@ export function parsePositiveIntegerArgument(commandArgs?: string): number | und
   return parsed;
 }
 
-export function pickRestoreBackup(
+export function pickResumeBackup(
   backups: ConversationBackupSummary[],
   commandArgs?: string,
 ): ConversationBackupSummary | undefined {

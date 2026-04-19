@@ -388,7 +388,7 @@ describe("createMessageProcessor", () => {
     await Promise.all([first, reset]);
   });
 
-  it("lets /restore bypass the active session queue even when command metadata is missing", async () => {
+  it("lets /resume bypass the active session queue even when command metadata is missing", async () => {
     const starts: string[] = [];
     const releases = new Map<string, () => void>();
     const handler = {
@@ -422,7 +422,7 @@ describe("createMessageProcessor", () => {
               allowedCommands: priorityInboundCommands,
             });
         if (command) {
-          if (command.command === "restore") {
+          if (command.command === "resume") {
             activeSessionId = "session-restored";
           }
 
@@ -450,10 +450,10 @@ describe("createMessageProcessor", () => {
 
     const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
     await tick();
-    const restore = processor.handle(
+    const resume = processor.handle(
       createEvent({
         ...createIncomingMessage("2", "42"),
-        text: "/restore 1",
+        text: "/resume 1",
       }),
     );
     const third = processor.handle(createEvent(createIncomingMessage("3", "42")));
@@ -461,13 +461,13 @@ describe("createMessageProcessor", () => {
     await tick();
     await tick();
 
-    expect(starts).toEqual(["1:session-1", "2:restore", "3:session-restored"]);
+    expect(starts).toEqual(["1:session-1", "2:resume", "3:session-restored"]);
 
     releases.get("3")?.();
     await third;
 
     releases.get("1")?.();
-    await Promise.all([first, restore]);
+    await Promise.all([first, resume]);
   });
 
   it("lets rename bypass the active session queue as a lightweight session metadata change", async () => {

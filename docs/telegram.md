@@ -14,7 +14,7 @@ Current commands:
 - `/reset` resets the messages in the current agent's active session while preserving its title and agent.
 - `/status` shows the current agent's active session details, including title, agent, message count, timestamps, working directory, and how many previous sessions are available.
 - `/history` lists previous sessions for the current agent and their transcript entry counts.
-- `/restore <n>` switches the current agent to session `n` from `/history`.
+- `/resume <n>` switches the current agent to session `n` from `/history` and replays the visible user and assistant messages into the chat.
 - `/export` writes the current agent's active session transcript to an HTML file and replies with the file path and link. Use `/export full` to include complete tool arguments, tool output, and technical details; the default readable export keeps tool details compact.
 - `/ping` returns a simple liveness response.
 - `/config` shows runtime and config details for the current endpoint, including instance name, config path, data root, logging level, enabled endpoints, and the endpoint's default agent.
