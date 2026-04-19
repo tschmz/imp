@@ -366,6 +366,7 @@ class WakePhraseRecorder:
         tone_map: dict[str, list[tuple[float, float, float]]] = {
             "ready": [(740.0, 0.045, 0.22), (988.0, 0.085, 0.26)],
             "follow-up-ready": [(880.0, 0.04, 0.22), (1174.0, 0.08, 0.26)],
+            "captured": [(1174.0, 0.035, 0.22), (784.0, 0.07, 0.24)],
             "closed": [(880.0, 0.04, 0.2), (659.0, 0.06, 0.22), (440.0, 0.11, 0.24)],
         }
         segments = tone_map.get(name)
@@ -775,6 +776,14 @@ class WakePhraseRecorder:
             wav_file.writeframes(raw)
 
         duration = self.command_chunk_count * self.config.audio.chunk_ms / 1000
+        captured_cue_seconds = self.play_feedback_tone("captured")
+        self.write_runtime_status(
+            "transcribing_command",
+            can_speak=False,
+            cue=("captured" if captured_cue_seconds > 0 else None),
+            recording_file=str(path),
+            finish_reason=reason,
+        )
         transcript = self.transcribe_command_audio(raw)
         self.saved_recordings += 1
         self.log(
