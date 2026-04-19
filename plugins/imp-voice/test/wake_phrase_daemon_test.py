@@ -137,6 +137,15 @@ class WakePhraseDaemonStateTests(unittest.TestCase):
         self.assertGreater(len(wav_bytes), 44)
         self.assertGreater(duration, 0)
 
+    def test_follow_up_ready_tone_is_shorter_than_wake_ready_tone(self):
+        recorder = self.create_recorder()
+
+        _ready_bytes, ready_duration = recorder.build_feedback_tone("ready")
+        follow_up_bytes, follow_up_duration = recorder.build_feedback_tone("follow-up-ready")
+
+        self.assertGreater(len(follow_up_bytes), 44)
+        self.assertLess(follow_up_duration, ready_duration)
+
     def test_accepted_feedback_tone_is_available(self):
         recorder = self.create_recorder()
 
