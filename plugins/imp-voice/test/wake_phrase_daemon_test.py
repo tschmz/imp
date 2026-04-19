@@ -8,6 +8,11 @@ import unittest
 from pathlib import Path
 
 
+class _FakeNumpyArray:
+    def copy(self):
+        return self
+
+
 class _FakeOpenWakeWordModel:
     def __init__(self, wakeword_model_paths: list[str]) -> None:
         self.models = {"fake": object()}
@@ -34,6 +39,10 @@ class _FakeKaldiRecognizer:
     def FinalResult(self) -> str:
         return self._result
 
+
+numpy_module = types.ModuleType("numpy")
+numpy_module.frombuffer = lambda _buffer, dtype=None: _FakeNumpyArray()
+sys.modules.setdefault("numpy", numpy_module)
 
 openwakeword_module = types.ModuleType("openwakeword")
 openwakeword_module.models = {"hey_jarvis": {"model_path": "/tmp/fake-wake.onnx"}}
@@ -118,6 +127,32 @@ class WakePhraseDaemonStateTests(unittest.TestCase):
         self.assertEqual(last_status, "active")
         self.assertEqual(last_payload["phase"], "waiting_for_wake")
         self.assertEqual(last_payload["closed_reason"], "wake-timeout")
+
+    def test_waiting_for_speaker_has_no_timeout_when_disabled(self):
+        recorder = self.create_recorder()
+        recorder.config.conversation.enabled = True
+        recorder.config.conversation.response_wait_timeout_seconds = 0.0
+        recorder.config.speaker_feedback.enabled = True
+
+        recorder.wait_for_speaker_response()
+        self.assertEqual(recorder.speaker_response_wait_until, 0.0)
+
+        recorder.handle_waiting_for_speaker(10**12)
+
+        self.assertEqual(recorder.state, "waiting_for_speaker")
+        self.assertFalse(recorder.awaiting_follow_up)
+
+    def test_waiting_for_speaker_timeout_still_opens_follow_up_when_configured(self):
+        recorder = self.create_recorder()
+        recorder.config.conversation.enabled = True
+        recorder.config.conversation.response_wait_timeout_seconds = 1.0
+        recorder.config.speaker_feedback.enabled = True
+
+        recorder.wait_for_speaker_response()
+        recorder.handle_waiting_for_speaker(recorder.speaker_response_wait_until + 1)
+
+        self.assertEqual(recorder.state, "armed")
+        self.assertTrue(recorder.awaiting_follow_up)
 
 
 if __name__ == "__main__":

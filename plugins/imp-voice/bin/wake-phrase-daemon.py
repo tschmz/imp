@@ -97,7 +97,7 @@ class ImpPluginIngressConfig:
 class ConversationConfig:
     enabled: bool = True
     follow_up_timeout_seconds: float = 5.0
-    response_wait_timeout_seconds: float = 60.0
+    response_wait_timeout_seconds: float = 0.0
 
 
 @dataclass(slots=True)
@@ -553,7 +553,7 @@ class WakePhraseRecorder:
             self.arm_follow_up_recording()
             return
 
-        if now > self.speaker_response_wait_until:
+        if self.speaker_response_wait_until > 0 and now > self.speaker_response_wait_until:
             self.log(
                 "No speaker response was detected within the wait window; "
                 "opening the follow-up window anyway."
@@ -669,17 +669,16 @@ class WakePhraseRecorder:
         self.awaiting_follow_up = False
         self.clear_listen_ready_status()
         now = time.monotonic()
-        self.speaker_response_wait_until = now + self.config.conversation.response_wait_timeout_seconds
+        wait_timeout = self.config.conversation.response_wait_timeout_seconds
+        self.speaker_response_wait_until = now + wait_timeout if wait_timeout > 0 else 0.0
         self.speaker_response_seen = False
         self.command_pre_roll_buffer.clear()
         self.wake_pre_roll_buffer.clear()
         self.command_trigger_streak = 0
         self.command_pending_after_delay = False
         self.write_runtime_status("waiting_for_speaker", can_speak=False)
-        self.log(
-            "Waiting for the speaker response before opening the follow-up window "
-            f"({self.config.conversation.response_wait_timeout_seconds:.1f}s timeout)."
-        )
+        timeout_text = f"{wait_timeout:.1f}s timeout" if wait_timeout > 0 else "no timeout"
+        self.log(f"Waiting for the speaker response before opening the follow-up window ({timeout_text}).")
 
     def transcribe_command_audio(self, audio: bytes) -> str:
         if not self.config.command_transcription.enabled:

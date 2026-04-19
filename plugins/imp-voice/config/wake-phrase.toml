@@ -47,7 +47,7 @@ user_id = "imp-voice"
 [conversation]
 enabled = true
 follow_up_timeout_seconds = 5.0
-response_wait_timeout_seconds = 60.0
+response_wait_timeout_seconds = 0.0
 
 [speaker_feedback]
 enabled = true
