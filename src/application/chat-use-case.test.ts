@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppConfig } from "../config/types.js";
 import type { DaemonConfig } from "../daemon/types.js";
+import type { ConversationContext } from "../domain/conversation.js";
 import type { createRuntimeEntries, RuntimeEntry } from "../daemon/runtime-runner.js";
 import type { ConversationStore } from "../storage/types.js";
 import { createChatUseCase } from "./chat-use-case.js";
@@ -168,9 +169,45 @@ describe("createChatUseCase", () => {
     expect(dependencies.stopRuntimeEntries).toHaveBeenCalledWith([dependencies.runtimeEntry]);
     expect(dependencies.stopRuntimeEntries).toHaveBeenCalledTimes(2);
   });
+
+  it("loads the active session replay when starting direct chat", async () => {
+    const conversationStore = createConversationStore({
+      getSelectedAgent: vi.fn(async () => "ops"),
+      getActiveForAgent: vi.fn(async () => createActiveConversation()),
+    });
+    const dependencies = createDependencies(createAppConfig(), conversationStore);
+    const useCase = createChatUseCase(dependencies);
+
+    await useCase({});
+
+    expect(conversationStore.getSelectedAgent).toHaveBeenCalledWith({
+      transport: "cli",
+      externalId: "local",
+      endpointId: "local-cli",
+    });
+    expect(conversationStore.getActiveForAgent).toHaveBeenCalledWith("ops");
+    expect(dependencies.createRuntimeEntries).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          endpointConfig: expect.objectContaining({
+            id: "local-cli",
+            type: "cli",
+            initialReplay: [
+              { role: "user", text: "old question", createdAt: "2026-04-05T00:00:10.000Z" },
+              { role: "assistant", text: "old answer", createdAt: "2026-04-05T00:00:20.000Z" },
+            ],
+          }),
+        }),
+      ],
+      expect.any(Object),
+    );
+  });
 });
 
-function createDependencies(appConfig: AppConfig = createAppConfig()) {
+function createDependencies(
+  appConfig: AppConfig = createAppConfig(),
+  conversationStore: ConversationStore = createConversationStore(),
+) {
   const runtimeEntry: RuntimeEntry = {
     start: vi.fn(async () => undefined),
     stop: vi.fn(async () => undefined),
@@ -228,7 +265,7 @@ function createDependencies(appConfig: AppConfig = createAppConfig()) {
           error: vi.fn(async () => undefined),
         })),
       },
-      conversationStore: createConversationStore(),
+      conversationStore,
       engine: {
         run: vi.fn(),
         close: vi.fn(async () => undefined),
@@ -285,7 +322,7 @@ function createAppConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   };
 }
 
-function createConversationStore(): ConversationStore {
+function createConversationStore(overrides: Partial<ConversationStore> = {}): ConversationStore {
   return {
     get: vi.fn(),
     put: vi.fn(),
@@ -293,6 +330,61 @@ function createConversationStore(): ConversationStore {
     restore: vi.fn(),
     ensureActive: vi.fn(),
     create: vi.fn(),
+    ...overrides,
+  };
+}
+
+function createActiveConversation(): ConversationContext {
+  return {
+    state: {
+      conversation: { transport: "cli", externalId: "local", sessionId: "session-1" },
+      agentId: "ops",
+      createdAt: "2026-04-05T00:00:00.000Z",
+      updatedAt: "2026-04-05T00:03:00.000Z",
+      version: 1,
+    },
+    messages: [
+      {
+        id: "msg-1",
+        role: "user",
+        content: "old question",
+        timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
+        createdAt: "2026-04-05T00:00:10.000Z",
+      },
+      {
+        id: "msg-2",
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "hidden", thinkingSignature: "sig" },
+          { type: "text", text: "old answer" },
+          { type: "toolCall", id: "call-1", name: "shell", arguments: { cmd: "npm test" } },
+        ],
+        timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
+        createdAt: "2026-04-05T00:00:20.000Z",
+        api: "test",
+        provider: "test",
+        model: "stub",
+        stopReason: "stop",
+        usage: {
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 2,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+      },
+      {
+        id: "msg-3",
+        role: "toolResult",
+        toolCallId: "call-1",
+        toolName: "shell",
+        isError: false,
+        content: [{ type: "text", text: "tool output" }],
+        timestamp: Date.parse("2026-04-05T00:00:30.000Z"),
+        createdAt: "2026-04-05T00:00:30.000Z",
+      },
+    ],
   };
 }
 

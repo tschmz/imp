@@ -8,11 +8,14 @@ import { prepareRuntimeFilesystem } from "../daemon/bootstrap/prepare-runtime-fi
 import { buildAgents, validateAgentRegistry } from "../daemon/create-daemon.js";
 import type { BootstrappedRuntime } from "../daemon/runtime-bootstrap.js";
 import { createRuntimeEntries, runRuntimeEntries, stopRuntimeEntries } from "../daemon/runtime-runner.js";
-import type { DaemonConfig } from "../daemon/types.js";
+import type { CliEndpointRuntimeConfig, DaemonConfig } from "../daemon/types.js";
+import type { ChatRef } from "../domain/conversation.js";
 import { ConfigurationError } from "../domain/errors.js";
 import { prepareAgentLogFiles } from "../logging/agent-loggers.js";
 import { createFileOnlyLogger } from "../logging/file-logger.js";
 import { createBuiltInToolRegistry } from "../runtime/create-pi-agent-engine.js";
+import type { ConversationStore } from "../storage/types.js";
+import { toVisibleReplayItems } from "./conversation-replay.js";
 import { createRuntimeTransportFactory } from "./runtime-target.js";
 
 interface ChatUseCaseDependencies {
@@ -74,8 +77,11 @@ export function createChatUseCase(
         const components = deps.buildRuntimeComponents(chatRuntimeConfig, endpointConfig, {
           createLogger: createFileOnlyLogger,
         });
+        const endpointConfigWithReplay = endpointConfig.type === "cli"
+          ? await withInitialCliReplay(endpointConfig, components.conversationStore)
+          : endpointConfig;
         return {
-          endpointConfig,
+          endpointConfig: endpointConfigWithReplay,
           configPath: chatRuntimeConfig.configPath,
           ...components,
         };
@@ -148,4 +154,30 @@ function resolveCliChatRuntimeConfig(runtimeConfig: DaemonConfig): DaemonConfig 
     ...runtimeConfig,
     activeEndpoints: runtimeConfig.activeEndpoints.filter((endpoint) => endpoint.type === "cli"),
   };
+}
+
+async function withInitialCliReplay(
+  endpointConfig: CliEndpointRuntimeConfig & DaemonConfig["activeEndpoints"][number],
+  conversationStore: ConversationStore,
+): Promise<CliEndpointRuntimeConfig & DaemonConfig["activeEndpoints"][number]> {
+  const chatRef: ChatRef = {
+    transport: "cli",
+    externalId: endpointConfig.userId,
+    endpointId: endpointConfig.id,
+  };
+  const selectedAgentId =
+    await conversationStore.getSelectedAgent?.(chatRef) ??
+    endpointConfig.defaultAgentId;
+  const conversation =
+    await conversationStore.getActiveForAgent?.(selectedAgentId) ??
+    await conversationStore.get(chatRef);
+
+  if (!conversation) {
+    return endpointConfig;
+  }
+
+  const initialReplay = toVisibleReplayItems(conversation);
+  return initialReplay.length > 0
+    ? { ...endpointConfig, initialReplay }
+    : endpointConfig;
 }

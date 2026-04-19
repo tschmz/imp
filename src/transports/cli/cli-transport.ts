@@ -115,6 +115,7 @@ export function createCliTransport(
       terminalUi.addChild(statusContainer);
       terminalUi.addChild(editor);
       terminalUi.setFocus(editor);
+      renderCliReplay(config.initialReplay ?? [], chatContainer);
 
       stopInputListener = terminalUi.addInputListener((data) => {
         if (!matchesKey(data, Key.ctrl("c"))) {

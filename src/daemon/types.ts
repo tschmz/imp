@@ -8,6 +8,7 @@ import type {
 } from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
 import type { SkillDefinition } from "../skills/types.js";
+import type { OutgoingMessageReplayItem } from "../domain/message.js";
 import type { TransportType } from "../transports/registry.js";
 
 interface BaseTransportRuntimeConfig {
@@ -26,6 +27,7 @@ export interface TelegramEndpointRuntimeConfig extends BaseTransportRuntimeConfi
 export interface CliEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
   type: "cli";
   userId: string;
+  initialReplay?: OutgoingMessageReplayItem[];
 }
 
 export interface PluginEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
