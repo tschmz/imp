@@ -242,7 +242,7 @@ function renderToolResultMessage(
     "tool-result",
     summary,
     message.createdAt,
-    `<details ${mode === "full" ? "open" : ""}><summary>${escapeHtml(summary)}</summary>${content}</details>`,
+    `<details><summary>${escapeHtml(summary)}</summary>${content}</details>`,
   );
 }
 

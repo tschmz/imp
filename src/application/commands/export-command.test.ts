@@ -62,6 +62,8 @@ describe("exportCommandHandler", () => {
     expect(html).toContain("&quot;workingDirectory&quot;: &quot;/workspace&quot;");
     expect(html).toContain("all tests passed");
     expect(html).toContain("Internal thinking: present, content omitted.");
+    expect(html).toContain("<details><summary>Tool result: shell (ok)</summary>");
+    expect(html).not.toContain("<details open><summary>Tool result: shell (ok)</summary>");
   });
 
   it("returns usage text for unsupported export options", async () => {
