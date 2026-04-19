@@ -31,4 +31,28 @@ describe("imp-voice config", () => {
       fallbackFormat: "wav",
     });
   });
+
+  it("normalizes ElevenLabs TTS defaults", () => {
+    const config = normalizeConfig(
+      {
+        runtimeDir: "/tmp/imp-voice/runtime",
+        speaker: {
+          tts: {
+            provider: "elevenlabs",
+            voice: "voice-id",
+          },
+        },
+      },
+      "/tmp/imp-config",
+    );
+
+    expect(config.speaker.tts).toMatchObject({
+      provider: "elevenlabs",
+      apiKeyEnv: "ELEVENLABS_API_KEY",
+      baseUrl: "https://api.elevenlabs.io",
+      fallbackModel: "eleven_multilingual_v2",
+      fallbackVoice: "voice-id",
+      fallbackFormat: "wav_16000",
+    });
+  });
 });

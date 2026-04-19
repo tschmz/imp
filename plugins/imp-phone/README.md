@@ -110,6 +110,26 @@ The default controller config uses:
 - `arecord -D imp_phone_remote_capture ... -t raw` to capture caller audio
 - `aplay -D imp_phone_agent_playback -q {path}` to play TTS audio
 
+TTS providers:
+
+- `openai` uses `OPENAI_API_KEY` by default and sends audio requests to OpenAI's speech API.
+- `elevenlabs` uses `ELEVENLABS_API_KEY` by default and sends audio requests to ElevenLabs' text-to-speech API.
+
+Example ElevenLabs controller config:
+
+```json
+{
+  "tts": {
+    "provider": "elevenlabs",
+    "voice": "your-elevenlabs-voice-id",
+    "model": "eleven_multilingual_v2",
+    "format": "wav_16000"
+  }
+}
+```
+
+When using ElevenLabs, make sure the endpoint `response.speech.voice` value is also an ElevenLabs voice ID or omit the endpoint voice override so the local fallback is used.
+
 While `imp` is working on a response, the controller can play a configurable hold message after `conversation.holdMessageAfterSeconds` and then every `conversation.holdMessageIntervalSeconds`.
 
 Short feedback tones are available for `captured`, `accepted`, `error`, and `closed`. They are played through the same phone playback command and can be disabled with `feedbackTones.enabled = false`.

@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Blob } from "node:buffer";
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { ensureDirs, sanitizeFileName, writeJsonAtomic } from "./files.mjs";
 import { buildFeedbackTone, recordSpeechTurn, renderArgs, renderTemplate, runCommand, writeWav } from "./audio.mjs";
+import { synthesizeSpeech } from "./tts.mjs";
 
 export class PhoneController {
   constructor(config, options = {}) {
@@ -233,13 +234,18 @@ export class PhoneController {
         await this.playFeedbackTone("accepted", contact).catch((error) => {
           this.log(`Feedback tone 'accepted' could not be played: ${error instanceof Error ? error.message : String(error)}`);
         });
+        await this.playHoldMessage(contact).catch((error) => {
+          this.log(`Immediate hold message could not be played: ${error instanceof Error ? error.message : String(error)}`);
+        });
         await this.writeRuntimeStatus("waiting_for_speaker", false, {
           requestId,
           conversationId,
           turn,
           transcript,
         });
-        const reply = await this.waitForOutboxReply(event, contact);
+        const reply = await this.waitForOutboxReply(event, contact, {
+          initialHoldMessagePlayed: true,
+        });
         if (!reply.text.trim()) {
           continue;
         }
@@ -346,9 +352,12 @@ export class PhoneController {
     };
   }
 
-  async waitForOutboxReply(event, contact) {
+  async waitForOutboxReply(event, contact, options = {}) {
     const deadline = Date.now() + this.config.conversation.responseTimeoutSeconds * 1000;
-    let nextHoldAt = Date.now() + this.config.conversation.holdMessageAfterSeconds * 1000;
+    let nextHoldAt = Date.now()
+      + (options.initialHoldMessagePlayed
+        ? this.config.conversation.holdMessageIntervalSeconds
+        : this.config.conversation.holdMessageAfterSeconds) * 1000;
     while (Date.now() < deadline && !this.stopped) {
       const filePath = await this.nextOutboxFile();
       if (!filePath) {
@@ -446,33 +455,7 @@ export class PhoneController {
   }
 
   async synthesize(text, speech = {}) {
-    assertOpenAi("TTS", this.config.tts.provider, this.config.tts.apiKeyEnv);
-    const apiKey = process.env[this.config.tts.apiKeyEnv];
-    const tempDir = await mkdtemp(join(tmpdir(), "imp-phone-tts-"));
-    const format = speech.format ?? this.config.tts.fallbackFormat;
-    const instructions = speech.instructions ?? this.config.tts.fallbackInstructions;
-    const audioPath = join(tempDir, `reply.${format}`);
-    const response = await this.fetchImpl("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: speech.model ?? this.config.tts.fallbackModel,
-        voice: speech.voice ?? this.config.tts.fallbackVoice,
-        input: text,
-        response_format: format,
-        ...(instructions ? { instructions } : {}),
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI TTS failed: ${response.status} ${response.statusText} ${await response.text()}`);
-    }
-
-    await writeFile(audioPath, Buffer.from(await response.arrayBuffer()));
-    return audioPath;
+    return await synthesizeSpeech(this.config.tts, text, speech, { fetchImpl: this.fetchImpl });
   }
 
   async play(audioPath, contact) {

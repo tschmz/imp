@@ -189,6 +189,150 @@ describe("imp-voice speaker outbox", () => {
     ]);
   });
 
+  it("supports ElevenLabs TTS", async () => {
+    const root = await createTempRoot();
+    const previousApiKey = process.env.ELEVENLABS_API_KEY;
+    process.env.ELEVENLABS_API_KEY = "test-eleven-key";
+    const requests = [];
+    const config = normalizeConfig(
+      {
+        runtimeDir: join(root, "runtime"),
+        speaker: {
+          tts: {
+            provider: "elevenlabs",
+            fallbackModel: "eleven_multilingual_v2",
+            fallbackVoice: "voice-id",
+            fallbackFormat: "wav_16000",
+          },
+        },
+      },
+      root,
+    );
+    await mkdir(config.outboxDir, { recursive: true });
+    await writeFile(
+      join(config.outboxDir, "reply.json"),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        text: "Hallo.",
+        speech: {
+          model: "eleven_turbo_v2_5",
+          voice: "message-voice-id",
+          format: "mp3_44100_128",
+        },
+      })}\n`,
+      "utf8",
+    );
+    const consumer = new SpeakerOutboxConsumer(config, {
+      once: true,
+      playAudio: false,
+      fetchImpl: async (url, options) => {
+        requests.push({
+          url,
+          headers: options.headers,
+          body: JSON.parse(options.body),
+        });
+        return {
+          ok: true,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        };
+      },
+      log: () => undefined,
+    });
+
+    try {
+      await expect(consumer.run()).resolves.toBe(0);
+    } finally {
+      if (previousApiKey === undefined) {
+        delete process.env.ELEVENLABS_API_KEY;
+      } else {
+        process.env.ELEVENLABS_API_KEY = previousApiKey;
+      }
+    }
+
+    expect(requests).toEqual([
+      {
+        url: "https://api.elevenlabs.io/v1/text-to-speech/message-voice-id?output_format=mp3_44100_128",
+        headers: {
+          "xi-api-key": "test-eleven-key",
+          "Content-Type": "application/json",
+        },
+        body: {
+          text: "Hallo.",
+          model_id: "eleven_turbo_v2_5",
+        },
+      },
+    ]);
+  });
+
+  it("ignores OpenAI speech metadata for ElevenLabs TTS", async () => {
+    const root = await createTempRoot();
+    const previousApiKey = process.env.ELEVENLABS_API_KEY;
+    process.env.ELEVENLABS_API_KEY = "test-eleven-key";
+    const requests = [];
+    const config = normalizeConfig(
+      {
+        runtimeDir: join(root, "runtime"),
+        speaker: {
+          tts: {
+            provider: "elevenlabs",
+            fallbackModel: "eleven_multilingual_v2",
+            fallbackVoice: "fallback-voice-id",
+            fallbackFormat: "wav_16000",
+          },
+        },
+      },
+      root,
+    );
+    await mkdir(config.outboxDir, { recursive: true });
+    await writeFile(
+      join(config.outboxDir, "reply.json"),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        text: "Hallo.",
+        speech: {
+          model: "gpt-4o-mini-tts",
+          voice: "nova",
+        },
+      })}\n`,
+      "utf8",
+    );
+    const consumer = new SpeakerOutboxConsumer(config, {
+      once: true,
+      playAudio: false,
+      fetchImpl: async (url, options) => {
+        requests.push({
+          url,
+          body: JSON.parse(options.body),
+        });
+        return {
+          ok: true,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        };
+      },
+      log: () => undefined,
+    });
+
+    try {
+      await expect(consumer.run()).resolves.toBe(0);
+    } finally {
+      if (previousApiKey === undefined) {
+        delete process.env.ELEVENLABS_API_KEY;
+      } else {
+        process.env.ELEVENLABS_API_KEY = previousApiKey;
+      }
+    }
+
+    expect(requests).toEqual([
+      {
+        url: "https://api.elevenlabs.io/v1/text-to-speech/fallback-voice-id?output_format=wav_16000",
+        body: {
+          text: "Hallo.",
+          model_id: "eleven_multilingual_v2",
+        },
+      },
+    ]);
+  });
+
   it("detects expired replies", () => {
     expect(
       isExpired({

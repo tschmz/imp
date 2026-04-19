@@ -52,6 +52,28 @@ export IMP_VOICE_RUNTIME_DIR=/path/to/runtime/plugins/imp-voice/endpoints/audio-
 
 `speaker.tts` only contains local rendering fallbacks. The response-specific speech metadata comes from the imp outbox payload, which is written from the installed endpoint `response.speech` config.
 
+TTS providers:
+
+- `openai` uses `OPENAI_API_KEY` by default and sends audio requests to OpenAI's speech API.
+- `elevenlabs` uses `ELEVENLABS_API_KEY` by default and sends audio requests to ElevenLabs' text-to-speech API.
+
+Example ElevenLabs speaker config:
+
+```json
+{
+  "speaker": {
+    "tts": {
+      "provider": "elevenlabs",
+      "voice": "your-elevenlabs-voice-id",
+      "model": "eleven_multilingual_v2",
+      "format": "wav_16000"
+    }
+  }
+}
+```
+
+When using ElevenLabs, make sure the endpoint `response.speech.voice` value is also an ElevenLabs voice ID or omit the endpoint voice override so the local fallback is used.
+
 ## Wake Phrase Runtime
 
 The `imp-voice-in` service uses the Python wake phrase stack from inside this plugin. `imp plugin install` prepares a Python virtual environment before installing auto-start services:

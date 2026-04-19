@@ -1,8 +1,8 @@
-import { mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readdir, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { spawn } from "node:child_process";
 import { ensureDirs, readJson, writeJsonAtomic, buildClaimedFileName } from "./files.mjs";
+import { synthesizeSpeech } from "./tts.mjs";
 
 export class SpeakerOutboxConsumer {
   constructor(config, options = {}) {
@@ -144,44 +144,7 @@ export class SpeakerOutboxConsumer {
   }
 
   async synthesize(text, speech = {}) {
-    if (this.config.speaker.tts.provider !== "openai") {
-      throw new Error(`Unsupported TTS provider: ${this.config.speaker.tts.provider}`);
-    }
-
-    if (!this.fetchImpl) {
-      throw new Error("Global fetch is not available.");
-    }
-
-    const apiKey = process.env[this.config.speaker.tts.apiKeyEnv];
-    if (!apiKey) {
-      throw new Error(`${this.config.speaker.tts.apiKeyEnv} is not set.`);
-    }
-
-    const tempDir = await mkdtemp(join(tmpdir(), "imp-voice-tts-"));
-    const format = speech.format ?? this.config.speaker.tts.fallbackFormat;
-    const instructions = speech.instructions ?? this.config.speaker.tts.fallbackInstructions;
-    const audioPath = join(tempDir, `reply.${format}`);
-    const response = await this.fetchImpl("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: speech.model ?? this.config.speaker.tts.fallbackModel,
-        voice: speech.voice ?? this.config.speaker.tts.fallbackVoice,
-        input: text,
-        response_format: format,
-        ...(instructions ? { instructions } : {}),
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI TTS failed: ${response.status} ${response.statusText} ${await response.text()}`);
-    }
-
-    await writeFile(audioPath, Buffer.from(await response.arrayBuffer()));
-    return audioPath;
+    return await synthesizeSpeech(this.config.speaker.tts, text, speech, { fetchImpl: this.fetchImpl });
   }
 
   async play(audioPath) {

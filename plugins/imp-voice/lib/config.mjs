@@ -15,6 +15,7 @@ export function normalizeConfig(input, configDir = process.cwd()) {
     configDir,
   );
   const speaker = input.speaker ?? {};
+  const ttsProvider = stringValue(speaker.tts?.provider, "openai");
 
   return {
     pluginId: stringValue(input.pluginId, "imp-voice"),
@@ -36,12 +37,22 @@ export function normalizeConfig(input, configDir = process.cwd()) {
         args: arrayValue(speaker.playback?.args, ["-q"]),
       },
       tts: {
-        provider: stringValue(speaker.tts?.provider, "openai"),
-        apiKeyEnv: stringValue(speaker.tts?.apiKeyEnv, "OPENAI_API_KEY"),
-        fallbackModel: stringValue(speaker.tts?.fallbackModel ?? speaker.tts?.model, "gpt-4o-mini-tts"),
-        fallbackVoice: stringValue(speaker.tts?.fallbackVoice ?? speaker.tts?.voice, "nova"),
+        provider: ttsProvider,
+        apiKeyEnv: stringValue(
+          speaker.tts?.apiKeyEnv,
+          ttsProvider === "elevenlabs" ? "ELEVENLABS_API_KEY" : "OPENAI_API_KEY",
+        ),
+        baseUrl: stringValue(speaker.tts?.baseUrl, "https://api.elevenlabs.io"),
+        fallbackModel: stringValue(
+          speaker.tts?.fallbackModel ?? speaker.tts?.model,
+          ttsProvider === "elevenlabs" ? "eleven_multilingual_v2" : "gpt-4o-mini-tts",
+        ),
+        fallbackVoice: stringValue(speaker.tts?.fallbackVoice ?? speaker.tts?.voice, ttsProvider === "elevenlabs" ? "" : "nova"),
         fallbackInstructions: stringValue(speaker.tts?.fallbackInstructions ?? speaker.tts?.instructions, ""),
-        fallbackFormat: stringValue(speaker.tts?.fallbackFormat ?? speaker.tts?.format, "wav"),
+        fallbackFormat: stringValue(
+          speaker.tts?.fallbackFormat ?? speaker.tts?.format,
+          ttsProvider === "elevenlabs" ? "wav_16000" : "wav",
+        ),
       },
     },
   };

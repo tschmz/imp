@@ -55,4 +55,26 @@ describe("imp-phone config", () => {
       process.env.IMP_PHONE_RECORDINGS_DIR = recordingsDir;
     }
   });
+
+  it("normalizes ElevenLabs TTS defaults", () => {
+    const config = normalizeConfig(
+      {
+        runtimeDir: "/tmp/imp-phone/runtime",
+        tts: {
+          provider: "elevenlabs",
+          voice: "voice-id",
+        },
+      },
+      "/tmp/imp-phone",
+    );
+
+    expect(config.tts).toMatchObject({
+      provider: "elevenlabs",
+      apiKeyEnv: "ELEVENLABS_API_KEY",
+      baseUrl: "https://api.elevenlabs.io",
+      fallbackModel: "eleven_multilingual_v2",
+      fallbackVoice: "voice-id",
+      fallbackFormat: "wav_16000",
+    });
+  });
 });
