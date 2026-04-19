@@ -1,0 +1,59 @@
+import { createFindTool, createGrepTool, createLsTool, createCodingTools } from "@mariozechner/pi-coding-agent";
+import type { AgentDefinition } from "../domain/agent.js";
+import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
+import type { ToolDefinition } from "../tools/types.js";
+import { resolveBuiltInToolOptions } from "./shell-path.js";
+import { createConfiguredSkillTools } from "./skill-tool.js";
+import {
+  createWorkingDirectoryState,
+  createWorkingDirectoryTools,
+  type WorkingDirectoryState,
+} from "./working-directory-tools.js";
+
+export function createBuiltInToolRegistry(
+  workingDirectory: string | WorkingDirectoryState,
+  agent?: AgentDefinition,
+): ToolRegistry {
+  const workingDirectoryState = getWorkingDirectoryState(workingDirectory);
+
+  return createToolRegistry([
+    ...createDynamicBuiltInTools(workingDirectoryState, agent),
+    ...createConfiguredSkillTools(agent?.skillCatalog ?? []),
+    ...createWorkingDirectoryTools(workingDirectoryState),
+  ]);
+}
+
+function getWorkingDirectoryState(workingDirectory: string | WorkingDirectoryState): WorkingDirectoryState {
+  return typeof workingDirectory === "string"
+    ? createWorkingDirectoryState(workingDirectory)
+    : workingDirectory;
+}
+
+function createDynamicBuiltInTools(
+  workingDirectoryState: WorkingDirectoryState,
+  agent?: AgentDefinition,
+): ToolDefinition[] {
+  return createBaseBuiltInTools(workingDirectoryState.get(), agent).map((tool) => ({
+    ...tool,
+    async execute(toolCallId, params, signal, onUpdate) {
+      const delegatedTool = createBaseBuiltInTools(workingDirectoryState.get(), agent).find(
+        (candidate) => candidate.name === tool.name,
+      );
+      if (!delegatedTool) {
+        throw new Error(`Unknown built-in tool: ${tool.name}`);
+      }
+
+      return delegatedTool.execute(toolCallId, params, signal, onUpdate);
+    },
+  }));
+}
+
+function createBaseBuiltInTools(workingDirectory: string, agent?: AgentDefinition): ToolDefinition[] {
+  const toolOptions = resolveBuiltInToolOptions(agent);
+  return [
+    ...createCodingTools(workingDirectory, toolOptions),
+    createGrepTool(workingDirectory),
+    createFindTool(workingDirectory),
+    createLsTool(workingDirectory),
+  ];
+}
