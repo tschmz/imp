@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.9.0 - 2026-04-19
+
+### Added
+
+- Add voice capture, accepted, and error feedback tones in the bundled voice plugin.
+- Add configurable voice close phrases.
+- Soften the bundled voice follow-up tone.
+
+### Fixed
+
+- Remove the voice speaker wait timeout in the bundled voice plugin.
+
 ## 0.8.0 - 2026-04-19
 
 ### Added
