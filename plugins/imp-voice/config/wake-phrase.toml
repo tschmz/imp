@@ -48,6 +48,7 @@ user_id = "imp-voice"
 enabled = true
 follow_up_timeout_seconds = 5.0
 response_wait_timeout_seconds = 0.0
+close_phrases = []
 
 [speaker_feedback]
 enabled = true

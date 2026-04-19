@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 import tomllib
+import unicodedata
 import wave
 from array import array
 from collections import deque
@@ -98,6 +99,7 @@ class ConversationConfig:
     enabled: bool = True
     follow_up_timeout_seconds: float = 5.0
     response_wait_timeout_seconds: float = 0.0
+    close_phrases: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
@@ -738,6 +740,13 @@ class WakePhraseRecorder:
         result = json.loads(recognizer.FinalResult())
         return result.get("text", "").strip()
 
+    def is_close_phrase(self, text: str) -> bool:
+        normalized = self.normalize_text(text)
+        if not normalized:
+            return False
+        close_phrases = {phrase for phrase in map(self.normalize_text, self.config.conversation.close_phrases) if phrase}
+        return normalized in close_phrases
+
     def write_temp_command_audio(self, audio: bytes) -> Path:
         output_dir = self.config.command_recording.output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -823,6 +832,25 @@ class WakePhraseRecorder:
 
         if self.config.command_recording.write_metadata:
             path.with_suffix(".json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+        if self.awaiting_follow_up and self.is_close_phrase(transcript):
+            self.log("Follow-up conversation closed by local close phrase.")
+            self.health_writer.write(
+                "recorded",
+                state=self.state,
+                phase="conversation_closed",
+                can_speak=False,
+                recording_file=str(path),
+                command_text=transcript,
+                finish_reason=reason,
+                closed_reason="close-phrase",
+            )
+            self.command_chunks = []
+            self.command_chunk_count = 0
+            self.command_max_rms = 0
+            self.command_trigger_rms = 0
+            self.reset_to_idle(cooldown=False, closed_reason="close-phrase", play_closed_tone=True)
+            return
 
         imp_event_path: Path | None = None
         if self.config.imp_plugin.enabled:
@@ -940,8 +968,9 @@ class WakePhraseRecorder:
 
     @staticmethod
     def normalize_text(text: str) -> str:
-        text = text.lower().strip()
-        text = re.sub(r"[^a-z0-9 ]+", " ", text)
+        text = unicodedata.normalize("NFKC", text).casefold().strip()
+        text = re.sub(r"['’`´]", "", text)
+        text = "".join(character if character.isalnum() else " " for character in text)
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
@@ -1065,6 +1094,7 @@ def load_config(path: Path) -> RuntimeConfig:
                     conversation_defaults.response_wait_timeout_seconds,
                 )
             ),
+            close_phrases=tuple(str(phrase) for phrase in conversation_data.get("close_phrases", [])),
         ),
         speaker_feedback=SpeakerFeedbackConfig(
             enabled=bool(speaker_feedback_data.get("enabled", speaker_feedback_defaults.enabled)),

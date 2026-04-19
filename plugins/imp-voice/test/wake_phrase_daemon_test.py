@@ -150,6 +150,14 @@ class WakePhraseDaemonStateTests(unittest.TestCase):
         self.assertEqual(recorder.state, "waiting_for_speaker")
         self.assertFalse(recorder.awaiting_follow_up)
 
+    def test_close_phrase_matches_only_configured_normalized_phrase(self):
+        recorder = self.create_recorder()
+        recorder.config.conversation.close_phrases = ("stop now",)
+
+        self.assertTrue(recorder.is_close_phrase(" Stop, now! "))
+        self.assertEqual(wake_phrase_daemon.WakePhraseRecorder.normalize_text("that's it"), "thats it")
+        self.assertFalse(recorder.is_close_phrase("stop now please"))
+
     def test_waiting_for_speaker_timeout_still_opens_follow_up_when_configured(self):
         recorder = self.create_recorder()
         recorder.config.conversation.enabled = True
