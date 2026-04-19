@@ -165,6 +165,10 @@ function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
     transport: {
       kind: "",
     },
+    conversation: {
+      kind: "",
+      metadata: {},
+    },
     reply: {
       channel: {
         kind: "",

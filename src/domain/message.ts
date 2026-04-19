@@ -1,4 +1,4 @@
-import type { ChatRef } from "./conversation.js";
+import type { ChatRef, ConversationRef } from "./conversation.js";
 
 export type IncomingMessageCommand =
   | "new"
@@ -21,7 +21,7 @@ export type OutgoingMessageDeliveryAction = "reload" | "restart";
 
 export interface IncomingMessage {
   endpointId: string;
-  conversation: ChatRef;
+  conversation: ConversationRef;
   messageId: string;
   correlationId: string;
   userId: string;

@@ -81,15 +81,10 @@ export function createRuntimeEntries(
         const selectedAgentId =
           await runtime.conversationStore.getSelectedAgent?.(scopedEvent.message.conversation) ??
           runtime.endpointConfig.defaultAgentId;
-        const ensureActive =
-          runtime.conversationStore.ensureActiveForAgent ?? runtime.conversationStore.ensureActive;
-        const conversation = await ensureActive(
-          scopedEvent.message.conversation,
-          {
-            agentId: selectedAgentId,
-            now: scopedEvent.message.receivedAt,
-          },
-        );
+        const detachedSession = getDetachedSessionRequest(scopedEvent.message);
+        const conversation = detachedSession && scopedEvent.message.conversation.sessionId
+          ? await ensureDetachedConversation(runtime, scopedEvent.message, selectedAgentId, detachedSession)
+          : await ensureActiveConversation(runtime, scopedEvent.message, selectedAgentId);
 
         return {
           ...scopedEvent,
@@ -192,6 +187,71 @@ export function createRuntimeEntries(
       },
     };
   });
+}
+
+async function ensureActiveConversation(
+  runtime: BootstrappedRuntime,
+  message: IncomingMessage,
+  selectedAgentId: string,
+): Promise<ConversationContext> {
+  const ensureActive =
+    runtime.conversationStore.ensureActiveForAgent ?? runtime.conversationStore.ensureActive;
+  return await ensureActive(
+    message.conversation,
+    {
+      agentId: selectedAgentId,
+      now: message.receivedAt,
+    },
+  );
+}
+
+async function ensureDetachedConversation(
+  runtime: BootstrappedRuntime,
+  message: IncomingMessage,
+  selectedAgentId: string,
+  detachedSession: DetachedSessionRequest,
+): Promise<ConversationContext> {
+  if (!runtime.conversationStore.ensureDetachedForAgent) {
+    return await ensureActiveConversation(runtime, message, selectedAgentId);
+  }
+
+  return await runtime.conversationStore.ensureDetachedForAgent(message.conversation, {
+    agentId: selectedAgentId,
+    now: message.receivedAt,
+    title: detachedSession.title,
+    kind: detachedSession.kind,
+    metadata: detachedSession.metadata,
+  });
+}
+
+interface DetachedSessionRequest {
+  mode: "detached";
+  id: string;
+  kind?: string;
+  title?: string;
+  metadata?: Record<string, unknown>;
+}
+
+function getDetachedSessionRequest(message: IncomingMessage): DetachedSessionRequest | undefined {
+  const session = message.source?.plugin?.metadata?.session;
+  if (typeof session !== "object" || session === null) {
+    return undefined;
+  }
+  const candidate = session as Record<string, unknown>;
+  if (candidate.mode !== "detached" || typeof candidate.id !== "string" || candidate.id.length === 0) {
+    return undefined;
+  }
+  return {
+    mode: "detached",
+    id: candidate.id,
+    ...(typeof candidate.kind === "string" ? { kind: candidate.kind } : {}),
+    ...(typeof candidate.title === "string" ? { title: candidate.title } : {}),
+    ...(isRecord(candidate.metadata) ? { metadata: candidate.metadata } : {}),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function recoverInterruptedRuns(

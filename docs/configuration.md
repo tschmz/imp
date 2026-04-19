@@ -226,6 +226,8 @@ Available variables:
 - `agent.authFile`
 - `agent.workspace.cwd`
 - `transport.kind`
+- `conversation.kind`
+- `conversation.metadata`
 - `reply.channel.kind`
 - `reply.channel.delivery`
 - `reply.channel.endpointId`
@@ -238,6 +240,16 @@ Available variables:
 - `skills[].filePath`
 
 Reply-channel context describes where the answer will go, not where the inbound message came from. Normal endpoint conversations use the current endpoint transport. Plugin endpoint responses with `response.type: "endpoint"` use the target endpoint transport and endpoint ID. Plugin outbox responses use the explicit `response.replyChannel.kind` value from config, and `none` responses use `reply.channel.kind` set to `none`. Channel-specific behavior belongs in prompt files, not in hidden daemon prompts.
+
+Conversation context describes the current session. Plugins may set `conversation.kind` and `conversation.metadata` when they create a detached session. For imp-phone sessions, `conversation.kind` is `phone-call` and metadata includes `contact_id`, `contact_name`, and `contact_uri`.
+
+Guard plugin-specific metadata with the session kind:
+
+```hbs
+{{#if (eq conversation.kind "phone-call")}}
+You are currently on a phone call with {{conversation.metadata.contact_name}} at {{conversation.metadata.contact_uri}}.
+{{/if}}
+```
 
 Example:
 

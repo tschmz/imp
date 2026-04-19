@@ -313,15 +313,169 @@ describe("createRuntimeEntries", () => {
     });
   });
 
+  it("uses detached sessions requested by plugin events without replacing the active agent session", async () => {
+    const detachedConversation = {
+      state: {
+        conversation: {
+          transport: "plugin",
+          externalId: "imp-phone-call-1",
+          endpointId: "phone-ingress",
+          sessionId: "imp-phone-call-1",
+        },
+        agentId: "default",
+        kind: "phone-call",
+        createdAt: "2026-04-07T12:00:00.000Z",
+        updatedAt: "2026-04-07T12:00:00.000Z",
+        version: 1,
+      },
+      messages: [],
+    };
+    const conversationStore = {
+      get: vi.fn(async (ref: { sessionId?: string }) =>
+        ref.sessionId === "imp-phone-call-1" ? detachedConversation : undefined,
+      ),
+      put: vi.fn(async () => undefined),
+      create: vi.fn(async () => {
+        throw new Error("unexpected create fallback");
+      }),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      getSelectedAgent: vi.fn(async () => undefined),
+      ensureActive: vi.fn(async () => {
+        throw new Error("unexpected ensureActive fallback");
+      }),
+      ensureActiveForAgent: vi.fn(async () => {
+        throw new Error("unexpected ensureActiveForAgent fallback");
+      }),
+      ensureDetachedForAgent: vi.fn(async () => detachedConversation),
+    };
+    const engine = {
+      run: vi.fn(async ({ message }: { message: IncomingMessage }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "phone reply",
+        },
+        conversationEvents: [],
+      })),
+      close: vi.fn(async () => undefined),
+    };
+    const runtime = createRuntime({
+      endpointConfig: {
+        id: "phone-ingress",
+        type: "plugin",
+        pluginId: "imp-phone",
+        defaultAgentId: "default",
+        ingress: {
+          pollIntervalMs: 250,
+          maxEventBytes: 65536,
+        },
+        response: {
+          type: "outbox",
+          replyChannel: {
+            kind: "phone",
+          },
+        },
+        paths: {
+          dataRoot: "/tmp",
+          conversationsDir: "/tmp/conversations",
+          logsDir: "/tmp/logs/endpoints",
+          logFilePath: "/tmp/logs/endpoints/phone-ingress.log",
+          runtimeDir: "/tmp/runtime/endpoints",
+          runtimeStatePath: "/tmp/runtime/endpoints/phone-ingress.json",
+          plugin: {
+            rootDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress",
+            inboxDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/inbox",
+            processingDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/processing",
+            processedDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/processed",
+            failedDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/failed",
+            outboxDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/outbox",
+          },
+        },
+      },
+      conversationStore,
+      engine,
+    });
+    const transport = createCapturingTransport();
+    const event = createEvent({
+      endpointId: "phone-ingress",
+      conversation: {
+        transport: "plugin",
+        externalId: "imp-phone-call-1",
+        sessionId: "imp-phone-call-1",
+      },
+      messageId: "turn-1",
+      correlationId: "corr-turn-1",
+      userId: "imp-phone",
+      text: "Hallo",
+      receivedAt: "2026-04-07T12:00:00.000Z",
+      source: {
+        kind: "plugin-event",
+        plugin: {
+          pluginId: "imp-phone",
+          eventId: "turn-1",
+          fileName: "turn-1.json",
+          metadata: {
+            session: {
+              mode: "detached",
+              id: "imp-phone-call-1",
+              kind: "phone-call",
+              title: "Phone call: Thomas",
+              metadata: {
+                contact_id: "thomas",
+              },
+            },
+          },
+        },
+      },
+    });
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([createTestAgent("default")]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+    await transport.handler.handle(event);
+
+    expect(conversationStore.ensureDetachedForAgent).toHaveBeenCalledWith(
+      {
+        transport: "plugin",
+        externalId: "imp-phone-call-1",
+        sessionId: "imp-phone-call-1",
+        endpointId: "phone-ingress",
+      },
+      {
+        agentId: "default",
+        now: "2026-04-07T12:00:00.000Z",
+        kind: "phone-call",
+        title: "Phone call: Thomas",
+        metadata: {
+          contact_id: "thomas",
+        },
+      },
+    );
+    expect(conversationStore.ensureActiveForAgent).not.toHaveBeenCalled();
+    expect(engine.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation: detachedConversation,
+        message: expect.objectContaining({
+          conversation: expect.objectContaining({
+            sessionId: "imp-phone-call-1",
+            agentId: "default",
+          }),
+        }),
+      }),
+    );
+  });
+
   it("uses the endpoint default agent when another endpoint selected an agent for the same local chat id", async () => {
     const conversationStore = {
       get: vi.fn(async () => undefined),
       put: vi.fn(async () => undefined),
-      listBackups: vi.fn(async () => []),
-      restore: vi.fn(async () => false),
       create: vi.fn(async () => {
         throw new Error("unexpected create fallback");
       }),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
       ensureActive: vi.fn(async () => {
         throw new Error("unexpected ensureActive fallback");
       }),

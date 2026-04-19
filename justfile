@@ -40,10 +40,13 @@ init *args: build
 install: clean build
   npm install -g .
   npm install -g ./plugins/imp-voice
-  just _install-managed-voice-plugin "{{justfile_directory()}}/plugins/imp-voice"
+  npm install -g ./plugins/imp-phone
+  just _install-managed-plugin "{{justfile_directory()}}/plugins/imp-voice"
+  just _install-managed-plugin "{{justfile_directory()}}/plugins/imp-phone"
   if command -v systemctl >/dev/null && systemctl --user list-unit-files imp-voice-in.service >/dev/null 2>&1; then systemctl --user restart imp-voice-in.service imp-voice-out.service; fi
+  if command -v systemctl >/dev/null && systemctl --user list-unit-files imp-phone-controller.service >/dev/null 2>&1; then systemctl --user restart imp-phone-controller.service; fi
 
-_install-managed-voice-plugin plugin_root:
+_install-managed-plugin plugin_root:
   #!/usr/bin/env bash
   set -euo pipefail
 

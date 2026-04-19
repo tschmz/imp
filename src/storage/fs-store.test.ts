@@ -692,6 +692,54 @@ describe("createFsConversationStore", () => {
     await expect(store.get(pluginChat)).resolves.toEqual(telegramSession);
   });
 
+  it("creates detached agent sessions without replacing the active agent session", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const chat = createChatRef();
+
+    const activeSession = await store.ensureActiveForAgent!(chat, {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const detachedRef = {
+      transport: "plugin",
+      externalId: "imp-phone-call-1",
+      sessionId: "imp-phone-call-1",
+      endpointId: "phone-ingress",
+    };
+    const detachedSession = await store.ensureDetachedForAgent!(detachedRef, {
+      agentId: "default",
+      now: "2026-04-05T00:01:00.000Z",
+      kind: "phone-call",
+      title: "Phone call: Thomas",
+      metadata: {
+        contact_id: "thomas",
+      },
+    });
+    const secondRead = await store.ensureDetachedForAgent!(detachedRef, {
+      agentId: "default",
+      now: "2026-04-05T00:02:00.000Z",
+      kind: "phone-call",
+    });
+
+    expect(detachedSession.state).toMatchObject({
+      agentId: "default",
+      kind: "phone-call",
+      title: "Phone call: Thomas",
+      metadata: {
+        contact_id: "thomas",
+      },
+      conversation: {
+        transport: "plugin",
+        externalId: "imp-phone-call-1",
+        sessionId: "imp-phone-call-1",
+      },
+    });
+    expect(secondRead.state.conversation.sessionId).toBe(detachedSession.state.conversation.sessionId);
+    await expect(store.getActiveForAgent!("default")).resolves.toEqual(activeSession);
+    await expect(store.get(detachedRef)).resolves.toEqual(detachedSession);
+  });
+
   it("tracks selected agents per chat without mutating existing sessions", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));

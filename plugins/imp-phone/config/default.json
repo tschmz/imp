@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "pluginId": "imp-phone",
+  "endpointId": "phone-ingress",
+  "runtimeDir": "./runtime/plugins/imp-phone/endpoints/phone-ingress",
+  "requestsDir": "./runtime/plugins/imp-phone/requests",
+  "recordingsDir": "./runtime/plugins/imp-phone/recordings",
+  "conversationIdPrefix": "imp-phone",
+  "userId": "imp-phone",
+  "pollIntervalMs": 250,
+  "call": {
+    "command": "baresip",
+    "args": [],
+    "dialCommand": "/dial {uri}",
+    "registerTimeoutMs": 10000,
+    "answerTimeoutMs": 60000,
+    "maxTurns": 8
+  },
+  "capture": {
+    "command": "arecord",
+    "args": ["-q", "-D", "imp_phone_remote_capture", "-f", "S16_LE", "-r", "16000", "-c", "1", "-t", "raw"],
+    "sampleRate": 16000,
+    "channels": 1,
+    "chunkMs": 80,
+    "startThresholdRms": 900,
+    "stopThresholdRms": 900,
+    "silenceMs": 1200,
+    "preRollMs": 600,
+    "minSeconds": 1.0,
+    "maxSeconds": 20.0,
+    "noSpeechTimeoutSeconds": 30.0
+  },
+  "transcription": {
+    "provider": "openai",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "model": "gpt-4o-mini-transcribe",
+    "prompt": "Transcribe the phone caller exactly and concisely. Return only the spoken text, without comments."
+  },
+  "tts": {
+    "provider": "openai",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "fallbackModel": "gpt-4o-mini-tts",
+    "fallbackVoice": "nova",
+    "fallbackInstructions": "",
+    "fallbackFormat": "wav"
+  },
+  "playback": {
+    "command": "aplay",
+    "args": ["-q", "-D", "imp_phone_agent_playback", "{path}"]
+  },
+  "conversation": {
+    "closePhrases": ["goodbye", "bye"],
+    "responseTimeoutSeconds": 600.0,
+    "holdMessageAfterSeconds": 8.0,
+    "holdMessageIntervalSeconds": 20.0,
+    "holdMessageText": "Einen Moment bitte."
+  },
+  "feedbackTones": {
+    "enabled": true,
+    "sampleRate": 16000,
+    "quietAfterMs": 120
+  },
+  "statusFile": "phone-status.json"
+}

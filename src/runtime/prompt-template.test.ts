@@ -44,6 +44,44 @@ describe("createPromptTemplateContext", () => {
 
     expect(rendered).toBe("audio outbox spoken");
   });
+
+  it("renders conversation kind and metadata in prompt templates", () => {
+    const context = createPromptTemplateContext({
+      system: createSystemContext(),
+      agent: createAgent(),
+      endpointId: "phone-ingress",
+      transportKind: "plugin",
+      conversation: {
+        state: {
+          conversation: {
+            transport: "plugin",
+            externalId: "imp-phone-call-1",
+            sessionId: "imp-phone-call-1",
+          },
+          agentId: "default",
+          kind: "phone-call",
+          metadata: {
+            contact_name: "Thomas",
+            contact_uri: "+10000000000",
+          },
+          createdAt: "2026-04-19T12:00:00.000Z",
+          updatedAt: "2026-04-19T12:00:00.000Z",
+          version: 1,
+        },
+        messages: [],
+      },
+    });
+
+    const rendered = renderPromptTemplate(
+      '{{conversation.kind}} {{conversation.metadata.contact_name}} {{conversation.metadata.contact_uri}}',
+      {
+        filePath: "/workspace/SYSTEM.md",
+        context,
+      },
+    );
+
+    expect(rendered).toBe("phone-call Thomas +10000000000");
+  });
 });
 
 function createSystemContext(): PromptTemplateSystemContext {

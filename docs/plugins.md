@@ -307,6 +307,10 @@ Prompt files receive explicit reply-channel context:
 
 Put channel-specific behavior, such as Telegram formatting or audio-friendly wording, in prompt files by checking `reply.channel.kind`. Do not rely on hidden daemon code to add channel instructions.
 
+Plugin events may request detached sessions. Detached session `kind` and `metadata` are exposed to prompt templates as `conversation.kind` and `conversation.metadata`. This lets a plugin add prompt-visible call or device context without mixing the session with the initiating chat.
+
+For example, imp-phone writes `conversation.kind = "phone-call"` and exposes `contact_id`, `contact_name`, and `contact_uri` through `conversation.metadata`.
+
 Outbox files include:
 
 - `schemaVersion`

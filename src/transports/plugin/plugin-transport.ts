@@ -17,6 +17,15 @@ const pluginEventSchema = z.object({
   id: z.string().min(1).optional(),
   correlationId: z.string().min(1).optional(),
   conversationId: z.string().min(1).optional(),
+  session: z
+    .object({
+      mode: z.literal("detached"),
+      id: z.string().min(1),
+      kind: z.string().min(1).optional(),
+      title: z.string().min(1).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
   userId: z.string().min(1).optional(),
   text: z.string().min(1),
   receivedAt: z.string().datetime().optional(),
@@ -253,6 +262,7 @@ function createPluginInboundEvent(
     conversation: {
       transport: "plugin",
       externalId: conversationId,
+      ...(event.session ? { sessionId: event.session.id } : {}),
     },
     messageId: eventId,
     correlationId,
@@ -265,7 +275,18 @@ function createPluginInboundEvent(
         pluginId: config.pluginId,
         eventId,
         fileName: basename(eventFile.originalPath),
-        ...(event.metadata ? { metadata: event.metadata } : {}),
+        ...((event.metadata || event.session)
+          ? {
+              metadata: {
+                ...(event.metadata ?? {}),
+                ...(event.session
+                  ? {
+                      session: event.session,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       },
     },
   };

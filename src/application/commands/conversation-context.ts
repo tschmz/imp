@@ -12,7 +12,12 @@ export async function getOrCreateConversationContext(
   const selectedAgentId =
     await conversationStore.getSelectedAgent?.(message.conversation) ??
     defaultAgentId;
+  const explicitSession =
+    message.conversation.sessionId
+      ? await conversationStore.get(message.conversation)
+      : undefined;
   const existing =
+    explicitSession ??
     await conversationStore.getActiveForAgent?.(selectedAgentId) ??
     await conversationStore.get(message.conversation);
   if (existing) {

@@ -189,6 +189,9 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
       await writeSelectedAgentId(paths.conversationsDir, ref, options.agentId);
       return ensureActiveAgentSession(paths.conversationsDir, ref, options);
     },
+    async ensureDetachedForAgent(ref, options) {
+      return ensureDetachedAgentSession(paths.conversationsDir, ref, options);
+    },
   };
 }
 
@@ -422,18 +425,27 @@ async function restoreAgentSession(
 
 function createEmptyConversationContext(
   ref: ChatRef,
-  options: { agentId: string; now: string; title?: string },
+  options: {
+    agentId: string;
+    now: string;
+    title?: string;
+    sessionId?: string;
+    kind?: string;
+    metadata?: Record<string, unknown>;
+  },
 ): ConversationContext {
   const conversation: ConversationRef = {
     transport: ref.transport,
     externalId: ref.externalId,
-    sessionId: randomUUID(),
+    sessionId: options.sessionId ?? randomUUID(),
   };
 
   return {
     state: {
       conversation,
       agentId: options.agentId,
+      ...(typeof options.kind === "string" ? { kind: options.kind } : {}),
+      ...(options.metadata ? { metadata: options.metadata } : {}),
       ...(typeof options.title === "string" ? { title: options.title } : {}),
       createdAt: options.now,
       updatedAt: options.now,
@@ -441,6 +453,35 @@ function createEmptyConversationContext(
     },
     messages: [],
   };
+}
+
+async function ensureDetachedAgentSession(
+  conversationsDir: string,
+  ref: ConversationRef,
+  options: {
+    agentId: string;
+    now: string;
+    title?: string;
+    kind?: string;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<ConversationContext> {
+  const sessionId = requireSessionId(ref);
+  return withAgentWriteQueue(options.agentId, async () =>
+    withAgentLock(conversationsDir, options.agentId, async () => {
+      const existing = await readSession(options.agentId, ref, conversationsDir);
+      if (existing) {
+        return existing;
+      }
+
+      const created = createEmptyConversationContext(ref, {
+        ...options,
+        sessionId,
+      });
+      await writeConversationLog(conversationsDir, created);
+      return created;
+    }),
+  );
 }
 
 async function writeConversationLog(
@@ -740,6 +781,8 @@ function toConversationState(meta: StoredConversationMeta): ConversationState {
   return {
     conversation: meta.conversation,
     agentId: meta.agentId,
+    ...(meta.kind ? { kind: meta.kind } : {}),
+    ...(meta.metadata ? { metadata: meta.metadata } : {}),
     ...(meta.title ? { title: meta.title } : {}),
     ...(meta.workingDirectory ? { workingDirectory: meta.workingDirectory } : {}),
     ...(meta.run ? { run: meta.run } : {}),

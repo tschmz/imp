@@ -45,6 +45,15 @@ describe("createPluginTransport", () => {
         schemaVersion: 1,
         id: "wake-1",
         conversationId: "kitchen",
+        session: {
+          mode: "detached",
+          id: "phone-call-1",
+          kind: "phone-call",
+          title: "Phone call: Kitchen",
+          metadata: {
+            contact_id: "kitchen",
+          },
+        },
         userId: "frontend",
         text: "turn on the lights",
         metadata: {
@@ -61,6 +70,7 @@ describe("createPluginTransport", () => {
           conversation: {
             transport: "plugin",
             externalId: "kitchen",
+            sessionId: "phone-call-1",
           },
           messageId: "wake-1",
           userId: "frontend",
@@ -73,6 +83,15 @@ describe("createPluginTransport", () => {
               fileName: "wake.json",
               metadata: {
                 confidence: 0.94,
+                session: {
+                  mode: "detached",
+                  id: "phone-call-1",
+                  kind: "phone-call",
+                  title: "Phone call: Kitchen",
+                  metadata: {
+                    contact_id: "kitchen",
+                  },
+                },
               },
             },
           },

@@ -1,0 +1,27 @@
+{
+  "name": "@tschmz/imp-phone",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Turn-based SIP phone conversation frontend for imp",
+  "files": [
+    "plugin.json",
+    "README.md",
+    "bin",
+    "lib",
+    "config"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "imp-phone-controller": "bin/controller.mjs",
+    "imp-phone-request-call": "bin/request-call.mjs"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "test": "vitest run test/*.test.mjs"
+  }
+}

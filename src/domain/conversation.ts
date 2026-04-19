@@ -12,10 +12,10 @@ export interface ChatRef {
   transport: string;
   externalId: string;
   endpointId?: string;
+  sessionId?: string;
 }
 
 export interface ConversationRef extends ChatRef {
-  sessionId?: string;
   agentId?: string;
 }
 
@@ -84,6 +84,8 @@ export interface ConversationDocumentAttachment {
 export interface ConversationState {
   conversation: ConversationRef;
   agentId: string;
+  kind?: string;
+  metadata?: Record<string, unknown>;
   title?: string;
   workingDirectory?: string;
   run?: ConversationRunState;

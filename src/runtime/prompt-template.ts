@@ -1,6 +1,7 @@
 import { arch, homedir, hostname, platform, type, userInfo } from "node:os";
 import Handlebars from "handlebars";
 import type { AgentDefinition } from "../domain/agent.js";
+import type { ConversationContext } from "../domain/conversation.js";
 import type { SkillDefinition } from "../skills/types.js";
 import type { ReplyChannelContext } from "./context.js";
 
@@ -32,6 +33,10 @@ export interface PromptTemplateContext {
   };
   transport: {
     kind: string;
+  };
+  conversation: {
+    kind: string;
+    metadata: Record<string, unknown>;
   };
   reply: {
     channel: ReplyChannelContext;
@@ -66,6 +71,7 @@ export function createPromptTemplateContext(options: {
   agent: AgentDefinition;
   endpointId: string;
   transportKind: string;
+  conversation?: ConversationContext;
   replyChannel?: ReplyChannelContext;
   configPath?: string;
   dataRoot?: string;
@@ -96,6 +102,10 @@ export function createPromptTemplateContext(options: {
     },
     transport: {
       kind: options.transportKind,
+    },
+    conversation: {
+      kind: options.conversation?.state.kind ?? "",
+      metadata: options.conversation?.state.metadata ?? {},
     },
     reply: {
       channel: {

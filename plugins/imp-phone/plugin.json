@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "imp-phone",
+  "name": "imp Phone",
+  "version": "0.1.0",
+  "description": "Turn-based SIP phone conversation frontend for imp.",
+  "capabilities": ["endpoint", "service", "audio", "voice", "speech-output"],
+  "endpoints": [
+    {
+      "id": "phone-ingress",
+      "description": "Receives transcribed phone turns and returns spoken replies through the plugin outbox.",
+      "ingress": {
+        "pollIntervalMs": 250,
+        "maxEventBytes": 65536
+      },
+      "response": {
+        "type": "outbox",
+        "replyChannel": {
+          "kind": "phone"
+        },
+        "speech": {
+          "enabled": true,
+          "language": "de",
+          "model": "gpt-4o-mini-tts",
+          "voice": "nova"
+        }
+      }
+    }
+  ],
+  "services": [
+    {
+      "id": "controller",
+      "description": "Consumes phone call requests and bridges turn-based call audio to imp.",
+      "autoStart": true,
+      "command": "node",
+      "cwd": ".",
+      "args": ["bin/controller.mjs", "--config", "config/default.json"],
+      "env": {
+        "IMP_PHONE_RUNTIME_DIR": "{{endpoint.phone-ingress.runtimeDir}}",
+        "IMP_PHONE_REQUESTS_DIR": "{{paths.dataRoot}}/runtime/plugins/{{plugin.id}}/requests",
+        "IMP_PHONE_RECORDINGS_DIR": "{{paths.dataRoot}}/runtime/plugins/{{plugin.id}}/recordings",
+        "OPENAI_API_KEY": "required"
+      }
+    }
+  ],
+  "init": {
+    "configTemplate": "config/default.json",
+    "postInstallMessage": "Configure agents[].tools.phone with allowlisted contacts and the installed bin/request-call.mjs path."
+  }
+}

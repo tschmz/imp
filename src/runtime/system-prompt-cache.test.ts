@@ -112,6 +112,10 @@ function createTemplateContext(): PromptTemplateContext {
     transport: {
       kind: "telegram",
     },
+    conversation: {
+      kind: "",
+      metadata: {},
+    },
     reply: {
       channel: {
         kind: "telegram",
