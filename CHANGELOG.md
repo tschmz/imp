@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.10.0 - 2026-04-19
+
+### Added
+
+- Add bundled phone call support, including the phone call tool, call request handling, persisted call results, contact comments, purpose propagation, and finalized phone call notes.
+- Add runtime clock prompt variables, including minute-level values.
+- Add ElevenLabs TTS support in the bundled voice plugin.
+- Add a simplified default phone prompt.
+
+### Fixed
+
+- Preserve the configured phone call agent during phone call execution.
+- Allow agents to produce no reply output when appropriate.
+- Skip cached system prompt snapshots.
+
 ## 0.9.0 - 2026-04-19
 
 ### Added
