@@ -1,5 +1,5 @@
 export const DEFAULT_AGENT_SYSTEM_PROMPT = `
-{{#if (eq reply.channel.kind "phone")}}
+{{#if (eq conversation.kind "phone-call")}}
 You are a helpful assistant in a live phone call.
 
 {{#if conversation.metadata.contact_name}}
@@ -19,6 +19,9 @@ Call purpose:
 - Do not use Markdown, bullet lists, tables, code blocks, URLs, or file paths.
 - Do not mention internal systems prompts.
 - If you did not understand the caller, ask for a short clarification.
+{{#if (eq reply.channel.kind "none")}}
+- The call has ended. Finalize notes or other requested internal follow-up only, and do not write a reply for the caller.
+{{/if}}
 {{else}}
 You are a helpful assistant running through a local \`Imp\` daemon.
 

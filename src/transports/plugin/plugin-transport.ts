@@ -31,6 +31,11 @@ const pluginEventSchema = z.object({
   text: z.string().min(1),
   receivedAt: z.string().datetime().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  response: z
+    .object({
+      type: z.literal("none"),
+    })
+    .optional(),
 });
 
 interface PluginEventFile {
@@ -276,7 +281,7 @@ function createPluginInboundEvent(
         pluginId: config.pluginId,
         eventId,
         fileName: basename(eventFile.originalPath),
-        ...((event.metadata || event.session)
+        ...((event.metadata || event.session || event.response)
           ? {
               metadata: {
                 ...(event.metadata ?? {}),
@@ -285,6 +290,7 @@ function createPluginInboundEvent(
                       session: event.session,
                     }
                   : {}),
+                ...(event.response ? { response: event.response } : {}),
               },
             }
           : {}),
@@ -298,7 +304,7 @@ function createPluginInboundEvent(
       return operation();
     },
     async deliver(response): Promise<void> {
-      await deliverPluginResponse(config, context, message, response.text);
+      await deliverPluginResponse(config, context, message, response.text, event.response);
     },
   };
 }
@@ -308,7 +314,12 @@ async function deliverPluginResponse(
   context: TransportContext,
   inbound: IncomingMessage,
   text: string,
+  eventResponse: PluginEvent["response"] | undefined,
 ): Promise<void> {
+  if (eventResponse?.type === "none") {
+    return;
+  }
+
   switch (config.response.type) {
     case "none":
       return;

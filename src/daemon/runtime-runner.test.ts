@@ -961,6 +961,88 @@ describe("createRuntimeEntries", () => {
       }),
     );
   });
+
+  it("lets plugin event response overrides set none reply channel context", async () => {
+    const runtime = createRuntime({
+      endpointConfig: {
+        id: "phone-ingress",
+        type: "plugin",
+        pluginId: "imp-phone",
+        ingress: {
+          pollIntervalMs: 250,
+          maxEventBytes: 65536,
+        },
+        response: {
+          type: "outbox",
+          replyChannel: {
+            kind: "phone",
+          },
+        },
+        defaultAgentId: "default",
+        paths: {
+          dataRoot: "/tmp",
+          conversationsDir: "/tmp/endpoints/phone-ingress/conversations",
+          logsDir: "/tmp/logs/endpoints",
+          logFilePath: "/tmp/logs/endpoints/phone-ingress.log",
+          runtimeDir: "/tmp/runtime/endpoints",
+          runtimeStatePath: "/tmp/runtime/endpoints/phone-ingress.json",
+          plugin: {
+            rootDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress",
+            inboxDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/inbox",
+            processingDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/processing",
+            processedDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/processed",
+            failedDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/failed",
+            outboxDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/outbox",
+          },
+        },
+      },
+    });
+    const transport = createCapturingTransport();
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([createTestAgent("default")]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+    await transport.handler.handle(
+      createEvent({
+        endpointId: "phone-ingress",
+        conversation: {
+          transport: "plugin",
+          externalId: "imp-phone-call-1",
+        },
+        messageId: "closed-1",
+        correlationId: "corr-closed-1",
+        userId: "imp-phone",
+        text: "finalize notes",
+        receivedAt: "2026-04-07T12:00:00.000Z",
+        source: {
+          kind: "plugin-event",
+          plugin: {
+            pluginId: "imp-phone",
+            eventId: "closed-1",
+            fileName: "closed.json",
+            metadata: {
+              response: {
+                type: "none",
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    expect(runtime.engine.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          replyChannel: {
+            kind: "none",
+            delivery: "none",
+          },
+        }),
+      }),
+    );
+  });
 });
 
 function createCapturingTransport(): {

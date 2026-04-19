@@ -34,6 +34,7 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
 
   let result;
   try {
+    const replyChannel = resolveMessageReplyChannel(context);
     result = await context.dependencies.engine.run({
       agent: context.agent,
       conversation: conversationBeforeRun,
@@ -57,9 +58,7 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
       runtime: {
         configPath: context.dependencies.runtimeInfo.configPath,
         dataRoot: context.dependencies.runtimeInfo.dataRoot,
-        ...(context.dependencies.runtimeInfo.replyChannel
-          ? { replyChannel: context.dependencies.runtimeInfo.replyChannel }
-          : {}),
+        ...(replyChannel ? { replyChannel } : {}),
         ...(context.availableSkills.length > 0 ? { availableSkills: context.availableSkills } : {}),
       },
     });
@@ -99,6 +98,22 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
       ...result.conversationEvents,
     ],
   };
+}
+
+function resolveMessageReplyChannel(context: InboundProcessingContext) {
+  const response = context.message.source?.plugin?.metadata?.response;
+  if (isResponseNoneOverride(response)) {
+    return {
+      kind: "none",
+      delivery: "none" as const,
+    };
+  }
+
+  return context.dependencies.runtimeInfo.replyChannel;
+}
+
+function isResponseNoneOverride(value: unknown): value is { type: "none" } {
+  return typeof value === "object" && value !== null && "type" in value && value.type === "none";
 }
 
 function toUserConversationMessage(message: InboundProcessingContext["message"]) {

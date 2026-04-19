@@ -541,6 +541,43 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).not.toContain("{{conversation.metadata.contact_name}}");
   });
 
+  it("renders phone note-finalization guidance for closed phone calls", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        prompt: {
+          base: { builtIn: "default" },
+        },
+      },
+      undefined,
+      {
+        ...createTemplateContext(),
+        conversation: {
+          kind: "phone-call",
+          metadata: {
+            contact_name: "Thomas",
+          },
+        },
+        reply: {
+          channel: {
+            kind: "none",
+            delivery: "none",
+            endpointId: "",
+          },
+        },
+      },
+      [],
+      async (path) => {
+        throw new Error(`unexpected path: ${path}`);
+      },
+    );
+
+    expect(prompt).toContain("You are a helpful assistant in a live phone call.");
+    expect(prompt).toContain("The call has ended. Finalize notes");
+    expect(prompt).toContain("do not write a reply for the caller");
+    expect(prompt).not.toContain("Runtime Context");
+  });
+
   it("renders neutral guidance for none reply channels in the built-in default prompt", async () => {
     const prompt = await buildSystemPrompt(
       {

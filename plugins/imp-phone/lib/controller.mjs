@@ -15,6 +15,7 @@ export class PhoneController {
     this.log = options.log ?? ((message) => console.log(message));
     this.stopped = false;
     this.lastCall = undefined;
+    this.activeCall = undefined;
   }
 
   async run() {
@@ -102,6 +103,15 @@ export class PhoneController {
     const requestId = typeof request.id === "string" && request.id.length > 0 ? request.id : randomUUID();
     const conversationId = `${this.config.conversationIdPrefix}-${sanitizeFileName(requestId)}`;
     const callProcess = this.startCall(contact);
+    this.activeCall = {
+      requestId,
+      conversationId,
+      requestedAgentId,
+      purpose,
+      contact,
+      answered: false,
+      finalEventWritten: false,
+    };
     this.lastCall = {
       requestId,
       conversationId,
@@ -142,6 +152,7 @@ export class PhoneController {
       }
 
       await this.writeRuntimeStatus("answered", false);
+      this.activeCall.answered = true;
 
       for (let turn = 1; turn <= this.config.call.maxTurns && !this.stopped; turn += 1) {
         const turnFailure = await callProcess.waitForFailure(0);
@@ -235,6 +246,7 @@ export class PhoneController {
       }
     } finally {
       callProcess.kill();
+      this.activeCall = undefined;
       await this.writeStatus("active");
     }
   }
@@ -288,29 +300,13 @@ export class PhoneController {
         ...(input.requestedAgentId ? { agentId: input.requestedAgentId } : {}),
         kind: "phone-call",
         title: `Phone call: ${input.contact.name}`,
-        metadata: {
-          source: "imp-phone",
-          ...(input.requestedAgentId ? { agent_id: input.requestedAgentId } : {}),
-          request_id: input.requestId,
-          ...(input.purpose ? { phone_call_purpose: input.purpose } : {}),
-          contact_id: input.contact.id,
-          contact_name: input.contact.name,
-          contact_uri: input.contact.uri,
-          ...(input.contact.comment ? { contact_comment: input.contact.comment } : {}),
-        },
+        metadata: createPhoneCallMetadata(input),
       },
       userId: this.config.userId,
       text: input.transcript,
       receivedAt: new Date().toISOString(),
       metadata: {
-        source: "imp-phone",
-        ...(input.requestedAgentId ? { agent_id: input.requestedAgentId } : {}),
-        request_id: input.requestId,
-        ...(input.purpose ? { phone_call_purpose: input.purpose } : {}),
-        contact_id: input.contact.id,
-        contact_name: input.contact.name,
-        contact_uri: input.contact.uri,
-        ...(input.contact.comment ? { contact_comment: input.contact.comment } : {}),
+        ...createPhoneCallMetadata(input),
         turn: input.turn,
         recording_file: input.recording.path,
         duration_seconds: input.recording.durationSeconds,
@@ -485,6 +481,65 @@ export class PhoneController {
       reason,
       ...fields,
     });
+    await this.writeFinalIngressEvent(reason, fields);
+  }
+
+  async writeFinalIngressEvent(reason, fields = {}) {
+    const activeCall = this.activeCall;
+    if (!activeCall?.answered || activeCall.finalEventWritten) {
+      return;
+    }
+    activeCall.finalEventWritten = true;
+
+    const eventId = `${sanitizeFileName(activeCall.requestId)}-closed`;
+    const correlationId = randomUUID();
+    const eventPath = join(this.config.inboxDir, `${eventId}-${process.hrtime.bigint().toString()}.json`);
+    const closedAt = new Date().toISOString();
+    const payload = {
+      schemaVersion: 1,
+      id: eventId,
+      correlationId,
+      conversationId: activeCall.conversationId,
+      response: {
+        type: "none",
+      },
+      session: {
+        mode: "detached",
+        id: activeCall.conversationId,
+        ...(activeCall.requestedAgentId ? { agentId: activeCall.requestedAgentId } : {}),
+        kind: "phone-call",
+        title: `Phone call: ${activeCall.contact.name}`,
+        metadata: createPhoneCallMetadata({
+          requestId: activeCall.requestId,
+          requestedAgentId: activeCall.requestedAgentId,
+          purpose: activeCall.purpose,
+          contact: activeCall.contact,
+          eventType: "call_closed",
+          closedReason: reason,
+          closedAt,
+        }),
+      },
+      userId: this.config.userId,
+      text: [
+        "The phone call has ended.",
+        "Finalize the contact notes now if needed.",
+        "Do not write a reply for the caller.",
+      ].join(" "),
+      receivedAt: closedAt,
+      metadata: {
+        ...createPhoneCallMetadata({
+          requestId: activeCall.requestId,
+          requestedAgentId: activeCall.requestedAgentId,
+          purpose: activeCall.purpose,
+          contact: activeCall.contact,
+          eventType: "call_closed",
+          closedReason: reason,
+          closedAt,
+        }),
+        ...fields,
+      },
+    };
+    await writeJsonAtomic(eventPath, payload);
   }
 
   async writeRuntimeStatus(phase, canSpeak, fields = {}) {
@@ -562,6 +617,22 @@ export function parsePurpose(request) {
     throw new Error("Call request purpose must be a string when provided.");
   }
   return request.purpose;
+}
+
+function createPhoneCallMetadata(input) {
+  return {
+    source: "imp-phone",
+    ...(input.requestedAgentId ? { agent_id: input.requestedAgentId } : {}),
+    request_id: input.requestId,
+    ...(input.purpose ? { phone_call_purpose: input.purpose } : {}),
+    contact_id: input.contact.id,
+    contact_name: input.contact.name,
+    contact_uri: input.contact.uri,
+    ...(input.contact.comment ? { contact_comment: input.contact.comment } : {}),
+    ...(input.eventType ? { phone_call_event: input.eventType } : {}),
+    ...(input.closedReason ? { closed_reason: input.closedReason } : {}),
+    ...(input.closedAt ? { closed_at: input.closedAt } : {}),
+  };
 }
 
 export function parseCallFailureReason(text) {

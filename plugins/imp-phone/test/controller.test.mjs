@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
+  PhoneController,
   isCallReadyOutput,
   parseCallFailureReason,
   parseCallProgress,
@@ -7,6 +11,12 @@ import {
   parsePurpose,
   parseRequestedAgentId,
 } from "../lib/controller.mjs";
+
+const tempDirs = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
 
 describe("imp-phone controller", () => {
   it("parses call request contacts", () => {
@@ -45,6 +55,69 @@ describe("imp-phone controller", () => {
     expect(parsePurpose({ purpose: "Ask about the appointment." })).toBe("Ask about the appointment.");
     expect(parsePurpose({})).toBeUndefined();
     expect(() => parsePurpose({ purpose: 42 })).toThrow("Call request purpose must be a string when provided.");
+  });
+
+  it("writes a final no-response ingress event when an answered call closes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
+    tempDirs.push(root);
+    const controller = new PhoneController({
+      inboxDir: join(root, "inbox"),
+      outboxDir: join(root, "outbox"),
+      requestsDir: join(root, "requests"),
+      requestProcessingDir: join(root, "request-processing"),
+      requestProcessedDir: join(root, "request-processed"),
+      requestFailedDir: join(root, "request-failed"),
+      recordingsDir: join(root, "recordings"),
+      statusFile: join(root, "status.json"),
+      userId: "imp-phone",
+    });
+    await controller.ensureDirs();
+    controller.activeCall = {
+      requestId: "call-1",
+      conversationId: "imp-phone-call-1",
+      requestedAgentId: "imp.telebot",
+      purpose: "Ask about the appointment.",
+      contact: {
+        id: "thomas",
+        name: "Thomas",
+        uri: "+10000000000",
+        comment: "work colleague",
+      },
+      answered: true,
+      finalEventWritten: false,
+    };
+
+    await controller.closeCall("close-phrase", { transcript: "Gespräch beendet" });
+
+    const [fileName] = await readdir(join(root, "inbox"));
+    const payload = JSON.parse(await readFile(join(root, "inbox", fileName), "utf8"));
+    expect(payload).toMatchObject({
+      id: "call-1-closed",
+      conversationId: "imp-phone-call-1",
+      response: {
+        type: "none",
+      },
+      session: {
+        mode: "detached",
+        id: "imp-phone-call-1",
+        agentId: "imp.telebot",
+        kind: "phone-call",
+        metadata: {
+          phone_call_event: "call_closed",
+          closed_reason: "close-phrase",
+          phone_call_purpose: "Ask about the appointment.",
+          contact_id: "thomas",
+          contact_name: "Thomas",
+          contact_comment: "work colleague",
+        },
+      },
+      metadata: {
+        phone_call_event: "call_closed",
+        closed_reason: "close-phrase",
+        transcript: "Gespräch beendet",
+      },
+    });
+    expect(payload.text).toContain("Finalize the contact notes now");
   });
 
   it("extracts SIP call failure reasons from call output", () => {

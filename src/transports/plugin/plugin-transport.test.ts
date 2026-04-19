@@ -193,6 +193,54 @@ describe("createPluginTransport", () => {
     await start;
   });
 
+  it("allows plugin events to suppress response delivery", async () => {
+    const root = await createTempDir();
+    const config = createPluginRuntimeConfig(root, {
+      response: {
+        type: "outbox",
+        replyChannel: {
+          kind: "phone",
+        },
+      },
+    });
+    const transport = createPluginTransport(config, createMockLogger(), {
+      deliveryRouter: createDeliveryRouter(),
+    });
+    await ensurePluginDirs(config);
+
+    await writeFile(
+      join(config.paths.plugin!.inboxDir, "closed.json"),
+      `${JSON.stringify({
+        id: "closed-1",
+        text: "finalize notes",
+        response: {
+          type: "none",
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const start = transport.start({
+      handle: vi.fn(async (event) => {
+        expect(event.message.source?.plugin?.metadata).toMatchObject({
+          response: {
+            type: "none",
+          },
+        });
+        await event.deliver({
+          conversation: event.message.conversation,
+          text: "notes updated",
+        });
+      }),
+    });
+
+    await waitForDirectoryEntry(config.paths.plugin!.processedDir, ".json");
+    expect(await readdir(config.paths.plugin!.outboxDir)).toEqual([]);
+
+    await transport.stop?.();
+    await start;
+  });
+
   it("records invalid plugin event files in the failed directory", async () => {
     const root = await createTempDir();
     const config = createPluginRuntimeConfig(root, {

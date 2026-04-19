@@ -65,6 +65,8 @@ The controller watches `requestsDir` for request files. The `phone_call` tool ca
 The tool automatically passes the calling agent id through `IMP_PHONE_AGENT_ID`, so phone call sessions stay attached to the agent that initiated the call. Optional contact comments are passed through `IMP_PHONE_CONTACT_COMMENT`.
 When configured with `--purpose "{purpose}"`, the tool passes the call purpose into the detached phone session as `conversation.metadata.phone_call_purpose`.
 
+When an answered call ends, the controller writes one final `call_closed` event into the same detached phone session with `"response": { "type": "none" }`. This gives the agent one internal turn to update contact notes without producing another phone reply or leaving an outbox message.
+
 Example `agents[].tools.phone` config:
 
 ```json
