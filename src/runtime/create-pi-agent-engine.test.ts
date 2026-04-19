@@ -1754,6 +1754,7 @@ describe("createPiAgentEngine", () => {
             id: "office",
             name: "Office",
             uri: "sip:+491234567@example.com",
+            comment: "work colleague",
           },
         ],
       },
@@ -1781,6 +1782,9 @@ describe("createPiAgentEngine", () => {
     expect(output).toContain("it does not confirm ringing, connection, or call audio");
     expect(output).toContain("Purpose: Test call");
     expect(output).toContain("imp.telebot|office|Office|sip:+491234567@example.com");
+    expect(result.details).toMatchObject({
+      contactComment: "work colleague",
+    });
     expect(result.details).toMatchObject({
       contactId: "office",
       contactName: "Office",

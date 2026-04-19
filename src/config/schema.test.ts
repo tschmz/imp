@@ -441,6 +441,7 @@ describe("appConfigSchema", () => {
                 id: "office",
                 name: "Office",
                 uri: "sip:+491234567@example.com",
+                comment: "work colleague",
               },
             ],
           },

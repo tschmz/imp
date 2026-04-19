@@ -37,9 +37,7 @@ function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: 
     additionalProperties: false,
   } as unknown as ToolDefinition["parameters"];
 
-  const contactList = config.contacts
-    .map((contact) => `${contact.id} (${contact.name})`)
-    .join(", ");
+  const contactList = config.contacts.map(formatContactForDescription).join(", ");
 
   return {
     name: "phone_call",
@@ -66,6 +64,7 @@ function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: 
         details: {
           contactId: contact.id,
           contactName: contact.name,
+          ...(contact.comment ? { contactComment: contact.comment } : {}),
           command: result.command,
           args: result.args,
           exitCode: result.exitCode,
@@ -130,6 +129,7 @@ function runPhoneCommand(
         ...process.env,
         ...(config.env ?? {}),
         ...(agentId ? { IMP_PHONE_AGENT_ID: agentId } : {}),
+        ...(contact.comment ? { IMP_PHONE_CONTACT_COMMENT: contact.comment } : {}),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -200,7 +200,12 @@ function renderTemplate(template: string, contact: AgentPhoneContactConfig): str
   return template
     .replaceAll("{contactId}", contact.id)
     .replaceAll("{contactName}", contact.name)
+    .replaceAll("{comment}", contact.comment ?? "")
     .replaceAll("{uri}", contact.uri);
+}
+
+function formatContactForDescription(contact: AgentPhoneContactConfig): string {
+  return `${contact.id} (${contact.name}${contact.comment ? `, ${contact.comment}` : ""})`;
 }
 
 function renderPhoneCallResult(

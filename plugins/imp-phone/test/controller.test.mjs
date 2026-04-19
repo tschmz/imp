@@ -15,12 +15,14 @@ describe("imp-phone controller", () => {
           id: "thomas",
           name: "Thomas",
           uri: "+10000000000",
+          comment: "work colleague",
         },
       }),
     ).toEqual({
       id: "thomas",
       name: "Thomas",
       uri: "+10000000000",
+      comment: "work colleague",
     });
   });
 

@@ -293,6 +293,7 @@ export class PhoneController {
           contact_id: input.contact.id,
           contact_name: input.contact.name,
           contact_uri: input.contact.uri,
+          ...(input.contact.comment ? { contact_comment: input.contact.comment } : {}),
         },
       },
       userId: this.config.userId,
@@ -305,6 +306,7 @@ export class PhoneController {
         contact_id: input.contact.id,
         contact_name: input.contact.name,
         contact_uri: input.contact.uri,
+        ...(input.contact.comment ? { contact_comment: input.contact.comment } : {}),
         turn: input.turn,
         recording_file: input.recording.path,
         duration_seconds: input.recording.durationSeconds,
@@ -528,6 +530,7 @@ export function parseContact(request) {
     id: contact.id,
     name: contact.name,
     uri: contact.uri,
+    ...(typeof contact.comment === "string" && contact.comment.length > 0 ? { comment: contact.comment } : {}),
   };
 }
 

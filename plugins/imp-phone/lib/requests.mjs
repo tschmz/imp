@@ -8,6 +8,7 @@ export async function writeCallRequest(options) {
   const contactName = requiredString(options.contactName ?? options.name, "contactName");
   const uri = requiredString(options.uri, "uri");
   const agentId = optionalString(options.agentId ?? process.env.IMP_PHONE_AGENT_ID, "agentId");
+  const comment = optionalString(options.comment ?? process.env.IMP_PHONE_CONTACT_COMMENT, "comment");
   const requestId = options.id ?? `call-${new Date().toISOString().replace(/[:.]/g, "-")}`;
   const fileName = `${sanitizeFileName(requestId)}-${process.hrtime.bigint().toString()}.json`;
   const path = join(requestsDir, fileName);
@@ -19,6 +20,7 @@ export async function writeCallRequest(options) {
       id: contactId,
       name: contactName,
       uri,
+      ...(comment ? { comment } : {}),
     },
     ...(agentId ? { agentId } : {}),
     purpose: typeof options.purpose === "string" && options.purpose.length > 0 ? options.purpose : undefined,
@@ -41,6 +43,8 @@ export function parseRequestCliArgs(argv) {
       parsed.contactName = argv[++index];
     } else if (arg === "--uri") {
       parsed.uri = argv[++index];
+    } else if (arg === "--comment") {
+      parsed.comment = argv[++index];
     } else if (arg === "--purpose") {
       parsed.purpose = argv[++index];
     } else if (arg === "--agent-id") {

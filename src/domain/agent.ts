@@ -41,6 +41,7 @@ export interface AgentPhoneContactConfig {
   id: string;
   name: string;
   uri: string;
+  comment?: string;
 }
 
 export interface AgentPhoneCallConfig {

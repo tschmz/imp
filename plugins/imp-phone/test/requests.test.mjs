@@ -22,6 +22,7 @@ describe("imp-phone call requests", () => {
       contactId: "thomas",
       contactName: "Thomas",
       uri: "+10000000000",
+      comment: "work colleague",
       agentId: "imp.telebot",
       purpose: "Test call",
     });
@@ -35,6 +36,7 @@ describe("imp-phone call requests", () => {
         id: "thomas",
         name: "Thomas",
         uri: "+10000000000",
+        comment: "work colleague",
       },
       agentId: "imp.telebot",
       purpose: "Test call",
@@ -45,8 +47,10 @@ describe("imp-phone call requests", () => {
   it("uses the phone agent environment variable when no agent id argument is provided", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-phone-request-"));
     tempDirs.push(root);
-    const previous = process.env.IMP_PHONE_AGENT_ID;
+    const previousAgentId = process.env.IMP_PHONE_AGENT_ID;
+    const previousComment = process.env.IMP_PHONE_CONTACT_COMMENT;
     process.env.IMP_PHONE_AGENT_ID = "imp.telebot";
+    process.env.IMP_PHONE_CONTACT_COMMENT = "work colleague";
 
     try {
       const path = await writeCallRequest({
@@ -59,11 +63,17 @@ describe("imp-phone call requests", () => {
 
       const payload = JSON.parse(await readFile(path, "utf8"));
       expect(payload.agentId).toBe("imp.telebot");
+      expect(payload.contact.comment).toBe("work colleague");
     } finally {
-      if (previous === undefined) {
+      if (previousAgentId === undefined) {
         delete process.env.IMP_PHONE_AGENT_ID;
       } else {
-        process.env.IMP_PHONE_AGENT_ID = previous;
+        process.env.IMP_PHONE_AGENT_ID = previousAgentId;
+      }
+      if (previousComment === undefined) {
+        delete process.env.IMP_PHONE_CONTACT_COMMENT;
+      } else {
+        process.env.IMP_PHONE_CONTACT_COMMENT = previousComment;
       }
     }
   });

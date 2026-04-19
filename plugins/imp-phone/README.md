@@ -62,7 +62,7 @@ The install command does not add phone contacts to an agent. Contacts are allowl
 ## Call Requests
 
 The controller watches `requestsDir` for request files. The `phone_call` tool can be wired to create those files by running `bin/request-call.mjs` from the installed package.
-The tool automatically passes the calling agent id through `IMP_PHONE_AGENT_ID`, so phone call sessions stay attached to the agent that initiated the call.
+The tool automatically passes the calling agent id through `IMP_PHONE_AGENT_ID`, so phone call sessions stay attached to the agent that initiated the call. Optional contact comments are passed through `IMP_PHONE_CONTACT_COMMENT`.
 
 Example `agents[].tools.phone` config:
 
@@ -84,7 +84,8 @@ Example `agents[].tools.phone` config:
     {
       "id": "thomas",
       "name": "Thomas",
-      "uri": "+10000000000"
+      "uri": "+10000000000",
+      "comment": "work colleague"
     }
   ]
 }
@@ -159,6 +160,7 @@ node bin/request-call.mjs \
   --contact-id thomas \
   --contact-name Thomas \
   --uri +10000000000 \
+  --comment "work colleague" \
   --agent-id imp.telebot
 ```
 

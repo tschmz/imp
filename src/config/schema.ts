@@ -79,6 +79,7 @@ const phoneCallConfigSchema = z.object({
       id: phoneContactIdSchema,
       name: z.string().min(1),
       uri: z.string().min(1),
+      comment: z.string().min(1).optional(),
     })
     .array()
     .min(1),
