@@ -56,6 +56,24 @@ describe("SystemPromptCache", () => {
     expect(key).not.toContain('"content":"---\\nname: commit');
   });
 
+  it("omits runtime clock values from cache keys", async () => {
+    const cache = new SystemPromptCache({
+      getContextFileFingerprint: async () => "fp",
+      readTextFile: async () => "No dynamic time here.",
+      strategy: new InMemoryCacheStrategy<string>(),
+    });
+
+    const key = await cache.buildCacheKey({
+      agent: createAgent(),
+      promptWorkingDirectory: "/workspace/project",
+      promptFiles: ["/workspace/AGENTS.md"],
+      templateContext: createTemplateContext(),
+    });
+
+    expect(key).not.toContain("2026-04-19T12:34:56.000Z");
+    expect(key).toContain('"runtime":{"timezone":"Europe/Berlin"}');
+  });
+
   it("evicts prior key per agent on set", () => {
     const strategy = new InMemoryCacheStrategy<string>();
     const cache = new SystemPromptCache({
@@ -96,6 +114,15 @@ function createTemplateContext(): PromptTemplateContext {
       hostname: "builder",
       username: "thomas",
       homeDir: "/home/thomas",
+    },
+    runtime: {
+      now: {
+        iso: "2026-04-19T12:34:56.000Z",
+        date: "2026-04-19",
+        time: "14:34:56",
+        local: "2026-04-19 14:34:56 Europe/Berlin",
+      },
+      timezone: "Europe/Berlin",
     },
     endpoint: {
       id: "private-telegram",

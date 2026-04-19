@@ -32,6 +32,45 @@ describe("resolveSystemPrompt", () => {
     expect(second.cacheHit).toBe(true);
   });
 
+  it("does not cache prompts that render runtime clock values", async () => {
+    let reads = 0;
+    const readTextFile = async () => {
+      reads += 1;
+      return "Current time: {{runtime.now.iso}}.";
+    };
+    const cache = new SystemPromptCache({
+      getContextFileFingerprint: async () => "1:1",
+      readTextFile,
+    });
+    const agent = {
+      ...createAgent(),
+      prompt: {
+        ...createAgent().prompt,
+        instructions: [{ file: "/workspace/AGENTS.md" }],
+      },
+    };
+
+    const first = await resolveSystemPrompt({
+      agent,
+      promptWorkingDirectory: "/workspace",
+      templateContext: createTemplateContext(),
+      readTextFile,
+      cache,
+    });
+
+    const second = await resolveSystemPrompt({
+      agent,
+      promptWorkingDirectory: "/workspace",
+      templateContext: createTemplateContext(),
+      readTextFile,
+      cache,
+    });
+
+    expect(first.cacheHit).toBe(false);
+    expect(second.cacheHit).toBe(false);
+    expect(reads).toBe(2);
+  });
+
   it("renders curated template variables for file-backed instructions and references", async () => {
     const prompt = await buildSystemPrompt(
       {
@@ -573,6 +612,15 @@ function createTemplateContext(): PromptTemplateContext {
       hostname: "builder",
       username: "thomas",
       homeDir: "/home/thomas",
+    },
+    runtime: {
+      now: {
+        iso: "2026-04-19T12:34:56.000Z",
+        date: "2026-04-19",
+        time: "14:34:56",
+        local: "2026-04-19 14:34:56 Europe/Berlin",
+      },
+      timezone: "Europe/Berlin",
     },
     endpoint: {
       id: "private-telegram",

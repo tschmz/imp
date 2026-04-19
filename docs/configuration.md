@@ -207,8 +207,8 @@ Constraints:
 - only the built-in `if`, `unless`, `each`, `with`, `eq`, `instructionAttr`, and `instructionText` helpers are available by default
 - `instructionAttr` escapes values for XML-like instruction tag attributes
 - `instructionText` escapes values for XML-like instruction tag text
-- arbitrary JavaScript execution, date/time variables, and custom user-defined helpers are not supported
-- the context is curated and stable so prompt caching stays deterministic
+- arbitrary JavaScript execution and custom user-defined helpers are not supported
+- runtime clock values are included in the prompt cache key only when a prompt references `runtime.now` or `runtime.timezone`
 
 Available variables:
 
@@ -218,6 +218,11 @@ Available variables:
 - `system.hostname`
 - `system.username`
 - `system.homeDir`
+- `runtime.now.iso`
+- `runtime.now.date`
+- `runtime.now.time`
+- `runtime.now.local`
+- `runtime.timezone`
 - `endpoint.id`
 - `agent.id`
 - `agent.home`

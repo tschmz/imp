@@ -75,7 +75,7 @@ export class SystemPromptCache {
       instructions: (input.agent.prompt.instructions ?? []).map(serializePromptSource),
       references: (input.agent.prompt.references ?? []).map(serializePromptSource),
       promptWorkingDirectory: input.promptWorkingDirectory,
-      templateContext: input.templateContext,
+      templateContext: createCacheTemplateContext(input.templateContext),
       availableSkills: (input.availableSkills ?? []).map((skill) => ({
         directoryPath: skill.directoryPath,
         filePath: skill.filePath,
@@ -100,6 +100,18 @@ export class SystemPromptCache {
 
     this.#latestCacheKeyByAgentId.set(agentId, cacheKey);
   }
+}
+
+function createCacheTemplateContext(
+  context: PromptTemplateContext,
+): Omit<PromptTemplateContext, "runtime"> & { runtime: Pick<PromptTemplateContext["runtime"], "timezone"> } {
+  const { runtime, ...stableContext } = context;
+  return {
+    ...stableContext,
+    runtime: {
+      timezone: runtime.timezone,
+    },
+  };
 }
 
 function serializePromptSource(source: PromptSource): Record<string, string> {

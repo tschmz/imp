@@ -82,6 +82,29 @@ describe("createPromptTemplateContext", () => {
 
     expect(rendered).toBe("phone-call Thomas +10000000000");
   });
+
+  it("renders runtime date and time in prompt templates", () => {
+    const context = createPromptTemplateContext({
+      system: createSystemContext(),
+      agent: createAgent(),
+      endpointId: "phone-ingress",
+      transportKind: "plugin",
+      now: new Date("2026-04-19T12:34:56.000Z"),
+      timezone: "Europe/Berlin",
+    });
+
+    const rendered = renderPromptTemplate(
+      "{{runtime.now.iso}} | {{runtime.now.date}} | {{runtime.now.time}} | {{runtime.now.local}} | {{runtime.timezone}}",
+      {
+        filePath: "/workspace/SYSTEM.md",
+        context,
+      },
+    );
+
+    expect(rendered).toBe(
+      "2026-04-19T12:34:56.000Z | 2026-04-19 | 14:34:56 | 2026-04-19 14:34:56 Europe/Berlin | Europe/Berlin",
+    );
+  });
 });
 
 function createSystemContext(): PromptTemplateSystemContext {

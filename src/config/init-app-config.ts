@@ -148,6 +148,15 @@ function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
       username: "",
       homeDir: "",
     },
+    runtime: {
+      now: {
+        iso: "",
+        date: "",
+        time: "",
+        local: "",
+      },
+      timezone: "",
+    },
     endpoint: {
       id: "",
     },

@@ -53,7 +53,8 @@ Prompt files use Handlebars templating.
 - syntax includes variables, `if`/`else`, `unless`, `each`, `with`, and `eq`
 - unknown variables fail immediately with the file path in the error
 - documented variables with no runtime value render as an empty string
-- arbitrary JavaScript execution, custom user-defined helpers, defaults, and time-based variables are not supported
+- arbitrary JavaScript execution, custom user-defined helpers, and defaults are not supported
+- runtime clock values are included in the prompt cache key only when a prompt references `runtime.now` or `runtime.timezone`
 - `instructionAttr` escapes values for XML-like instruction tag attributes
 - `instructionText` escapes values for XML-like instruction tag text
 
@@ -65,6 +66,11 @@ Available variables:
 - `system.hostname`
 - `system.username`
 - `system.homeDir`
+- `runtime.now.iso`
+- `runtime.now.date`
+- `runtime.now.time`
+- `runtime.now.local`
+- `runtime.timezone`
 - `endpoint.id`
 - `agent.id`
 - `agent.home`
@@ -73,6 +79,8 @@ Available variables:
 - `agent.authFile`
 - `agent.workspace.cwd`
 - `transport.kind`
+- `conversation.kind`
+- `conversation.metadata`
 - `reply.channel.kind`
 - `reply.channel.delivery`
 - `reply.channel.endpointId`

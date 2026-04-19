@@ -34,6 +34,10 @@ export interface SystemPromptSourceSummary {
   configuredReferenceFiles: string[];
 }
 
+interface PromptRuntimeUsage {
+  now: boolean;
+}
+
 export async function resolveSystemPrompt(
   options: SystemPromptResolutionOptions,
 ): Promise<SystemPromptResolutionResult> {
@@ -71,7 +75,7 @@ export async function resolveSystemPrompt(
     };
   }
 
-  const systemPrompt = await buildSystemPrompt(
+  const result = await buildSystemPromptWithRuntimeUsage(
     options.agent,
     options.promptWorkingDirectory,
     options.templateContext,
@@ -80,10 +84,12 @@ export async function resolveSystemPrompt(
     agentHomeMarkdownFiles,
   );
 
-  options.cache.set(options.agent.id, cacheKey, systemPrompt);
+  if (!result.runtimeUsage.now) {
+    options.cache.set(options.agent.id, cacheKey, result.systemPrompt);
+  }
 
   return {
-    systemPrompt,
+    systemPrompt: result.systemPrompt,
     cacheHit: false,
     sources,
   };
@@ -150,7 +156,28 @@ export async function buildSystemPrompt(
   readTextFile: (path: string) => Promise<string>,
   agentHomeMarkdownFiles: string[] = [],
 ): Promise<string> {
+  return (
+    await buildSystemPromptWithRuntimeUsage(
+      agent,
+      promptWorkingDirectory,
+      templateContext,
+      availableSkills,
+      readTextFile,
+      agentHomeMarkdownFiles,
+    )
+  ).systemPrompt;
+}
+
+async function buildSystemPromptWithRuntimeUsage(
+  agent: AgentDefinition,
+  promptWorkingDirectory: string | undefined,
+  templateContext: PromptTemplateContext,
+  availableSkills: SkillDefinition[],
+  readTextFile: (path: string) => Promise<string>,
+  agentHomeMarkdownFiles: string[] = [],
+): Promise<{ systemPrompt: string; runtimeUsage: PromptRuntimeUsage }> {
   const sections: string[] = [];
+  const runtimeUsage = { now: false };
   const promptTemplateContext: PromptTemplateContext = {
     ...templateContext,
     skills: availableSkills.map((skill) => ({
@@ -165,6 +192,7 @@ export async function buildSystemPrompt(
     kind: "base prompt",
     templateFileContent: true,
     templateContext: promptTemplateContext,
+    runtimeUsage,
   });
   if (!basePrompt) {
     throw new Error(`Configured base prompt for agent "${agent.id}" must define text, file, or built-in source.`);
@@ -177,6 +205,7 @@ export async function buildSystemPrompt(
       optional: source.optional,
       templateFileContent: true,
       templateContext: promptTemplateContext,
+      runtimeUsage,
     });
     if (!content) {
       continue;
@@ -190,6 +219,7 @@ export async function buildSystemPrompt(
       kind: "reference file",
       templateFileContent: true,
       templateContext: promptTemplateContext,
+      runtimeUsage,
     });
     if (!content) {
       continue;
@@ -198,7 +228,10 @@ export async function buildSystemPrompt(
     sections.push(formatPromptSection("REFERENCE", describePromptSource(source), content));
   }
 
-  return sections.join("\n\n");
+  return {
+    systemPrompt: sections.join("\n\n"),
+    runtimeUsage,
+  };
 }
 
 function formatPromptSection(tagName: "INSTRUCTIONS" | "REFERENCE", source: string, content: string): string {
@@ -298,6 +331,7 @@ async function resolvePromptSourceContent(
     optional?: boolean;
     templateFileContent: boolean;
     templateContext: PromptTemplateContext;
+    runtimeUsage?: PromptRuntimeUsage;
   },
 ): Promise<string | undefined> {
   if (source.text !== undefined) {
@@ -310,6 +344,7 @@ async function resolvePromptSourceContent(
   }
 
   if (source.builtIn === "default") {
+    recordPromptRuntimeUsage(DEFAULT_AGENT_SYSTEM_PROMPT, options.runtimeUsage);
     const content = renderPromptTemplate(DEFAULT_AGENT_SYSTEM_PROMPT, {
       filePath: "built-in:default-system-prompt",
       context: options.templateContext,
@@ -339,6 +374,7 @@ async function resolvePromptSourceContent(
   }
 
   if (options.templateFileContent) {
+    recordPromptRuntimeUsage(content, options.runtimeUsage);
     content = renderPromptTemplate(content, {
       filePath: source.file,
       context: options.templateContext,
@@ -355,6 +391,13 @@ async function resolvePromptSourceContent(
   }
 
   return trimmedContent;
+}
+
+function recordPromptRuntimeUsage(content: string, runtimeUsage: PromptRuntimeUsage | undefined): void {
+  if (!runtimeUsage) {
+    return;
+  }
+  runtimeUsage.now ||= content.includes("runtime.now");
 }
 
 function extractFileSources(sources: PromptSource[]): Array<{ path: string; optional: boolean }> {

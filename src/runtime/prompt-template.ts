@@ -14,8 +14,19 @@ export interface PromptTemplateSystemContext {
   homeDir: string;
 }
 
+export interface PromptTemplateRuntimeNowContext {
+  iso: string;
+  date: string;
+  time: string;
+  local: string;
+}
+
 export interface PromptTemplateContext {
   system: PromptTemplateSystemContext;
+  runtime: {
+    now: PromptTemplateRuntimeNowContext;
+    timezone: string;
+  };
   endpoint: {
     id: string;
   };
@@ -76,6 +87,8 @@ export function createPromptTemplateContext(options: {
   configPath?: string;
   dataRoot?: string;
   availableSkills?: SkillDefinition[];
+  now?: Date;
+  timezone?: string;
 }): PromptTemplateContext {
   const replyChannel = options.replyChannel ?? {
     kind: options.transportKind,
@@ -85,6 +98,7 @@ export function createPromptTemplateContext(options: {
 
   return {
     system: options.system,
+    runtime: createPromptTemplateRuntimeContext(options.now ?? new Date(), options.timezone),
     endpoint: {
       id: options.endpointId,
     },
@@ -125,6 +139,48 @@ export function createPromptTemplateContext(options: {
       filePath: skill.filePath,
     })),
   };
+}
+
+function createPromptTemplateRuntimeContext(
+  now: Date,
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+): PromptTemplateContext["runtime"] {
+  const date = formatDatePart(now, timezone);
+  const time = formatTimePart(now, timezone);
+  return {
+    now: {
+      iso: now.toISOString(),
+      date,
+      time,
+      local: `${date} ${time} ${timezone}`,
+    },
+    timezone,
+  };
+}
+
+function formatDatePart(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  return `${getDateTimePart(parts, "year")}-${getDateTimePart(parts, "month")}-${getDateTimePart(parts, "day")}`;
+}
+
+function formatTimePart(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  return `${getDateTimePart(parts, "hour")}:${getDateTimePart(parts, "minute")}:${getDateTimePart(parts, "second")}`;
+}
+
+function getDateTimePart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): string {
+  return parts.find((part) => part.type === type)?.value ?? "";
 }
 
 export function renderPromptTemplate(
