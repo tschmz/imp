@@ -279,6 +279,14 @@ async function continueInterruptedRun(
           );
         }
       : undefined,
+    onSystemPromptResolved: runtime.conversationStore.writeSystemPromptSnapshot
+      ? async (snapshot) => {
+          await runtime.conversationStore.writeSystemPromptSnapshot!(
+            persistedConversation,
+            snapshot,
+          );
+        }
+      : undefined,
     runtime: {
       configPath: runtime.configPath,
       dataRoot: runtime.endpointConfig.paths.dataRoot,

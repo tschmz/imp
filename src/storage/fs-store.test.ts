@@ -73,6 +73,69 @@ describe("createFsConversationStore", () => {
     });
   });
 
+  it("writes system prompt snapshots as session artifacts", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const created = await store.create(createChatRef(), {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+
+    await store.writeSystemPromptSnapshot!(created, {
+      messageId: "msg/1",
+      correlationId: "corr-1",
+      agentId: "default",
+      createdAt: "2026-04-05T00:00:01.000Z",
+      content: "Base prompt\n\n<INSTRUCTIONS from=\"AGENTS.md\">\n\nUse facts.\n</INSTRUCTIONS>",
+      cacheHit: false,
+      sources: {
+        basePromptSource: "file",
+        basePromptFile: "/workspace/SYSTEM.md",
+        instructionFiles: ["/workspace/AGENTS.md"],
+        configuredInstructionFiles: [],
+        agentHomeInstructionFiles: [],
+        workspaceInstructionFile: "/workspace/AGENTS.md",
+        referenceFiles: ["/workspace/RUNBOOK.md"],
+        configuredReferenceFiles: ["/workspace/RUNBOOK.md"],
+      },
+      promptWorkingDirectory: "/workspace",
+    });
+
+    const promptDir = join(
+      root,
+      "conversations",
+      "agents",
+      "default",
+      "sessions",
+      created.state.conversation.sessionId!,
+      "system-prompts",
+    );
+    await expect(readFile(join(promptDir, "msg_1.md"), "utf8")).resolves.toBe(
+      "Base prompt\n\n<INSTRUCTIONS from=\"AGENTS.md\">\n\nUse facts.\n</INSTRUCTIONS>",
+    );
+    await expect(readFile(join(promptDir, "msg_1.json"), "utf8")).resolves.toContain(
+      "\"contentFile\": \"msg_1.md\"",
+    );
+    const metadata = JSON.parse(await readFile(join(promptDir, "msg_1.json"), "utf8")) as {
+      messageId: string;
+      conversation: { sessionId: string };
+      sources: { workspaceInstructionFile?: string };
+      promptWorkingDirectory?: string;
+      content?: string;
+    };
+    expect(metadata).toMatchObject({
+      messageId: "msg/1",
+      conversation: {
+        sessionId: created.state.conversation.sessionId,
+      },
+      sources: {
+        workspaceInstructionFile: "/workspace/AGENTS.md",
+      },
+      promptWorkingDirectory: "/workspace",
+    });
+    expect(metadata.content).toBeUndefined();
+  });
+
   it("persists and reloads telegram document attachment metadata", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));

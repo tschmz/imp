@@ -97,6 +97,29 @@ export interface ConversationContext {
   messages: ConversationEvent[];
 }
 
+export interface ConversationSystemPromptSnapshot {
+  messageId: string;
+  correlationId: string;
+  agentId: string;
+  createdAt: string;
+  content: string;
+  cacheHit: boolean;
+  sources: ConversationSystemPromptSourceSummary;
+  promptWorkingDirectory?: string;
+}
+
+export interface ConversationSystemPromptSourceSummary {
+  basePromptSource: "built-in" | "file" | "text" | "unknown";
+  basePromptFile?: string;
+  basePromptBuiltIn?: string;
+  instructionFiles: string[];
+  configuredInstructionFiles: string[];
+  agentHomeInstructionFiles: string[];
+  workspaceInstructionFile?: string;
+  referenceFiles: string[];
+  configuredReferenceFiles: string[];
+}
+
 export interface ConversationRunState {
   status: "idle" | "running" | "failed" | "interrupted";
   messageId?: string;

@@ -1,5 +1,9 @@
 import type { AgentDefinition } from "../domain/agent.js";
-import type { ConversationContext, ConversationEvent } from "../domain/conversation.js";
+import type {
+  ConversationContext,
+  ConversationEvent,
+  ConversationSystemPromptSnapshot,
+} from "../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import type { SkillDefinition } from "../skills/types.js";
 
@@ -22,6 +26,7 @@ export interface AgentRunInput {
   message: IncomingMessage;
   runtime?: AgentRunRuntimeContext;
   onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
+  onSystemPromptResolved?: (snapshot: ConversationSystemPromptSnapshot) => Promise<void> | void;
   continueFromContext?: boolean;
 }
 

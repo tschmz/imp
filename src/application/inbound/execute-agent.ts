@@ -46,6 +46,14 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
             );
           }
         : undefined,
+      onSystemPromptResolved: context.dependencies.conversationStore.writeSystemPromptSnapshot
+        ? async (snapshot) => {
+            await context.dependencies.conversationStore.writeSystemPromptSnapshot!(
+              persistedConversation,
+              snapshot,
+            );
+          }
+        : undefined,
       runtime: {
         configPath: context.dependencies.runtimeInfo.configPath,
         dataRoot: context.dependencies.runtimeInfo.dataRoot,

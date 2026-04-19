@@ -4,6 +4,7 @@ import type {
   ConversationEvent,
   ConversationRef,
   ConversationState,
+  ConversationSystemPromptSnapshot,
 } from "../domain/conversation.js";
 
 export interface ConversationBackupSummary {
@@ -24,6 +25,7 @@ export interface ConversationStore {
   put(context: ConversationContext): Promise<void>;
   appendEvents?(context: ConversationContext, events: ConversationEvent[]): Promise<ConversationContext>;
   updateState?(context: ConversationContext, patch: Partial<ConversationState>): Promise<ConversationContext>;
+  writeSystemPromptSnapshot?(context: ConversationContext, snapshot: ConversationSystemPromptSnapshot): Promise<void>;
   markInterruptedRuns?(now: string): Promise<number>;
   listInterruptedRuns?(): Promise<ConversationContext[]>;
   listBackups(ref: ChatRef): Promise<ConversationBackupSummary[]>;

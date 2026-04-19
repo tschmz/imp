@@ -162,6 +162,18 @@ export function createPiAgentEngine(
           cacheHit: promptContext.systemPromptResolution.cacheHit,
         });
         await logSystemPromptSources(logger, context, promptContext.systemPromptResolution);
+        await input.onSystemPromptResolved?.({
+          messageId: input.message.messageId,
+          correlationId: input.message.correlationId,
+          agentId: input.agent.id,
+          createdAt: new Date().toISOString(),
+          content: promptContext.systemPromptResolution.systemPrompt,
+          cacheHit: promptContext.systemPromptResolution.cacheHit,
+          sources: promptContext.systemPromptResolution.sources,
+          ...(promptContext.promptWorkingDirectory
+            ? { promptWorkingDirectory: promptContext.promptWorkingDirectory }
+            : {}),
+        });
 
         await logPipelineEvent(logger, context, { step: "tool-resolution", status: "started" });
         const toolContext = await resolveToolsStage(promptContext, {

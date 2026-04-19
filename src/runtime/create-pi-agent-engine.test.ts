@@ -1222,6 +1222,56 @@ describe("createPiAgentEngine", () => {
     expect(JSON.stringify(vi.mocked(logger.debug).mock.calls)).not.toContain("secret content");
   });
 
+  it("exposes the resolved system prompt for session snapshots", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-system-prompt-snapshot-"));
+    tempDirs.push(root);
+    const workspace = join(root, "workspace");
+    const instructionFile = join(workspace, "AGENTS.md");
+    await mkdir(workspace, { recursive: true });
+    await writeFile(instructionFile, "Use only verified facts.", "utf8");
+    const onSystemPromptResolved = vi.fn(async () => undefined);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("ok")] }),
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        prompt: {
+          base: { text: "Base prompt." },
+          instructions: [{ file: instructionFile }],
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+      onSystemPromptResolved,
+    });
+
+    expect(onSystemPromptResolved).toHaveBeenCalledWith({
+      messageId: "2",
+      correlationId: "corr-2",
+      agentId: "default",
+      createdAt: expect.any(String),
+      content: [
+        "Base prompt.",
+        `<INSTRUCTIONS from="${instructionFile}">\n\nUse only verified facts.\n</INSTRUCTIONS>`,
+      ].join("\n\n"),
+      cacheHit: false,
+      sources: expect.objectContaining({
+        basePromptSource: "text",
+        instructionFiles: [instructionFile],
+        configuredInstructionFiles: [instructionFile],
+      }),
+    });
+  });
+
   it("passes a dynamic api key resolver into the agent runtime", async () => {
     let capturedGetApiKey:
       | ((provider: string) => Promise<string | undefined> | string | undefined)

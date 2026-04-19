@@ -14,6 +14,7 @@ import type {
   ConversationEvent,
   ConversationRef,
   ConversationState,
+  ConversationSystemPromptSnapshot,
   ConversationToolResultMessage,
   ConversationUserMessage,
 } from "../domain/conversation.js";
@@ -63,6 +64,10 @@ function getSessionMetaPath(conversationsDir: string, ref: ConversationRef, agen
 
 function getSessionEventsPath(conversationsDir: string, ref: ConversationRef, agentId: string): string {
   return join(getSessionDir(conversationsDir, ref, agentId), "events.jsonl");
+}
+
+function getSystemPromptsDir(conversationsDir: string, ref: ConversationRef, agentId: string): string {
+  return join(getSessionDir(conversationsDir, ref, agentId), "system-prompts");
 }
 
 function getSelectedAgentPath(conversationsDir: string, ref: ChatRef): string {
@@ -123,6 +128,13 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
       return withAgentWriteQueue(context.state.agentId, async () =>
         withAgentLock(paths.conversationsDir, context.state.agentId, async () =>
           updateConversationState(paths.conversationsDir, context, patch),
+        ),
+      );
+    },
+    async writeSystemPromptSnapshot(context, snapshot) {
+      await withAgentWriteQueue(context.state.agentId, async () =>
+        withAgentLock(paths.conversationsDir, context.state.agentId, async () =>
+          writeSystemPromptSnapshot(paths.conversationsDir, context, snapshot),
         ),
       );
     },
@@ -526,6 +538,35 @@ async function updateConversationState(
 
   await writeSessionMeta(conversationsDir, next);
   return next;
+}
+
+async function writeSystemPromptSnapshot(
+  conversationsDir: string,
+  context: ConversationContext,
+  snapshot: ConversationSystemPromptSnapshot,
+): Promise<void> {
+  const promptId = sanitizePathSegment(snapshot.messageId);
+  const promptsDir = getSystemPromptsDir(conversationsDir, context.state.conversation, context.state.agentId);
+  const promptFileName = `${promptId}.md`;
+  const metadataFileName = `${promptId}.json`;
+
+  await writeFileAtomically(join(promptsDir, promptFileName), snapshot.content);
+  await writeFileAtomically(
+    join(promptsDir, metadataFileName),
+    `${JSON.stringify({
+      messageId: snapshot.messageId,
+      correlationId: snapshot.correlationId,
+      agentId: snapshot.agentId,
+      conversation: context.state.conversation,
+      createdAt: snapshot.createdAt,
+      cacheHit: snapshot.cacheHit,
+      sources: snapshot.sources,
+      ...(snapshot.promptWorkingDirectory
+        ? { promptWorkingDirectory: snapshot.promptWorkingDirectory }
+        : {}),
+      contentFile: promptFileName,
+    }, null, 2)}\n`,
+  );
 }
 
 async function writeSessionMeta(
