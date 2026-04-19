@@ -20,6 +20,7 @@ import { resolveToolsStage } from "./pipeline/resolve-tools-stage.js";
 import { InMemoryCacheStrategy, SystemPromptCache } from "./system-prompt-cache.js";
 import type { SystemPromptResolutionResult } from "./system-prompt-resolution.js";
 import type { AgentEngine, AgentRunContext } from "./types.js";
+import { AgentExecutionError } from "./agent-execution.js";
 import {
   createBuiltInToolRegistry,
   type WorkingDirectoryState,
@@ -65,6 +66,20 @@ interface PipelineEvent {
   durationMs?: number;
   cacheHit?: boolean;
   errorType?: string;
+  errorMessage?: string;
+  errorStack?: string;
+  errorCauseType?: string;
+  errorCauseMessage?: string;
+  agentStopReason?: string;
+  upstreamErrorMessage?: string;
+  upstreamProvider?: string;
+  upstreamModel?: string;
+  upstreamApi?: string;
+  upstreamResponseId?: string;
+  assistantContentTypes?: string[];
+  assistantTextLength?: number;
+  assistantToolCallNames?: string[];
+  assistantHasThinking?: boolean;
   error?: unknown;
   initialWorkingDirectory?: string;
   configuredBuiltInTools?: string[];
@@ -197,7 +212,7 @@ export function createPiAgentEngine(
           step: "pipeline",
           status: "failed",
           durationMs: Date.now() - startedAt,
-          errorType: error instanceof Error ? error.name : typeof error,
+          ...getPipelineErrorFields(error),
           error,
         });
         await hookRunner.runErrorHook(
@@ -254,9 +269,10 @@ async function logPipelineEvent(
   context: EngineLogContext,
   event: PipelineEvent,
 ): Promise<void> {
+  const { error, ...eventFields } = event;
   await logger?.debug("agent-engine.pipeline", {
     ...context,
-    ...event,
+    ...eventFields,
   });
 
   if (event.status === "failed") {
@@ -264,12 +280,61 @@ async function logPipelineEvent(
       "agent engine run failed",
       {
         ...context,
-        durationMs: event.durationMs,
-        errorType: event.errorType,
+        ...eventFields,
       },
-      event.error instanceof Error ? event.error : new Error(String(event.error ?? "Unknown pipeline error")),
+      error instanceof Error ? error : new Error(String(error ?? "Unknown pipeline error")),
     );
   }
+}
+
+function getPipelineErrorFields(error: unknown): Omit<PipelineEvent, "step" | "status" | "error" | "durationMs"> {
+  const baseFields = {
+    errorType: error instanceof Error ? error.name : typeof error,
+    ...(error instanceof Error ? { errorMessage: error.message } : { errorMessage: String(error) }),
+    ...(error instanceof Error && error.stack ? { errorStack: error.stack } : {}),
+    ...getErrorCauseFields(error),
+  };
+
+  if (!(error instanceof AgentExecutionError)) {
+    return baseFields;
+  }
+
+  return {
+    ...baseFields,
+    agentStopReason: error.details.stopReason,
+    ...(error.details.upstreamErrorMessage
+      ? { upstreamErrorMessage: error.details.upstreamErrorMessage }
+      : {}),
+    upstreamProvider: error.details.upstreamProvider,
+    upstreamModel: error.details.upstreamModel,
+    upstreamApi: error.details.upstreamApi,
+    ...(error.details.upstreamResponseId
+      ? { upstreamResponseId: error.details.upstreamResponseId }
+      : {}),
+    assistantContentTypes: error.details.assistantContentTypes,
+    assistantTextLength: error.details.assistantTextLength,
+    assistantToolCallNames: error.details.assistantToolCallNames,
+    assistantHasThinking: error.details.assistantHasThinking,
+  };
+}
+
+function getErrorCauseFields(error: unknown): Pick<PipelineEvent, "errorCauseType" | "errorCauseMessage"> {
+  if (!(error instanceof Error) || !("cause" in error) || error.cause === undefined) {
+    return {};
+  }
+
+  const cause = error.cause;
+  if (cause instanceof Error) {
+    return {
+      errorCauseType: cause.name,
+      errorCauseMessage: cause.message,
+    };
+  }
+
+  return {
+    errorCauseType: typeof cause,
+    errorCauseMessage: String(cause),
+  };
 }
 
 async function defaultReadTextFile(path: string): Promise<string> {

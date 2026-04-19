@@ -784,6 +784,7 @@ describe("createPiAgentEngine", () => {
   });
 
   it("surfaces upstream agent errors instead of masking them as empty text", async () => {
+    const logger = createMockLogger();
     const registration = registerFauxProvider({
       provider: "faux",
       models: [{ id: "faux-1", name: "Faux 1" }],
@@ -793,21 +794,53 @@ describe("createPiAgentEngine", () => {
       fauxAssistantMessage([], {
         stopReason: "error",
         errorMessage: "No API key for provider: faux",
+        responseId: "resp-1",
       }),
     ]);
 
     const engine = createPiAgentEngine({
+      logger,
       resolveModel: () => registration.getModel("faux-1"),
       readTextFile: async () => "unused context",
     });
 
-    await expect(
-      engine.run({
-        agent: createAgent(),
-        conversation: createConversation(),
-        message: createIncomingMessage(),
-      }),
-    ).rejects.toThrow('Agent "default" failed: No API key for provider: faux');
+    const runPromise = engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    await expect(runPromise).rejects.toThrow('Agent "default" failed: No API key for provider: faux');
+
+    const runError = await runPromise.catch((error: unknown) => error);
+    const expectedFailureFields = expect.objectContaining({
+      endpointId: "private-telegram",
+      transport: "telegram",
+      conversationId: "42",
+      messageId: "2",
+      correlationId: "corr-2",
+      agentId: "default",
+      step: "pipeline",
+      status: "failed",
+      errorType: "AgentExecutionError",
+      errorMessage: 'Agent "default" failed: No API key for provider: faux',
+      agentStopReason: "error",
+      upstreamErrorMessage: "No API key for provider: faux",
+      upstreamProvider: "faux",
+      upstreamModel: "faux-1",
+      upstreamApi: registration.api,
+      upstreamResponseId: "resp-1",
+      assistantContentTypes: [],
+      assistantTextLength: 0,
+      assistantToolCallNames: [],
+      assistantHasThinking: false,
+    });
+    expect(logger.debug).toHaveBeenCalledWith("agent-engine.pipeline", expectedFailureFields);
+    expect(logger.error).toHaveBeenCalledWith(
+      "agent engine run failed",
+      expectedFailureFields,
+      runError,
+    );
   });
 
   it("applies inference options and request overrides from agent config", async () => {

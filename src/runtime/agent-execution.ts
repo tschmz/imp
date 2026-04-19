@@ -57,6 +57,33 @@ export interface ExecuteAgentResult {
   workingDirectory?: string;
 }
 
+export interface AgentExecutionFailureDetails {
+  agentId: string;
+  stopReason: AssistantMessage["stopReason"];
+  upstreamErrorMessage?: string;
+  upstreamProvider: string;
+  upstreamModel: string;
+  upstreamApi: string;
+  upstreamResponseId?: string;
+  assistantContentTypes: string[];
+  assistantTextLength: number;
+  assistantToolCallNames: string[];
+  assistantHasThinking: boolean;
+}
+
+export class AgentExecutionError extends Error {
+  readonly details: AgentExecutionFailureDetails;
+
+  constructor(details: AgentExecutionFailureDetails) {
+    super(
+      `Agent "${details.agentId}" failed: ` +
+        `${details.upstreamErrorMessage ?? "unknown upstream error"}`,
+    );
+    this.name = "AgentExecutionError";
+    this.details = details;
+  }
+}
+
 export function defaultCreateAgent(options: AgentOptions): AgentHandle {
   return new Agent(options);
 }
@@ -124,10 +151,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
   }
 
   if (assistantMessage.stopReason === "error" || assistantMessage.stopReason === "aborted") {
-    throw new Error(
-      `Agent "${options.agent.id}" failed: ` +
-        `${assistantMessage.errorMessage ?? "unknown upstream error"}`,
-    );
+    throw new AgentExecutionError(getAgentExecutionFailureDetails(options.agent.id, assistantMessage));
   }
 
   const responseText = getAssistantText(assistantMessage);
@@ -144,6 +168,29 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
     ...(options.workingDirectoryState.get() !== options.initialWorkingDirectory
       ? { workingDirectory: options.workingDirectoryState.get() }
       : {}),
+  };
+}
+
+function getAgentExecutionFailureDetails(
+  agentId: string,
+  message: AssistantMessage,
+): AgentExecutionFailureDetails {
+  return {
+    agentId,
+    stopReason: message.stopReason,
+    ...(message.errorMessage ? { upstreamErrorMessage: message.errorMessage } : {}),
+    upstreamProvider: message.provider,
+    upstreamModel: message.model,
+    upstreamApi: message.api,
+    ...(message.responseId ? { upstreamResponseId: message.responseId } : {}),
+    assistantContentTypes: message.content.map((content) => content.type),
+    assistantTextLength: message.content
+      .filter((content) => content.type === "text")
+      .reduce((length, content) => length + content.text.length, 0),
+    assistantToolCallNames: message.content
+      .filter((content) => content.type === "toolCall")
+      .map((content) => content.name),
+    assistantHasThinking: message.content.some((content) => content.type === "thinking"),
   };
 }
 
