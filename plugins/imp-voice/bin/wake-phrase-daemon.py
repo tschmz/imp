@@ -369,6 +369,7 @@ class WakePhraseRecorder:
             "ready": [(740.0, 0.045, 0.22), (988.0, 0.085, 0.26)],
             "follow-up-ready": [(880.0, 0.04, 0.22), (1174.0, 0.08, 0.26)],
             "captured": [(1174.0, 0.035, 0.22), (784.0, 0.07, 0.24)],
+            "accepted": [(660.0, 0.035, 0.2), (880.0, 0.04, 0.22), (1174.0, 0.055, 0.24)],
             "closed": [(880.0, 0.04, 0.2), (659.0, 0.06, 0.22), (440.0, 0.11, 0.24)],
         }
         segments = tone_map.get(name)
@@ -855,6 +856,15 @@ class WakePhraseRecorder:
         imp_event_path: Path | None = None
         if self.config.imp_plugin.enabled:
             if transcript:
+                accepted_cue_seconds = self.play_feedback_tone("accepted")
+                if accepted_cue_seconds > 0:
+                    self.write_runtime_status(
+                        "command_accepted",
+                        can_speak=False,
+                        cue="accepted",
+                        recording_file=str(path),
+                        command_text=transcript,
+                    )
                 imp_event_path = self.write_imp_plugin_event(path, transcript, metadata)
             else:
                 self.log("No command transcript is available; not writing an imp plugin event.")

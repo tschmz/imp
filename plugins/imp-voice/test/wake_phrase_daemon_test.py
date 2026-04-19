@@ -136,6 +136,14 @@ class WakePhraseDaemonStateTests(unittest.TestCase):
         self.assertGreater(len(wav_bytes), 44)
         self.assertGreater(duration, 0)
 
+    def test_accepted_feedback_tone_is_available(self):
+        recorder = self.create_recorder()
+
+        wav_bytes, duration = recorder.build_feedback_tone("accepted")
+
+        self.assertGreater(len(wav_bytes), 44)
+        self.assertGreater(duration, 0)
+
     def test_waiting_for_speaker_has_no_timeout_when_disabled(self):
         recorder = self.create_recorder()
         recorder.config.conversation.enabled = True
