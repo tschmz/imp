@@ -4,6 +4,7 @@ import {
   parseCallFailureReason,
   parseCallProgress,
   parseContact,
+  parsePurpose,
   parseRequestedAgentId,
 } from "../lib/controller.mjs";
 
@@ -38,6 +39,12 @@ describe("imp-phone controller", () => {
     expect(() => parseRequestedAgentId({ agentId: 42 })).toThrow(
       "Call request agentId must be a string when provided.",
     );
+  });
+
+  it("parses call purposes", () => {
+    expect(parsePurpose({ purpose: "Ask about the appointment." })).toBe("Ask about the appointment.");
+    expect(parsePurpose({})).toBeUndefined();
+    expect(() => parsePurpose({ purpose: 42 })).toThrow("Call request purpose must be a string when provided.");
   });
 
   it("extracts SIP call failure reasons from call output", () => {

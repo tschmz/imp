@@ -30,7 +30,8 @@ function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: 
       purpose: {
         type: "string",
         minLength: 1,
-        description: "Short reason for the call.",
+        description:
+          "Detailed prompt for the AI agent that will conduct the phone call. Include the reason for the call, relevant context, desired outcome, and important constraints.",
       },
     },
     required: ["contactId"],
@@ -53,7 +54,7 @@ function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: 
         throw new Error(`Unknown phone contact: ${contactId}. Available contacts: ${[...contacts.keys()].join(", ")}`);
       }
 
-      const result = await runPhoneCommand(config, contact, signal, options.agentId);
+      const result = await runPhoneCommand(config, contact, signal, options.agentId, purpose);
       return {
         content: [
           {
@@ -118,9 +119,10 @@ function runPhoneCommand(
   contact: AgentPhoneContactConfig,
   signal: AbortSignal | undefined,
   agentId: string | undefined,
+  purpose: string | undefined,
 ): Promise<PhoneCommandResult> {
-  const command = renderTemplate(config.command ?? defaultPhoneCommand, contact);
-  const args = (config.args ?? defaultPhoneArgs).map((arg) => renderTemplate(arg, contact));
+  const command = renderTemplate(config.command ?? defaultPhoneCommand, contact, purpose);
+  const args = (config.args ?? defaultPhoneArgs).map((arg) => renderTemplate(arg, contact, purpose));
 
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -196,11 +198,12 @@ function runPhoneCommand(
   });
 }
 
-function renderTemplate(template: string, contact: AgentPhoneContactConfig): string {
+function renderTemplate(template: string, contact: AgentPhoneContactConfig, purpose?: string): string {
   return template
     .replaceAll("{contactId}", contact.id)
     .replaceAll("{contactName}", contact.name)
     .replaceAll("{comment}", contact.comment ?? "")
+    .replaceAll("{purpose}", purpose ?? "")
     .replaceAll("{uri}", contact.uri);
 }
 

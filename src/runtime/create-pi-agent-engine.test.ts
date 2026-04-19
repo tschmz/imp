@@ -1748,6 +1748,7 @@ describe("createPiAgentEngine", () => {
           "{contactId}",
           "{contactName}",
           "{uri}",
+          "{purpose}",
         ],
         contacts: [
           {
@@ -1781,7 +1782,7 @@ describe("createPiAgentEngine", () => {
     expect(output).toContain("Phone call command for Office (office) completed successfully.");
     expect(output).toContain("it does not confirm ringing, connection, or call audio");
     expect(output).toContain("Purpose: Test call");
-    expect(output).toContain("imp.telebot|office|Office|sip:+491234567@example.com");
+    expect(output).toContain("imp.telebot|office|Office|sip:+491234567@example.com|Test call");
     expect(result.details).toMatchObject({
       contactComment: "work colleague",
     });
@@ -1795,6 +1796,7 @@ describe("createPiAgentEngine", () => {
         "office",
         "Office",
         "sip:+491234567@example.com",
+        "Test call",
       ],
       exitCode: 0,
     });

@@ -98,6 +98,7 @@ export class PhoneController {
   async processRequest(request) {
     const contact = parseContact(request);
     const requestedAgentId = parseRequestedAgentId(request);
+    const purpose = parsePurpose(request);
     const requestId = typeof request.id === "string" && request.id.length > 0 ? request.id : randomUUID();
     const conversationId = `${this.config.conversationIdPrefix}-${sanitizeFileName(requestId)}`;
     const callProcess = this.startCall(contact);
@@ -195,6 +196,7 @@ export class PhoneController {
           requestId,
           conversationId,
           requestedAgentId,
+          purpose,
           contact,
           turn,
           transcript,
@@ -290,6 +292,7 @@ export class PhoneController {
           source: "imp-phone",
           ...(input.requestedAgentId ? { agent_id: input.requestedAgentId } : {}),
           request_id: input.requestId,
+          ...(input.purpose ? { phone_call_purpose: input.purpose } : {}),
           contact_id: input.contact.id,
           contact_name: input.contact.name,
           contact_uri: input.contact.uri,
@@ -303,6 +306,7 @@ export class PhoneController {
         source: "imp-phone",
         ...(input.requestedAgentId ? { agent_id: input.requestedAgentId } : {}),
         request_id: input.requestId,
+        ...(input.purpose ? { phone_call_purpose: input.purpose } : {}),
         contact_id: input.contact.id,
         contact_name: input.contact.name,
         contact_uri: input.contact.uri,
@@ -545,6 +549,19 @@ export function parseRequestedAgentId(request) {
     throw new Error("Call request agentId must be a string when provided.");
   }
   return request.agentId;
+}
+
+export function parsePurpose(request) {
+  if (typeof request !== "object" || request === null || !("purpose" in request)) {
+    return undefined;
+  }
+  if (request.purpose === undefined || request.purpose === null || request.purpose === "") {
+    return undefined;
+  }
+  if (typeof request.purpose !== "string") {
+    throw new Error("Call request purpose must be a string when provided.");
+  }
+  return request.purpose;
 }
 
 export function parseCallFailureReason(text) {

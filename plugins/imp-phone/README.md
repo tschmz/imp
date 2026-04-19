@@ -63,6 +63,7 @@ The install command does not add phone contacts to an agent. Contacts are allowl
 
 The controller watches `requestsDir` for request files. The `phone_call` tool can be wired to create those files by running `bin/request-call.mjs` from the installed package.
 The tool automatically passes the calling agent id through `IMP_PHONE_AGENT_ID`, so phone call sessions stay attached to the agent that initiated the call. Optional contact comments are passed through `IMP_PHONE_CONTACT_COMMENT`.
+When configured with `--purpose "{purpose}"`, the tool passes the call purpose into the detached phone session as `conversation.metadata.phone_call_purpose`.
 
 Example `agents[].tools.phone` config:
 
@@ -78,7 +79,9 @@ Example `agents[].tools.phone` config:
     "--contact-name",
     "{contactName}",
     "--uri",
-    "{uri}"
+    "{uri}",
+    "--purpose",
+    "{purpose}"
   ],
   "contacts": [
     {
