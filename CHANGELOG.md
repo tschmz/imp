@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.7.0 - 2026-04-19
+
+### Added
+
+- Export conversations as HTML and deliver export files over Telegram.
+- Resume saved sessions by replaying their conversation history.
+- Add agent-scoped logging.
+
+### Changed
+
+- Refine default skill prompt instructions.
+- Simplify the bundled voice wake trigger flow.
+- Replace daemon no-op control with a deferred action controller.
+- Modularize CLI command registration.
+- Split plugin management use cases into focused modules.
+- Switch tar archive handling to `tar-stream`.
+- Use proper lockfiles and atomic writes for filesystem-backed state.
+- Rework Telegram Markdown parsing with a dedicated parser.
+
+### Fixed
+
+- Continue speaker outbox processing after playback failures and fail once mode when every file fails.
+- Preserve blockquote newlines and keep Telegram link parsing working after invalid patterns and for valid bracketed targets.
+- Enforce configured checks for services-only installs.
+- Parse plugin package specs correctly.
+- Refine default prompt channel guidance.
+
 ## 0.6.0 - 2026-04-18
 
 ### Added
