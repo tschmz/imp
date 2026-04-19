@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.8.0 - 2026-04-19
+
+### Added
+
+- Append conversation events while agent runs and track per-session run state.
+- Mark interrupted sessions at startup and continue them safely on the next daemon run.
+- Replay the active session in chat.
+- Store system prompt snapshots with conversation history.
+
+### Changed
+
+- Store conversations as event logs.
+- Improve agent failure logging for runtime and engine errors.
+- Split config schema, plugin transport, and runtime tool resolution into focused modules.
+
+### Fixed
+
+- Resolve `dataRoot` relative to the config file path.
+- Collapse tool results in full conversation exports.
+
 ## 0.7.0 - 2026-04-19
 
 ### Added
