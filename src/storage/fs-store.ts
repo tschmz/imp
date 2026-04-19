@@ -129,6 +129,9 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     async markInterruptedRuns(now) {
       return markInterruptedAgentRuns(paths.conversationsDir, now);
     },
+    async listInterruptedRuns() {
+      return readInterruptedRuns(paths.conversationsDir);
+    },
     async listBackups(ref) {
       const selectedAgentId = await readSelectedAgentId(paths.conversationsDir, ref);
       return selectedAgentId ? readAgentInactiveSessions(paths.conversationsDir, selectedAgentId) : [];
@@ -175,6 +178,57 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
       return ensureActiveAgentSession(paths.conversationsDir, ref, options);
     },
   };
+}
+
+async function readInterruptedRuns(conversationsDir: string): Promise<ConversationContext[]> {
+  let entries;
+
+  try {
+    entries = await readdir(join(conversationsDir, "agents"), { withFileTypes: true });
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  const conversations = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => readInterruptedRunsForAgent(conversationsDir, entry.name)),
+  );
+
+  return conversations.flat();
+}
+
+async function readInterruptedRunsForAgent(
+  conversationsDir: string,
+  agentId: string,
+): Promise<ConversationContext[]> {
+  const sessionsDir = getAgentSessionsDir(conversationsDir, agentId);
+  let entries;
+
+  try {
+    entries = await readdir(sessionsDir, { withFileTypes: true });
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  const conversations = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const meta = await readSessionMetaByAgentAndSessionId(agentId, entry.name, conversationsDir);
+        return meta?.run?.status === "interrupted"
+          ? readSessionByAgentAndSessionId(agentId, entry.name, conversationsDir)
+          : undefined;
+      }),
+  );
+
+  return conversations.filter((conversation): conversation is ConversationContext => conversation !== undefined);
 }
 
 async function markInterruptedAgentRuns(

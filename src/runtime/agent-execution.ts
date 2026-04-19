@@ -16,7 +16,7 @@ export type AgentHandle =
   & {
     state: Pick<Agent["state"], "messages">;
   }
-  & Partial<Pick<Agent, "subscribe">>;
+  & Partial<Pick<Agent, "continue" | "subscribe">>;
 
 type ConversationMessageEvent = Extract<AgentEvent, { type: "message_end" }>;
 
@@ -42,6 +42,7 @@ export interface ExecuteAgentOptions {
   parentMessageId: string;
   correlationId: string;
   onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
+  continueFromContext?: boolean;
 }
 
 export interface ExecuteAgentResult {
@@ -63,6 +64,7 @@ export function defaultCreateAgent(options: AgentOptions): AgentHandle {
 export async function executeAgent(options: ExecuteAgentOptions): Promise<ExecuteAgentResult> {
   const createAgent = options.createAgent ?? defaultCreateAgent;
   const initialMessages = toAgentMessages(options.conversationMessages, options.model);
+  const initialTurnIndexes = countExistingTurnEvents(options.conversationMessages, options.parentMessageId);
 
   const agent = createAgent({
     initialState: {
@@ -83,11 +85,20 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
   const eventMessages = collectConversationEventMessages(agent, {
     parentMessageId: options.parentMessageId,
     correlationId: options.correlationId,
+    initialAssistantIndex: initialTurnIndexes.assistant,
+    initialToolResultIndex: initialTurnIndexes.toolResult,
     onConversationEvents: options.onConversationEvents,
   });
 
   try {
-    await agent.prompt(options.userText);
+    if (options.continueFromContext) {
+      if (!agent.continue) {
+        throw new Error(`Agent "${options.agent.id}" cannot continue from persisted context.`);
+      }
+      await agent.continue();
+    } else {
+      await agent.prompt(options.userText);
+    }
   } finally {
     eventMessages.unsubscribe?.();
   }
@@ -100,6 +111,8 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
     : toConversationEvents(appendedMessages, {
         parentMessageId: options.parentMessageId,
         correlationId: options.correlationId,
+        initialAssistantIndex: initialTurnIndexes.assistant,
+        initialToolResultIndex: initialTurnIndexes.toolResult,
       });
 
   const assistantMessage = [...agent.state.messages]
@@ -139,6 +152,8 @@ function collectConversationEventMessages(
   options: {
     parentMessageId: string;
     correlationId: string;
+    initialAssistantIndex: number;
+    initialToolResultIndex: number;
     onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
   },
 ): {
@@ -165,6 +180,8 @@ function collectConversationEventMessages(
     const nextEvents = toConversationEvents(messages, {
       parentMessageId: options.parentMessageId,
       correlationId: options.correlationId,
+      initialAssistantIndex: options.initialAssistantIndex,
+      initialToolResultIndex: options.initialToolResultIndex,
     }).slice(events.length);
     events.push(...nextEvents);
 
@@ -180,6 +197,25 @@ function collectConversationEventMessages(
   });
 
   return { messages, events, unsubscribe };
+}
+
+function countExistingTurnEvents(
+  messages: ConversationEvent[],
+  parentMessageId: string,
+): { assistant: number; toolResult: number } {
+  let assistant = 0;
+  let toolResult = 0;
+
+  for (const message of messages) {
+    if (message.role === "assistant" && message.id.startsWith(`${parentMessageId}:assistant:`)) {
+      assistant += 1;
+    }
+    if (message.role === "toolResult" && message.id.startsWith(`${parentMessageId}:tool-result:`)) {
+      toolResult += 1;
+    }
+  }
+
+  return { assistant, toolResult };
 }
 
 function isConversationMessageEvent(event: AgentEvent): event is ConversationMessageEvent {

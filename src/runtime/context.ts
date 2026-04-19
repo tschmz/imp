@@ -22,6 +22,7 @@ export interface AgentRunInput {
   message: IncomingMessage;
   runtime?: AgentRunRuntimeContext;
   onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
+  continueFromContext?: boolean;
 }
 
 export interface AgentRunResult {

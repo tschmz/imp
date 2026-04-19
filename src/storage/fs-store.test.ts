@@ -596,6 +596,17 @@ describe("createFsConversationStore", () => {
         },
       },
     });
+    await expect(store.listInterruptedRuns!()).resolves.toMatchObject([
+      {
+        state: {
+          conversation: created.state.conversation,
+          agentId: "default",
+          run: {
+            status: "interrupted",
+          },
+        },
+      },
+    ]);
     await expect(store.markInterruptedRuns!("2026-04-05T00:03:00.000Z")).resolves.toBe(0);
   });
 

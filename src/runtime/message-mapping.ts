@@ -64,10 +64,12 @@ export function toConversationEvents(
   options: {
     parentMessageId: string;
     correlationId: string;
+    initialAssistantIndex?: number;
+    initialToolResultIndex?: number;
   },
 ): ConversationEvent[] {
-  let assistantIndex = 0;
-  let toolResultIndex = 0;
+  let assistantIndex = options.initialAssistantIndex ?? 0;
+  let toolResultIndex = options.initialToolResultIndex ?? 0;
 
   return messages.flatMap<ConversationEvent>((message) => {
     if (message.role === "user") {

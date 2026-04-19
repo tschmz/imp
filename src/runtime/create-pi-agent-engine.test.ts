@@ -490,6 +490,118 @@ describe("createPiAgentEngine", () => {
     ]);
   });
 
+  it("continues from persisted user or tool context without adding a new prompt", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([() => fauxAssistantMessage("Recovered answer")]);
+    const resolvedModel = registration.getModel("faux-1")!;
+    const finalAssistantMessage = fauxAssistantMessage("Recovered answer");
+    const onPrompt = vi.fn();
+    const onContinue = vi.fn();
+
+    const engine = createPiAgentEngine({
+      createAgent: () => createAgentDouble({
+        messages: [finalAssistantMessage],
+        events: [{ type: "message_end", message: finalAssistantMessage }],
+        onPrompt,
+        onContinue,
+      }),
+      resolveModel: () => resolvedModel,
+      readTextFile: async () => "unused context",
+    });
+
+    const result = await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+      continueFromContext: true,
+    });
+
+    expect(onPrompt).not.toHaveBeenCalled();
+    expect(onContinue).toHaveBeenCalledOnce();
+    expect(result.message.text).toBe("Recovered answer");
+    expect(result.conversationEvents).toMatchObject([
+      {
+        id: "2:assistant:1",
+        role: "assistant",
+        content: [{ type: "text", text: "Recovered answer" }],
+      },
+    ]);
+  });
+
+  it("continues assistant indexes after persisted tool results", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([() => fauxAssistantMessage("Recovered answer")]);
+    const resolvedModel = registration.getModel("faux-1")!;
+    const finalAssistantMessage = fauxAssistantMessage("Recovered answer");
+    const conversation: ConversationContext = {
+      ...createConversation(),
+      messages: [
+        ...createConversation().messages,
+        {
+          id: "2:assistant:1",
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "tool-1",
+              name: "read_file",
+              arguments: { path: "README.md" },
+            },
+          ],
+          timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
+          api: "openai-responses",
+          provider: "openai",
+          model: "gpt-5-mini",
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+          stopReason: "toolUse",
+          createdAt: "2026-04-05T00:00:02.000Z",
+        },
+        {
+          id: "2:tool-result:1",
+          role: "toolResult",
+          toolCallId: "tool-1",
+          toolName: "read_file",
+          content: [{ type: "text", text: "README" }],
+          isError: false,
+          timestamp: Date.parse("2026-04-05T00:00:03.000Z"),
+          createdAt: "2026-04-05T00:00:03.000Z",
+        },
+      ],
+    };
+
+    const engine = createPiAgentEngine({
+      createAgent: () => createAgentDouble({
+        messages: [finalAssistantMessage],
+        events: [{ type: "message_end", message: finalAssistantMessage }],
+        onContinue: vi.fn(),
+      }),
+      resolveModel: () => resolvedModel,
+      readTextFile: async () => "unused context",
+    });
+
+    const result = await engine.run({
+      agent: createAgent(),
+      conversation,
+      message: createIncomingMessage(),
+      continueFromContext: true,
+    });
+
+    expect(result.conversationEvents).toMatchObject([
+      {
+        id: "2:assistant:2",
+        role: "assistant",
+      },
+    ]);
+  });
+
   it("fails clearly when the configured model cannot be resolved", async () => {
     const logger = createMockLogger();
     const engine = createPiAgentEngine({
@@ -2229,7 +2341,7 @@ describe("createPiAgentEngine", () => {
   });
 });
 
-type AgentDouble = Pick<Agent, "prompt" | "subscribe"> & {
+type AgentDouble = Pick<Agent, "continue" | "prompt" | "subscribe"> & {
   state: Pick<Agent["state"], "messages">;
 };
 
@@ -2240,6 +2352,7 @@ interface AgentDoubleOptions {
     input: AgentMessage | AgentMessage[] | string,
     images?: ImageContent[],
   ) => Promise<void> | void;
+  onContinue?: () => Promise<void> | void;
 }
 
 function createAgentDouble(options: AgentDoubleOptions = {}): AgentDouble {
@@ -2262,10 +2375,22 @@ function createAgentDouble(options: AgentDoubleOptions = {}): AgentDouble {
     }
   }
 
+  async function continueRun(): Promise<void> {
+    await options.onContinue?.();
+
+    const signal = new AbortController().signal;
+    for (const event of options.events ?? []) {
+      for (const subscriber of subscribers) {
+        await subscriber(event, signal);
+      }
+    }
+  }
+
   return {
     state: {
       messages,
     },
+    continue: continueRun,
     prompt,
     subscribe(subscriber) {
       subscribers.push(subscriber);
