@@ -370,6 +370,7 @@ class WakePhraseRecorder:
             "follow-up-ready": [(880.0, 0.04, 0.22), (1174.0, 0.08, 0.26)],
             "captured": [(1174.0, 0.035, 0.22), (784.0, 0.07, 0.24)],
             "accepted": [(660.0, 0.035, 0.2), (880.0, 0.04, 0.22), (1174.0, 0.055, 0.24)],
+            "error": [(392.0, 0.07, 0.24), (330.0, 0.11, 0.22)],
             "closed": [(880.0, 0.04, 0.2), (659.0, 0.06, 0.22), (440.0, 0.11, 0.24)],
         }
         segments = tone_map.get(name)
@@ -834,6 +835,34 @@ class WakePhraseRecorder:
         if self.config.command_recording.write_metadata:
             path.with_suffix(".json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
+        if not transcript:
+            self.log("No command transcript is available; not writing an imp plugin event.")
+            error_cue_seconds = self.play_feedback_tone("error")
+            self.health_writer.write(
+                "recorded",
+                state=self.state,
+                phase="command_rejected",
+                can_speak=False,
+                cue=("error" if error_cue_seconds > 0 else None),
+                recording_file=str(path),
+                command_text=transcript,
+                finish_reason=reason,
+                closed_reason="empty-transcript",
+            )
+            self.command_chunks = []
+            self.command_chunk_count = 0
+            self.command_max_rms = 0
+            self.command_trigger_rms = 0
+            if self.once:
+                self.log("--once active, exiting after the first recording.")
+                self.stop_requested = True
+                return
+            if self.awaiting_follow_up and self.config.conversation.enabled:
+                self.arm_follow_up_recording()
+                return
+            self.reset_to_idle(cooldown=True, closed_reason="empty-transcript")
+            return
+
         if self.awaiting_follow_up and self.is_close_phrase(transcript):
             self.log("Follow-up conversation closed by local close phrase.")
             self.health_writer.write(
@@ -855,19 +884,16 @@ class WakePhraseRecorder:
 
         imp_event_path: Path | None = None
         if self.config.imp_plugin.enabled:
-            if transcript:
-                accepted_cue_seconds = self.play_feedback_tone("accepted")
-                if accepted_cue_seconds > 0:
-                    self.write_runtime_status(
-                        "command_accepted",
-                        can_speak=False,
-                        cue="accepted",
-                        recording_file=str(path),
-                        command_text=transcript,
-                    )
-                imp_event_path = self.write_imp_plugin_event(path, transcript, metadata)
-            else:
-                self.log("No command transcript is available; not writing an imp plugin event.")
+            accepted_cue_seconds = self.play_feedback_tone("accepted")
+            if accepted_cue_seconds > 0:
+                self.write_runtime_status(
+                    "command_accepted",
+                    can_speak=False,
+                    cue="accepted",
+                    recording_file=str(path),
+                    command_text=transcript,
+                )
+            imp_event_path = self.write_imp_plugin_event(path, transcript, metadata)
 
         self.health_writer.write(
             "recorded",

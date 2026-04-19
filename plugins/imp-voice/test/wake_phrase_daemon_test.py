@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -143,6 +144,31 @@ class WakePhraseDaemonStateTests(unittest.TestCase):
 
         self.assertGreater(len(wav_bytes), 44)
         self.assertGreater(duration, 0)
+
+    def test_error_feedback_tone_is_available(self):
+        recorder = self.create_recorder()
+
+        wav_bytes, duration = recorder.build_feedback_tone("error")
+
+        self.assertGreater(len(wav_bytes), 44)
+        self.assertGreater(duration, 0)
+
+    def test_empty_transcript_returns_to_idle_instead_of_waiting_for_speaker(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = self.create_recorder()
+            recorder.config.command_recording.output_dir = Path(temp_dir)
+            recorder.config.conversation.enabled = True
+            recorder.config.speaker_feedback.enabled = True
+            recorder.state = "recording_command"
+            recorder.command_chunks = [b"\x00" * recorder.chunk_bytes]
+            recorder.command_chunk_count = 1
+            recorder.command_start_ts = 0.0
+
+            recorder.finish_command_recording(reason="silence")
+
+            self.assertEqual(recorder.state, "idle")
+            self.assertGreater(recorder.cooldown_until, 0)
+            self.assertFalse(recorder.stop_requested)
 
     def test_waiting_for_speaker_has_no_timeout_when_disabled(self):
         recorder = self.create_recorder()
