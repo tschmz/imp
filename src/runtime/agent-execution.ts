@@ -41,6 +41,7 @@ export interface ExecuteAgentOptions {
   };
   parentMessageId: string;
   correlationId: string;
+  onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
 }
 
 export interface ExecuteAgentResult {
@@ -79,7 +80,11 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
     ...(options.onPayload ? { onPayload: options.onPayload } : {}),
   });
 
-  const eventMessages = collectConversationEventMessages(agent);
+  const eventMessages = collectConversationEventMessages(agent, {
+    parentMessageId: options.parentMessageId,
+    correlationId: options.correlationId,
+    onConversationEvents: options.onConversationEvents,
+  });
 
   try {
     await agent.prompt(options.userText);
@@ -90,6 +95,12 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
   const appendedMessages = eventMessages.messages.length > 0
     ? eventMessages.messages
     : agent.state.messages.slice(initialMessages.length);
+  const conversationEvents = eventMessages.events.length > 0
+    ? eventMessages.events
+    : toConversationEvents(appendedMessages, {
+        parentMessageId: options.parentMessageId,
+        correlationId: options.correlationId,
+      });
 
   const assistantMessage = [...agent.state.messages]
     .reverse()
@@ -116,24 +127,30 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       conversation: options.conversation,
       text: responseText,
     },
-    conversationEvents: toConversationEvents(appendedMessages, {
-      parentMessageId: options.parentMessageId,
-      correlationId: options.correlationId,
-    }),
+    conversationEvents,
     ...(options.workingDirectoryState.get() !== options.initialWorkingDirectory
       ? { workingDirectory: options.workingDirectoryState.get() }
       : {}),
   };
 }
 
-function collectConversationEventMessages(agent: AgentHandle): {
+function collectConversationEventMessages(
+  agent: AgentHandle,
+  options: {
+    parentMessageId: string;
+    correlationId: string;
+    onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
+  },
+): {
   messages: AgentMessage[];
+  events: ConversationEvent[];
   unsubscribe?: () => void;
 } {
   const messages: AgentMessage[] = [];
+  const events: ConversationEvent[] = [];
   const seen = new Set<string>();
 
-  const recordMessage = (message: AgentMessage) => {
+  const recordMessage = async (message: AgentMessage) => {
     if (message.role !== "assistant" && message.role !== "toolResult") {
       return;
     }
@@ -145,15 +162,24 @@ function collectConversationEventMessages(agent: AgentHandle): {
 
     seen.add(key);
     messages.push(message);
+    const nextEvents = toConversationEvents(messages, {
+      parentMessageId: options.parentMessageId,
+      correlationId: options.correlationId,
+    }).slice(events.length);
+    events.push(...nextEvents);
+
+    if (nextEvents.length > 0) {
+      await options.onConversationEvents?.(nextEvents);
+    }
   };
 
-  const unsubscribe = agent.subscribe?.((event) => {
+  const unsubscribe = agent.subscribe?.(async (event) => {
     if (isConversationMessageEvent(event)) {
-      recordMessage(event.message);
+      await recordMessage(event.message);
     }
   });
 
-  return { messages, unsubscribe };
+  return { messages, events, unsubscribe };
 }
 
 function isConversationMessageEvent(event: AgentEvent): event is ConversationMessageEvent {

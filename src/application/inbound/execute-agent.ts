@@ -5,10 +5,28 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
     return;
   }
 
+  const conversationBeforeRun = context.conversation;
+  const userConversationMessage = toUserConversationMessage(context.message);
+  let persistedConversation = context.conversation;
+  if (context.dependencies.conversationStore.appendEvents) {
+    persistedConversation = await context.dependencies.conversationStore.appendEvents(
+      persistedConversation,
+      [userConversationMessage],
+    );
+  }
+
   const result = await context.dependencies.engine.run({
     agent: context.agent,
-    conversation: context.conversation,
+    conversation: conversationBeforeRun,
     message: context.message,
+    onConversationEvents: context.dependencies.conversationStore.appendEvents
+      ? async (events) => {
+          persistedConversation = await context.dependencies.conversationStore.appendEvents!(
+            persistedConversation,
+            events,
+          );
+        }
+      : undefined,
     runtime: {
       configPath: context.dependencies.runtimeInfo.configPath,
       dataRoot: context.dependencies.runtimeInfo.dataRoot,
@@ -27,8 +45,8 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
       updatedAt: new Date().toISOString(),
     },
     messages: [
-      ...context.conversation.messages,
-      toUserConversationMessage(context.message),
+      ...conversationBeforeRun.messages,
+      userConversationMessage,
       ...result.conversationEvents,
     ],
   };

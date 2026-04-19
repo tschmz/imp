@@ -98,10 +98,7 @@ export function toConversationEvents(
     assistantIndex += 1;
     return {
       kind: "message",
-      id:
-        assistantIndex === 1 && messages.filter((candidate) => candidate.role === "assistant").length === 1
-          ? `${options.parentMessageId}:assistant`
-          : `${options.parentMessageId}:assistant:${assistantIndex}`,
+      id: `${options.parentMessageId}:assistant:${assistantIndex}`,
       role: "assistant",
       createdAt: new Date(message.timestamp).toISOString(),
       correlationId: options.correlationId,

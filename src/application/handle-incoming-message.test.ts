@@ -659,11 +659,19 @@ describe("createHandleIncomingMessage", () => {
           messages: Array<Record<string, unknown>>;
         }
       | undefined;
+    const appendCalls: Array<Array<Record<string, unknown>>> = [];
 
     const conversationStore: ConversationStore = {
       get: vi.fn(async () => undefined),
       put: vi.fn(async (context) => {
         storedContext = context as typeof storedContext;
+      }),
+      appendEvents: vi.fn(async (context, events) => {
+        appendCalls.push(events as Array<Record<string, unknown>>);
+        return {
+          ...context,
+          messages: [...context.messages, ...events],
+        };
       }),
       listBackups: vi.fn(async () => []),
       restore: vi.fn(async () => false),
@@ -696,7 +704,7 @@ describe("createHandleIncomingMessage", () => {
     };
 
     const engine: AgentEngine = {
-      run: vi.fn(async ({ message }) => {
+      run: vi.fn(async ({ message, onConversationEvents }) => {
         const conversationEvents = [
           {
             kind: "message",
@@ -766,6 +774,7 @@ describe("createHandleIncomingMessage", () => {
             stopReason: "stop",
           },
         ] satisfies ConversationEvent[];
+        await onConversationEvents?.(conversationEvents);
 
         return {
           message: {
@@ -787,6 +796,29 @@ describe("createHandleIncomingMessage", () => {
 
     await service.handle(createIncomingMessage("7", "check the readme"));
 
+    expect(appendCalls).toMatchObject([
+      [
+        {
+          id: "7",
+          role: "user",
+          content: "check the readme",
+        },
+      ],
+      [
+        {
+          id: "7:assistant:1",
+          role: "assistant",
+        },
+        {
+          id: "7:tool-result:1",
+          role: "toolResult",
+        },
+        {
+          id: "7:assistant:2",
+          role: "assistant",
+        },
+      ],
+    ]);
     expect(storedContext?.messages).toMatchObject([
       {
         kind: "message",
@@ -1023,7 +1055,7 @@ function createAgentRunResult(message: IncomingMessage, text: string) {
     conversationEvents: [
       {
         kind: "message" as const,
-        id: `${message.messageId}:assistant`,
+        id: `${message.messageId}:assistant:1`,
         role: "assistant" as const,
         content: [{ type: "text" as const, text }],
         timestamp: Date.parse("2026-04-05T00:00:01.000Z"),

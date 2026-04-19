@@ -67,7 +67,7 @@ describe("createDaemon", () => {
       },
       {
         kind: "message",
-        id: "1:assistant",
+        id: "1:assistant:1",
         role: "assistant",
         content: [{ type: "text", text: "reply:1" }],
         timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
@@ -684,7 +684,7 @@ function createAgentRunResult(message: IncomingMessage, text: string) {
     conversationEvents: [
       {
         kind: "message" as const,
-        id: `${message.messageId}:assistant`,
+        id: `${message.messageId}:assistant:1`,
         role: "assistant" as const,
         content: [{ type: "text" as const, text }],
         timestamp: Date.parse("2026-04-05T00:00:01.000Z"),

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
-import type { ConversationContext } from "../domain/conversation.js";
+import type { ConversationContext, ConversationEvent } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
 import type { ToolDefinition } from "../tools/types.js";
@@ -98,7 +98,7 @@ describe("createPiAgentEngine", () => {
       conversationEvents: [
         {
           kind: "message",
-          id: "2:assistant",
+          id: "2:assistant:1",
           role: "assistant",
           content: [{ type: "text", text: "You said hello." }],
           correlationId: "corr-2",
@@ -294,10 +294,14 @@ describe("createPiAgentEngine", () => {
       readTextFile: async () => "unused context",
     });
 
+    const streamedEvents: ConversationEvent[][] = [];
     const result = await engine.run({
       agent: createAgent(),
       conversation: createConversation(),
       message: createIncomingMessage(),
+      onConversationEvents: async (events) => {
+        streamedEvents.push(events);
+      },
     });
 
     expect(result.conversationEvents).toEqual([
@@ -350,6 +354,7 @@ describe("createPiAgentEngine", () => {
         stopReason: finalAssistantMessage.stopReason,
       },
     ]);
+    expect(streamedEvents).toEqual(result.conversationEvents.map((event) => [event]));
   });
 
   it("falls back to state messages instead of collecting turn_end aggregate data", async () => {
@@ -591,7 +596,7 @@ describe("createPiAgentEngine", () => {
             },
           },
           {
-            id: "voice-1:assistant",
+            id: "voice-1:assistant:1",
             role: "assistant",
             content: [{ type: "text", text: "hi there" }],
             timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
@@ -2314,7 +2319,7 @@ function createConversation(): ConversationContext {
         createdAt: "2026-04-05T00:00:00.000Z",
       },
       {
-        id: "1:assistant",
+        id: "1:assistant:1",
         role: "assistant",
         content: [{ type: "text", text: "hi there" }],
         timestamp: Date.parse("2026-04-05T00:00:01.000Z"),

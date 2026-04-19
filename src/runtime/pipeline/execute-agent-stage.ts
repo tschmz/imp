@@ -36,6 +36,7 @@ export async function executeAgentStage(
     conversation: context.input.message.conversation,
     parentMessageId: context.input.message.messageId,
     correlationId: context.input.message.correlationId,
+    onConversationEvents: context.input.onConversationEvents,
   });
 
   return {
