@@ -220,6 +220,9 @@ describe("createDaemon", () => {
       tools: ["read"],
     });
     expect(runInputs[0]?.agent.prompt.base.text).toBeUndefined();
+    await expect(readFile(join(root, "logs", "agents", "default.log"), "utf8")).resolves.toContain(
+      '"message":"loaded configured base prompt","agentId":"default","basePromptSource":"file","basePromptFile":"/workspace/prompts/default.md"',
+    );
   });
 
   it("fails startup when an agent references an unknown tool", async () => {
@@ -360,8 +363,17 @@ describe("createDaemon", () => {
     await expect(readFile(privateBot.paths.logFilePath, "utf8")).resolves.toContain(
       '"message":"starting daemon with default agent \\"default\\""',
     );
+    await expect(readFile(privateBot.paths.logFilePath, "utf8")).resolves.not.toContain(
+      '"message":"loaded configured agent skills"',
+    );
     await expect(readFile(opsBot.paths.logFilePath, "utf8")).resolves.toContain(
       '"message":"starting daemon with default agent \\"ops\\""',
+    );
+    await expect(readFile(join(root, "logs", "agents", "default.log"), "utf8")).resolves.toContain(
+      '"message":"loaded configured agent skills"',
+    );
+    await expect(readFile(join(root, "logs", "agents", "ops.log"), "utf8")).resolves.toContain(
+      '"message":"loaded configured agent skills"',
     );
   });
 

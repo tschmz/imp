@@ -223,7 +223,7 @@ describe("createHandleIncomingMessage", () => {
     expect(runInput?.runtime?.availableSkills).toHaveLength(4);
     expect(runInput?.runtime).not.toHaveProperty("activatedSkills");
     expect(logger.debug).toHaveBeenCalledWith(
-      "resolved available agent skills for turn",
+      "resolved effective agent skills for turn",
       expect.objectContaining({
         skillCount: 4,
         skillNames: ["git-commit", "git-rebase", "git-review", "git-cleanup"],

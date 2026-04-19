@@ -14,6 +14,8 @@ export interface BootstrappedRuntime {
   endpointConfig: ActiveEndpointRuntimeConfig;
   configPath: string;
   logger: ReturnType<typeof buildRuntimeComponents>["logger"];
+  endpointLogger: ReturnType<typeof buildRuntimeComponents>["endpointLogger"];
+  agentLoggers: ReturnType<typeof buildRuntimeComponents>["agentLoggers"];
   loggingLevel: ReturnType<typeof buildRuntimeComponents>["loggingLevel"];
   conversationStore: ReturnType<typeof buildRuntimeComponents>["conversationStore"];
   engine: ReturnType<typeof buildRuntimeComponents>["engine"];

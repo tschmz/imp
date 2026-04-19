@@ -50,6 +50,8 @@ Show logs for one endpoint:
 imp log --endpoint private-telegram
 ```
 
+Agent-specific runtime details, such as skill discovery and agent-engine pipeline events, are written to `logs/agents/<agent-id>.log`.
+
 Follow new log lines:
 
 ```bash

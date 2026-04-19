@@ -10,6 +10,7 @@ import type { BootstrappedRuntime } from "../daemon/runtime-bootstrap.js";
 import { createRuntimeEntries, runRuntimeEntries, stopRuntimeEntries } from "../daemon/runtime-runner.js";
 import type { DaemonConfig } from "../daemon/types.js";
 import { ConfigurationError } from "../domain/errors.js";
+import { prepareAgentLogFiles } from "../logging/agent-loggers.js";
 import { createFileOnlyLogger } from "../logging/file-logger.js";
 import { createBuiltInToolRegistry } from "../runtime/create-pi-agent-engine.js";
 import { createRuntimeTransportFactory } from "./runtime-target.js";
@@ -19,6 +20,7 @@ interface ChatUseCaseDependencies {
   loadAppConfig: typeof loadAppConfig;
   resolveRuntimeConfig: typeof resolveRuntimeConfig;
   prepareRuntimeFilesystem: typeof prepareRuntimeFilesystem;
+  prepareAgentLogFiles: typeof prepareAgentLogFiles;
   buildRuntimeComponents: typeof buildRuntimeComponents;
   createRuntimeEntries: typeof createRuntimeEntries;
   runRuntimeEntries: typeof runRuntimeEntries;
@@ -33,6 +35,7 @@ export function createChatUseCase(
     loadAppConfig,
     resolveRuntimeConfig,
     prepareRuntimeFilesystem,
+    prepareAgentLogFiles,
     buildRuntimeComponents,
     createRuntimeEntries,
     runRuntimeEntries,
@@ -60,6 +63,10 @@ export function createChatUseCase(
     const chatRuntimeConfig = resolveCliChatRuntimeConfig(runtimeConfig);
     const agentRegistry = createAgentRegistry(buildAgents(chatRuntimeConfig.agents));
     validateAgentRegistry(agentRegistry, undefined, createBuiltInToolRegistry);
+    await deps.prepareAgentLogFiles(
+      chatRuntimeConfig.activeEndpoints.map((endpoint) => endpoint.paths.dataRoot),
+      agentRegistry.list().map((agent) => agent.id),
+    );
 
     const runtimes = await Promise.all(
       chatRuntimeConfig.activeEndpoints.map(async (endpointConfig): Promise<BootstrappedRuntime> => {

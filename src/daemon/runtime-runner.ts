@@ -28,6 +28,7 @@ export function createRuntimeEntries(
   dependencies: RuntimeRunnerDependencies,
 ): RuntimeEntry[] {
   const deliveryRouter = dependencies.deliveryRouter ?? createDeliveryRouter();
+  const loggedAgentStartup = new Set<string>();
   const transportContext: TransportContext = {
     deliveryRouter,
   };
@@ -118,14 +119,33 @@ export function createRuntimeEntries(
         await runtime.logger.info(`runtime file: ${runtime.endpointConfig.paths.runtimeStatePath}`);
         await runtime.logger.info(`active endpoint: ${runtime.endpointConfig.id}`);
         for (const agent of dependencies.agentRegistry.list()) {
-          await runtime.logger.info("discovered agent skills", {
-            endpointId: runtime.endpointConfig.id,
+          if (loggedAgentStartup.has(agent.id)) {
+            continue;
+          }
+          loggedAgentStartup.add(agent.id);
+
+          const agentLogger = runtime.agentLoggers.forAgent(agent.id);
+          await agentLogger.info("loaded configured base prompt", {
             agentId: agent.id,
-            skillCount: agent.skillCatalog?.length ?? 0,
-            skillNames: (agent.skillCatalog ?? []).map((skill) => skill.name),
+            ...describeBasePrompt(agent.prompt.base),
+          });
+          await agentLogger.info("loaded configured agent skills", {
+            agentId: agent.id,
+            configuredSkillCount: agent.skillCatalog?.length ?? 0,
+            configuredSkillNames: (agent.skillCatalog ?? []).map((skill) => skill.name),
+          });
+          await agentLogger.info("loaded configured instruction files", {
+            agentId: agent.id,
+            configuredInstructionFileCount: countConfiguredFiles(agent.prompt.instructions),
+            configuredInstructionFiles: getConfiguredFiles(agent.prompt.instructions),
+          });
+          await agentLogger.info("loaded configured reference files", {
+            agentId: agent.id,
+            configuredReferenceFileCount: countConfiguredFiles(agent.prompt.references),
+            configuredReferenceFiles: getConfiguredFiles(agent.prompt.references),
           });
           for (const issue of agent.skillIssues ?? []) {
-            await runtime.logger.info(issue, { endpointId: runtime.endpointConfig.id, agentId: agent.id });
+            await agentLogger.info(issue, { agentId: agent.id });
           }
         }
         await runtime.logger.debug("starting transport for endpoint", {
@@ -157,6 +177,46 @@ export function createRuntimeEntries(
       },
     };
   });
+}
+
+function getConfiguredFiles(sources: Array<{ file?: string }> | undefined): string[] {
+  return (sources ?? [])
+    .map((source) => source.file)
+    .filter((file): file is string => typeof file === "string");
+}
+
+function countConfiguredFiles(sources: Array<{ file?: string }> | undefined): number {
+  return getConfiguredFiles(sources).length;
+}
+
+function describeBasePrompt(source: { builtIn?: string; file?: string; text?: string }): {
+  basePromptSource: "built-in" | "file" | "text" | "unknown";
+  basePromptFile?: string;
+  basePromptBuiltIn?: string;
+} {
+  if (source.file) {
+    return {
+      basePromptSource: "file",
+      basePromptFile: source.file,
+    };
+  }
+
+  if (source.builtIn) {
+    return {
+      basePromptSource: "built-in",
+      basePromptBuiltIn: source.builtIn,
+    };
+  }
+
+  if (source.text !== undefined) {
+    return {
+      basePromptSource: "text",
+    };
+  }
+
+  return {
+    basePromptSource: "unknown",
+  };
 }
 
 function withEndpointScopedConversation<TEvent extends { message: { endpointId: string; conversation: ChatRef } }>(

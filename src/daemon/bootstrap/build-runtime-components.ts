@@ -1,6 +1,8 @@
 import type { AgentDefinition } from "../../domain/agent.js";
+import { createAgentLoggers, type AgentLoggers } from "../../logging/agent-loggers.js";
 import { createFileLogger } from "../../logging/file-logger.js";
 import type { LogLevel, Logger } from "../../logging/types.js";
+import { createRoutingLogger } from "../../logging/routing-logger.js";
 import {
   createBuiltInToolRegistry,
   type WorkingDirectoryState,
@@ -16,6 +18,8 @@ import type { ActiveEndpointRuntimeConfig, DaemonConfig, RuntimePaths } from "..
 export interface RuntimeComponents {
   loggingLevel: LogLevel;
   logger: Logger;
+  endpointLogger: Logger;
+  agentLoggers: AgentLoggers;
   conversationStore: ConversationStore;
   engine: AgentEngine;
 }
@@ -42,7 +46,9 @@ export function buildRuntimeComponents(
   const createBuiltInRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
 
-  const logger = createLogger(endpointConfig.paths.logFilePath, config.logging.level);
+  const endpointLogger = createLogger(endpointConfig.paths.logFilePath, config.logging.level);
+  const agentLoggers = createAgentLoggers(endpointConfig.paths.dataRoot, config.logging.level, createLogger);
+  const logger = createRoutingLogger(endpointLogger, agentLoggers);
   const conversationStore = createConversationStore(endpointConfig.paths);
 
   const getApiKey = async (provider: string, agent: AgentDefinition) =>
@@ -58,6 +64,8 @@ export function buildRuntimeComponents(
   return {
     loggingLevel: config.logging.level,
     logger,
+    endpointLogger,
+    agentLoggers,
     conversationStore,
     engine,
   };

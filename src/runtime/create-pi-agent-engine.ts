@@ -18,6 +18,7 @@ import { resolveModelStage } from "./pipeline/resolve-model-stage.js";
 import { resolvePromptStage } from "./pipeline/resolve-prompt-stage.js";
 import { resolveToolsStage } from "./pipeline/resolve-tools-stage.js";
 import { InMemoryCacheStrategy, SystemPromptCache } from "./system-prompt-cache.js";
+import type { SystemPromptResolutionResult } from "./system-prompt-resolution.js";
 import type { AgentEngine, AgentRunContext } from "./types.js";
 import {
   createBuiltInToolRegistry,
@@ -145,6 +146,7 @@ export function createPiAgentEngine(
           status: "completed",
           cacheHit: promptContext.systemPromptResolution.cacheHit,
         });
+        await logSystemPromptSources(logger, context, promptContext.systemPromptResolution);
 
         await logPipelineEvent(logger, context, { step: "tool-resolution", status: "started" });
         const toolContext = await resolveToolsStage(promptContext, {
@@ -219,6 +221,32 @@ export function createPiAgentEngine(
       await mcpToolCache.close();
     },
   };
+}
+
+async function logSystemPromptSources(
+  logger: Logger | undefined,
+  context: EngineLogContext,
+  resolution: SystemPromptResolutionResult,
+): Promise<void> {
+  const sources = resolution.sources;
+  await logger?.debug("resolved system prompt sources", {
+    ...context,
+    cacheHit: resolution.cacheHit,
+    basePromptSource: sources.basePromptSource,
+    ...(sources.basePromptFile ? { basePromptFile: sources.basePromptFile } : {}),
+    ...(sources.basePromptBuiltIn ? { basePromptBuiltIn: sources.basePromptBuiltIn } : {}),
+    instructionFileCount: sources.instructionFiles.length,
+    instructionFiles: sources.instructionFiles,
+    configuredInstructionFileCount: sources.configuredInstructionFiles.length,
+    configuredInstructionFiles: sources.configuredInstructionFiles,
+    agentHomeInstructionFileCount: sources.agentHomeInstructionFiles.length,
+    agentHomeInstructionFiles: sources.agentHomeInstructionFiles,
+    ...(sources.workspaceInstructionFile ? { workspaceInstructionFile: sources.workspaceInstructionFile } : {}),
+    referenceFileCount: sources.referenceFiles.length,
+    referenceFiles: sources.referenceFiles,
+    configuredReferenceFileCount: sources.configuredReferenceFiles.length,
+    configuredReferenceFiles: sources.configuredReferenceFiles,
+  });
 }
 
 async function logPipelineEvent(

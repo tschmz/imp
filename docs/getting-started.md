@@ -67,6 +67,7 @@ Runtime data under the state directory uses this layout:
 
 - conversations and selected-agent state: `conversations/`
 - endpoint logs: `logs/endpoints/<endpoint-id>.log`
+- agent logs: `logs/agents/<agent-id>.log`
 - endpoint runtime state: `runtime/endpoints/<endpoint-id>.json`
 - agent-managed files, when you keep them in the data root: `agents/<agent-id>/...`
 

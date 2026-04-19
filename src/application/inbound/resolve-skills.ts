@@ -74,7 +74,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
       });
     }
 
-    await context.dependencies.logger?.debug("resolved available agent skills for turn", {
+    await context.dependencies.logger?.debug("resolved effective agent skills for turn", {
       endpointId: context.message.endpointId,
       transport: context.message.conversation.transport,
       conversationId: context.message.conversation.externalId,
@@ -94,7 +94,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
   } catch (error) {
     context.availableSkills = [];
     void context.dependencies.logger?.error(
-      "failed to resolve available agent skills for turn; continuing without skills",
+      "failed to resolve effective agent skills for turn; continuing without skills",
       {
         endpointId: context.message.endpointId,
         transport: context.message.conversation.transport,

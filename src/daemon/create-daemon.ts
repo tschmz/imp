@@ -2,6 +2,7 @@ import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import { ConfigurationError } from "../domain/errors.js";
 import type { Logger } from "../logging/types.js";
+import { prepareAgentLogFiles } from "../logging/agent-loggers.js";
 import {
   createBuiltInToolRegistry,
   resolveAgentTools,
@@ -45,6 +46,10 @@ export function createDaemon(
   return {
     async start() {
       validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createBuiltInRegistry);
+      await prepareAgentLogFiles(
+        config.activeEndpoints.map((endpoint) => endpoint.paths.dataRoot),
+        agentRegistry.list().map((agent) => agent.id),
+      );
       const runtimes: BootstrappedRuntime[] = [];
 
       try {

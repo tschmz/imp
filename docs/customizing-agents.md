@@ -134,7 +134,7 @@ Rules:
 - invalid files are ignored for that agent or turn and logged for diagnostics
 - duplicate skill names within one discovery source are ignored for that agent or turn
 - when an auto-discovered skill name collides with an earlier skill, the later source overrides the earlier one for that turn
-- skill discovery for configured paths is logged per agent at startup
+- configured base prompt source, skill catalogs, instruction files, and reference files are logged per agent at startup
 - all available skills are exposed to prompt file templates as metadata only: skill directory path, `SKILL.md` path, skill name, and description
 - when available skills exist, the `load_skill` tool is enabled automatically for that turn
 - `load_skill` returns the selected skill's `SKILL.md` instructions, the absolute skill directory, and a `<skill_resources>` list of bundled `scripts/` and `references/` files

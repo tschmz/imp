@@ -207,6 +207,7 @@ function createDependencies(appConfig: AppConfig = createAppConfig()) {
       } satisfies DaemonConfig;
     }),
     prepareRuntimeFilesystem: vi.fn(async () => undefined),
+    prepareAgentLogFiles: vi.fn(async () => undefined),
     buildRuntimeComponents: vi.fn(() => ({
       loggingLevel: "info" as const,
       logger: {
@@ -214,6 +215,18 @@ function createDependencies(appConfig: AppConfig = createAppConfig()) {
         info: vi.fn(async () => undefined),
         warn: vi.fn(async () => undefined),
         error: vi.fn(async () => undefined),
+      },
+      endpointLogger: {
+        debug: vi.fn(async () => undefined),
+        info: vi.fn(async () => undefined),
+        error: vi.fn(async () => undefined),
+      },
+      agentLoggers: {
+        forAgent: vi.fn(() => ({
+          debug: vi.fn(async () => undefined),
+          info: vi.fn(async () => undefined),
+          error: vi.fn(async () => undefined),
+        })),
       },
       conversationStore: createConversationStore(),
       engine: {

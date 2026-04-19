@@ -19,6 +19,19 @@ export interface SystemPromptResolutionOptions {
 export interface SystemPromptResolutionResult {
   systemPrompt: string;
   cacheHit: boolean;
+  sources: SystemPromptSourceSummary;
+}
+
+export interface SystemPromptSourceSummary {
+  basePromptSource: "built-in" | "file" | "text" | "unknown";
+  basePromptFile?: string;
+  basePromptBuiltIn?: string;
+  instructionFiles: string[];
+  configuredInstructionFiles: string[];
+  agentHomeInstructionFiles: string[];
+  workspaceInstructionFile?: string;
+  referenceFiles: string[];
+  configuredReferenceFiles: string[];
 }
 
 export async function resolveSystemPrompt(
@@ -27,6 +40,11 @@ export async function resolveSystemPrompt(
   const agentHomeMarkdownFiles = await resolveAgentHomeMarkdownFiles(
     options.agent,
     options.listAgentHomeMarkdownFiles ?? defaultListAgentHomeMarkdownFiles,
+  );
+  const sources = summarizePromptSources(
+    options.agent,
+    options.promptWorkingDirectory,
+    agentHomeMarkdownFiles,
   );
   const promptFiles = [
     ...resolvePromptFileSources(
@@ -49,6 +67,7 @@ export async function resolveSystemPrompt(
     return {
       systemPrompt: cachedPrompt,
       cacheHit: true,
+      sources,
     };
   }
 
@@ -66,6 +85,60 @@ export async function resolveSystemPrompt(
   return {
     systemPrompt,
     cacheHit: false,
+    sources,
+  };
+}
+
+function summarizePromptSources(
+  agent: AgentDefinition,
+  promptWorkingDirectory: string | undefined,
+  agentHomeMarkdownFiles: string[],
+): SystemPromptSourceSummary {
+  const instructionSources = resolveInstructionSources(agent, promptWorkingDirectory, agentHomeMarkdownFiles);
+  const instructionFiles = instructionSources
+    .map((entry) => entry.source.file)
+    .filter((file): file is string => typeof file === "string");
+  const configuredInstructionFiles = extractFileSources(agent.prompt.instructions ?? []).map((entry) => entry.path);
+  const workspaceInstructionFile = instructionSources.find((entry) => entry.optional)?.source.file;
+  const referenceFiles = extractFileSources(agent.prompt.references ?? []).map((entry) => entry.path);
+
+  return {
+    ...describeBasePromptSource(agent.prompt.base),
+    instructionFiles,
+    configuredInstructionFiles,
+    agentHomeInstructionFiles: agentHomeMarkdownFiles,
+    ...(workspaceInstructionFile ? { workspaceInstructionFile } : {}),
+    referenceFiles,
+    configuredReferenceFiles: referenceFiles,
+  };
+}
+
+function describeBasePromptSource(source: PromptSource): Pick<
+  SystemPromptSourceSummary,
+  "basePromptSource" | "basePromptFile" | "basePromptBuiltIn"
+> {
+  if (source.file) {
+    return {
+      basePromptSource: "file",
+      basePromptFile: source.file,
+    };
+  }
+
+  if (source.builtIn) {
+    return {
+      basePromptSource: "built-in",
+      basePromptBuiltIn: source.builtIn,
+    };
+  }
+
+  if (source.text !== undefined) {
+    return {
+      basePromptSource: "text",
+    };
+  }
+
+  return {
+    basePromptSource: "unknown",
   };
 }
 

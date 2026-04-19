@@ -22,7 +22,7 @@ describe("createRuntimeEntries", () => {
           name: "Default",
           prompt: {
             base: {
-              text: "You are concise.",
+              file: "/agents/default/SYSTEM.md",
             },
           },
           model: {
@@ -431,9 +431,15 @@ describe("createRuntimeEntries", () => {
     expect(runtime.engine.close).toHaveBeenCalledTimes(1);
   });
 
-  it("logs discovered agent skills at runtime start", async () => {
+  it("logs configured agent resources to the agent log at runtime start", async () => {
     const runtime = createRuntime();
     const transport = createCapturingTransport();
+    const agentLogger = {
+      debug: vi.fn(async () => undefined),
+      info: vi.fn(async () => undefined),
+      error: vi.fn(async () => undefined),
+    };
+    runtime.agentLoggers.forAgent = vi.fn(() => agentLogger);
     const entries = createRuntimeEntries([runtime], {
       agentRegistry: createAgentRegistry([
         {
@@ -443,6 +449,13 @@ describe("createRuntimeEntries", () => {
             base: {
               text: "You are concise.",
             },
+            instructions: [
+              { file: "/agents/default/STYLE.md" },
+              { text: "Inline instruction." },
+            ],
+            references: [
+              { file: "/agents/default/RUNBOOK.md" },
+            ],
           },
           model: {
             provider: "openai",
@@ -469,13 +482,40 @@ describe("createRuntimeEntries", () => {
 
     await entries[0]?.start();
 
-    expect(runtime.logger.info).toHaveBeenCalledWith(
-      "discovered agent skills",
+    expect(runtime.logger.info).not.toHaveBeenCalledWith(
+      "loaded configured agent skills",
+      expect.anything(),
+    );
+    expect(runtime.agentLoggers.forAgent).toHaveBeenCalledWith("default");
+    expect(agentLogger.info).toHaveBeenCalledWith(
+      "loaded configured base prompt",
       expect.objectContaining({
-        endpointId: "private-telegram",
         agentId: "default",
-        skillCount: 1,
-        skillNames: ["commit"],
+        basePromptSource: "text",
+      }),
+    );
+    expect(agentLogger.info).toHaveBeenCalledWith(
+      "loaded configured agent skills",
+      expect.objectContaining({
+        agentId: "default",
+        configuredSkillCount: 1,
+        configuredSkillNames: ["commit"],
+      }),
+    );
+    expect(agentLogger.info).toHaveBeenCalledWith(
+      "loaded configured instruction files",
+      expect.objectContaining({
+        agentId: "default",
+        configuredInstructionFileCount: 1,
+        configuredInstructionFiles: ["/agents/default/STYLE.md"],
+      }),
+    );
+    expect(agentLogger.info).toHaveBeenCalledWith(
+      "loaded configured reference files",
+      expect.objectContaining({
+        agentId: "default",
+        configuredReferenceFileCount: 1,
+        configuredReferenceFiles: ["/agents/default/RUNBOOK.md"],
       }),
     );
   });
@@ -839,6 +879,18 @@ function createRuntime(overrides: Partial<BootstrappedRuntime> = {}): Bootstrapp
       debug: vi.fn(async () => undefined),
       info: vi.fn(async () => undefined),
       error: vi.fn(async () => undefined),
+    },
+    endpointLogger: overrides.endpointLogger ?? {
+      debug: vi.fn(async () => undefined),
+      info: vi.fn(async () => undefined),
+      error: vi.fn(async () => undefined),
+    },
+    agentLoggers: overrides.agentLoggers ?? {
+      forAgent: vi.fn(() => ({
+        debug: vi.fn(async () => undefined),
+        info: vi.fn(async () => undefined),
+        error: vi.fn(async () => undefined),
+      })),
     },
     conversationStore: overrides.conversationStore ?? {
       get: vi.fn(async () => undefined),

@@ -1000,6 +1000,78 @@ describe("createPiAgentEngine", () => {
     });
   });
 
+  it("logs resolved system prompt source details without prompt content", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-system-prompt-sources-"));
+    tempDirs.push(root);
+    const agentHome = join(root, "agent-home");
+    const workspace = join(root, "workspace");
+    const basePromptFile = join(root, "SYSTEM.md");
+    const agentHomeInstructionFile = join(agentHome, "AGENT.md");
+    const configuredInstructionFile = join(workspace, "RULES.md");
+    const workspaceInstructionFile = join(workspace, "AGENTS.md");
+    const referenceFile = join(workspace, "RUNBOOK.md");
+    await mkdir(agentHome, { recursive: true });
+    await mkdir(workspace, { recursive: true });
+    await writeFile(basePromptFile, "Base prompt secret content.", "utf8");
+    await writeFile(agentHomeInstructionFile, "Agent home secret content.", "utf8");
+    await writeFile(configuredInstructionFile, "Configured instruction secret content.", "utf8");
+    await writeFile(workspaceInstructionFile, "Workspace instruction secret content.", "utf8");
+    await writeFile(referenceFile, "Reference secret content.", "utf8");
+    const logger = createMockLogger();
+
+    const engine = createPiAgentEngine({
+      logger,
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("ok")] }),
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        home: agentHome,
+        prompt: {
+          base: { file: basePromptFile },
+          instructions: [{ file: configuredInstructionFile }],
+          references: [{ file: referenceFile }],
+        },
+        workspace: {
+          cwd: workspace,
+        },
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(logger.debug).toHaveBeenCalledWith("resolved system prompt sources", {
+      endpointId: "private-telegram",
+      transport: "telegram",
+      conversationId: "42",
+      messageId: "2",
+      correlationId: "corr-2",
+      agentId: "default",
+      cacheHit: false,
+      basePromptSource: "file",
+      basePromptFile,
+      instructionFileCount: 3,
+      instructionFiles: [agentHomeInstructionFile, configuredInstructionFile, workspaceInstructionFile],
+      configuredInstructionFileCount: 1,
+      configuredInstructionFiles: [configuredInstructionFile],
+      agentHomeInstructionFileCount: 1,
+      agentHomeInstructionFiles: [agentHomeInstructionFile],
+      workspaceInstructionFile,
+      referenceFileCount: 1,
+      referenceFiles: [referenceFile],
+      configuredReferenceFileCount: 1,
+      configuredReferenceFiles: [referenceFile],
+    });
+    expect(JSON.stringify(vi.mocked(logger.debug).mock.calls)).not.toContain("secret content");
+  });
+
   it("passes a dynamic api key resolver into the agent runtime", async () => {
     let capturedGetApiKey:
       | ((provider: string) => Promise<string | undefined> | string | undefined)
