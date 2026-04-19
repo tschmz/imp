@@ -30,6 +30,15 @@ interface PluginEventFile {
   bytes: number;
 }
 
+interface PendingPluginEventFile {
+  fileName: string;
+  originalPath: string;
+  processingPath: string;
+  finalName: string;
+}
+
+type PluginEvent = z.infer<typeof pluginEventSchema>;
+
 export function createPluginTransport(
   config: PluginTransportRuntimeConfig,
   logger: Logger,
@@ -122,15 +131,19 @@ async function scanPluginInbox(
   logger: Logger,
 ): Promise<void> {
   const paths = getPluginPaths(config);
-  const entries = await readdir(paths.inboxDir, { withFileTypes: true });
-  const fileNames = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-    .map((entry) => entry.name)
-    .sort();
+  const fileNames = await listPluginEventFiles(paths.inboxDir);
 
   for (const fileName of fileNames) {
     await processPluginEventFile(config, handler, context, logger, fileName);
   }
+}
+
+async function listPluginEventFiles(inboxDir: string): Promise<string[]> {
+  const entries = await readdir(inboxDir, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+    .map((entry) => entry.name)
+    .sort();
 }
 
 async function processPluginEventFile(
@@ -140,58 +153,95 @@ async function processPluginEventFile(
   logger: Logger,
   fileName: string,
 ): Promise<void> {
-  const paths = getPluginPaths(config);
-  const originalPath = join(paths.inboxDir, fileName);
-  const processingPath = join(paths.processingDir, `${Date.now()}-${randomUUID()}-${sanitizeFileName(fileName)}`);
-  const finalName = basename(processingPath);
+  const pendingFile = createPendingPluginEventFile(config, fileName);
 
   try {
-    const fileStat = await stat(originalPath);
-    if (fileStat.size > config.ingress.maxEventBytes) {
-      throw new PluginEventFileError(
-        `Plugin event file "${fileName}" exceeds configured size limit (${fileStat.size} > ${config.ingress.maxEventBytes}).`,
-      );
-    }
-
-    await rename(originalPath, processingPath);
-    const eventFile = {
-      originalPath,
-      processingPath,
-      finalName,
-      bytes: fileStat.size,
-    };
-    const raw = await readFile(processingPath, "utf8");
-    const parsed = pluginEventSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success) {
-      throw new PluginEventFileError(parsed.error.message);
-    }
-
-    const inboundEvent = createPluginInboundEvent(config, context, eventFile, parsed.data);
-    await logger.debug("received plugin event file", {
-      endpointId: config.id,
-      pluginId: config.pluginId,
-      fileName,
-      messageId: inboundEvent.message.messageId,
-      correlationId: inboundEvent.message.correlationId,
-    });
-    await handler.handle(inboundEvent);
+    const eventFile = await claimPluginEventFile(config, pendingFile);
+    const event = await readPluginEvent(eventFile);
+    await handlePluginEventFile(config, handler, context, logger, pendingFile.fileName, eventFile, event);
     await moveProcessedEvent(config, eventFile);
   } catch (error) {
     await recordFailedEvent(config, logger, {
-      originalPath,
-      processingPath,
-      finalName,
-      fileName,
+      originalPath: pendingFile.originalPath,
+      processingPath: pendingFile.processingPath,
+      finalName: pendingFile.finalName,
+      fileName: pendingFile.fileName,
       error,
     });
   }
+}
+
+function createPendingPluginEventFile(
+  config: PluginTransportRuntimeConfig,
+  fileName: string,
+): PendingPluginEventFile {
+  const paths = getPluginPaths(config);
+  const originalPath = join(paths.inboxDir, fileName);
+  const processingPath = join(paths.processingDir, `${Date.now()}-${randomUUID()}-${sanitizeFileName(fileName)}`);
+
+  return {
+    fileName,
+    originalPath,
+    processingPath,
+    finalName: basename(processingPath),
+  };
+}
+
+async function claimPluginEventFile(
+  config: PluginTransportRuntimeConfig,
+  pendingFile: PendingPluginEventFile,
+): Promise<PluginEventFile> {
+  const fileStat = await stat(pendingFile.originalPath);
+  if (fileStat.size > config.ingress.maxEventBytes) {
+    throw new PluginEventFileError(
+      `Plugin event file "${pendingFile.fileName}" exceeds configured size limit (${fileStat.size} > ${config.ingress.maxEventBytes}).`,
+    );
+  }
+
+  await rename(pendingFile.originalPath, pendingFile.processingPath);
+  return {
+    originalPath: pendingFile.originalPath,
+    processingPath: pendingFile.processingPath,
+    finalName: pendingFile.finalName,
+    bytes: fileStat.size,
+  };
+}
+
+async function readPluginEvent(eventFile: PluginEventFile): Promise<PluginEvent> {
+  const raw = await readFile(eventFile.processingPath, "utf8");
+  const parsed = pluginEventSchema.safeParse(JSON.parse(raw));
+  if (!parsed.success) {
+    throw new PluginEventFileError(parsed.error.message);
+  }
+
+  return parsed.data;
+}
+
+async function handlePluginEventFile(
+  config: PluginTransportRuntimeConfig,
+  handler: TransportHandler,
+  context: TransportContext,
+  logger: Logger,
+  fileName: string,
+  eventFile: PluginEventFile,
+  event: PluginEvent,
+): Promise<void> {
+  const inboundEvent = createPluginInboundEvent(config, context, eventFile, event);
+  await logger.debug("received plugin event file", {
+    endpointId: config.id,
+    pluginId: config.pluginId,
+    fileName,
+    messageId: inboundEvent.message.messageId,
+    correlationId: inboundEvent.message.correlationId,
+  });
+  await handler.handle(inboundEvent);
 }
 
 function createPluginInboundEvent(
   config: PluginTransportRuntimeConfig,
   context: TransportContext,
   eventFile: PluginEventFile,
-  event: z.infer<typeof pluginEventSchema>,
+  event: PluginEvent,
 ): TransportInboundEvent {
   const eventId = event.id ?? basename(eventFile.finalName, ".json");
   const conversationId = event.conversationId ?? config.pluginId;
@@ -226,28 +276,37 @@ function createPluginInboundEvent(
       return operation();
     },
     async deliver(response): Promise<void> {
-      switch (config.response.type) {
-        case "none":
-          return;
-        case "outbox":
-          await writePluginOutboxMessage(config as PluginOutboxRuntimeConfig, message, response.text);
-          return;
-        case "endpoint":
-          await context.deliveryRouter.deliver({
-            endpointId: config.response.endpointId,
-            target: config.response.target,
-            message: {
-              conversation: {
-                transport: config.response.endpointId,
-                externalId: config.response.target.conversationId,
-              },
-              text: response.text,
-            },
-          });
-          return;
-      }
+      await deliverPluginResponse(config, context, message, response.text);
     },
   };
+}
+
+async function deliverPluginResponse(
+  config: PluginTransportRuntimeConfig,
+  context: TransportContext,
+  inbound: IncomingMessage,
+  text: string,
+): Promise<void> {
+  switch (config.response.type) {
+    case "none":
+      return;
+    case "outbox":
+      await writePluginOutboxMessage(config as PluginOutboxRuntimeConfig, inbound, text);
+      return;
+    case "endpoint":
+      await context.deliveryRouter.deliver({
+        endpointId: config.response.endpointId,
+        target: config.response.target,
+        message: {
+          conversation: {
+            transport: config.response.endpointId,
+            externalId: config.response.target.conversationId,
+          },
+          text,
+        },
+      });
+      return;
+  }
 }
 
 async function writePluginOutboxMessage(
