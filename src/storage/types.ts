@@ -1,4 +1,10 @@
-import type { ChatRef, ConversationContext, ConversationRef } from "../domain/conversation.js";
+import type {
+  ChatRef,
+  ConversationContext,
+  ConversationEvent,
+  ConversationRef,
+  ConversationState,
+} from "../domain/conversation.js";
 
 export interface ConversationBackupSummary {
   id: string;
@@ -16,6 +22,8 @@ export interface ConversationBackupSummary {
 export interface ConversationStore {
   get(ref: ChatRef | ConversationRef): Promise<ConversationContext | undefined>;
   put(context: ConversationContext): Promise<void>;
+  appendEvents?(context: ConversationContext, events: ConversationEvent[]): Promise<ConversationContext>;
+  updateState?(context: ConversationContext, patch: Partial<ConversationState>): Promise<ConversationContext>;
   listBackups(ref: ChatRef): Promise<ConversationBackupSummary[]>;
   restore(ref: ChatRef, backupId: string, options?: { now?: Date }): Promise<boolean>;
   ensureActive(ref: ChatRef, options: { agentId: string; now: string; title?: string }): Promise<ConversationContext>;

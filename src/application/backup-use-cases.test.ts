@@ -24,7 +24,7 @@ describe("backup use cases", () => {
     const dataRoot = join(root, "state");
     const promptPath = join(root, "config", "prompts", "SYSTEM.md");
     const authPath = join(root, "config", "oauth.json");
-    const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "conversation.json");
+    const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
     const logPath = join(dataRoot, "logs", "endpoints", "private-telegram.log");
     const backupPath = join(root, "backup.tar");
     const extractDir = join(root, "extract");
@@ -61,7 +61,7 @@ describe("backup use cases", () => {
     expect(manifest.conversations).toHaveLength(1);
     await expect(readFile(join(extractDir, manifest.agentFiles?.[0]?.archivePath ?? ""), "utf8")).resolves.toBeDefined();
     await expect(
-      readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "chats", "telegram", "42", "conversation.json"), "utf8"),
+      readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "chats", "telegram", "42", "meta.json"), "utf8"),
     ).resolves.toContain('"id":"1"');
     await expect(readFile(join(extractDir, "logs", "endpoints", "private-telegram.log"), "utf8")).rejects.toThrow();
   });
@@ -74,7 +74,7 @@ describe("backup use cases", () => {
 
     await writeConfig(sourceConfigPath, sourceDataRoot);
     await writeTextFile(
-      join(sourceDataRoot, "conversations", "chats", "telegram", "42", "conversation.json"),
+      join(sourceDataRoot, "conversations", "chats", "telegram", "42", "meta.json"),
       "{\"messages\":[{\"id\":\"source\"}]}\n",
     );
 
@@ -92,7 +92,7 @@ describe("backup use cases", () => {
     const targetRoot = await createTempDir();
     const targetDataRoot = join(targetRoot, "state");
     await writeTextFile(
-      join(targetDataRoot, "conversations", "chats", "telegram", "42", "conversation.json"),
+      join(targetDataRoot, "conversations", "chats", "telegram", "42", "meta.json"),
       "{\"messages\":[{\"id\":\"old\"}]}\n",
     );
     await writeTextFile(
@@ -100,7 +100,7 @@ describe("backup use cases", () => {
       "keep log\n",
     );
     await writeTextFile(
-      join(targetDataRoot, "endpoints", "another-endpoint", "conversations", "telegram", "7", "conversation.json"),
+      join(targetDataRoot, "endpoints", "another-endpoint", "conversations", "telegram", "7", "meta.json"),
       "{\"messages\":[{\"id\":\"other\"}]}\n",
     );
 
@@ -120,7 +120,7 @@ describe("backup use cases", () => {
 
     await expect(
       readFile(
-        join(targetDataRoot, "conversations", "chats", "telegram", "42", "conversation.json"),
+        join(targetDataRoot, "conversations", "chats", "telegram", "42", "meta.json"),
         "utf8",
       ),
     ).resolves.toContain('"source"');
@@ -129,7 +129,7 @@ describe("backup use cases", () => {
     );
     await expect(
       readFile(
-        join(targetDataRoot, "endpoints", "another-endpoint", "conversations", "telegram", "7", "conversation.json"),
+        join(targetDataRoot, "endpoints", "another-endpoint", "conversations", "telegram", "7", "meta.json"),
         "utf8",
       ),
     ).resolves.toContain('"other"');
@@ -235,7 +235,7 @@ describe("backup use cases", () => {
           "default",
           "sessions",
           created.state.conversation.sessionId!,
-          "conversation.json",
+          "meta.json",
         ),
         "utf8",
       ),
@@ -314,7 +314,7 @@ describe("backup use cases", () => {
       "conversations",
       "telegram",
       "42",
-      "conversation.json",
+      "meta.json",
     );
     const backupPath = join(sourceRoot, "backup.tar");
     const targetRoot = await createTempDir();
@@ -474,7 +474,7 @@ describe("backup use cases", () => {
 
     await writeConfig(sourceConfigPath, sourceDataRoot);
     await writeTextFile(
-      join(sourceDataRoot, "conversations", "chats", "telegram", "42", "conversation.json"),
+      join(sourceDataRoot, "conversations", "chats", "telegram", "42", "meta.json"),
       "{\"messages\":[{\"id\":\"source\"}]}\n",
     );
     await useCases.createBackup({

@@ -88,21 +88,19 @@ describe("createDaemon", () => {
       },
     ]);
 
-    const persistedConversation = JSON.parse(
-      await readFile(
-        join(
-          endpointConfig.paths.conversationsDir,
-          "agents",
-          "default",
-          "sessions",
-          runInputs[1]!.conversation.state.conversation.sessionId!,
-          "conversation.json",
-        ),
-        "utf8",
+    const persistedEvents = await readFile(
+      join(
+        endpointConfig.paths.conversationsDir,
+        "agents",
+        "default",
+        "sessions",
+        runInputs[1]!.conversation.state.conversation.sessionId!,
+        "events.jsonl",
       ),
-    ) as { messages: unknown[] };
+      "utf8",
+    );
 
-    expect(persistedConversation.messages).toHaveLength(4);
+    expect(persistedEvents.trim().split("\n")).toHaveLength(4);
   });
 
   it("builds the default agent from configured agents", async () => {

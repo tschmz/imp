@@ -86,6 +86,7 @@ export interface ConversationState {
   agentId: string;
   title?: string;
   workingDirectory?: string;
+  run?: ConversationRunState;
   createdAt: string;
   updatedAt: string;
   version?: number;
@@ -94,4 +95,13 @@ export interface ConversationState {
 export interface ConversationContext {
   state: ConversationState;
   messages: ConversationEvent[];
+}
+
+export interface ConversationRunState {
+  status: "idle" | "running" | "failed" | "interrupted";
+  messageId?: string;
+  correlationId?: string;
+  startedAt?: string;
+  updatedAt?: string;
+  error?: string;
 }

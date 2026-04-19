@@ -146,11 +146,11 @@ describe("createFsConversationStore", () => {
         "default",
         "sessions",
         created.state.conversation.sessionId!,
-        "conversation.json",
+        "events.jsonl",
       ),
       "utf8",
     );
-    expect(raw).toContain('"relativePath": "attachments/msg-1-report.txt"');
+    expect(raw).toContain('"relativePath":"attachments/msg-1-report.txt"');
     expect(raw).not.toContain(savedPath);
   });
 
@@ -350,12 +350,15 @@ describe("createFsConversationStore", () => {
         "default",
         "sessions",
         created.state.conversation.sessionId!,
-        "conversation.json",
+        "meta.json",
       ),
       "utf8",
     );
 
-    expect(JSON.parse(written)).toEqual(created);
+    expect(JSON.parse(written)).toEqual({
+      ...created.state,
+      messageCount: 0,
+    });
   });
 
   it("sanitizes dot-only session path segments before writing snapshots", async () => {
@@ -379,7 +382,7 @@ describe("createFsConversationStore", () => {
     await store.put(context);
 
     await expect(
-      readFile(join(root, "conversations", "agents", "default", "sessions", "_", "conversation.json"), "utf8"),
+      readFile(join(root, "conversations", "agents", "default", "sessions", "_", "meta.json"), "utf8"),
     ).resolves.toContain('"sessionId": ".."');
   });
 
