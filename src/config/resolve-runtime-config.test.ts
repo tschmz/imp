@@ -457,6 +457,67 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
+  it("resolves phone call cwd relative to the config directory", async () => {
+    const appConfig = createAppConfig({
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          tools: {
+            builtIn: ["phone_call"],
+            phone: {
+              cwd: "./phone",
+              command: "baresip",
+              args: ["-e", "/dial {uri}"],
+              contacts: [
+                {
+                  id: "office",
+                  name: "Office",
+                  uri: "sip:+491234567@example.com",
+                },
+              ],
+            },
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.tools).toEqual(["phone_call"]);
+    expect(result.agents[0]?.phone).toEqual({
+      cwd: "/etc/imp/phone",
+      command: "baresip",
+      args: ["-e", "/dial {uri}"],
+      contacts: [
+        {
+          id: "office",
+          name: "Office",
+          uri: "sip:+491234567@example.com",
+        },
+      ],
+    });
+  });
+
   it("resolves a relative agent auth file path against the config directory", async () => {
     const appConfig = createAppConfig({
       agents: [

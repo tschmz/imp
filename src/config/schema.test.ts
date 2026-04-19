@@ -418,6 +418,84 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts allowlisted phone call config under agents.tools.phone", () => {
+    const result = appConfigSchema.safeParse(
+      createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        tools: {
+          builtIn: ["phone_call"],
+          phone: {
+            command: "baresip",
+            args: ["-e", "/dial {uri}"],
+            contacts: [
+              {
+                id: "office",
+                name: "Office",
+                uri: "sip:+491234567@example.com",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects duplicate phone contact ids for a single agent", () => {
+    const result = appConfigSchema.safeParse(
+      createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        tools: {
+          phone: {
+            contacts: [
+              {
+                id: "office",
+                name: "Office",
+                uri: "sip:+491234567@example.com",
+              },
+              {
+                id: "office",
+                name: "Office duplicate",
+                uri: "sip:+499999999@example.com",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["agents", 0, "tools", "phone", "contacts", 1, "id"],
+        message: 'Duplicate phone contact id "office". Phone contact ids must be unique per agent.',
+      }),
+    );
+  });
+
   it("rejects duplicate MCP server ids for a single agent", () => {
     const result = appConfigSchema.safeParse(
       createConfig({

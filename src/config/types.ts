@@ -1,5 +1,6 @@
 import type {
   AgentMcpConfig,
+  AgentPhoneCallConfig,
   AgentWorkspaceConfig,
   InferenceSettings,
   ModelRef,
@@ -29,6 +30,7 @@ export type ModelConfig = ModelRef;
 export interface AgentToolsConfigObject {
   builtIn?: string[];
   mcp?: AgentMcpConfig;
+  phone?: AgentPhoneCallConfig;
 }
 
 export type AgentToolsConfig = string[] | AgentToolsConfigObject;

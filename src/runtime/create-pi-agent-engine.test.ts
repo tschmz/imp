@@ -1733,6 +1733,74 @@ describe("createPiAgentEngine", () => {
     expect(outputEntries.slice(0, 3)).toEqual(["/custom/bin", "/usr/bin", "/bin"]);
   });
 
+  it("registers an allowlisted phone call tool when configured", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-call-"));
+    tempDirs.push(root);
+    const registry = createBuiltInToolRegistry(root, {
+      ...createAgent(),
+      tools: ["phone_call"],
+      phone: {
+        command: process.execPath,
+        args: [
+          "-e",
+          "console.log(process.argv.slice(1).join('|'))",
+          "{contactId}",
+          "{contactName}",
+          "{uri}",
+        ],
+        contacts: [
+          {
+            id: "office",
+            name: "Office",
+            uri: "sip:+491234567@example.com",
+          },
+        ],
+      },
+    });
+    const phoneCall = registry.get("phone_call");
+
+    expect(phoneCall).toBeDefined();
+    expect(phoneCall?.parameters).toMatchObject({
+      properties: {
+        contactId: {
+          enum: ["office"],
+        },
+      },
+    });
+
+    const result = await phoneCall!.execute("1", {
+      contactId: "office",
+      purpose: "Test call",
+    });
+    const output = result.content
+      .flatMap((item) => (item.type === "text" ? [item.text] : []))
+      .join("\n");
+
+    expect(output).toContain("Phone call command for Office (office) completed successfully.");
+    expect(output).toContain("it does not confirm ringing, connection, or call audio");
+    expect(output).toContain("Purpose: Test call");
+    expect(output).toContain("office|Office|sip:+491234567@example.com");
+    expect(result.details).toMatchObject({
+      contactId: "office",
+      contactName: "Office",
+      command: process.execPath,
+      args: [
+        "-e",
+        "console.log(process.argv.slice(1).join('|'))",
+        "office",
+        "Office",
+        "sip:+491234567@example.com",
+      ],
+      exitCode: 0,
+    });
+  });
+
+  it("does not register phone call tools without phone config", () => {
+    const registry = createBuiltInToolRegistry(process.cwd(), createAgent());
+
+    expect(registry.get("phone_call")).toBeUndefined();
+  });
+
   it("preserves the existing Windows PATH key and delimiter when merging shell path entries", () => {
     const env = {
       Path: "C:\\Windows\\System32;C:\\Program Files\\Git\\bin",

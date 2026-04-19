@@ -194,6 +194,7 @@ Optional additional tools:
 
 - `pwd`
 - `cd`
+- `phone_call`
 
 See [Built-in tools](./tools.md) for the full reference.
 

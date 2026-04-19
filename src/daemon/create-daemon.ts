@@ -129,6 +129,7 @@ export function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefi
       ...(configuredAgent.skillCatalog ? { skillCatalog: configuredAgent.skillCatalog } : {}),
       ...(configuredAgent.skillIssues ? { skillIssues: configuredAgent.skillIssues } : {}),
       ...(configuredAgent.mcp ? { mcp: configuredAgent.mcp } : {}),
+      ...(configuredAgent.phone ? { phone: configuredAgent.phone } : {}),
       tools: configuredAgent.tools ?? [],
       extensions: [],
     };

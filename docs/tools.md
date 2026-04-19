@@ -23,6 +23,7 @@ Additional built-in tools are available when configured:
 |-------|-----------------------------------------------------------------------------|
 | `pwd` | Show the current working directory used by filesystem and shell tools.      |
 | `cd`  | Change the working directory used by subsequent filesystem and shell tools. |
+| `phone_call` | Start an allowlisted SIP phone call through a configured local command. |
 
 When an agent has available skills from configured `skills.paths`, `paths.dataRoot/skills`, `agent.home/.skills`, or workspace `.skills`, `imp` also enables `load_skill` automatically for that turn. It loads the skill's `SKILL.md` instructions, reports the absolute skill directory, and lists bundled files under `scripts/` and `references/` without reading their contents.
 
@@ -37,3 +38,52 @@ If an agent sets `workspace.shellPath`, those entries are appended to that defau
 service-wide environment used by `imp` itself.
 
 That means `workspace.shellPath` is agent-local runtime configuration, while service credentials and other daemon-wide variables belong in the process environment or, on Linux services, `service.env`.
+
+## Phone Calls
+
+`phone_call` is disabled unless both of these are true:
+
+- `phone_call` is listed in `agents[].tools.builtIn`
+- `agents[].tools.phone.contacts` defines at least one allowed contact
+
+The tool never accepts arbitrary phone numbers from the model. The model can only choose one of the configured contact IDs.
+
+Example with a preconfigured `baresip` account:
+
+```json
+{
+  "agents": [
+    {
+      "id": "default",
+      "tools": {
+        "builtIn": ["read", "bash", "phone_call"],
+        "phone": {
+          "command": "baresip",
+          "args": ["-e", "/dial {uri}"],
+          "contacts": [
+            {
+              "id": "office",
+              "name": "Office",
+              "uri": "sip:+491234567@example.com"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+Supported command placeholders:
+
+- `{uri}`: the configured SIP URI
+- `{contactId}`: the allowlist contact ID
+- `{contactName}`: the display name
+
+Optional fields:
+
+- `cwd`: working directory for the phone command; relative paths resolve from the config file directory
+- `env`: environment variables for the phone command
+- `timeoutMs`: maximum call command runtime before `imp` sends `SIGTERM`
+
+When `command` and `args` are omitted, `imp` defaults to `baresip -e "/dial {uri}"`.

@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import type {
   AgentMcpConfig,
+  AgentPhoneCallConfig,
   AgentPromptConfig,
   AgentWorkspaceConfig,
   PromptSource,
@@ -144,7 +145,7 @@ function resolveAgentSkills(
 function resolveAgentTools(
   tools: AgentToolsConfig | undefined,
   configDir: string,
-): Pick<DaemonConfig["agents"][number], "tools" | "mcp"> {
+): Pick<DaemonConfig["agents"][number], "tools" | "mcp" | "phone"> {
   if (!tools) {
     return {};
   }
@@ -158,6 +159,7 @@ function resolveAgentTools(
   return {
     ...(tools.builtIn ? { tools: tools.builtIn } : {}),
     ...(tools.mcp ? { mcp: resolveAgentMcpConfig(tools.mcp, configDir) } : {}),
+    ...(tools.phone ? { phone: resolveAgentPhoneCallConfig(tools.phone, configDir) } : {}),
   };
 }
 
@@ -167,6 +169,16 @@ function resolveAgentMcpConfig(mcp: AgentMcpConfig, configDir: string): AgentMcp
       ...server,
       ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, configDir) } : {}),
     })),
+  };
+}
+
+function resolveAgentPhoneCallConfig(
+  phone: AgentPhoneCallConfig,
+  configDir: string,
+): AgentPhoneCallConfig {
+  return {
+    ...phone,
+    ...(phone.cwd ? { cwd: resolveConfigPath(phone.cwd, configDir) } : {}),
   };
 }
 

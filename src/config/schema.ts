@@ -65,6 +65,30 @@ const mcpServerConfigSchema = z.object({
   cwd: z.string().min(1).optional(),
 });
 
+const phoneContactIdSchema = z
+  .string()
+  .min(1)
+  .regex(
+    /^[A-Za-z0-9_-]+$/,
+    "Phone contact ids may only contain letters, numbers, hyphens, and underscores.",
+  );
+
+const phoneCallConfigSchema = z.object({
+  contacts: z
+    .object({
+      id: phoneContactIdSchema,
+      name: z.string().min(1),
+      uri: z.string().min(1),
+    })
+    .array()
+    .min(1),
+  command: z.string().min(1).optional(),
+  args: z.string().array().optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  cwd: z.string().min(1).optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+
 const agentToolsConfigSchema = z
   .union([
     z.string().min(1).array(),
@@ -75,6 +99,7 @@ const agentToolsConfigSchema = z
           servers: mcpServerConfigSchema.array().min(1),
         })
         .optional(),
+      phone: phoneCallConfigSchema.optional(),
     }),
   ])
   .superRefine(validateAgentToolsConfig);
@@ -165,6 +190,20 @@ function validateAgentToolsConfig(
 ): void {
   if (Array.isArray(tools)) {
     return;
+  }
+
+  const contactIds = new Set<string>();
+  for (const [index, contact] of (tools.phone?.contacts ?? []).entries()) {
+    if (contactIds.has(contact.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["phone", "contacts", index, "id"],
+        message: `Duplicate phone contact id "${contact.id}". Phone contact ids must be unique per agent.`,
+      });
+      continue;
+    }
+
+    contactIds.add(contact.id);
   }
 
   const serverIds = new Set<string>();

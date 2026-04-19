@@ -37,6 +37,21 @@ export interface AgentMcpConfig {
   servers: AgentMcpServerConfig[];
 }
 
+export interface AgentPhoneContactConfig {
+  id: string;
+  name: string;
+  uri: string;
+}
+
+export interface AgentPhoneCallConfig {
+  contacts: AgentPhoneContactConfig[];
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+  timeoutMs?: number;
+}
+
 export interface ModelRef {
   provider: string;
   modelId: string;
@@ -56,5 +71,6 @@ export interface AgentDefinition {
   skillIssues?: string[];
   tools: string[];
   mcp?: AgentMcpConfig;
+  phone?: AgentPhoneCallConfig;
   extensions: string[];
 }
