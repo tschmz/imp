@@ -8,6 +8,23 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
   const conversationBeforeRun = context.conversation;
   const userConversationMessage = toUserConversationMessage(context.message);
   let persistedConversation = context.conversation;
+  const startedAt = new Date().toISOString();
+  if (context.dependencies.conversationStore.updateState) {
+    persistedConversation = await context.dependencies.conversationStore.updateState(
+      persistedConversation,
+      {
+        updatedAt: startedAt,
+        run: {
+          status: "running",
+          messageId: context.message.messageId,
+          correlationId: context.message.correlationId,
+          startedAt,
+          updatedAt: startedAt,
+        },
+      },
+    );
+  }
+
   if (context.dependencies.conversationStore.appendEvents) {
     persistedConversation = await context.dependencies.conversationStore.appendEvents(
       persistedConversation,
@@ -15,34 +32,58 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
     );
   }
 
-  const result = await context.dependencies.engine.run({
-    agent: context.agent,
-    conversation: conversationBeforeRun,
-    message: context.message,
-    onConversationEvents: context.dependencies.conversationStore.appendEvents
-      ? async (events) => {
-          persistedConversation = await context.dependencies.conversationStore.appendEvents!(
-            persistedConversation,
-            events,
-          );
-        }
-      : undefined,
-    runtime: {
-      configPath: context.dependencies.runtimeInfo.configPath,
-      dataRoot: context.dependencies.runtimeInfo.dataRoot,
-      ...(context.dependencies.runtimeInfo.replyChannel
-        ? { replyChannel: context.dependencies.runtimeInfo.replyChannel }
-        : {}),
-      ...(context.availableSkills.length > 0 ? { availableSkills: context.availableSkills } : {}),
-    },
-  });
+  let result;
+  try {
+    result = await context.dependencies.engine.run({
+      agent: context.agent,
+      conversation: conversationBeforeRun,
+      message: context.message,
+      onConversationEvents: context.dependencies.conversationStore.appendEvents
+        ? async (events) => {
+            persistedConversation = await context.dependencies.conversationStore.appendEvents!(
+              persistedConversation,
+              events,
+            );
+          }
+        : undefined,
+      runtime: {
+        configPath: context.dependencies.runtimeInfo.configPath,
+        dataRoot: context.dependencies.runtimeInfo.dataRoot,
+        ...(context.dependencies.runtimeInfo.replyChannel
+          ? { replyChannel: context.dependencies.runtimeInfo.replyChannel }
+          : {}),
+        ...(context.availableSkills.length > 0 ? { availableSkills: context.availableSkills } : {}),
+      },
+    });
+  } catch (error) {
+    const failedAt = new Date().toISOString();
+    if (context.dependencies.conversationStore.updateState) {
+      await context.dependencies.conversationStore.updateState(persistedConversation, {
+        updatedAt: failedAt,
+        run: {
+          status: "failed",
+          messageId: context.message.messageId,
+          correlationId: context.message.correlationId,
+          startedAt,
+          updatedAt: failedAt,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+    throw error;
+  }
 
+  const completedAt = new Date().toISOString();
   context.response = result.message;
   context.conversation = {
     state: {
       ...context.conversation.state,
       ...(result.workingDirectory ? { workingDirectory: result.workingDirectory } : {}),
-      updatedAt: new Date().toISOString(),
+      updatedAt: completedAt,
+      run: {
+        status: "idle",
+        updatedAt: completedAt,
+      },
     },
     messages: [
       ...conversationBeforeRun.messages,

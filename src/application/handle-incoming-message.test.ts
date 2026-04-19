@@ -656,10 +656,12 @@ describe("createHandleIncomingMessage", () => {
     const agent = createDefaultAgent();
     let storedContext:
       | {
+          state: Record<string, unknown>;
           messages: Array<Record<string, unknown>>;
         }
       | undefined;
     const appendCalls: Array<Array<Record<string, unknown>>> = [];
+    const stateUpdates: Array<Record<string, unknown>> = [];
 
     const conversationStore: ConversationStore = {
       get: vi.fn(async () => undefined),
@@ -671,6 +673,16 @@ describe("createHandleIncomingMessage", () => {
         return {
           ...context,
           messages: [...context.messages, ...events],
+        };
+      }),
+      updateState: vi.fn(async (context, patch) => {
+        stateUpdates.push(patch as Record<string, unknown>);
+        return {
+          ...context,
+          state: {
+            ...context.state,
+            ...patch,
+          },
         };
       }),
       listBackups: vi.fn(async () => []),
@@ -796,6 +808,14 @@ describe("createHandleIncomingMessage", () => {
 
     await service.handle(createIncomingMessage("7", "check the readme"));
 
+    expect(stateUpdates).toMatchObject([
+      {
+        run: {
+          status: "running",
+          messageId: "7",
+        },
+      },
+    ]);
     expect(appendCalls).toMatchObject([
       [
         {
@@ -819,6 +839,11 @@ describe("createHandleIncomingMessage", () => {
         },
       ],
     ]);
+    expect(storedContext?.state).toMatchObject({
+      run: {
+        status: "idle",
+      },
+    });
     expect(storedContext?.messages).toMatchObject([
       {
         kind: "message",
