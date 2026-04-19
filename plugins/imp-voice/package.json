@@ -1,6 +1,6 @@
 {
   "name": "@tschmz/imp-voice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "description": "Local voice and audio file-protocol frontend for imp",

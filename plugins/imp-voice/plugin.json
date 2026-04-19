@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "imp-voice",
   "name": "imp Voice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local voice and audio file-protocol frontend for imp.",
   "capabilities": ["endpoint", "service", "audio", "voice", "wake-word", "speech-output"],
   "endpoints": [
