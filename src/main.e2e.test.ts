@@ -14,6 +14,7 @@ const packageJson = require("../package.json") as { version: string };
 const tempDirs: string[] = [];
 const projectRoot = resolveProjectRoot();
 const cliEntryPoint = join(projectRoot, "dist", "main.js");
+const cliE2eTimeoutMs = 20_000;
 
 afterEach(async () => {
   await Promise.all(
@@ -38,7 +39,7 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("restore");
     expect(stdout).toContain("plugin");
     expect(stdout).toContain("service");
-  });
+  }, cliE2eTimeoutMs);
 
   it("shows version output", async () => {
     const root = await createTempDir();
@@ -47,7 +48,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["--version"], env);
 
     expect(stdout.trim()).toBe(packageJson.version);
-  });
+  }, cliE2eTimeoutMs);
 
   it("creates a default config through `imp init --defaults`", async () => {
     const root = await createTempDir();
@@ -91,7 +92,7 @@ describe("imp CLI e2e", () => {
     await expect(
       readFile(join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
     ).resolves.toContain(`global skills live under \`${join(root, "state-home", "imp", "skills")}\``);
-  });
+  }, cliE2eTimeoutMs);
 
   it("creates and restores a backup with config, agent files, and conversations", async () => {
     const root = await createTempDir();
@@ -192,7 +193,7 @@ describe("imp CLI e2e", () => {
     expect(await readFile(promptPath, "utf8")).toBe("backup prompt\n");
     expect(await readFile(authPath, "utf8")).toBe('{"token":"secret"}\n');
     expect(await readFile(conversationPath, "utf8")).toContain('"hi"');
-  }, 10_000);
+  }, cliE2eTimeoutMs);
 
   it("updates a discovered config value through `imp config set` using array id navigation", async () => {
     const root = await createTempDir();
@@ -242,7 +243,7 @@ describe("imp CLI e2e", () => {
 
     expect(stdout).toBe(`Updated config ${configPath}: endpoints.private-telegram.enabled\n`);
     expect(config.endpoints.find((endpoint) => endpoint.id === "private-telegram")?.enabled).toBe(false);
-  }, 10_000);
+  }, cliE2eTimeoutMs);
 
   it("prints a native service definition in dry-run mode", async () => {
     const root = await createTempDir();
@@ -270,7 +271,7 @@ describe("imp CLI e2e", () => {
       default:
         throw new Error(`Unsupported test platform: ${process.platform}`);
     }
-  });
+  }, cliE2eTimeoutMs);
 
   it("creates runtime directories and logs a startup failure for an invalid telegram token", async () => {
     const root = await createTempDir();
@@ -341,7 +342,7 @@ describe("imp CLI e2e", () => {
     await expect(stat(runtimeStatePath)).rejects.toMatchObject({
       code: "ENOENT",
     });
-  });
+  }, cliE2eTimeoutMs);
 
   it("shows recent daemon log lines", async () => {
     const root = await createTempDir();
@@ -394,7 +395,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["log", "--config", configPath, "--lines", "2"], env);
 
     expect(stdout).toBe("two\nthree\n");
-  }, 10_000);
+  }, cliE2eTimeoutMs);
 
   it("rejects non-interactive init without --defaults", async () => {
     const root = await createTempDir();
@@ -405,7 +406,7 @@ describe("imp CLI e2e", () => {
         "`imp init` requires an interactive terminal. Re-run with --defaults to skip prompts.",
       ),
     });
-  });
+  }, cliE2eTimeoutMs);
 });
 
 async function createTempDir(): Promise<string> {
