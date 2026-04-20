@@ -9,6 +9,7 @@
   },
   "files": [
     "dist",
+    "assets",
     "config.example.json",
     "CHANGELOG.md"
   ],
