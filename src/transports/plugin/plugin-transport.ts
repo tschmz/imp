@@ -1,42 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { z } from "zod";
 import type { ActiveEndpointRuntimeConfig, PluginEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessage } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
+import {
+  pluginErrorRecordSchema,
+  pluginEventSchema,
+  pluginOutboxMessageSchema,
+  type PluginEvent,
+} from "../../plugins/protocol.js";
 import type { Transport, TransportContext, TransportHandler, TransportInboundEvent } from "../types.js";
 
 type PluginTransportRuntimeConfig = PluginEndpointRuntimeConfig & ActiveEndpointRuntimeConfig;
 type PluginOutboxRuntimeConfig = PluginTransportRuntimeConfig & {
   response: Extract<PluginTransportRuntimeConfig["response"], { type: "outbox" }>;
 };
-
-const pluginEventSchema = z.object({
-  schemaVersion: z.literal(1).optional(),
-  id: z.string().min(1).optional(),
-  correlationId: z.string().min(1).optional(),
-  conversationId: z.string().min(1).optional(),
-  session: z
-    .object({
-      mode: z.literal("detached"),
-      id: z.string().min(1),
-      agentId: z.string().min(1).optional(),
-      kind: z.string().min(1).optional(),
-      title: z.string().min(1).optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
-    })
-    .optional(),
-  userId: z.string().min(1).optional(),
-  text: z.string().min(1),
-  receivedAt: z.string().datetime().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  response: z
-    .object({
-      type: z.literal("none"),
-    })
-    .optional(),
-});
 
 interface PluginEventFile {
   originalPath: string;
@@ -51,8 +30,6 @@ interface PendingPluginEventFile {
   processingPath: string;
   finalName: string;
 }
-
-type PluginEvent = z.infer<typeof pluginEventSchema>;
 
 export function createPluginTransport(
   config: PluginTransportRuntimeConfig,
@@ -349,26 +326,23 @@ async function writePluginOutboxMessage(
 ): Promise<void> {
   const paths = getPluginPaths(config);
   const fileName = `${Date.now()}-${sanitizeFileName(inbound.messageId)}-${randomUUID()}.json`;
+  const message = pluginOutboxMessageSchema.parse({
+    schemaVersion: 1,
+    id: randomUUID(),
+    eventId: inbound.messageId,
+    correlationId: inbound.correlationId,
+    conversationId: inbound.conversation.externalId,
+    userId: inbound.userId,
+    replyChannel: config.response.replyChannel,
+    priority: config.response.priority ?? "normal",
+    ...(config.response.ttlMs ? { ttlMs: config.response.ttlMs } : {}),
+    ...(config.response.speech ? { speech: config.response.speech } : {}),
+    text,
+    createdAt: new Date().toISOString(),
+  });
   await writeFile(
     join(paths.outboxDir, fileName),
-    `${JSON.stringify(
-      {
-        schemaVersion: 1,
-        id: randomUUID(),
-        eventId: inbound.messageId,
-        correlationId: inbound.correlationId,
-        conversationId: inbound.conversation.externalId,
-        userId: inbound.userId,
-        replyChannel: config.response.replyChannel,
-        priority: config.response.priority ?? "normal",
-        ...(config.response.ttlMs ? { ttlMs: config.response.ttlMs } : {}),
-        ...(config.response.speech ? { speech: config.response.speech } : {}),
-        text,
-        createdAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify(message, null, 2)}\n`,
     "utf8",
   );
 }
@@ -401,20 +375,17 @@ async function recordFailedEvent(
   }
 
   const errorRecordPath = `${failedPath}.error.json`;
+  const errorRecord = pluginErrorRecordSchema.parse({
+    fileName: input.fileName,
+    endpointId: config.id,
+    pluginId: config.pluginId,
+    failedAt: new Date().toISOString(),
+    errorType: input.error instanceof Error ? input.error.name : typeof input.error,
+    message: input.error instanceof Error ? input.error.message : String(input.error),
+  });
   await writeFile(
     errorRecordPath,
-    `${JSON.stringify(
-      {
-        fileName: input.fileName,
-        endpointId: config.id,
-        pluginId: config.pluginId,
-        failedAt: new Date().toISOString(),
-        errorType: input.error instanceof Error ? input.error.name : typeof input.error,
-        message: input.error instanceof Error ? input.error.message : String(input.error),
-      },
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify(errorRecord, null, 2)}\n`,
     "utf8",
   );
 

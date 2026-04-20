@@ -17,3 +17,15 @@ export {
   type PluginServiceManifest,
   type PluginSetupManifest,
 } from "./manifest.js";
+export {
+  pluginErrorRecordSchema,
+  pluginEventSchema,
+  pluginIdentifierSchema,
+  pluginOutboxMessageSchema,
+  pluginReplyChannelKindSchema,
+  pluginResponseRoutingSchema,
+  type PluginErrorRecord,
+  type PluginEvent,
+  type PluginOutboxMessage,
+  type PluginResponseRouting,
+} from "./protocol.js";

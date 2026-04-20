@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { PluginIngressConfig, PluginResponseRoutingConfig } from "../config/types.js";
+import { pluginIdentifierSchema, pluginResponseRoutingSchema } from "./protocol.js";
 
 export const PLUGIN_MANIFEST_FILE = "plugin.json";
 export const PLUGIN_MANIFEST_SCHEMA_VERSION = 1;
@@ -55,56 +56,9 @@ export interface PluginPythonSetupManifest {
   venv?: string;
 }
 
-const identifierSchema = z
-  .string()
-  .min(1)
-  .regex(
-    /^[A-Za-z0-9_-]+$/,
-    "Identifiers may only contain letters, numbers, hyphens, and underscores.",
-  );
-
-const replyChannelKindSchema = z
-  .string()
-  .min(1)
-  .regex(
-    /^[A-Za-z0-9_-]+$/,
-    "Reply channel kinds may only contain letters, numbers, hyphens, and underscores.",
-  );
-
-const responseRoutingSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("none"),
-  }),
-  z.object({
-    type: z.literal("endpoint"),
-    endpointId: identifierSchema,
-    target: z.object({
-      conversationId: z.string().min(1),
-      userId: z.string().min(1).optional(),
-    }),
-  }),
-  z.object({
-    type: z.literal("outbox"),
-    replyChannel: z.object({
-      kind: replyChannelKindSchema,
-    }),
-    priority: z.enum(["low", "normal", "high"]).optional(),
-    ttlMs: z.number().int().positive().optional(),
-    speech: z
-      .object({
-        enabled: z.boolean().optional(),
-        language: z.string().min(1).optional(),
-        model: z.string().min(1).optional(),
-        voice: z.string().min(1).optional(),
-        instructions: z.string().min(1).optional(),
-      })
-      .optional(),
-  }),
-]);
-
 export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
   schemaVersion: z.literal(PLUGIN_MANIFEST_SCHEMA_VERSION),
-  id: identifierSchema,
+  id: pluginIdentifierSchema,
   name: z.string().min(1),
   version: z.string().min(1),
   description: z.string().min(1).optional(),
@@ -115,7 +69,7 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
     .optional(),
   endpoints: z
     .object({
-      id: identifierSchema,
+      id: pluginIdentifierSchema,
       description: z.string().min(1).optional(),
       routing: z
         .object({
@@ -128,13 +82,13 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
           maxEventBytes: z.number().int().positive().optional(),
         })
         .optional(),
-      response: responseRoutingSchema,
+      response: pluginResponseRoutingSchema,
     })
     .array()
     .optional(),
   services: z
     .object({
-      id: identifierSchema,
+      id: pluginIdentifierSchema,
       description: z.string().min(1).optional(),
       autoStart: z.boolean().optional(),
       command: z.string().min(1),
