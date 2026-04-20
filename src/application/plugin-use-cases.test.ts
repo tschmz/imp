@@ -173,6 +173,77 @@ describe("plugin use cases", () => {
     expect(writeOutput).toHaveBeenCalledWith("Added endpoints: audio-ingress");
   });
 
+  it("checks configured plugin health", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    const dataRoot = join(root, "state");
+    const pluginRoot = join(root, "imp-voice");
+    await writeManifest(root, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+      endpoints: [
+        {
+          id: "audio-ingress",
+          response: {
+            type: "none",
+          },
+        },
+      ],
+    });
+    await mkdir(join(dataRoot, "runtime", "plugins", "imp-voice", "endpoints", "audio-ingress"), { recursive: true });
+    await writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          ...createConfig(),
+          paths: { dataRoot },
+          plugins: [
+            {
+              id: "imp-voice",
+              enabled: true,
+              package: {
+                path: pluginRoot,
+              },
+            },
+          ],
+          endpoints: [
+            {
+              id: "audio-ingress",
+              type: "file",
+              enabled: true,
+              pluginId: "imp-voice",
+              response: {
+                type: "none",
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const writeOutput = vi.fn();
+    const useCases = createPluginUseCases({ writeOutput });
+
+    await useCases.doctorPlugin({ configPath, id: "imp-voice" });
+    await useCases.statusPlugin({ configPath, id: "imp-voice" });
+
+    expect(writeOutput).toHaveBeenCalledWith(
+      [
+        "Plugin imp-voice: ok",
+        "- OK config entry: enabled",
+        `- OK package path: ${pluginRoot}`,
+        "- OK manifest: id=imp-voice version=0.1.0",
+        "- OK endpoint audio-ingress: configured",
+        `- OK runtime audio-ingress: ${join(dataRoot, "runtime", "plugins", "imp-voice", "endpoints", "audio-ingress")}`,
+      ].join("\n"),
+    );
+    expect(writeOutput).toHaveBeenCalledWith("Plugin imp-voice: ok");
+  });
+
   it("installs plugin packages below paths.dataRoot when no local manifest matches", async () => {
     const root = await createPluginRoot();
     const configDir = join(root, "config");

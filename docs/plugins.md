@@ -35,6 +35,8 @@ Operators normally install plugins by passing an npm package spec. Local plugin 
 imp plugin list
 imp plugin list --root /opt/imp/plugins
 imp plugin inspect my-plugin --root /opt/imp/plugins
+imp plugin doctor my-plugin --config ~/.config/imp/config.json
+imp plugin status my-plugin --config ~/.config/imp/config.json
 imp plugin install @tschmz/imp-voice@0.1.0 --config ~/.config/imp/config.json
 imp plugin install ./my-plugin-0.1.0.tgz --config ~/.config/imp/config.json
 ```
@@ -108,6 +110,8 @@ The install command writes the manifest defaults into an existing config:
 - fails if the plugin ID or any endpoint ID already exists
 
 This manifest API defines plugin identity, default endpoint bindings, companion services, and init metadata so `imp init` and service-install flows can install a plugin without loading plugin code into the daemon process.
+
+`imp plugin doctor <id>` checks the configured plugin entry, package path, manifest, file endpoints, and expected runtime directories. `imp plugin status <id>` prints the same health result in one line for scripts and quick checks.
 
 Plugins can declare a Python setup for companion services:
 

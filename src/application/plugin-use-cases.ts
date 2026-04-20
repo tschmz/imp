@@ -13,6 +13,7 @@ import {
   type PluginPackageInstaller,
   tryParseNpmPackageName,
 } from "./plugin-package-installer.js";
+import { diagnoseConfiguredPlugin, renderPluginDiagnostic } from "./plugin-diagnostics.js";
 import { renderPluginInstallSummary } from "./plugin-output.js";
 import { createPluginServiceOrchestrator } from "./plugin-service-orchestrator.js";
 import { findConfiguredPluginManifest } from "./plugin-config-installer.js";
@@ -119,6 +120,55 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
       if (plugin.manifest.init?.postInstallMessage) {
         writeOutput(plugin.manifest.init.postInstallMessage);
       }
+    },
+
+    async doctorPlugin(options: { configPath?: string; id: string }): Promise<void> {
+      const { configPath, config } = await configInstaller.readValidatedConfig({
+        configPath: options.configPath,
+      });
+      let plugin;
+      let manifestError: unknown;
+      try {
+        plugin = await findConfiguredPluginManifest({
+          config,
+          configPath,
+          pluginId: options.id,
+        });
+      } catch (error) {
+        manifestError = error;
+      }
+      writeOutput(renderPluginDiagnostic(await diagnoseConfiguredPlugin({
+        config,
+        configPath,
+        pluginId: options.id,
+        plugin,
+        manifestError,
+      })));
+    },
+
+    async statusPlugin(options: { configPath?: string; id: string }): Promise<void> {
+      const { configPath, config } = await configInstaller.readValidatedConfig({
+        configPath: options.configPath,
+      });
+      let plugin;
+      let manifestError: unknown;
+      try {
+        plugin = await findConfiguredPluginManifest({
+          config,
+          configPath,
+          pluginId: options.id,
+        });
+      } catch (error) {
+        manifestError = error;
+      }
+      const result = await diagnoseConfiguredPlugin({
+        config,
+        configPath,
+        pluginId: options.id,
+        plugin,
+        manifestError,
+      });
+      writeOutput(`Plugin ${result.pluginId}: ${result.ok ? "ok" : "issues found"}`);
     },
   };
 }

@@ -31,6 +31,34 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
 
   addConfigOption(
     pluginCommand
+      .command("doctor")
+      .description("Check a configured plugin installation")
+      .argument("<id>", "Plugin ID"),
+  ).action(
+    withAsyncAction(async (id: string, options: { config?: string }) => {
+      await deps.doctorPlugin({
+        configPath: options.config,
+        id,
+      });
+    }),
+  );
+
+  addConfigOption(
+    pluginCommand
+      .command("status")
+      .description("Show configured plugin health")
+      .argument("<id>", "Plugin ID"),
+  ).action(
+    withAsyncAction(async (id: string, options: { config?: string }) => {
+      await deps.statusPlugin({
+        configPath: options.config,
+        id,
+      });
+    }),
+  );
+
+  addConfigOption(
+    pluginCommand
       .command("install")
       .description("Install a plugin manifest into the config")
       .argument("<id>", "Plugin ID or npm package spec")

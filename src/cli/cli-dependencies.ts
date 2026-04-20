@@ -26,6 +26,8 @@ export interface CliDependencies {
   }) => Promise<void>;
   listPlugins: (options: { root?: string }) => Promise<void>;
   inspectPlugin: (options: { root?: string; id: string }) => Promise<void>;
+  doctorPlugin: (options: { configPath?: string; id: string }) => Promise<void>;
+  statusPlugin: (options: { configPath?: string; id: string }) => Promise<void>;
   installPlugin: (options: {
     configPath?: string;
     root?: string;
