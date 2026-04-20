@@ -39,6 +39,13 @@ describe("pluginManifestSchema", () => {
           },
         },
       ],
+      mcpServers: [
+        {
+          id: "voice-tools",
+          command: "node",
+          args: ["dist/mcp-server.js"],
+        },
+      ],
       setup: {
         python: {
           requirements: "requirements.txt",

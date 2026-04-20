@@ -55,6 +55,13 @@ describe("plugin use cases", () => {
           args: ["dist/speaker.js"],
         },
       ],
+      mcpServers: [
+        {
+          id: "voice-tools",
+          command: "node",
+          args: ["dist/mcp-server.js"],
+        },
+      ],
     });
     const writeOutput = vi.fn();
     const useCases = createPluginUseCases({ writeOutput });
@@ -74,6 +81,9 @@ describe("plugin use cases", () => {
         "",
         "Services:",
         "- speaker: node dist/speaker.js",
+        "",
+        "MCP servers:",
+        "- voice-tools: node dist/mcp-server.js",
       ].join("\n"),
     );
   });

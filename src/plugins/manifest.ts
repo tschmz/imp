@@ -15,6 +15,7 @@ export interface PluginManifest {
   capabilities?: PluginCapability[];
   endpoints?: PluginEndpointManifest[];
   services?: PluginServiceManifest[];
+  mcpServers?: PluginMcpServerManifest[];
   setup?: PluginSetupManifest;
   init?: PluginInitManifest;
 }
@@ -35,6 +36,15 @@ export interface PluginServiceManifest {
   id: string;
   description?: string;
   autoStart?: boolean;
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+}
+
+export interface PluginMcpServerManifest {
+  id: string;
+  description?: string;
   command: string;
   args?: string[];
   cwd?: string;
@@ -98,6 +108,17 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
     })
     .array()
     .optional(),
+  mcpServers: z
+    .object({
+      id: pluginIdentifierSchema,
+      description: z.string().min(1).optional(),
+      command: z.string().min(1),
+      args: z.string().min(1).array().optional(),
+      cwd: z.string().min(1).optional(),
+      env: z.record(z.string(), z.string()).optional(),
+    })
+    .array()
+    .optional(),
   setup: z
     .object({
       python: z
@@ -142,5 +163,19 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
     }
 
     serviceIds.add(service.id);
+  }
+
+  const mcpServerIds = new Set<string>();
+  for (const [index, server] of (manifest.mcpServers ?? []).entries()) {
+    if (mcpServerIds.has(server.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mcpServers", index, "id"],
+        message: `Duplicate MCP server id "${server.id}". MCP server ids must be unique per plugin.`,
+      });
+      continue;
+    }
+
+    mcpServerIds.add(server.id);
   }
 });

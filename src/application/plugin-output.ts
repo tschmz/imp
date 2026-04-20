@@ -37,6 +37,14 @@ export function renderPluginDetails(plugin: DiscoveredPluginManifest): string {
     }
   }
 
+  if (plugin.manifest.mcpServers?.length) {
+    lines.push("");
+    lines.push("MCP servers:");
+    for (const server of plugin.manifest.mcpServers) {
+      lines.push(`- ${server.id}: ${server.command}${server.args?.length ? ` ${server.args.join(" ")}` : ""}`);
+    }
+  }
+
   if (plugin.manifest.init?.configTemplate) {
     lines.push("");
     lines.push(`Config template: ${plugin.manifest.init.configTemplate}`);

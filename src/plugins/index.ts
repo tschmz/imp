@@ -13,6 +13,7 @@ export {
   type PluginEndpointManifest,
   type PluginInitManifest,
   type PluginManifest,
+  type PluginMcpServerManifest,
   type PluginPythonSetupManifest,
   type PluginServiceManifest,
   type PluginSetupManifest,
