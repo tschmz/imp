@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.11.0 - 2026-04-20
+
+### Added
+
+- Add plugin health diagnostics through `imp plugin doctor` and `imp plugin status`.
+- Record plugin package install metadata, including manifest version and hash checks.
+- Allow plugin manifests to declare MCP servers for agent tool integration.
+
+### Changed
+
+- Rename plugin-backed endpoint configs from `type: "plugin"` to `type: "file"`.
+- Centralize plugin protocol schemas across manifest, config, and runtime handling.
+- Separate internal extensions from external plugin-facing APIs.
+
 ## 0.10.0 - 2026-04-19
 
 ### Added

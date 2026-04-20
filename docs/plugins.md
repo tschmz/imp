@@ -37,7 +37,7 @@ imp plugin list --root /opt/imp/plugins
 imp plugin inspect my-plugin --root /opt/imp/plugins
 imp plugin doctor my-plugin --config ~/.config/imp/config.json
 imp plugin status my-plugin --config ~/.config/imp/config.json
-imp plugin install @tschmz/imp-voice@0.1.0 --config ~/.config/imp/config.json
+imp plugin install @tschmz/imp-voice@latest --config ~/.config/imp/config.json
 imp plugin install ./my-plugin-0.1.0.tgz --config ~/.config/imp/config.json
 ```
 

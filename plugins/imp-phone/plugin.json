@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "imp-phone",
   "name": "imp Phone",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turn-based SIP phone conversation frontend for imp.",
   "capabilities": ["endpoint", "service", "audio", "voice", "speech-output"],
   "endpoints": [
