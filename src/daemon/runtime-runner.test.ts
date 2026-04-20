@@ -246,7 +246,7 @@ describe("createRuntimeEntries", () => {
     const event = createEvent({
       endpointId: "audio-ingress",
       conversation: {
-        transport: "plugin",
+        transport: "file",
         externalId: "kitchen",
       },
       messageId: "wake-1",
@@ -281,7 +281,7 @@ describe("createRuntimeEntries", () => {
 
     expect(conversationStore.ensureActiveForAgent).toHaveBeenCalledWith(
       {
-        transport: "plugin",
+        transport: "file",
         externalId: "kitchen",
         endpointId: "audio-ingress",
       },
@@ -292,7 +292,7 @@ describe("createRuntimeEntries", () => {
         conversation: sharedConversation,
         message: expect.objectContaining({
           conversation: {
-            transport: "plugin",
+            transport: "file",
             externalId: "kitchen",
             endpointId: "audio-ingress",
             sessionId: "shared-session",
@@ -303,7 +303,7 @@ describe("createRuntimeEntries", () => {
     );
     expect(event.deliver).toHaveBeenCalledWith({
       conversation: {
-        transport: "plugin",
+        transport: "file",
         externalId: "kitchen",
         endpointId: "audio-ingress",
         sessionId: "shared-session",
@@ -317,7 +317,7 @@ describe("createRuntimeEntries", () => {
     const detachedConversation = {
       state: {
         conversation: {
-          transport: "plugin",
+          transport: "file",
           externalId: "imp-phone-call-1",
           endpointId: "phone-ingress",
           sessionId: "imp-phone-call-1",
@@ -362,7 +362,7 @@ describe("createRuntimeEntries", () => {
     const runtime = createRuntime({
       endpointConfig: {
         id: "phone-ingress",
-        type: "plugin",
+        type: "file",
         pluginId: "imp-phone",
         defaultAgentId: "default",
         ingress: {
@@ -382,7 +382,7 @@ describe("createRuntimeEntries", () => {
           logFilePath: "/tmp/logs/endpoints/phone-ingress.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/phone-ingress.json",
-          plugin: {
+          file: {
             rootDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress",
             inboxDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/inbox",
             processingDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/processing",
@@ -399,7 +399,7 @@ describe("createRuntimeEntries", () => {
     const event = createEvent({
       endpointId: "phone-ingress",
       conversation: {
-        transport: "plugin",
+        transport: "file",
         externalId: "imp-phone-call-1",
         sessionId: "imp-phone-call-1",
       },
@@ -439,7 +439,7 @@ describe("createRuntimeEntries", () => {
 
     expect(conversationStore.ensureDetachedForAgent).toHaveBeenCalledWith(
       {
-        transport: "plugin",
+        transport: "file",
         externalId: "imp-phone-call-1",
         sessionId: "imp-phone-call-1",
         endpointId: "phone-ingress",
@@ -728,12 +728,12 @@ describe("createRuntimeEntries", () => {
     );
   });
 
-  it("passes plugin endpoint target reply channel context into agent runs", async () => {
+  it("passes file endpoint target reply channel context into agent runs", async () => {
     const telegramRuntime = createRuntime();
     const pluginRuntime = createRuntime({
       endpointConfig: {
         id: "audio-ingress",
-        type: "plugin",
+        type: "file",
         pluginId: "pi-audio",
         ingress: {
           pollIntervalMs: 250,
@@ -754,7 +754,7 @@ describe("createRuntimeEntries", () => {
           logFilePath: "/tmp/logs/endpoints/audio-ingress.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/audio-ingress.json",
-          plugin: {
+          file: {
             rootDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress",
             inboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox",
             processingDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/processing",
@@ -795,7 +795,7 @@ describe("createRuntimeEntries", () => {
       createEvent({
         endpointId: "audio-ingress",
         conversation: {
-          transport: "plugin",
+          transport: "file",
           externalId: "kitchen",
         },
         messageId: "wake-1",
@@ -823,7 +823,7 @@ describe("createRuntimeEntries", () => {
     const outboxRuntime = createRuntime({
       endpointConfig: {
         id: "audio-ingress",
-        type: "plugin",
+        type: "file",
         pluginId: "pi-audio",
         ingress: {
           pollIntervalMs: 250,
@@ -843,7 +843,7 @@ describe("createRuntimeEntries", () => {
           logFilePath: "/tmp/logs/endpoints/audio-ingress.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/audio-ingress.json",
-          plugin: {
+          file: {
             rootDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress",
             inboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox",
             processingDir: "/tmp/runtime/plugins/pi-audio/endpoints/audio-ingress/processing",
@@ -857,7 +857,7 @@ describe("createRuntimeEntries", () => {
     const noneRuntime = createRuntime({
       endpointConfig: {
         id: "silent-ingress",
-        type: "plugin",
+        type: "file",
         pluginId: "pi-audio",
         ingress: {
           pollIntervalMs: 250,
@@ -874,7 +874,7 @@ describe("createRuntimeEntries", () => {
           logFilePath: "/tmp/logs/endpoints/silent-ingress.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/silent-ingress.json",
-          plugin: {
+          file: {
             rootDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress",
             inboxDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress/inbox",
             processingDir: "/tmp/runtime/plugins/pi-audio/endpoints/silent-ingress/processing",
@@ -915,7 +915,7 @@ describe("createRuntimeEntries", () => {
       createEvent({
         endpointId: "audio-ingress",
         conversation: {
-          transport: "plugin",
+          transport: "file",
           externalId: "kitchen",
         },
         messageId: "wake-1",
@@ -929,7 +929,7 @@ describe("createRuntimeEntries", () => {
       createEvent({
         endpointId: "silent-ingress",
         conversation: {
-          transport: "plugin",
+          transport: "file",
           externalId: "kitchen",
         },
         messageId: "wake-2",
@@ -966,7 +966,7 @@ describe("createRuntimeEntries", () => {
     const runtime = createRuntime({
       endpointConfig: {
         id: "phone-ingress",
-        type: "plugin",
+        type: "file",
         pluginId: "imp-phone",
         ingress: {
           pollIntervalMs: 250,
@@ -986,7 +986,7 @@ describe("createRuntimeEntries", () => {
           logFilePath: "/tmp/logs/endpoints/phone-ingress.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/phone-ingress.json",
-          plugin: {
+          file: {
             rootDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress",
             inboxDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/inbox",
             processingDir: "/tmp/runtime/plugins/imp-phone/endpoints/phone-ingress/processing",
@@ -1008,7 +1008,7 @@ describe("createRuntimeEntries", () => {
       createEvent({
         endpointId: "phone-ingress",
         conversation: {
-          transport: "plugin",
+          transport: "file",
           externalId: "imp-phone-call-1",
         },
         messageId: "closed-1",

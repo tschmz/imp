@@ -164,7 +164,7 @@ describe("createMessageProcessor", () => {
       createEvent({
         ...createIncomingMessage("2", "plugin-chat"),
         conversation: {
-          transport: "plugin",
+          transport: "file",
           externalId: "plugin-chat",
         },
       }),
@@ -175,7 +175,7 @@ describe("createMessageProcessor", () => {
     expect(starts).toEqual(["1:telegram"]);
     releases.get("1")?.();
     await tick();
-    expect(starts).toEqual(["1:telegram", "2:plugin"]);
+    expect(starts).toEqual(["1:telegram", "2:file"]);
 
     releases.get("2")?.();
     await Promise.all([first, second]);

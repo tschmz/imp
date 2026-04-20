@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import type { ActiveEndpointRuntimeConfig, PluginEndpointRuntimeConfig } from "../../daemon/types.js";
+import type { ActiveEndpointRuntimeConfig, FileEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessage } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import {
@@ -12,9 +12,9 @@ import {
 } from "../../plugins/protocol.js";
 import type { Transport, TransportContext, TransportHandler, TransportInboundEvent } from "../types.js";
 
-type PluginTransportRuntimeConfig = PluginEndpointRuntimeConfig & ActiveEndpointRuntimeConfig;
-type PluginOutboxRuntimeConfig = PluginTransportRuntimeConfig & {
-  response: Extract<PluginTransportRuntimeConfig["response"], { type: "outbox" }>;
+type FileTransportRuntimeConfig = FileEndpointRuntimeConfig & ActiveEndpointRuntimeConfig;
+type FileOutboxRuntimeConfig = FileTransportRuntimeConfig & {
+  response: Extract<FileTransportRuntimeConfig["response"], { type: "outbox" }>;
 };
 
 interface PluginEventFile {
@@ -31,16 +31,16 @@ interface PendingPluginEventFile {
   finalName: string;
 }
 
-export function createPluginTransport(
-  config: PluginTransportRuntimeConfig,
+export function createFileTransport(
+  config: FileTransportRuntimeConfig,
   logger: Logger,
   context: TransportContext,
 ): Transport {
-  if (!config.paths.plugin) {
-    throw new Error(`Plugin endpoint "${config.id}" is missing plugin runtime paths.`);
+  if (!config.paths.file) {
+    throw new Error(`File endpoint "${config.id}" is missing file runtime paths.`);
   }
 
-  const paths = config.paths.plugin;
+  const paths = config.paths.file;
   let stopped = false;
   let timer: NodeJS.Timeout | undefined;
   let activeScan: Promise<void> = Promise.resolve();
@@ -48,7 +48,7 @@ export function createPluginTransport(
   return {
     async start(handler: TransportHandler): Promise<void> {
       await ensurePluginDirectories(config);
-      await logger.info("plugin endpoint runtime directories", {
+      await logger.info("file endpoint runtime directories", {
         endpointId: config.id,
         pluginId: config.pluginId,
         rootDir: paths.rootDir,
@@ -106,7 +106,7 @@ export function createPluginTransport(
   };
 }
 
-async function ensurePluginDirectories(config: PluginTransportRuntimeConfig): Promise<void> {
+async function ensurePluginDirectories(config: FileTransportRuntimeConfig): Promise<void> {
   const paths = getPluginPaths(config);
   await mkdir(paths.rootDir, { recursive: true });
   await mkdir(paths.inboxDir, { recursive: true });
@@ -117,7 +117,7 @@ async function ensurePluginDirectories(config: PluginTransportRuntimeConfig): Pr
 }
 
 async function scanPluginInbox(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   handler: TransportHandler,
   context: TransportContext,
   logger: Logger,
@@ -139,7 +139,7 @@ async function listPluginEventFiles(inboxDir: string): Promise<string[]> {
 }
 
 async function processPluginEventFile(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   handler: TransportHandler,
   context: TransportContext,
   logger: Logger,
@@ -164,7 +164,7 @@ async function processPluginEventFile(
 }
 
 function createPendingPluginEventFile(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   fileName: string,
 ): PendingPluginEventFile {
   const paths = getPluginPaths(config);
@@ -180,7 +180,7 @@ function createPendingPluginEventFile(
 }
 
 async function claimPluginEventFile(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   pendingFile: PendingPluginEventFile,
 ): Promise<PluginEventFile> {
   const fileStat = await stat(pendingFile.originalPath);
@@ -210,7 +210,7 @@ async function readPluginEvent(eventFile: PluginEventFile): Promise<PluginEvent>
 }
 
 async function handlePluginEventFile(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   handler: TransportHandler,
   context: TransportContext,
   logger: Logger,
@@ -230,7 +230,7 @@ async function handlePluginEventFile(
 }
 
 function createPluginInboundEvent(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   context: TransportContext,
   eventFile: PluginEventFile,
   event: PluginEvent,
@@ -243,7 +243,7 @@ function createPluginInboundEvent(
   const message: IncomingMessage = {
     endpointId: config.id,
     conversation: {
-      transport: "plugin",
+      transport: "file",
       externalId: conversationId,
       ...(event.session ? { sessionId: event.session.id } : {}),
     },
@@ -287,7 +287,7 @@ function createPluginInboundEvent(
 }
 
 async function deliverPluginResponse(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   context: TransportContext,
   inbound: IncomingMessage,
   text: string,
@@ -301,7 +301,7 @@ async function deliverPluginResponse(
     case "none":
       return;
     case "outbox":
-      await writePluginOutboxMessage(config as PluginOutboxRuntimeConfig, inbound, text);
+      await writePluginOutboxMessage(config as FileOutboxRuntimeConfig, inbound, text);
       return;
     case "endpoint":
       await context.deliveryRouter.deliver({
@@ -320,7 +320,7 @@ async function deliverPluginResponse(
 }
 
 async function writePluginOutboxMessage(
-  config: PluginOutboxRuntimeConfig,
+  config: FileOutboxRuntimeConfig,
   inbound: IncomingMessage,
   text: string,
 ): Promise<void> {
@@ -348,7 +348,7 @@ async function writePluginOutboxMessage(
 }
 
 async function moveProcessedEvent(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   eventFile: PluginEventFile,
 ): Promise<void> {
   const paths = getPluginPaths(config);
@@ -356,7 +356,7 @@ async function moveProcessedEvent(
 }
 
 async function recordFailedEvent(
-  config: PluginTransportRuntimeConfig,
+  config: FileTransportRuntimeConfig,
   logger: Logger,
   input: {
     originalPath: string;
@@ -412,12 +412,12 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function getPluginPaths(config: PluginTransportRuntimeConfig): NonNullable<PluginTransportRuntimeConfig["paths"]["plugin"]> {
-  if (!config.paths.plugin) {
-    throw new Error(`Plugin endpoint "${config.id}" is missing plugin runtime paths.`);
+function getPluginPaths(config: FileTransportRuntimeConfig): NonNullable<FileTransportRuntimeConfig["paths"]["file"]> {
+  if (!config.paths.file) {
+    throw new Error(`File endpoint "${config.id}" is missing file runtime paths.`);
   }
 
-  return config.paths.plugin;
+  return config.paths.file;
 }
 
 function sanitizeFileName(value: string): string {

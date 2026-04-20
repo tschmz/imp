@@ -677,7 +677,7 @@ describe("createFsConversationStore", () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
     const telegramChat = createChatRef();
-    const pluginChat = { transport: "plugin", externalId: "audio" };
+    const pluginChat = { transport: "file", externalId: "audio" };
 
     const telegramSession = await store.ensureActiveForAgent!(telegramChat, {
       agentId: "default",
@@ -702,7 +702,7 @@ describe("createFsConversationStore", () => {
       now: "2026-04-05T00:00:00.000Z",
     });
     const detachedRef = {
-      transport: "plugin",
+      transport: "file",
       externalId: "imp-phone-call-1",
       sessionId: "imp-phone-call-1",
       endpointId: "phone-ingress",
@@ -730,7 +730,7 @@ describe("createFsConversationStore", () => {
         contact_id: "thomas",
       },
       conversation: {
-        transport: "plugin",
+        transport: "file",
         externalId: "imp-phone-call-1",
         sessionId: "imp-phone-call-1",
       },

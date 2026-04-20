@@ -534,7 +534,7 @@ function resolveReplyChannel(
   endpoint: ActiveEndpointRuntimeConfig,
   activeEndpoints: BootstrappedRuntime[],
 ): ReplyChannelContext {
-  if (endpoint.type !== "plugin") {
+  if (endpoint.type !== "file") {
     return {
       kind: endpoint.type,
       delivery: "endpoint",

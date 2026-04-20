@@ -7,13 +7,13 @@ export async function prepareRuntimeFilesystem(paths: RuntimePaths): Promise<voi
   await mkdir(paths.conversationsDir, { recursive: true });
   await mkdir(paths.logsDir, { recursive: true });
   await mkdir(paths.runtimeDir, { recursive: true });
-  if (paths.plugin) {
-    await mkdir(paths.plugin.rootDir, { recursive: true });
-    await mkdir(paths.plugin.inboxDir, { recursive: true });
-    await mkdir(paths.plugin.processingDir, { recursive: true });
-    await mkdir(paths.plugin.processedDir, { recursive: true });
-    await mkdir(paths.plugin.failedDir, { recursive: true });
-    await mkdir(paths.plugin.outboxDir, { recursive: true });
+  if (paths.file) {
+    await mkdir(paths.file.rootDir, { recursive: true });
+    await mkdir(paths.file.inboxDir, { recursive: true });
+    await mkdir(paths.file.processingDir, { recursive: true });
+    await mkdir(paths.file.processedDir, { recursive: true });
+    await mkdir(paths.file.failedDir, { recursive: true });
+    await mkdir(paths.file.outboxDir, { recursive: true });
   }
   await rotateLogFileOnStartup(paths.logFilePath);
 }

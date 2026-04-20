@@ -607,7 +607,7 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
-  it("maps enabled plugin endpoints into daemon runtime config", async () => {
+  it("maps enabled file endpoints into daemon runtime config", async () => {
     const appConfig = createAppConfig({
       plugins: [
         {
@@ -621,7 +621,7 @@ describe("resolveRuntimeConfig", () => {
       endpoints: [
         {
           id: "audio-ingress",
-          type: "plugin",
+          type: "file",
           enabled: true,
           pluginId: "pi-audio",
           routing: {
@@ -646,7 +646,7 @@ describe("resolveRuntimeConfig", () => {
     expect(result.activeEndpoints).toEqual([
       {
         id: "audio-ingress",
-        type: "plugin",
+        type: "file",
         pluginId: "pi-audio",
         ingress: {
           pollIntervalMs: 250,
@@ -666,7 +666,7 @@ describe("resolveRuntimeConfig", () => {
           logFilePath: "/var/lib/imp/logs/endpoints/audio-ingress.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",
           runtimeStatePath: "/var/lib/imp/runtime/endpoints/audio-ingress.json",
-          plugin: {
+          file: {
             rootDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress",
             inboxDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox",
             processingDir: "/var/lib/imp/runtime/plugins/pi-audio/endpoints/audio-ingress/processing",

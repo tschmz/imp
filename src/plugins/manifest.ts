@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PluginIngressConfig, PluginResponseRoutingConfig } from "../config/types.js";
+import type { FileIngressConfig, FileResponseRoutingConfig } from "../config/types.js";
 import { pluginIdentifierSchema, pluginResponseRoutingSchema } from "./protocol.js";
 
 export const PLUGIN_MANIFEST_FILE = "plugin.json";
@@ -27,8 +27,8 @@ export interface PluginEndpointManifest {
   routing?: {
     defaultAgentId?: string;
   };
-  ingress?: PluginIngressConfig;
-  response: PluginResponseRoutingConfig;
+  ingress?: FileIngressConfig;
+  response: FileResponseRoutingConfig;
 }
 
 export interface PluginServiceManifest {

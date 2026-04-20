@@ -107,7 +107,7 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("accepts plugin endpoints with explicit plugin configuration and endpoint response routing", () => {
+  it("accepts file endpoints with explicit plugin configuration and endpoint response routing", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({
         id: "default",
@@ -139,7 +139,7 @@ describe("appConfigSchema", () => {
         },
         {
           id: "audio-ingress",
-          type: "plugin",
+          type: "file",
           enabled: true,
           pluginId: "pi-audio",
           ingress: {
@@ -178,7 +178,7 @@ describe("appConfigSchema", () => {
       endpoints: [
         {
           id: "audio-ingress",
-          type: "plugin",
+          type: "file",
           enabled: true,
           pluginId: "pi-audio",
           response: {
@@ -212,7 +212,7 @@ describe("appConfigSchema", () => {
       endpoints: [
         {
           id: "audio-ingress",
-          type: "plugin",
+          type: "file",
           enabled: true,
           pluginId: "pi-audio",
           response: {
@@ -235,7 +235,7 @@ describe("appConfigSchema", () => {
     );
   });
 
-  it("rejects plugin endpoints that reference unknown plugins", () => {
+  it("rejects file endpoints that reference unknown plugins", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({
         id: "default",
@@ -248,7 +248,7 @@ describe("appConfigSchema", () => {
       endpoints: [
         {
           id: "audio-ingress",
-          type: "plugin",
+          type: "file",
           enabled: true,
           pluginId: "pi-audio",
           response: {

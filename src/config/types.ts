@@ -89,28 +89,28 @@ export interface CliEndpointConfig extends BaseEndpointConfig {
   type: "cli";
 }
 
-export interface PluginEndpointConfig extends BaseEndpointConfig {
-  type: "plugin";
+export interface FileEndpointConfig extends BaseEndpointConfig {
+  type: "file";
   pluginId: string;
-  ingress?: PluginIngressConfig;
-  response: PluginResponseRoutingConfig;
+  ingress?: FileIngressConfig;
+  response: FileResponseRoutingConfig;
 }
 
-export interface PluginIngressConfig {
+export interface FileIngressConfig {
   pollIntervalMs?: number;
   maxEventBytes?: number;
 }
 
-export type PluginResponseRoutingConfig =
-  | PluginNoOutputResponseRoutingConfig
-  | PluginEndpointResponseRoutingConfig
-  | PluginOutboxResponseRoutingConfig;
+export type FileResponseRoutingConfig =
+  | FileNoOutputResponseRoutingConfig
+  | FileEndpointResponseRoutingConfig
+  | FileOutboxResponseRoutingConfig;
 
-export interface PluginNoOutputResponseRoutingConfig {
+export interface FileNoOutputResponseRoutingConfig {
   type: "none";
 }
 
-export interface PluginEndpointResponseRoutingConfig {
+export interface FileEndpointResponseRoutingConfig {
   type: "endpoint";
   endpointId: string;
   target: {
@@ -119,17 +119,17 @@ export interface PluginEndpointResponseRoutingConfig {
   };
 }
 
-export interface PluginOutboxResponseRoutingConfig {
+export interface FileOutboxResponseRoutingConfig {
   type: "outbox";
   replyChannel: {
     kind: string;
   };
   priority?: "low" | "normal" | "high";
   ttlMs?: number;
-  speech?: PluginOutboxSpeechConfig;
+  speech?: FileOutboxSpeechConfig;
 }
 
-export interface PluginOutboxSpeechConfig {
+export interface FileOutboxSpeechConfig {
   enabled?: boolean;
   language?: string;
   model?: string;
@@ -137,7 +137,7 @@ export interface PluginOutboxSpeechConfig {
   instructions?: string;
 }
 
-export type EndpointConfig = TelegramEndpointConfig | CliEndpointConfig | PluginEndpointConfig;
+export type EndpointConfig = TelegramEndpointConfig | CliEndpointConfig | FileEndpointConfig;
 
 export interface TelegramAccessConfig {
   allowedUserIds: string[];

@@ -233,7 +233,14 @@ describe("backup use cases", () => {
 
     const targetRoot = await createTempDir();
     const targetDataRoot = join(targetRoot, "state");
-    await useCases.restoreBackup({
+    const restoreUseCases = createBackupUseCases({
+      discoverConfigPath: async () => {
+        throw new Error("No config found");
+      },
+      writeOutput: vi.fn(),
+    });
+
+    await restoreUseCases.restoreBackup({
       inputPath: backupPath,
       dataRoot: targetDataRoot,
       only: "conversations",

@@ -4,7 +4,7 @@ import { parseConfigJson } from "../config/config-json.js";
 import { discoverConfigPath } from "../config/discover-config-path.js";
 import { appConfigSchema } from "../config/schema.js";
 import { resolveConfigPath as resolvePathRelativeToConfig } from "../config/secret-value.js";
-import type { AppConfig, EndpointConfig, PluginConfig, PluginEndpointConfig } from "../config/types.js";
+import type { AppConfig, EndpointConfig, PluginConfig, FileEndpointConfig } from "../config/types.js";
 import type { DiscoveredPluginManifest } from "../plugins/discovery.js";
 import { readPluginManifest } from "../plugins/discovery.js";
 import { PLUGIN_MANIFEST_FILE } from "../plugins/manifest.js";
@@ -65,9 +65,9 @@ export function installPluginIntoConfig(config: AppConfig, plugin: DiscoveredPlu
       path: plugin.rootDir,
     },
   };
-  const endpointConfigs: PluginEndpointConfig[] = (plugin.manifest.endpoints ?? []).map((endpoint) => ({
+  const endpointConfigs: FileEndpointConfig[] = (plugin.manifest.endpoints ?? []).map((endpoint) => ({
     id: endpoint.id,
-    type: "plugin",
+    type: "file",
     enabled: true,
     pluginId: plugin.manifest.id,
     ...(endpoint.routing ? { routing: endpoint.routing } : {}),

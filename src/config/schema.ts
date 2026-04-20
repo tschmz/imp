@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import type { AgentConfig, AgentToolsConfig, AppConfig, EndpointConfig, PluginEndpointConfig } from "./types.js";
+import type { AgentConfig, AgentToolsConfig, AppConfig, EndpointConfig, FileEndpointConfig } from "./types.js";
 import { getTransport, listTransportTypes } from "../transports/registry.js";
 
 type RefinementContext<T> = z.core.$RefinementCtx<T>;
@@ -311,7 +311,7 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
 
   validateDefaultAgent(config, knownAgentIds, ctx);
   validateEndpointDefaultAgents(config, knownAgentIds, ctx);
-  validatePluginEndpoints(config, endpointIds, enabledEndpointIds, pluginIds, enabledPluginIds, ctx);
+  validateFileEndpoints(config, endpointIds, enabledEndpointIds, pluginIds, enabledPluginIds, ctx);
 }
 
 function validateDefaultAgent(
@@ -349,7 +349,7 @@ function validateEndpointDefaultAgents(
   }
 }
 
-function validatePluginEndpoints(
+function validateFileEndpoints(
   config: AppConfig,
   endpointIds: Set<string>,
   enabledEndpointIds: Set<string>,
@@ -358,22 +358,22 @@ function validatePluginEndpoints(
   ctx: RefinementContext<AppConfig>,
 ): void {
   for (const [index, endpoint] of config.endpoints.entries()) {
-    if (endpoint.type !== "plugin") {
+    if (endpoint.type !== "file") {
       continue;
     }
 
-    validatePluginEndpointPluginReference(endpoint, index, pluginIds, enabledPluginIds, ctx);
+    validateFileEndpointPluginReference(endpoint, index, pluginIds, enabledPluginIds, ctx);
 
     if (endpoint.response.type !== "endpoint") {
       continue;
     }
 
-    validatePluginEndpointResponseTarget(endpoint, index, endpointIds, enabledEndpointIds, ctx);
+    validateFileEndpointResponseTarget(endpoint, index, endpointIds, enabledEndpointIds, ctx);
   }
 }
 
-function validatePluginEndpointPluginReference(
-  endpoint: PluginEndpointConfig,
+function validateFileEndpointPluginReference(
+  endpoint: FileEndpointConfig,
   index: number,
   pluginIds: Set<string>,
   enabledPluginIds: Set<string>,
@@ -396,8 +396,8 @@ function validatePluginEndpointPluginReference(
   }
 }
 
-function validatePluginEndpointResponseTarget(
-  endpoint: PluginEndpointConfig,
+function validateFileEndpointResponseTarget(
+  endpoint: FileEndpointConfig,
   index: number,
   endpointIds: Set<string>,
   enabledEndpointIds: Set<string>,
@@ -411,7 +411,7 @@ function validatePluginEndpointResponseTarget(
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["endpoints", index, "response", "endpointId"],
-      message: "Plugin endpoint responses must target a different endpoint.",
+      message: "File endpoint responses must target a different endpoint.",
     });
   }
 
@@ -419,7 +419,7 @@ function validatePluginEndpointResponseTarget(
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["endpoints", index, "response", "endpointId"],
-      message: `Unknown response endpoint id "${endpoint.response.endpointId}" for plugin endpoint "${endpoint.id}".`,
+      message: `Unknown response endpoint id "${endpoint.response.endpointId}" for file endpoint "${endpoint.id}".`,
     });
   }
 
@@ -427,7 +427,7 @@ function validatePluginEndpointResponseTarget(
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["endpoints", index, "response", "endpointId"],
-      message: `Response endpoint "${endpoint.response.endpointId}" for plugin endpoint "${endpoint.id}" must be enabled.`,
+      message: `Response endpoint "${endpoint.response.endpointId}" for file endpoint "${endpoint.id}" must be enabled.`,
     });
   }
 }

@@ -7,7 +7,7 @@ Runtime hooks used by tests or library embedding are internal extensions, not in
 The model is intentionally explicit:
 
 - declare each plugin under top-level `plugins`
-- bind a plugin to an endpoint with `type: "plugin"`
+- bind a plugin to an endpoint with `type: "file"`
 - let the external component write JSON event files into the endpoint inbox
 - choose where agent replies go with `response`
 
@@ -104,7 +104,7 @@ The install command writes the manifest defaults into an existing config:
 
 - adds a top-level `plugins[]` entry with `enabled: true`
 - sets `package.path` to the discovered plugin directory
-- adds each manifest endpoint as an enabled `type: "plugin"` endpoint
+- adds each manifest endpoint as an enabled `type: "file"` endpoint
 - fails if the plugin ID or any endpoint ID already exists
 
 This manifest API defines plugin identity, default endpoint bindings, companion services, and init metadata so `imp init` and service-install flows can install a plugin without loading plugin code into the daemon process.
@@ -162,7 +162,7 @@ A Raspberry Pi audio frontend can run as its own local service, recognize speech
     },
     {
       "id": "audio-ingress",
-      "type": "plugin",
+      "type": "file",
       "enabled": true,
       "pluginId": "pi-audio",
       "routing": {
@@ -186,7 +186,7 @@ A Raspberry Pi audio frontend can run as its own local service, recognize speech
 
 ## Runtime Directories
 
-For plugin endpoint `audio-ingress` bound to plugin `pi-audio`, the runtime files live at:
+For file endpoint `audio-ingress` bound to plugin `pi-audio`, the runtime files live at:
 
 ```text
 <paths.dataRoot>/runtime/plugins/pi-audio/endpoints/audio-ingress/
@@ -245,7 +245,7 @@ Write files atomically from the plugin side: write to a temporary file outside `
 
 ## Response Routing
 
-Plugin endpoints choose one response route:
+File endpoints choose one response route:
 
 ```json
 {
@@ -291,7 +291,7 @@ Plugin endpoints choose one response route:
 }
 ```
 
-`outbox` writes a JSON reply file to the plugin endpoint outbox. This keeps a local speaker-output component outside the daemon process. `replyChannel.kind` is required for prompt context and describes the semantic channel that will consume the outbox reply. Use `"audio"` for a Raspberry Pi voice playback component. `imp` does not infer audio from `outbox`.
+`outbox` writes a JSON reply file to the file endpoint outbox. This keeps a local speaker-output component outside the daemon process. `replyChannel.kind` is required for prompt context and describes the semantic channel that will consume the outbox reply. Use `"audio"` for a Raspberry Pi voice playback component. `imp` does not infer audio from `outbox`.
 
 Optional outbox controls:
 
@@ -347,7 +347,7 @@ The endpoint log also records the failed path and error record path.
 
 ## File Protocol Smoke Test
 
-With a running daemon and an enabled plugin endpoint, write one event into the endpoint inbox:
+With a running daemon and an enabled file endpoint, write one event into the endpoint inbox:
 
 ```bash
 cat > <paths.dataRoot>/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox/smoke.json <<'JSON'

@@ -1,10 +1,10 @@
 import { join } from "node:path";
 import { z } from "zod";
-import type { PluginEndpointConfig } from "../../config/types.js";
-import type { ActiveEndpointRuntimeConfig, PluginEndpointRuntimeConfig } from "../../daemon/types.js";
+import type { FileEndpointConfig } from "../../config/types.js";
+import type { ActiveEndpointRuntimeConfig, FileEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportContext } from "../types.js";
-import { createPluginTransport } from "./plugin-transport.js";
+import { createFileTransport } from "./file-transport.js";
 
 const defaultPollIntervalMs = 1000;
 const defaultMaxEventBytes = 256 * 1024;
@@ -39,9 +39,9 @@ const replyChannelKindSchema = z
     "Reply channel kinds may only contain letters, numbers, hyphens, and underscores.",
   );
 
-export const pluginTransportConfigSchema = z.object({
+export const fileTransportConfigSchema = z.object({
   id: endpointIdSchema,
-  type: z.literal("plugin"),
+  type: z.literal("file"),
   enabled: z.boolean(),
   pluginId: pluginIdSchema,
   routing: routingSchema,
@@ -83,8 +83,8 @@ export const pluginTransportConfigSchema = z.object({
   ]),
 }).strict();
 
-export function normalizePluginRuntimeConfig(
-  endpoint: PluginEndpointConfig,
+export function normalizeFileRuntimeConfig(
+  endpoint: FileEndpointConfig,
   options: {
     dataRoot: string;
     defaultAgentId: string;
@@ -111,7 +111,7 @@ export function normalizePluginRuntimeConfig(
       logFilePath: join(logsDir, `${endpoint.id}.log`),
       runtimeDir,
       runtimeStatePath: join(runtimeDir, `${endpoint.id}.json`),
-      plugin: {
+      file: {
         rootDir: pluginRoot,
         inboxDir: join(pluginRoot, "inbox"),
         processingDir: join(pluginRoot, "processing"),
@@ -123,14 +123,14 @@ export function normalizePluginRuntimeConfig(
   };
 }
 
-export function createPluginTransportFromRuntimeConfig(
+export function createFileTransportFromRuntimeConfig(
   config: ActiveEndpointRuntimeConfig,
   logger: Logger,
   context: TransportContext,
 ): Transport {
-  if (config.type !== "plugin") {
-    throw new Error(`Expected plugin endpoint runtime config, got "${config.type}".`);
+  if (config.type !== "file") {
+    throw new Error(`Expected file endpoint runtime config, got "${config.type}".`);
   }
 
-  return createPluginTransport(config as PluginEndpointRuntimeConfig & ActiveEndpointRuntimeConfig, logger, context);
+  return createFileTransport(config as FileEndpointRuntimeConfig & ActiveEndpointRuntimeConfig, logger, context);
 }

@@ -159,7 +159,7 @@ dataRoot/
   skills/
 ```
 
-The shared `conversations/` tree stores one active session pointer per agent plus each chat's currently selected agent. Endpoint logs live under `logs/endpoints`, agent-scoped logs live under `logs/agents`, and runtime lock/state files live under the central `runtime/endpoints` tree. Plugin endpoint file ingress and egress live under `runtime/plugins/<plugin-id>/endpoints/<endpoint-id>`. Agent home directories default to `agents/<agent-id>`, and every direct `*.md` file in an agent home is loaded alphabetically as an instruction block before explicit `prompt.instructions` and the workspace `AGENTS.md`.
+The shared `conversations/` tree stores one active session pointer per agent plus each chat's currently selected agent. Endpoint logs live under `logs/endpoints`, agent-scoped logs live under `logs/agents`, and runtime lock/state files live under the central `runtime/endpoints` tree. File endpoint ingress and egress for plugins live under `runtime/plugins/<plugin-id>/endpoints/<endpoint-id>`. Agent home directories default to `agents/<agent-id>`, and every direct `*.md` file in an agent home is loaded alphabetically as an instruction block before explicit `prompt.instructions` and the workspace `AGENTS.md`.
 
 ## Secret References
 
@@ -247,7 +247,7 @@ Available variables:
 - `skills[].directoryPath`
 - `skills[].filePath`
 
-Reply-channel context describes where the answer will go, not where the inbound message came from. Normal endpoint conversations use the current endpoint transport. Plugin endpoint responses with `response.type: "endpoint"` use the target endpoint transport and endpoint ID. Plugin outbox responses use the explicit `response.replyChannel.kind` value from config, and `none` responses use `reply.channel.kind` set to `none`. Channel-specific behavior belongs in prompt files, not in hidden daemon prompts.
+Reply-channel context describes where the answer will go, not where the inbound message came from. Normal endpoint conversations use the current endpoint transport. File endpoint responses with `response.type: "endpoint"` use the target endpoint transport and endpoint ID. File endpoint outbox responses use the explicit `response.replyChannel.kind` value from config, and `none` responses use `reply.channel.kind` set to `none`. Channel-specific behavior belongs in prompt files, not in hidden daemon prompts.
 
 Conversation context describes the current session. Plugins may set `conversation.kind` and `conversation.metadata` when they create a detached session. For imp-phone sessions, `conversation.kind` is `phone-call` and metadata includes `contact_id`, `contact_name`, and `contact_uri`.
 
@@ -310,7 +310,7 @@ Telegram fields:
 
 CLI endpoints do not have additional public config fields.
 
-Plugin endpoint fields:
+File endpoint fields:
 
 - `pluginId`: points to an enabled top-level `plugins[].id`
 - `ingress.pollIntervalMs`: optional inbox polling interval in milliseconds; defaults to `1000`

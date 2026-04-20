@@ -27,7 +27,7 @@ describe("createPromptTemplateContext", () => {
       system: createSystemContext(),
       agent: createAgent(),
       endpointId: "audio-ingress",
-      transportKind: "plugin",
+      transportKind: "file",
       replyChannel: {
         kind: "audio",
         delivery: "outbox",
@@ -50,11 +50,11 @@ describe("createPromptTemplateContext", () => {
       system: createSystemContext(),
       agent: createAgent(),
       endpointId: "phone-ingress",
-      transportKind: "plugin",
+      transportKind: "file",
       conversation: {
         state: {
           conversation: {
-            transport: "plugin",
+            transport: "file",
             externalId: "imp-phone-call-1",
             sessionId: "imp-phone-call-1",
           },
@@ -88,7 +88,7 @@ describe("createPromptTemplateContext", () => {
       system: createSystemContext(),
       agent: createAgent(),
       endpointId: "phone-ingress",
-      transportKind: "plugin",
+      transportKind: "file",
       now: new Date("2026-04-19T12:34:56.000Z"),
       timezone: "Europe/Berlin",
     });

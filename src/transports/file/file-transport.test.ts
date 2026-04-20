@@ -2,10 +2,10 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ActiveEndpointRuntimeConfig, PluginEndpointRuntimeConfig } from "../../daemon/types.js";
+import type { ActiveEndpointRuntimeConfig, FileEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { Logger } from "../../logging/types.js";
 import { createDeliveryRouter } from "../delivery-router.js";
-import { createPluginTransport } from "./plugin-transport.js";
+import { createFileTransport } from "./file-transport.js";
 
 const tempDirs: string[] = [];
 
@@ -13,7 +13,7 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
-describe("createPluginTransport", () => {
+describe("createFileTransport", () => {
   it("ingests plugin event files and writes routed replies to the plugin outbox", async () => {
     const root = await createTempDir();
     const config = createPluginRuntimeConfig(root, {
@@ -34,13 +34,13 @@ describe("createPluginTransport", () => {
       },
     });
     const logger = createMockLogger();
-    const transport = createPluginTransport(config, logger, {
+    const transport = createFileTransport(config, logger, {
       deliveryRouter: createDeliveryRouter(),
     });
     await ensurePluginDirs(config);
 
     await writeFile(
-      join(config.paths.plugin!.inboxDir, "wake.json"),
+      join(config.paths.file!.inboxDir, "wake.json"),
       `${JSON.stringify({
         schemaVersion: 1,
         id: "wake-1",
@@ -69,7 +69,7 @@ describe("createPluginTransport", () => {
         expect(event.message).toMatchObject({
           endpointId: "audio-ingress",
           conversation: {
-            transport: "plugin",
+            transport: "file",
             externalId: "kitchen",
             sessionId: "phone-call-1",
           },
@@ -105,9 +105,9 @@ describe("createPluginTransport", () => {
       }),
     });
 
-    await waitForDirectoryEntry(config.paths.plugin!.processedDir, ".json");
-    const outboxFile = await waitForDirectoryEntry(config.paths.plugin!.outboxDir, ".json");
-    const outbox = JSON.parse(await readFile(join(config.paths.plugin!.outboxDir, outboxFile), "utf8"));
+    await waitForDirectoryEntry(config.paths.file!.processedDir, ".json");
+    const outboxFile = await waitForDirectoryEntry(config.paths.file!.outboxDir, ".json");
+    const outbox = JSON.parse(await readFile(join(config.paths.file!.outboxDir, outboxFile), "utf8"));
 
     expect(outbox).toMatchObject({
       schemaVersion: 1,
@@ -128,7 +128,7 @@ describe("createPluginTransport", () => {
       },
       text: "lights are on",
     });
-    expect(await readdir(config.paths.plugin!.failedDir)).toEqual([]);
+    expect(await readdir(config.paths.file!.failedDir)).toEqual([]);
 
     await transport.stop?.();
     await start;
@@ -150,13 +150,13 @@ describe("createPluginTransport", () => {
         },
       },
     });
-    const transport = createPluginTransport(config, createMockLogger(), {
+    const transport = createFileTransport(config, createMockLogger(), {
       deliveryRouter,
     });
     await ensurePluginDirs(config);
 
     await writeFile(
-      join(config.paths.plugin!.inboxDir, "event.json"),
+      join(config.paths.file!.inboxDir, "event.json"),
       `${JSON.stringify({
         id: "event-1",
         text: "hello",
@@ -173,7 +173,7 @@ describe("createPluginTransport", () => {
       }),
     });
 
-    await waitForDirectoryEntry(config.paths.plugin!.processedDir, ".json");
+    await waitForDirectoryEntry(config.paths.file!.processedDir, ".json");
 
     expect(delivered).toHaveBeenCalledWith({
       endpointId: "private-telegram",
@@ -203,13 +203,13 @@ describe("createPluginTransport", () => {
         },
       },
     });
-    const transport = createPluginTransport(config, createMockLogger(), {
+    const transport = createFileTransport(config, createMockLogger(), {
       deliveryRouter: createDeliveryRouter(),
     });
     await ensurePluginDirs(config);
 
     await writeFile(
-      join(config.paths.plugin!.inboxDir, "closed.json"),
+      join(config.paths.file!.inboxDir, "closed.json"),
       `${JSON.stringify({
         id: "closed-1",
         text: "finalize notes",
@@ -234,8 +234,8 @@ describe("createPluginTransport", () => {
       }),
     });
 
-    await waitForDirectoryEntry(config.paths.plugin!.processedDir, ".json");
-    expect(await readdir(config.paths.plugin!.outboxDir)).toEqual([]);
+    await waitForDirectoryEntry(config.paths.file!.processedDir, ".json");
+    expect(await readdir(config.paths.file!.outboxDir)).toEqual([]);
 
     await transport.stop?.();
     await start;
@@ -248,12 +248,12 @@ describe("createPluginTransport", () => {
         type: "none",
       },
     });
-    const transport = createPluginTransport(config, createMockLogger(), {
+    const transport = createFileTransport(config, createMockLogger(), {
       deliveryRouter: createDeliveryRouter(),
     });
     await ensurePluginDirs(config);
 
-    await writeFile(join(config.paths.plugin!.inboxDir, "bad.json"), "{\"text\":\"\"}\n", "utf8");
+    await writeFile(join(config.paths.file!.inboxDir, "bad.json"), "{\"text\":\"\"}\n", "utf8");
 
     const start = transport.start({
       handle: vi.fn(async () => {
@@ -261,8 +261,8 @@ describe("createPluginTransport", () => {
       }),
     });
 
-    await waitForDirectoryEntry(config.paths.plugin!.failedDir, ".error.json");
-    expect(await readdir(config.paths.plugin!.processedDir)).toEqual([]);
+    await waitForDirectoryEntry(config.paths.file!.failedDir, ".error.json");
+    expect(await readdir(config.paths.file!.processedDir)).toEqual([]);
 
     await transport.stop?.();
     await start;
@@ -275,13 +275,13 @@ describe("createPluginTransport", () => {
         type: "none",
       },
     });
-    const transport = createPluginTransport(config, createMockLogger(), {
+    const transport = createFileTransport(config, createMockLogger(), {
       deliveryRouter: createDeliveryRouter(),
     });
     await ensurePluginDirs(config);
 
     await writeFile(
-      join(config.paths.plugin!.inboxDir, "future.json"),
+      join(config.paths.file!.inboxDir, "future.json"),
       `${JSON.stringify({
         schemaVersion: 2,
         text: "hello from the future",
@@ -295,8 +295,8 @@ describe("createPluginTransport", () => {
       }),
     });
 
-    await waitForDirectoryEntry(config.paths.plugin!.failedDir, ".error.json");
-    expect(await readdir(config.paths.plugin!.processedDir)).toEqual([]);
+    await waitForDirectoryEntry(config.paths.file!.failedDir, ".error.json");
+    expect(await readdir(config.paths.file!.processedDir)).toEqual([]);
 
     await transport.stop?.();
     await start;
@@ -309,13 +309,13 @@ describe("createPluginTransport", () => {
         type: "none",
       },
     });
-    const transport = createPluginTransport(config, createMockLogger(), {
+    const transport = createFileTransport(config, createMockLogger(), {
       deliveryRouter: createDeliveryRouter(),
     });
     await ensurePluginDirs(config);
 
     await writeFile(
-      join(config.paths.plugin!.inboxDir, "first.json"),
+      join(config.paths.file!.inboxDir, "first.json"),
       `${JSON.stringify({
         id: "first",
         text: "first event",
@@ -343,7 +343,7 @@ describe("createPluginTransport", () => {
     await start;
 
     await writeFile(
-      join(config.paths.plugin!.inboxDir, "second.json"),
+      join(config.paths.file!.inboxDir, "second.json"),
       `${JSON.stringify({
         id: "second",
         text: "second event",
@@ -353,19 +353,19 @@ describe("createPluginTransport", () => {
     await new Promise((resolve) => setTimeout(resolve, config.ingress.pollIntervalMs * 3));
 
     expect(handle).toHaveBeenCalledTimes(1);
-    expect(await readdir(config.paths.plugin!.inboxDir)).toEqual(["second.json"]);
+    expect(await readdir(config.paths.file!.inboxDir)).toEqual(["second.json"]);
   });
 });
 
 function createPluginRuntimeConfig(
   root: string,
-  overrides: Pick<PluginEndpointRuntimeConfig, "response">,
-): PluginEndpointRuntimeConfig & ActiveEndpointRuntimeConfig {
+  overrides: Pick<FileEndpointRuntimeConfig, "response">,
+): FileEndpointRuntimeConfig & ActiveEndpointRuntimeConfig {
   const pluginRoot = join(root, "runtime", "plugins", "pi-audio", "endpoints", "audio-ingress");
 
   return {
     id: "audio-ingress",
-    type: "plugin",
+    type: "file",
     pluginId: "pi-audio",
     ingress: {
       pollIntervalMs: 10,
@@ -380,7 +380,7 @@ function createPluginRuntimeConfig(
       logFilePath: join(root, "logs", "endpoints", "audio-ingress.log"),
       runtimeDir: join(root, "runtime", "endpoints"),
       runtimeStatePath: join(root, "runtime", "endpoints", "audio-ingress.json"),
-      plugin: {
+      file: {
         rootDir: pluginRoot,
         inboxDir: join(pluginRoot, "inbox"),
         processingDir: join(pluginRoot, "processing"),
@@ -401,16 +401,16 @@ function createMockLogger(): Logger {
 }
 
 async function createTempDir(): Promise<string> {
-  const path = await mkdtemp(join(tmpdir(), "imp-plugin-transport-test-"));
+  const path = await mkdtemp(join(tmpdir(), "imp-file-transport-test-"));
   tempDirs.push(path);
   return path;
 }
 
-async function ensurePluginDirs(config: PluginEndpointRuntimeConfig & ActiveEndpointRuntimeConfig): Promise<void> {
-  await mkdir(config.paths.plugin!.inboxDir, { recursive: true });
-  await mkdir(config.paths.plugin!.processedDir, { recursive: true });
-  await mkdir(config.paths.plugin!.failedDir, { recursive: true });
-  await mkdir(config.paths.plugin!.outboxDir, { recursive: true });
+async function ensurePluginDirs(config: FileEndpointRuntimeConfig & ActiveEndpointRuntimeConfig): Promise<void> {
+  await mkdir(config.paths.file!.inboxDir, { recursive: true });
+  await mkdir(config.paths.file!.processedDir, { recursive: true });
+  await mkdir(config.paths.file!.failedDir, { recursive: true });
+  await mkdir(config.paths.file!.outboxDir, { recursive: true });
 }
 
 async function waitForDirectoryEntry(dir: string, suffix: string): Promise<string> {

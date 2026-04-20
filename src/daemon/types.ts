@@ -31,19 +31,19 @@ export interface CliEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
   initialReplay?: OutgoingMessageReplayItem[];
 }
 
-export interface PluginEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
-  type: "plugin";
+export interface FileEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
+  type: "file";
   pluginId: string;
-  ingress: PluginIngressRuntimeConfig;
-  response: PluginResponseRoutingRuntimeConfig;
+  ingress: FileIngressRuntimeConfig;
+  response: FileResponseRoutingRuntimeConfig;
 }
 
-export interface PluginIngressRuntimeConfig {
+export interface FileIngressRuntimeConfig {
   pollIntervalMs: number;
   maxEventBytes: number;
 }
 
-export type PluginResponseRoutingRuntimeConfig =
+export type FileResponseRoutingRuntimeConfig =
   | { type: "none" }
   | {
       type: "endpoint";
@@ -87,7 +87,7 @@ export interface TelegramDocumentRuntimeConfig {
 export type TransportEndpointRuntimeConfig =
   | TelegramEndpointRuntimeConfig
   | CliEndpointRuntimeConfig
-  | PluginEndpointRuntimeConfig;
+  | FileEndpointRuntimeConfig;
 
 export interface RuntimePaths {
   dataRoot: string;
@@ -96,10 +96,10 @@ export interface RuntimePaths {
   logFilePath: string;
   runtimeDir: string;
   runtimeStatePath: string;
-  plugin?: PluginRuntimePaths;
+  file?: FileEndpointRuntimePaths;
 }
 
-export interface PluginRuntimePaths {
+export interface FileEndpointRuntimePaths {
   rootDir: string;
   inboxDir: string;
   processingDir: string;

@@ -29,7 +29,7 @@ describe("plugin use cases", () => {
     expect(writeOutput).toHaveBeenCalledWith("imp-voice\timp Voice 0.1.0 - Local voice frontend.");
   });
 
-  it("inspects plugin endpoint and service defaults", async () => {
+  it("inspects file endpoint and service defaults", async () => {
     const root = await createPluginRoot();
     await writeManifest(root, "imp-voice", {
       schemaVersion: 1,
@@ -155,7 +155,7 @@ describe("plugin use cases", () => {
     expect(updated.endpoints).toEqual([
       {
         id: "audio-ingress",
-        type: "plugin",
+        type: "file",
         enabled: true,
         pluginId: "imp-voice",
         ingress: {
