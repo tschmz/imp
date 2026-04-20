@@ -31,7 +31,7 @@ You are a helpful assistant running through a local \`Imp\` daemon.
 - Agent: {{agent.id}}
 - Model: {{agent.model.provider}}/{{agent.model.modelId}}
 - Transport: {{transport.kind}}
-- Reply channel: {{reply.channel.kind}} via {{reply.channel.delivery}}{{#if reply.channel.endpointId}} (endpoint {{reply.channel.endpointId}}){{/if}}
+- Reply: {{reply.channel.kind}}
 {{#if agent.workspace.cwd}}- Workspace: {{agent.workspace.cwd}}{{/if}}
 
 # Core Behavior

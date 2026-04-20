@@ -380,7 +380,7 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toContain("Agent: default");
     expect(prompt).toContain("Model: faux/faux-1");
     expect(prompt).toContain("Transport: telegram");
-    expect(prompt).toContain("Reply channel: telegram via endpoint (endpoint private-telegram)");
+    expect(prompt).toContain("Reply: telegram");
     expect(prompt).not.toContain("{{agent.id}}");
   });
 
@@ -409,7 +409,7 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toContain("Reply channel: audio via outbox");
+    expect(prompt).toContain("Reply: audio");
     expect(prompt).toContain("The reply will be spoken aloud.");
     expect(prompt).toContain("preferably one or two short sentences");
     expect(prompt).toContain("Avoid Markdown, lists, tables, code blocks, links");
@@ -445,7 +445,7 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toContain("Reply channel: cli via endpoint (endpoint local-cli)");
+    expect(prompt).toContain("Reply: cli");
     expect(prompt).toContain("You are chatting through the interactive CLI.");
     expect(prompt).toContain("Strikethrough with double tildes");
     expect(prompt).toContain("Simple GitHub-flavored Markdown tables");
@@ -479,7 +479,7 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toContain("Reply channel: audio via endpoint (endpoint speaker-room)");
+    expect(prompt).toContain("Reply: audio");
     expect(prompt).toContain("The reply will be spoken aloud.");
     expect(prompt).toContain("Do not include URLs or file paths in final responses.");
   });
@@ -603,7 +603,7 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toContain("Reply channel: none via none");
+    expect(prompt).toContain("Reply: none");
     expect(prompt).toContain("Keep responses compact by default.");
     expect(prompt).not.toContain("You are chatting through Telegram.");
     expect(prompt).not.toContain("You are chatting through the interactive CLI.");
