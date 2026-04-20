@@ -24,7 +24,8 @@ export function createMcpToolCache(options: {
 
   return {
     async resolve(agent) {
-      if (!agent.mcp || agent.mcp.servers.length === 0) {
+      const servers = agent.mcp?.servers ?? [];
+      if (servers.length === 0) {
         return {
           tools: [],
           initializedServerIds: [],
@@ -33,22 +34,43 @@ export function createMcpToolCache(options: {
         };
       }
 
-      const cached = cache.get(agent.id);
-      if (cached) {
-        await options.logger?.debug(`reusing cached MCP runtime for agent "${agent.id}"`);
-        return cached.promise;
-      }
+      const resolutions = await Promise.all(
+        servers.map(async (server) => {
+          const cached = cache.get(server.id);
+          if (cached) {
+            await options.logger?.debug(`reusing cached MCP runtime for server "${server.id}"`);
+            return cached.promise;
+          }
 
-      await options.logger?.debug(`initializing cached MCP runtime for agent "${agent.id}"`);
-      const promise = options.resolveMcpTools(agent, { logger: options.logger }).catch((error) => {
-        cache.delete(agent.id);
-        throw error;
-      });
-      cache.set(agent.id, { promise });
+          await options.logger?.debug(`initializing cached MCP runtime for server "${server.id}"`);
+          const promise = options.resolveMcpTools(
+            {
+              ...agent,
+              mcp: {
+                servers: [server],
+              },
+            },
+            { logger: options.logger },
+          ).catch((error) => {
+            cache.delete(server.id);
+            throw error;
+          });
+          cache.set(server.id, { promise });
 
-      const resolution = await promise;
-      await options.logger?.debug(`cached MCP runtime ready for agent "${agent.id}"`);
-      return resolution;
+          const resolution = await promise;
+          await options.logger?.debug(`cached MCP runtime ready for server "${server.id}"`);
+          return resolution;
+        }),
+      );
+
+      return {
+        tools: resolutions.flatMap((resolution) => resolution.tools),
+        initializedServerIds: resolutions.flatMap((resolution) => resolution.initializedServerIds),
+        failedServerIds: resolutions.flatMap((resolution) => resolution.failedServerIds),
+        async close() {
+          // Shared server runtimes are owned by the cache and closed by cache.close().
+        },
+      };
     },
     async close() {
       const resolutions = [...cache.values()];

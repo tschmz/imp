@@ -1,5 +1,5 @@
 import type {
-  AgentMcpConfig,
+  AgentMcpServerConfig,
   AgentPhoneCallConfig,
   AgentWorkspaceConfig,
   InferenceSettings,
@@ -27,9 +27,19 @@ export interface DefaultsConfig {
 
 export type ModelConfig = ModelRef;
 
+export interface ToolsConfig {
+  mcp?: {
+    servers: AgentMcpServerConfig[];
+  };
+}
+
+export interface AgentMcpToolsConfig {
+  servers: string[];
+}
+
 export interface AgentToolsConfigObject {
   builtIn?: string[];
-  mcp?: AgentMcpConfig;
+  mcp?: AgentMcpToolsConfig;
   phone?: AgentPhoneCallConfig;
 }
 
@@ -173,6 +183,7 @@ export interface AppConfig {
   paths: PathsConfig;
   logging?: LoggingConfig;
   defaults: DefaultsConfig;
+  tools?: ToolsConfig;
   agents: AgentConfig[];
   plugins?: PluginConfig[];
   endpoints: EndpointConfig[];

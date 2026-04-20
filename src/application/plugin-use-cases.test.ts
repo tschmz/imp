@@ -141,6 +141,13 @@ describe("plugin use cases", () => {
           },
         },
       ],
+      mcpServers: [
+        {
+          id: "voice-control",
+          command: "node",
+          args: ["dist/mcp-server.js"],
+        },
+      ],
     });
     await writeFile(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`, "utf8");
     const writeOutput = vi.fn();
@@ -166,6 +173,17 @@ describe("plugin use cases", () => {
         },
       },
     ]);
+    expect(updated.tools).toEqual({
+      mcp: {
+        servers: [
+          {
+            id: "voice-control",
+            command: "node",
+            args: ["dist/mcp-server.js"],
+          },
+        ],
+      },
+    });
     expect(updated.endpoints).toEqual([
       {
         id: "audio-ingress",
@@ -185,6 +203,7 @@ describe("plugin use cases", () => {
     ]);
     expect(writeOutput).toHaveBeenCalledWith(`Installed plugin "imp-voice" into ${configPath}`);
     expect(writeOutput).toHaveBeenCalledWith("Added endpoints: audio-ingress");
+    expect(writeOutput).toHaveBeenCalledWith("Added MCP servers: voice-control");
   });
 
   it("checks configured plugin health", async () => {

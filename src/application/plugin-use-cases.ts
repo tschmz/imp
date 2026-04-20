@@ -105,6 +105,7 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
         pluginId: plugin.manifest.id,
         configPath,
         endpointIds: (plugin.manifest.endpoints ?? []).map((endpoint) => endpoint.id),
+        mcpServerIds: (plugin.manifest.mcpServers ?? []).map((server) => server.id),
       })) {
         writeOutput(line);
       }

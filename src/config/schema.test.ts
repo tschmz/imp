@@ -383,21 +383,28 @@ describe("appConfigSchema", () => {
     );
   });
 
-  it("accepts MCP stdio server config under agents.tools.mcp.servers", () => {
+  it("accepts global MCP stdio server config referenced by agents", () => {
     const result = appConfigSchema.safeParse(
-      createConfig({
-        id: "default",
-        prompt: {
-          base: {
-            text: "You are concise.",
+      {
+        ...createConfig({
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
           },
-        },
-        model: {
-          provider: "openai",
-          modelId: "gpt-5.4",
-        },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          tools: {
+            builtIn: ["read"],
+            mcp: {
+              servers: ["echo"],
+            },
+          },
+        }),
         tools: {
-          builtIn: ["read"],
           mcp: {
             servers: [
               {
@@ -412,7 +419,7 @@ describe("appConfigSchema", () => {
             ],
           },
         },
-      }),
+      },
     );
 
     expect(result.success).toBe(true);
@@ -497,19 +504,21 @@ describe("appConfigSchema", () => {
     );
   });
 
-  it("rejects duplicate MCP server ids for a single agent", () => {
+  it("rejects duplicate global MCP server ids", () => {
     const result = appConfigSchema.safeParse(
-      createConfig({
-        id: "default",
-        prompt: {
-          base: {
-            text: "You are concise.",
+      {
+        ...createConfig({
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
           },
-        },
-        model: {
-          provider: "openai",
-          modelId: "gpt-5.4",
-        },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+        }),
         tools: {
           mcp: {
             servers: [
@@ -524,6 +533,40 @@ describe("appConfigSchema", () => {
             ],
           },
         },
+      },
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["tools", "mcp", "servers", 1, "id"],
+        message: 'Duplicate MCP server id "echo". MCP server ids must be unique.',
+      }),
+    );
+  });
+
+  it("rejects unknown MCP server references for an agent", () => {
+    const result = appConfigSchema.safeParse(
+      createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        tools: {
+          mcp: {
+            servers: ["missing"],
+          },
+        },
       }),
     );
 
@@ -534,8 +577,8 @@ describe("appConfigSchema", () => {
 
     expect(result.error.issues).toContainEqual(
       expect.objectContaining({
-        path: ["agents", 0, "tools", "mcp", "servers", 1, "id"],
-        message: 'Duplicate MCP server id "echo". MCP server ids must be unique per agent.',
+        path: ["agents", 0, "tools", "mcp", "servers", 0],
+        message: 'Unknown MCP server id "missing" for agent "default".',
       }),
     );
   });

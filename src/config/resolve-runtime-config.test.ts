@@ -402,6 +402,18 @@ describe("resolveRuntimeConfig", () => {
 
   it("resolves MCP server cwd relative to the config directory", async () => {
     const appConfig = createAppConfig({
+      tools: {
+        mcp: {
+          servers: [
+            {
+              id: "echo",
+              command: "node",
+              args: ["./server.mjs"],
+              cwd: "./mcp",
+            },
+          ],
+        },
+      },
       agents: [
         {
           id: "default",
@@ -417,14 +429,7 @@ describe("resolveRuntimeConfig", () => {
           tools: {
             builtIn: ["read"],
             mcp: {
-              servers: [
-                {
-                  id: "echo",
-                  command: "node",
-                  args: ["./server.mjs"],
-                  cwd: "./mcp",
-                },
-              ],
+              servers: ["echo"],
             },
           },
         },
@@ -1007,6 +1012,7 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
         },
       },
     ],
+    ...(overrides.tools ? { tools: overrides.tools } : {}),
     ...(overrides.plugins ? { plugins: overrides.plugins } : {}),
     endpoints: overrides.endpoints ?? [],
   };

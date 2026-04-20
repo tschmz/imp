@@ -65,6 +65,14 @@ const mcpServerConfigSchema = z.object({
   cwd: z.string().min(1).optional(),
 });
 
+const toolsConfigSchema = z.object({
+  mcp: z
+    .object({
+      servers: mcpServerConfigSchema.array().min(1),
+    })
+    .optional(),
+});
+
 const phoneContactIdSchema = z
   .string()
   .min(1)
@@ -98,7 +106,7 @@ const agentToolsConfigSchema = z
       builtIn: z.string().min(1).array().optional(),
       mcp: z
         .object({
-          servers: mcpServerConfigSchema.array().min(1),
+          servers: mcpServerIdSchema.array().min(1),
         })
         .optional(),
       phone: phoneCallConfigSchema.optional(),
@@ -165,6 +173,7 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   defaults: z.object({
     agentId: z.string().min(1),
   }),
+  tools: toolsConfigSchema.optional(),
   agents: agentConfigSchema.array().min(1),
   plugins: pluginConfigSchema.array().optional(),
   endpoints: endpointConfigSchema.array(),
@@ -214,18 +223,18 @@ function validateAgentToolsConfig(
     contactIds.add(contact.id);
   }
 
-  const serverIds = new Set<string>();
-  for (const [index, server] of (tools.mcp?.servers ?? []).entries()) {
-    if (serverIds.has(server.id)) {
+  const serverRefs = new Set<string>();
+  for (const [index, serverId] of (tools.mcp?.servers ?? []).entries()) {
+    if (serverRefs.has(serverId)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["mcp", "servers", index, "id"],
-        message: `Duplicate MCP server id "${server.id}". MCP server ids must be unique per agent.`,
+        path: ["mcp", "servers", index],
+        message: `Duplicate MCP server reference "${serverId}". MCP server references must be unique per agent.`,
       });
       continue;
     }
 
-    serverIds.add(server.id);
+    serverRefs.add(serverId);
   }
 }
 
@@ -297,6 +306,20 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
     }
   }
 
+  const mcpServerIds = new Set<string>();
+  for (const [index, server] of (config.tools?.mcp?.servers ?? []).entries()) {
+    if (mcpServerIds.has(server.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tools", "mcp", "servers", index, "id"],
+        message: `Duplicate MCP server id "${server.id}". MCP server ids must be unique.`,
+      });
+      continue;
+    }
+
+    mcpServerIds.add(server.id);
+  }
+
   const pluginIds = new Set<string>();
   const enabledPluginIds = new Set<string>();
   for (const [index, plugin] of (config.plugins ?? []).entries()) {
@@ -316,8 +339,33 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
   }
 
   validateDefaultAgent(config, knownAgentIds, ctx);
+  validateAgentMcpServerReferences(config, mcpServerIds, ctx);
   validateEndpointDefaultAgents(config, knownAgentIds, ctx);
   validateFileEndpoints(config, endpointIds, enabledEndpointIds, pluginIds, enabledPluginIds, ctx);
+}
+
+function validateAgentMcpServerReferences(
+  config: AppConfig,
+  mcpServerIds: Set<string>,
+  ctx: RefinementContext<AppConfig>,
+): void {
+  for (const [agentIndex, agent] of config.agents.entries()) {
+    if (Array.isArray(agent.tools)) {
+      continue;
+    }
+
+    for (const [serverIndex, serverId] of (agent.tools?.mcp?.servers ?? []).entries()) {
+      if (mcpServerIds.has(serverId)) {
+        continue;
+      }
+
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["agents", agentIndex, "tools", "mcp", "servers", serverIndex],
+        message: `Unknown MCP server id "${serverId}" for agent "${agent.id}".`,
+      });
+    }
+  }
 }
 
 function validateDefaultAgent(

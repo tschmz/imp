@@ -78,9 +78,26 @@ export function installPluginIntoConfig(config: AppConfig, plugin: DiscoveredPlu
     ...(endpoint.ingress ? { ingress: endpoint.ingress } : {}),
     response: endpoint.response,
   }));
+  const mcpServerConfigs = (plugin.manifest.mcpServers ?? []).map((server) => ({
+    id: server.id,
+    command: server.command,
+    ...(server.args ? { args: server.args } : {}),
+    ...(server.env ? { env: server.env } : {}),
+    ...(server.cwd ? { cwd: server.cwd } : {}),
+  }));
 
   const updatedConfig: AppConfig = {
     ...config,
+    ...(mcpServerConfigs.length > 0
+      ? {
+          tools: {
+            ...(config.tools ?? {}),
+            mcp: {
+              servers: [...(config.tools?.mcp?.servers ?? []), ...mcpServerConfigs],
+            },
+          },
+        }
+      : {}),
     plugins: [...(config.plugins ?? []), pluginConfig],
     endpoints: [...config.endpoints, ...endpointConfigs],
   };
@@ -131,6 +148,13 @@ function assertPluginCanBeInstalled(config: AppConfig, plugin: DiscoveredPluginM
   for (const endpoint of plugin.manifest.endpoints ?? []) {
     if (endpointIds.has(endpoint.id)) {
       throw new Error(`Endpoint "${endpoint.id}" already exists in the config.`);
+    }
+  }
+
+  const mcpServerIds = new Set(config.tools?.mcp?.servers.map((server) => server.id) ?? []);
+  for (const server of plugin.manifest.mcpServers ?? []) {
+    if (mcpServerIds.has(server.id)) {
+      throw new Error(`MCP server "${server.id}" already exists in the config.`);
     }
   }
 }

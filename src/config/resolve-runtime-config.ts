@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import type {
   AgentMcpConfig,
+  AgentMcpServerConfig,
   AgentPhoneCallConfig,
   AgentPromptConfig,
   AgentWorkspaceConfig,
@@ -10,7 +11,7 @@ import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
 import { getTransport } from "../transports/registry.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
-import type { AgentToolsConfig, AppConfig } from "./types.js";
+import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig } from "./types.js";
 
 interface ResolveRuntimeConfigOptions {
   env?: NodeJS.ProcessEnv;
@@ -31,6 +32,7 @@ export async function resolveRuntimeConfig(
     throw new Error("Config must enable at least one daemon endpoint.");
   }
   const configDir = dirname(configPath);
+  const mcpServers = resolveGlobalMcpServers(appConfig, configDir);
 
   return {
     configPath,
@@ -54,7 +56,7 @@ export async function resolveRuntimeConfig(
           ...(agent.inference ? { inference: agent.inference } : {}),
           ...(skillCatalog.skills.length > 0 ? { skillCatalog: skillCatalog.skills } : {}),
           ...(skillCatalog.issues.length > 0 ? { skillIssues: skillCatalog.issues } : {}),
-          ...resolveAgentTools(agent.tools, configDir),
+          ...resolveAgentTools(agent.tools, mcpServers, configDir),
         };
       }),
     ),
@@ -144,6 +146,7 @@ function resolveAgentSkills(
 
 function resolveAgentTools(
   tools: AgentToolsConfig | undefined,
+  mcpServers: Map<string, AgentMcpServerConfig>,
   configDir: string,
 ): Pick<DaemonConfig["agents"][number], "tools" | "mcp" | "phone"> {
   if (!tools) {
@@ -158,17 +161,36 @@ function resolveAgentTools(
 
   return {
     ...(tools.builtIn ? { tools: tools.builtIn } : {}),
-    ...(tools.mcp ? { mcp: resolveAgentMcpConfig(tools.mcp, configDir) } : {}),
+    ...(tools.mcp ? { mcp: resolveAgentMcpConfig(tools.mcp, mcpServers) } : {}),
     ...(tools.phone ? { phone: resolveAgentPhoneCallConfig(tools.phone, configDir) } : {}),
   };
 }
 
-function resolveAgentMcpConfig(mcp: AgentMcpConfig, configDir: string): AgentMcpConfig {
+function resolveGlobalMcpServers(appConfig: AppConfig, configDir: string): Map<string, AgentMcpServerConfig> {
+  return new Map(
+    (appConfig.tools?.mcp?.servers ?? []).map((server) => [
+      server.id,
+      {
+        ...server,
+        ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, configDir) } : {}),
+      },
+    ]),
+  );
+}
+
+function resolveAgentMcpConfig(
+  mcp: AgentMcpToolsConfig,
+  mcpServers: Map<string, AgentMcpServerConfig>,
+): AgentMcpConfig {
   return {
-    servers: mcp.servers.map((server) => ({
-      ...server,
-      ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, configDir) } : {}),
-    })),
+    servers: mcp.servers.map((serverId) => {
+      const server = mcpServers.get(serverId);
+      if (!server) {
+        throw new Error(`Unknown MCP server id "${serverId}".`);
+      }
+
+      return server;
+    }),
   };
 }
 

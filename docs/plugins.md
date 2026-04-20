@@ -118,7 +118,8 @@ The install command writes the manifest defaults into an existing config:
 - sets `package.path` to the discovered plugin directory
 - records `package.source.version` and `package.source.manifestHash` from the installed manifest
 - adds each manifest endpoint as an enabled `type: "file"` endpoint
-- fails if the plugin ID or any endpoint ID already exists
+- adds each manifest MCP server to top-level `tools.mcp.servers`
+- fails if the plugin ID, endpoint ID, or MCP server ID already exists
 
 This manifest API defines plugin identity, default endpoint bindings, companion services, and init metadata so `imp init` and service-install flows can install a plugin without loading plugin code into the daemon process.
 
@@ -148,7 +149,7 @@ Plugins can declare a Python setup for companion services:
 
 Before service installation, `imp` creates the environment under `<paths.dataRoot>/plugins/state/<plugin-id>/python/.venv` and installs the requirements file from the plugin package. Services can reference the prepared interpreter with `{{setup.python.venvPython}}`.
 
-Plugins can declare MCP server defaults in `mcpServers[]`. `imp` records and displays these declarations, but it does not automatically attach them to agents. Operators should opt agents into plugin MCP servers explicitly so tool access remains agent-scoped.
+Plugins can declare MCP server defaults in `mcpServers[]`. `imp` installs those declarations into top-level `tools.mcp.servers`, but it does not automatically attach them to agents. Operators should opt agents into plugin MCP servers explicitly so tool access remains agent-scoped.
 
 ## Example: Audio Frontend To Telegram
 

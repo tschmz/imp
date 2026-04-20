@@ -106,6 +106,9 @@ Common fields:
 - `home`: optional agent home directory; defaults to `paths.dataRoot/agents/<agent-id>`
 - `authFile`: optional OAuth credential file for providers that support it
 - `tools`: tools the agent may use
+- `tools.builtIn`: built-in tools the agent may use
+- `tools.mcp.servers`: global MCP server IDs the agent may use
+- `tools.phone`: allowlisted phone call tool configuration
 - `workspace.cwd`: working directory for file and shell tools
 - `workspace.shellPath`: extra PATH entries for the `bash` tool
 - `skills.paths`: optional shared skill directories for this agent
@@ -117,6 +120,47 @@ Important rules:
 - `defaults.agentId` must point to an existing agent
 - prompt sources must specify exactly one of `text` or `file`
 - `authFile` only works with OAuth-capable providers
+
+## Tools
+
+Top-level `tools` defines reusable tool integrations. Agents opt into those integrations explicitly.
+
+MCP server fields:
+
+- `tools.mcp.servers[].id`: unique MCP server identifier
+- `tools.mcp.servers[].command`: command used to start the stdio MCP server
+- `tools.mcp.servers[].args`: optional command arguments
+- `tools.mcp.servers[].env`: optional environment variables
+- `tools.mcp.servers[].cwd`: optional working directory, resolved relative to the config file
+
+Agents reference global MCP servers by ID:
+
+```json
+{
+  "tools": {
+    "mcp": {
+      "servers": [
+        {
+          "id": "github",
+          "command": "github-mcp-server",
+          "args": ["stdio"]
+        }
+      ]
+    }
+  },
+  "agents": [
+    {
+      "id": "default",
+      "tools": {
+        "builtIn": ["read", "bash"],
+        "mcp": {
+          "servers": ["github"]
+        }
+      }
+    }
+  ]
+}
+```
 
 ## Data Root Layout
 
@@ -336,7 +380,7 @@ Installable plugin manifests:
 - local installable plugins are discovered from explicit plugin roots containing direct subdirectories with `plugin.json`
 - `imp plugin list` lists discovered manifests
 - `imp plugin inspect <id>` prints one manifest summary
-- `imp plugin install <package-spec>` installs an npm package, then adds the manifest's plugin entry and endpoint defaults to a config
+- `imp plugin install <package-spec>` installs an npm package, then adds the manifest's plugin entry, endpoint defaults, and MCP server defaults to a config
 - `--root <path>` scans an explicit plugin root
 - `IMP_PLUGIN_PATH` can provide additional plugin roots, separated with the platform path delimiter
 - manifest `schemaVersion` is currently `1`

@@ -11,6 +11,20 @@
   "defaults": {
     "agentId": "default"
   },
+  "tools": {
+    "mcp": {
+      "servers": [
+        {
+          "id": "docs",
+          "command": "node",
+          "args": [
+            "/opt/imp/mcp/docs-server.mjs"
+          ],
+          "cwd": "/var/lib/imp/tools"
+        }
+      ]
+    }
+  },
   "agents": [
     {
       "id": "default",
@@ -19,15 +33,22 @@
         "modelId": "gpt-5.4"
       },
       "authFile": "/var/lib/imp/auth.json",
-      "tools": [
-        "read",
-        "bash",
-        "edit",
-        "write",
-        "grep",
-        "find",
-        "ls"
-      ],
+      "tools": {
+        "builtIn": [
+          "read",
+          "bash",
+          "edit",
+          "write",
+          "grep",
+          "find",
+          "ls"
+        ],
+        "mcp": {
+          "servers": [
+            "docs"
+          ]
+        }
+      },
       "prompt": {
         "instructions": [
           {

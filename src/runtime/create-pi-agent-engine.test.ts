@@ -984,7 +984,7 @@ describe("createPiAgentEngine", () => {
     expect(capturedTools).toEqual([tool]);
   });
 
-  it("merges resolved MCP tools into the agent runtime and reuses them across runs", async () => {
+  it("merges resolved MCP tools into the agent runtime and reuses them across agents", async () => {
     let capturedTools: Array<{ name: string }> | undefined;
     const close = vi.fn(async () => {});
     const mcpAgent = {
@@ -1048,6 +1048,19 @@ describe("createPiAgentEngine", () => {
         ...createIncomingMessage(),
         messageId: "3",
         correlationId: "corr-3",
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...mcpAgent,
+        id: "other",
+      },
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        messageId: "4",
+        correlationId: "corr-4",
       },
     });
 

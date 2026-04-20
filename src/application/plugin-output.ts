@@ -75,10 +75,14 @@ export function renderPluginInstallSummary(options: {
   pluginId: string;
   configPath: string;
   endpointIds: string[];
+  mcpServerIds: string[];
 }): string[] {
   const lines = [`Installed plugin "${options.pluginId}" into ${options.configPath}`];
   if (options.endpointIds.length > 0) {
     lines.push(`Added endpoints: ${options.endpointIds.join(", ")}`);
+  }
+  if (options.mcpServerIds.length > 0) {
+    lines.push(`Added MCP servers: ${options.mcpServerIds.join(", ")}`);
   }
   return lines;
 }
