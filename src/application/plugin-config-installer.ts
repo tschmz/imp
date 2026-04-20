@@ -63,6 +63,10 @@ export function installPluginIntoConfig(config: AppConfig, plugin: DiscoveredPlu
     enabled: true,
     package: {
       path: plugin.rootDir,
+      source: {
+        version: plugin.manifest.version,
+        manifestHash: plugin.manifestHash,
+      },
     },
   };
   const endpointConfigs: FileEndpointConfig[] = (plugin.manifest.endpoints ?? []).map((endpoint) => ({

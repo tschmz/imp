@@ -66,9 +66,15 @@ export interface PluginConfig {
 
 export interface PluginPackageConfig {
   path: string;
+  source?: PluginPackageSourceConfig;
   command?: string;
   args?: string[];
   env?: Record<string, string>;
+}
+
+export interface PluginPackageSourceConfig {
+  version?: string;
+  manifestHash?: string;
 }
 
 interface BaseEndpointConfig {

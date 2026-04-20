@@ -37,6 +37,7 @@ describe("discoverPluginManifests", () => {
     expect(result.plugins[0]).toMatchObject({
       rootDir: join(root, "imp-voice"),
       manifestPath: join(root, "imp-voice", "plugin.json"),
+      manifestHash: expect.stringMatching(/^sha256:/),
       manifest: {
         id: "imp-voice",
         name: "imp Voice",

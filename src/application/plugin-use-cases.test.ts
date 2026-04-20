@@ -149,6 +149,10 @@ describe("plugin use cases", () => {
         enabled: true,
         package: {
           path: join(root, "imp-voice"),
+          source: {
+            version: "0.1.0",
+            manifestHash: expect.stringMatching(/^sha256:/),
+          },
         },
       },
     ]);
@@ -313,6 +317,10 @@ describe("plugin use cases", () => {
         enabled: true,
         package: {
           path: packageRoot,
+          source: {
+            version: "0.1.0",
+            manifestHash: expect.stringMatching(/^sha256:/),
+          },
         },
       },
     ]);

@@ -326,6 +326,8 @@ Top-level plugin fields:
 - `id`: unique plugin identifier
 - `enabled`: whether endpoints may bind to this plugin
 - `package.path`: optional operator-facing path to the local plugin package or component
+- `package.source.version`: plugin manifest version recorded at install time
+- `package.source.manifestHash`: `sha256:` hash of the installed manifest recorded at install time
 - `package.command`, `package.args`, `package.env`: optional launch metadata for operators and future service integration
 
 Installable plugin manifests:

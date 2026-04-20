@@ -1,4 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { parseConfigJson } from "../config/config-json.js";
 import { PLUGIN_MANIFEST_FILE, pluginManifestSchema, type PluginManifest } from "./manifest.js";
@@ -6,6 +7,7 @@ import { PLUGIN_MANIFEST_FILE, pluginManifestSchema, type PluginManifest } from 
 export interface DiscoveredPluginManifest {
   rootDir: string;
   manifestPath: string;
+  manifestHash: string;
   manifest: PluginManifest;
 }
 
@@ -77,6 +79,7 @@ export async function readPluginManifest(rootDir: string, manifestPath: string):
       plugin: {
         rootDir,
         manifestPath,
+        manifestHash: createManifestHash(raw),
         manifest: result.data,
       },
     };
@@ -88,6 +91,10 @@ export async function readPluginManifest(rootDir: string, manifestPath: string):
       },
     };
   }
+}
+
+function createManifestHash(raw: string): string {
+  return `sha256:${createHash("sha256").update(raw, "utf8").digest("hex")}`;
 }
 
 async function readPluginRootEntries(rootDir: string, issues: PluginDiscoveryIssue[]) {

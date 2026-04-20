@@ -72,6 +72,16 @@ export async function diagnoseConfiguredPlugin(options: {
       status: options.plugin.manifest.id === options.pluginId ? "ok" : "fail",
       detail: `id=${options.plugin.manifest.id} version=${options.plugin.manifest.version}`,
     });
+    if (configuredPlugin.package?.source?.manifestHash) {
+      const expectedHash = configuredPlugin.package.source.manifestHash;
+      checks.push({
+        label: "manifest hash",
+        status: expectedHash === options.plugin.manifestHash ? "ok" : "warn",
+        detail: expectedHash === options.plugin.manifestHash
+          ? expectedHash
+          : `configured=${expectedHash} current=${options.plugin.manifestHash}`,
+      });
+    }
     checks.push(...await diagnoseManifestEndpoints(options.config, options.configPath, options.plugin));
   }
 

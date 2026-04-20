@@ -106,6 +106,7 @@ The install command writes the manifest defaults into an existing config:
 
 - adds a top-level `plugins[]` entry with `enabled: true`
 - sets `package.path` to the discovered plugin directory
+- records `package.source.version` and `package.source.manifestHash` from the installed manifest
 - adds each manifest endpoint as an enabled `type: "file"` endpoint
 - fails if the plugin ID or any endpoint ID already exists
 

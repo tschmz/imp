@@ -135,6 +135,12 @@ const pluginConfigSchema = z.object({
   package: z
     .object({
       path: z.string().min(1),
+      source: z
+        .object({
+          version: z.string().min(1).optional(),
+          manifestHash: z.string().min(1).optional(),
+        })
+        .optional(),
       command: z.string().min(1).optional(),
       args: z.string().min(1).array().optional(),
       env: z.record(z.string(), z.string()).optional(),
