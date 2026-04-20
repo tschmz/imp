@@ -82,6 +82,7 @@ export function installPluginIntoConfig(config: AppConfig, plugin: DiscoveredPlu
     id: server.id,
     command: server.command,
     ...(server.args ? { args: server.args } : {}),
+    ...(server.inheritEnv ? { inheritEnv: server.inheritEnv } : {}),
     ...(server.env ? { env: server.env } : {}),
     ...(server.cwd ? { cwd: server.cwd } : {}),
   }));

@@ -29,6 +29,7 @@ export type ModelConfig = ModelRef;
 
 export interface ToolsConfig {
   mcp?: {
+    inheritEnv?: string[];
     servers: AgentMcpServerConfig[];
   };
 }

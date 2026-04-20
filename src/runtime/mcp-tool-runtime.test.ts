@@ -78,6 +78,53 @@ describe("resolveMcpTools", () => {
       await resolution.close();
     }
   });
+
+  it("passes allowlisted environment variables to MCP server processes", async () => {
+    const createTransport = vi.fn((server) => server);
+    const createClient = vi.fn(() => ({
+      connect: vi.fn(async () => {}),
+      listTools: vi.fn(async () => ({ tools: [] })),
+      callTool: vi.fn(async () => ({ content: [] })),
+      close: vi.fn(async () => {}),
+    }));
+
+    await resolveMcpTools(
+      createAgent({
+        mcp: {
+          servers: [
+            {
+              id: "env",
+              command: "node",
+              inheritEnv: ["OPENAI_API_KEY", "GITHUB_TOKEN", "MISSING_KEY", "BASH_FUNC_bad"],
+              env: {
+                OPENAI_API_KEY: "explicit-value",
+                STATIC_VALUE: "configured",
+              },
+            },
+          ],
+        },
+      }),
+      {
+        createClient,
+        createTransport,
+        env: {
+          OPENAI_API_KEY: "inherited-value",
+          GITHUB_TOKEN: "github-token",
+          BASH_FUNC_bad: "() { echo unsafe; }",
+        },
+      },
+    );
+
+    expect(createTransport).toHaveBeenCalledWith({
+      command: "node",
+      env: {
+        GITHUB_TOKEN: "github-token",
+        OPENAI_API_KEY: "explicit-value",
+        STATIC_VALUE: "configured",
+      },
+      stderr: "pipe",
+    });
+  });
 });
 
 function createAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {

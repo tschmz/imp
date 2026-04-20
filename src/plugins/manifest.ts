@@ -47,6 +47,7 @@ export interface PluginMcpServerManifest {
   description?: string;
   command: string;
   args?: string[];
+  inheritEnv?: string[];
   cwd?: string;
   env?: Record<string, string>;
 }
@@ -114,6 +115,7 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
       description: z.string().min(1).optional(),
       command: z.string().min(1),
       args: z.string().min(1).array().optional(),
+      inheritEnv: z.string().min(1).array().optional(),
       cwd: z.string().min(1).optional(),
       env: z.record(z.string(), z.string()).optional(),
     })

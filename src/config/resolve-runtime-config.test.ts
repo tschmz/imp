@@ -404,11 +404,13 @@ describe("resolveRuntimeConfig", () => {
     const appConfig = createAppConfig({
       tools: {
         mcp: {
+          inheritEnv: ["OPENAI_API_KEY"],
           servers: [
             {
               id: "echo",
               command: "node",
               args: ["./server.mjs"],
+              inheritEnv: ["GITHUB_TOKEN"],
               cwd: "./mcp",
             },
           ],
@@ -456,6 +458,7 @@ describe("resolveRuntimeConfig", () => {
           id: "echo",
           command: "node",
           args: ["./server.mjs"],
+          inheritEnv: ["OPENAI_API_KEY", "GITHUB_TOKEN"],
           cwd: "/etc/imp/mcp",
         },
       ],

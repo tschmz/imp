@@ -29,6 +29,7 @@ export interface AgentMcpServerConfig {
   id: string;
   command: string;
   args?: string[];
+  inheritEnv?: string[];
   env?: Record<string, string>;
   cwd?: string;
 }

@@ -101,6 +101,7 @@ The manifest schema is versioned separately from the runtime file protocol:
       "id": "voice-control",
       "command": "node",
       "args": ["dist/mcp-server.js"],
+      "inheritEnv": ["OPENAI_API_KEY"],
       "env": {
         "OPENAI_API_KEY": "required"
       }
@@ -149,7 +150,7 @@ Plugins can declare a Python setup for companion services:
 
 Before service installation, `imp` creates the environment under `<paths.dataRoot>/plugins/state/<plugin-id>/python/.venv` and installs the requirements file from the plugin package. Services can reference the prepared interpreter with `{{setup.python.venvPython}}`.
 
-Plugins can declare MCP server defaults in `mcpServers[]`. `imp` installs those declarations into top-level `tools.mcp.servers`, but it does not automatically attach them to agents. Operators should opt agents into plugin MCP servers explicitly so tool access remains agent-scoped.
+Plugins can declare MCP server defaults in `mcpServers[]`. `imp` installs those declarations into top-level `tools.mcp.servers`, but it does not automatically attach them to agents. Operators should opt agents into plugin MCP servers explicitly so tool access remains agent-scoped. MCP servers can use `inheritEnv` to allowlist environment variables from the `imp` process environment without writing secret values into `config.json`.
 
 ## Example: Audio Frontend To Telegram
 

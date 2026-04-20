@@ -130,6 +130,8 @@ MCP server fields:
 - `tools.mcp.servers[].id`: unique MCP server identifier
 - `tools.mcp.servers[].command`: command used to start the stdio MCP server
 - `tools.mcp.servers[].args`: optional command arguments
+- `tools.mcp.inheritEnv`: optional environment variable allowlist inherited by all MCP servers from the `imp` process environment
+- `tools.mcp.servers[].inheritEnv`: optional server-specific environment variable allowlist inherited from the `imp` process environment
 - `tools.mcp.servers[].env`: optional environment variables
 - `tools.mcp.servers[].cwd`: optional working directory, resolved relative to the config file
 
@@ -139,6 +141,7 @@ Agents reference global MCP servers by ID:
 {
   "tools": {
     "mcp": {
+      "inheritEnv": ["GITHUB_TOKEN"],
       "servers": [
         {
           "id": "github",

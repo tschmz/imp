@@ -13,12 +13,18 @@
   },
   "tools": {
     "mcp": {
+      "inheritEnv": [
+        "GITHUB_TOKEN"
+      ],
       "servers": [
         {
           "id": "docs",
           "command": "node",
           "args": [
             "/opt/imp/mcp/docs-server.mjs"
+          ],
+          "inheritEnv": [
+            "OPENAI_API_KEY"
           ],
           "cwd": "/var/lib/imp/tools"
         }

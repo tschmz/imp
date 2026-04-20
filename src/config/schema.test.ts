@@ -406,11 +406,13 @@ describe("appConfigSchema", () => {
         }),
         tools: {
           mcp: {
+            inheritEnv: ["OPENAI_API_KEY"],
             servers: [
               {
                 id: "echo",
                 command: "node",
                 args: ["./server.mjs"],
+                inheritEnv: ["GITHUB_TOKEN"],
                 cwd: "./tools",
                 env: {
                   MODE: "test",

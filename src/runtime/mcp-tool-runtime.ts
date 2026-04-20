@@ -76,6 +76,7 @@ export async function resolveMcpTools(
   agent: AgentDefinition,
   options: {
     logger?: Logger;
+    env?: NodeJS.ProcessEnv;
   } & McpToolRuntimeDependencies = {},
 ): Promise<ResolvedMcpTools> {
   const servers = agent.mcp?.servers ?? [];
@@ -95,7 +96,7 @@ export async function resolveMcpTools(
     const transport = createTransport({
       command: server.command,
       ...(server.args ? { args: server.args } : {}),
-      ...(server.env ? { env: server.env } : {}),
+      ...resolveMcpServerEnvironment(server, options.env ?? process.env),
       ...(server.cwd ? { cwd: server.cwd } : {}),
       stderr: "pipe",
     });
@@ -132,6 +133,26 @@ export async function resolveMcpTools(
       await Promise.all(clients.map(async (client) => safeCloseClient(client)));
     },
   };
+}
+
+function resolveMcpServerEnvironment(
+  server: NonNullable<AgentDefinition["mcp"]>["servers"][number],
+  sourceEnv: NodeJS.ProcessEnv,
+): { env?: Record<string, string> } {
+  const env: Record<string, string> = {};
+
+  for (const key of server.inheritEnv ?? []) {
+    const value = sourceEnv[key];
+    if (value === undefined || value.startsWith("()")) {
+      continue;
+    }
+
+    env[key] = value;
+  }
+
+  Object.assign(env, server.env ?? {});
+
+  return Object.keys(env).length > 0 ? { env } : {};
 }
 
 function createDefaultClient(): McpClientLike {

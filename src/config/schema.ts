@@ -61,6 +61,7 @@ const mcpServerConfigSchema = z.object({
   id: mcpServerIdSchema,
   command: z.string().min(1),
   args: z.string().min(1).array().optional(),
+  inheritEnv: z.string().min(1).array().optional(),
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().min(1).optional(),
 });
@@ -68,6 +69,7 @@ const mcpServerConfigSchema = z.object({
 const toolsConfigSchema = z.object({
   mcp: z
     .object({
+      inheritEnv: z.string().min(1).array().optional(),
       servers: mcpServerConfigSchema.array().min(1),
     })
     .optional(),

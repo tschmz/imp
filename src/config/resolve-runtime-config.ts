@@ -167,11 +167,16 @@ function resolveAgentTools(
 }
 
 function resolveGlobalMcpServers(appConfig: AppConfig, configDir: string): Map<string, AgentMcpServerConfig> {
+  const globalInheritEnv = appConfig.tools?.mcp?.inheritEnv ?? [];
+
   return new Map(
     (appConfig.tools?.mcp?.servers ?? []).map((server) => [
       server.id,
       {
         ...server,
+        ...(globalInheritEnv.length > 0 || server.inheritEnv
+          ? { inheritEnv: [...globalInheritEnv, ...(server.inheritEnv ?? [])] }
+          : {}),
         ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, configDir) } : {}),
       },
     ]),

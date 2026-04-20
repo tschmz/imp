@@ -44,6 +44,7 @@ describe("pluginManifestSchema", () => {
           id: "voice-tools",
           command: "node",
           args: ["dist/mcp-server.js"],
+          inheritEnv: ["OPENAI_API_KEY"],
         },
       ],
       setup: {
