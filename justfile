@@ -36,23 +36,52 @@ run *args: build
 init *args: build
   node dist/main.js init {{args}}
 
-# Install the package globally from the local checkout.
-install: clean build
-  npm install -g .
-  npm install -g ./plugins/imp-voice
-  npm install -g ./plugins/imp-phone
-  just _install-managed-plugin "{{justfile_directory()}}/plugins/imp-voice"
-  just _install-managed-plugin "{{justfile_directory()}}/plugins/imp-phone"
-  if command -v systemctl >/dev/null && systemctl --user list-unit-files imp-voice-in.service >/dev/null 2>&1; then systemctl --user restart imp-voice-in.service imp-voice-out.service; fi
-  if command -v systemctl >/dev/null && systemctl --user list-unit-files imp-phone-controller.service >/dev/null 2>&1; then systemctl --user restart imp-phone-controller.service; fi
-
-_install-managed-plugin plugin_root:
+# Build package tarballs and install those locally.
+install:
   #!/usr/bin/env bash
   set -euo pipefail
 
-  config_path="${IMP_CONFIG_PATH:-}"
-  if [[ -z "$config_path" && -f "${XDG_CONFIG_HOME:-$HOME/.config}/imp/config.json" ]]; then
+  package_dir="$(mktemp -d "${TMPDIR:-/tmp}/imp-install-packages.XXXXXX")"
+  trap 'rm -rf "$package_dir"' EXIT
+
+  pack_package() {
+    local package_root="$1"
+    local packed
+    packed="$(cd "$package_root" >/dev/null && npm pack --pack-destination "$package_dir" --silent | tail -n 1)"
+    if [[ "$packed" = /* ]]; then
+      printf '%s\n' "$packed"
+    else
+      printf '%s/%s\n' "$package_dir" "$packed"
+    fi
+  }
+
+  npm run clean
+  npm run build
+
+  imp_package="$(pack_package ".")"
+  voice_package="$(pack_package "plugins/imp-voice")"
+  phone_package="$(pack_package "plugins/imp-phone")"
+
+  npm install -g "$imp_package"
+  npm install -g "$voice_package"
+  npm install -g "$phone_package"
+  just _install-managed-plugin "$voice_package"
+  just _install-managed-plugin "$phone_package"
+  if command -v systemctl >/dev/null && systemctl --user list-unit-files imp.service >/dev/null 2>&1; then systemctl --user restart imp.service; fi
+  if command -v systemctl >/dev/null && systemctl --user list-unit-files imp-voice-in.service >/dev/null 2>&1; then systemctl --user restart imp-voice-in.service imp-voice-out.service; fi
+  if command -v systemctl >/dev/null && systemctl --user list-unit-files imp-phone-controller.service >/dev/null 2>&1; then systemctl --user restart imp-phone-controller.service; fi
+
+_install-managed-plugin package_spec:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  config_path=""
+  if [[ -n "${IMP_CONFIG_PATH:-}" && -f "${IMP_CONFIG_PATH}" ]]; then
+    config_path="${IMP_CONFIG_PATH}"
+  elif [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/imp/config.json" ]]; then
     config_path="${XDG_CONFIG_HOME:-$HOME/.config}/imp/config.json"
+  elif [[ -f /etc/imp/config.json ]]; then
+    config_path="/etc/imp/config.json"
   fi
   if [[ -z "$config_path" ]]; then
     exit 0
@@ -61,7 +90,7 @@ _install-managed-plugin plugin_root:
   data_root="$(
     node -e 'const fs = require("node:fs"); const path = require("node:path"); const configPath = path.resolve(process.argv[1]); const config = JSON.parse(fs.readFileSync(configPath, "utf8")); const dataRoot = config?.paths?.dataRoot; if (typeof dataRoot !== "string" || dataRoot.length === 0) { console.error(`Missing paths.dataRoot in ${configPath}`); process.exit(2); } console.log(path.resolve(path.dirname(configPath), dataRoot));' "$config_path"
   )"
-  npm install "{{plugin_root}}" --prefix "$data_root/plugins/npm" --omit=dev --no-audit --no-fund
+  npm install "{{package_spec}}" --prefix "$data_root/plugins/npm" --omit=dev --no-audit --no-fund
 
 # Remove the globally installed package.
 uninstall:
