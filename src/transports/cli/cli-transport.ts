@@ -30,7 +30,6 @@ const bold = sgr(1);
 const dim = sgr(2);
 const cyan = sgr(36);
 const green = sgr(32);
-const yellow = sgr(33);
 const red = sgr(31);
 
 const editorTheme: EditorTheme = {
@@ -96,6 +95,7 @@ export function createCliTransport(
 
       const chatContainer = new Container();
       const statusContainer = new Container();
+      const processingStatus = createCliProcessingStatus(statusContainer, terminalUi);
       const editor = new Editor(terminalUi, editorTheme, {
         paddingX: 1,
         autocompleteMaxVisible: 8,
@@ -131,7 +131,7 @@ export function createCliTransport(
           config,
           editor,
           chatContainer,
-          statusContainer,
+          processingStatus,
           ui: terminalUi,
           handler,
           logger,
@@ -156,7 +156,7 @@ async function submitInput(
     config: CliEndpointRuntimeConfig;
     editor: Editor;
     chatContainer: Container;
-    statusContainer: Container;
+    processingStatus: CliProcessingStatus;
     ui: TUI;
     handler: TransportHandler;
     logger?: Logger;
@@ -176,8 +176,6 @@ async function submitInput(
 
   options.editor.addToHistory(text);
   options.editor.setText("");
-  options.editor.disableSubmit = true;
-  options.editor.borderColor = yellow;
   options.chatContainer.addChild(new Text(green("You"), 0, 0));
   options.chatContainer.addChild(new Text(text, 1, 0));
   options.chatContainer.addChild(new Spacer(1));
@@ -185,32 +183,18 @@ async function submitInput(
 
   const event = createCliInboundEvent(options.config, text, {
     chatContainer: options.chatContainer,
-    statusContainer: options.statusContainer,
+    processingStatus: options.processingStatus,
     ui: options.ui,
     logger: options.logger,
   });
 
-  try {
-    await options.handler.handle(event);
-  } catch (error) {
-    await options.logger?.error(
-      "cli message processing terminated after an unhandled failure",
-      {
-        endpointId: options.config.id,
-        transport: "cli",
-        conversationId: options.config.userId,
-        messageId: event.message.messageId,
-        correlationId: event.message.correlationId,
-        errorType: error instanceof Error ? error.name : typeof error,
-      },
-      error,
-    );
-    await event.deliverError?.(error);
-  } finally {
-    options.editor.disableSubmit = false;
-    options.editor.borderColor = identity;
-    options.ui.requestRender();
-  }
+  detachCliEventProcessing(options.handler.handle(event), {
+    logger: options.logger,
+    endpointId: options.config.id,
+    conversationId: options.config.userId,
+    messageId: event.message.messageId,
+    correlationId: event.message.correlationId,
+  });
 }
 
 function createCliInboundEvent(
@@ -218,7 +202,7 @@ function createCliInboundEvent(
   text: string,
   options: {
     chatContainer: Container;
-    statusContainer: Container;
+    processingStatus: CliProcessingStatus;
     ui: TUI;
     logger?: Logger;
   },
@@ -247,17 +231,12 @@ function createCliInboundEvent(
       ...(parsedCommand ? toIncomingCommand(parsedCommand) : {}),
     },
     async runWithProcessing<T>(operation: () => Promise<T>): Promise<T> {
-      const loader = new Loader(options.ui, cyan, dim, formatProcessingMessage(text));
-      options.statusContainer.clear();
-      options.statusContainer.addChild(loader);
-      options.ui.requestRender();
+      const loaderId = options.processingStatus.start(formatProcessingMessage(text));
 
       try {
         return await operation();
       } finally {
-        loader.stop();
-        options.statusContainer.clear();
-        options.ui.requestRender();
+        options.processingStatus.stop(loaderId);
       }
     },
     async deliver(message): Promise<void> {
@@ -282,6 +261,96 @@ function createCliInboundEvent(
       options.ui.requestRender();
     },
   };
+}
+
+interface CliProcessingStatus {
+  start(label: string): string;
+  stop(id: string): void;
+}
+
+function createCliProcessingStatus(statusContainer: Container, ui: TUI): CliProcessingStatus {
+  const loaders = new Map<string, Loader>();
+
+  function render(): void {
+    statusContainer.clear();
+    for (const loader of loaders.values()) {
+      statusContainer.addChild(loader);
+    }
+    ui.requestRender();
+  }
+
+  return {
+    start(label) {
+      const id = randomUUID();
+      loaders.set(id, new Loader(ui, cyan, dim, label));
+      render();
+      return id;
+    },
+    stop(id) {
+      const loader = loaders.get(id);
+      if (!loader) {
+        return;
+      }
+
+      loader.stop();
+      loaders.delete(id);
+      render();
+    },
+  };
+}
+
+function detachCliEventProcessing(
+  operation: Promise<void>,
+  options: {
+    logger?: Logger;
+    endpointId: string;
+    conversationId: string;
+    messageId: string;
+    correlationId: string;
+  },
+): void {
+  void Promise.resolve()
+    .then(() => operation)
+    .catch((error) => {
+      void logCliTerminalFailure(
+        options.logger,
+        {
+          endpointId: options.endpointId,
+          conversationId: options.conversationId,
+          messageId: options.messageId,
+          correlationId: options.correlationId,
+          errorType: error instanceof Error ? error.name : typeof error,
+        },
+        error,
+      ).catch(() => {
+        // Detached processing must never leak terminal failure logging errors.
+      });
+    });
+}
+
+async function logCliTerminalFailure(
+  logger: Logger | undefined,
+  fields: {
+    endpointId: string;
+    conversationId: string;
+    messageId: string;
+    correlationId: string;
+    errorType: string;
+  },
+  error: unknown,
+): Promise<void> {
+  await logger?.error(
+    "cli message processing terminated after an unhandled failure",
+    {
+      endpointId: fields.endpointId,
+      transport: "cli",
+      conversationId: fields.conversationId,
+      messageId: fields.messageId,
+      correlationId: fields.correlationId,
+      errorType: fields.errorType,
+    },
+    error,
+  );
 }
 
 function renderCliReplay(
