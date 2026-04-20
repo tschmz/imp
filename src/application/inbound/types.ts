@@ -1,8 +1,8 @@
 import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
 import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
-import type { HookRunner } from "../../plugins/hook-runner.js";
-import type { InboundMessageLifecycleHooks } from "../../plugins/types.js";
+import type { HookRunner } from "../../extensions/hook-runner.js";
+import type { InboundMessageLifecycleHooks } from "../../extensions/types.js";
 import type { SkillDefinition } from "../../skills/types.js";
 import type { HandleIncomingMessageDependencies, InboundCommandHandler } from "../commands/types.js";
 

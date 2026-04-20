@@ -1,7 +1,7 @@
 import { loadAppConfig } from "../config/load-app-config.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { readRecentLogLines } from "../logging/view-logs.js";
-import { createHookRunner } from "../plugins/hook-runner.js";
+import { createHookRunner } from "../extensions/hook-runner.js";
 import { inboundCommandHandlers } from "./commands/registry.js";
 import type { HandleIncomingMessageDependencies } from "./commands/types.js";
 import { dispatchCommand } from "./inbound/dispatch-command.js";

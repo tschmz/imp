@@ -2,6 +2,8 @@
 
 Plugins are external local components that exchange files with `imp`. They are not loaded into the daemon process, and `imp` does not execute plugin code as part of message handling.
 
+Runtime hooks used by tests or library embedding are internal extensions, not installable plugins. Installable plugins should extend agents through external protocols such as file ingress/outbox and MCP companion services rather than daemon-loaded JavaScript.
+
 The model is intentionally explicit:
 
 - declare each plugin under top-level `plugins`

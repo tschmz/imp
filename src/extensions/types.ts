@@ -1,6 +1,4 @@
-import type { InboundCommandHandler } from "../application/commands/types.js";
 import type { AgentRunInput, AgentRunResult } from "../runtime/context.js";
-import type { ToolDefinition } from "../tools/types.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 
 export type MaybePromise<T> = T | Promise<T>;
@@ -47,30 +45,6 @@ export interface AgentEngineLifecycleHooks {
   onAgentEngineRunStart?(context: AgentEngineRunStartContext): MaybePromise<void>;
   onAgentEngineRunSuccess?(context: AgentEngineRunSuccessContext): MaybePromise<void>;
   onAgentEngineRunError?(context: AgentEngineRunErrorContext): MaybePromise<void>;
-}
-
-export interface CommandContribution {
-  inboundCommands: ReadonlyArray<InboundCommandHandler>;
-}
-
-export interface ToolContribution {
-  tools: ReadonlyArray<ToolDefinition>;
-}
-
-export interface PluginHooks {
-  inboundMessage?: InboundMessageLifecycleHooks;
-  agentEngine?: AgentEngineLifecycleHooks;
-}
-
-export interface PluginContributions {
-  commands?: CommandContribution;
-  tools?: ToolContribution;
-}
-
-export interface ImpPlugin {
-  id: string;
-  hooks?: PluginHooks;
-  contributions?: PluginContributions;
 }
 
 export interface HookRegistration<THooks> {
