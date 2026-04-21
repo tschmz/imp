@@ -88,7 +88,7 @@ describe("initAppConfig", () => {
       code: "ENOENT",
     });
     await expect(readFile(skillPath, "utf8")).resolves.toContain(
-      `global skills live under \`${join(root, "state-home", "imp", "skills")}\``,
+      `- global shared catalog: \`${join(root, "state-home", "imp", "skills")}\``,
     );
     await expect(readFile(skillPath, "utf8")).resolves.not.toContain("/home/thomas/.imp");
     expect((await stat(skillPath)).mode & 0o777).toBe(0o644);
@@ -267,7 +267,10 @@ describe("initAppConfig", () => {
     await expect(readFile(configPath, "utf8")).resolves.toContain('"prompt"');
     await expect(
       readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain(`global skills live under \`${join(root, "custom-state", "skills")}\``);
+    ).resolves.toContain(`- global shared catalog: \`${join(root, "custom-state", "skills")}\``);
+    await expect(
+      readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
+    ).resolves.toContain(`- workspace catalog for default: \`${join(root, "workspace", ".skills")}\``);
   });
 });
 

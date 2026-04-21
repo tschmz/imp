@@ -105,6 +105,33 @@ describe("createPromptTemplateContext", () => {
       "2026-04-19T12:34:56.000Z | 2026-04-19 | 14:34:56 | 14:34 | 2026-04-19 14:34:56 Europe/Berlin | 2026-04-19 14:34 Europe/Berlin | Europe/Berlin",
     );
   });
+
+  it("renders imp skill catalog paths in prompt templates", () => {
+    const context = createPromptTemplateContext({
+      system: createSystemContext(),
+      agent: createAgent(),
+      endpointId: "local-cli",
+      transportKind: "cli",
+    });
+
+    context.imp.skillCatalogs = [
+      { label: "global", path: "/var/lib/imp/skills" },
+      { label: "agent-home for default", path: "/agents/default/.skills" },
+    ];
+    context.imp.dynamicWorkspaceSkillsPath = "<working-directory>/.skills";
+
+    const rendered = renderPromptTemplate(
+      "{{#each imp.skillCatalogs}}{{label}}={{path}};{{/each}}{{imp.dynamicWorkspaceSkillsPath}}",
+      {
+        filePath: "/workspace/SYSTEM.md",
+        context,
+      },
+    );
+
+    expect(rendered).toBe(
+      "global=/var/lib/imp/skills;agent-home for default=/agents/default/.skills;<working-directory>/.skills",
+    );
+  });
 });
 
 function createSystemContext(): PromptTemplateSystemContext {

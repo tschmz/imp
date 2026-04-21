@@ -5,7 +5,11 @@ import { getDefaultUserConfigPath } from "./discover-config-path.js";
 import { assertManagedFileCanBeWritten, writeManagedFile } from "../files/managed-file.js";
 import { appConfigSchema } from "./schema.js";
 import type { AppConfig } from "./types.js";
-import { renderPromptTemplate, type PromptTemplateContext } from "../runtime/prompt-template.js";
+import {
+  renderPromptTemplate,
+  type PromptTemplateContext,
+  type PromptTemplateSkillCatalogContext,
+} from "../runtime/prompt-template.js";
 import { resolveConfigPath as resolvePathRelativeToConfig } from "./secret-value.js";
 
 const ownerReadWriteMode = 0o600;
@@ -138,6 +142,8 @@ function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
     imp: {
       configPath,
       dataRoot,
+      skillCatalogs: resolveSkillCatalogs(config, configPath),
+      dynamicWorkspaceSkillsPath: "<working-directory>/.skills",
     },
     skills: [],
   };
@@ -146,4 +152,40 @@ function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
     filePath: "built-in:imp-skill-creator",
     context,
   }).trim()}\n`;
+}
+
+function resolveSkillCatalogs(config: AppConfig, configPath: string): PromptTemplateSkillCatalogContext[] {
+  const configDir = dirname(configPath);
+  const dataRoot = resolvePathRelativeToConfig(config.paths.dataRoot, configDir);
+  const catalogs: PromptTemplateSkillCatalogContext[] = [
+    {
+      label: "global shared catalog",
+      path: join(dataRoot, "skills"),
+    },
+  ];
+
+  for (const agent of config.agents) {
+    if (agent.home) {
+      catalogs.push({
+        label: `agent-home catalog for ${agent.id}`,
+        path: join(resolvePathRelativeToConfig(agent.home, configDir), ".skills"),
+      });
+    }
+
+    for (const path of agent.skills?.paths ?? []) {
+      catalogs.push({
+        label: `configured shared catalog for ${agent.id}`,
+        path: resolvePathRelativeToConfig(path, configDir),
+      });
+    }
+
+    if (agent.workspace?.cwd) {
+      catalogs.push({
+        label: `workspace catalog for ${agent.id}`,
+        path: join(resolvePathRelativeToConfig(agent.workspace.cwd, configDir), ".skills"),
+      });
+    }
+  }
+
+  return catalogs;
 }
