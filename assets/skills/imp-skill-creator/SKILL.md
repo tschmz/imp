@@ -13,7 +13,6 @@ Create or update `Imp` skills.
 {{#each imp.skillCatalogs}}
   - {{label}}: `{{path}}`
 {{/each}}
-   - workspace catalog: `{{imp.dynamicWorkspaceSkillsPath}}`
 2. Create `<catalog-root>/<skill-name>/SKILL.md`.
 3. Write a concise `description` that includes the action and the user requests that should trigger the skill.
 4. Keep the body procedural and short. Put only instructions another agent needs at use time.
