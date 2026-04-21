@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.12.0 - 2026-04-21
+
+### Added
+
+- Add a shared top-level MCP server registry so agents can reference configured servers by ID and plugin installs can register MCP server defaults.
+- Add MCP environment variable allowlists for global and per-server inheritance.
+- Add `imp skills sync-managed` to refresh managed skills from the installed package.
+
+### Changed
+
+- Install local packages from packed tarballs during `just install`, refresh managed plugins from those tarballs, and restart `imp.service` when present.
+- Simplify the default system prompt runtime context to report only `Reply: <channel>`.
+- Ship the default system prompt and the managed `imp-skill-creator` skill as packaged assets.
+- Refresh the managed `imp-skill-creator` skill with concrete catalog paths, stronger validation guidance, and fuller bundled-resource examples.
+
+### Fixed
+
+- Keep interactive CLI commands responsive while detached request handling continues in the background.
+- Render managed skill templates with the current runtime context when `load_skill` is called.
+- Remove the duplicate workspace catalog entry from the managed `imp-skill-creator` template.
+
 ## 0.11.0 - 2026-04-20
 
 ### Added
