@@ -11,6 +11,7 @@ export interface CliDependencies {
     force: boolean;
     defaults: boolean;
   }) => Promise<void>;
+  syncManagedSkills: (options: { configPath?: string }) => Promise<void>;
   createBackup: (options: {
     configPath?: string;
     outputPath?: string;

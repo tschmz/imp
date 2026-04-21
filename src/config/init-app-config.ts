@@ -11,6 +11,7 @@ import {
   type PromptTemplateSkillCatalogContext,
 } from "../runtime/prompt-template.js";
 import { resolveConfigPath as resolvePathRelativeToConfig } from "./secret-value.js";
+import { loadAppConfig } from "./load-app-config.js";
 
 const ownerReadWriteMode = 0o600;
 const impSkillFileMode = 0o644;
@@ -62,6 +63,26 @@ export async function initAppConfig(options: {
   });
 
   return writtenConfigPath;
+}
+
+export async function syncManagedSkills(options: {
+  configPath: string;
+  now?: Date;
+}): Promise<string[]> {
+  const configPath = resolve(options.configPath);
+  const config = await loadAppConfig(configPath);
+  const impSkillPath = resolveImpSkillPath(config, configPath);
+
+  await writeManagedFile({
+    path: impSkillPath,
+    resourceLabel: "Imp skill",
+    content: renderImpSkillTemplate(config, configPath),
+    force: true,
+    now: options.now,
+    mode: impSkillFileMode,
+  });
+
+  return [impSkillPath];
 }
 
 export async function assertInitConfigCanBeCreated(options: {

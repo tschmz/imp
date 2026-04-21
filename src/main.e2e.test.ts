@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
 import { createRequire } from "node:module";
 import { promisify } from "node:util";
@@ -24,6 +24,13 @@ afterEach(async () => {
     }),
   );
 });
+
+beforeAll(async () => {
+  await execFileAsync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build"], {
+    cwd: projectRoot,
+    env: process.env,
+  });
+}, cliE2eTimeoutMs);
 
 describe("imp CLI e2e", () => {
   it("shows help output when no command is given", async () => {
@@ -91,7 +98,22 @@ describe("imp CLI e2e", () => {
     });
     await expect(
       readFile(join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain(`global skills live under \`${join(root, "state-home", "imp", "skills")}\``);
+    ).resolves.toContain(`- global shared catalog: \`${join(root, "state-home", "imp", "skills")}\``);
+  }, cliE2eTimeoutMs);
+
+  it("refreshes the managed imp skill through `imp skills sync-managed`", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+    const configPath = join(root, "config-home", "imp", "config.json");
+    const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
+
+    await runCli(["init", "--defaults"], env);
+    await writeTextFile(skillPath, "stale skill\n");
+
+    const { stdout } = await runCli(["skills", "sync-managed", "--config", configPath], env);
+
+    expect(stdout).toContain(`Updated managed skill at ${skillPath}`);
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Imp Skill Creator");
   }, cliE2eTimeoutMs);
 
   it("creates and restores a backup with config, agent files, and conversations", async () => {

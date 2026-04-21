@@ -6,6 +6,7 @@ describe("createCli", () => {
   it("exposes the documented help surface", () => {
     const cli = createCli(createDependencies());
     const configCommand = findCommand(cli, "config");
+    const skillsCommand = findCommand(cli, "skills");
     const serviceCommand = findCommand(cli, "service");
     const backupCommand = findCommand(cli, "backup");
     const pluginCommand = findCommand(cli, "plugin");
@@ -16,6 +17,7 @@ describe("createCli", () => {
     expect(cli.helpInformation()).toContain("log");
     expect(cli.helpInformation()).toContain("config");
     expect(cli.helpInformation()).toContain("init");
+    expect(cli.helpInformation()).toContain("skills");
     expect(cli.helpInformation()).toContain("backup");
     expect(cli.helpInformation()).toContain("restore");
     expect(cli.helpInformation()).toContain("plugin");
@@ -31,6 +33,8 @@ describe("createCli", () => {
     expect(logHelp).toContain("--lines <count>");
 
     expect(findCommand(cli, "init").helpInformation()).toContain("--config <path>");
+    expect(findCommand(skillsCommand, "sync-managed").helpInformation()).toContain("Usage: imp skills sync-managed");
+    expect(findCommand(skillsCommand, "sync-managed").helpInformation()).toContain("--config <path>");
 
     expect(findCommand(configCommand, "validate").helpInformation()).toContain("Usage: imp config validate");
     expect(findCommand(configCommand, "validate").helpInformation()).toContain("--config <path>");
@@ -120,6 +124,7 @@ describe("createCli", () => {
     ]);
     await cli.parseAsync(["node", "imp", "service", "install", "--config", "/tmp/imp.json", "--dry-run"]);
     await cli.parseAsync(["node", "imp", "init", "--config", "/tmp/imp.json"]);
+    await cli.parseAsync(["node", "imp", "skills", "sync-managed", "--config", "/tmp/imp.json"]);
 
     expect(dependencies.viewLogs).toHaveBeenCalledWith({
       endpointId: "ops",
@@ -184,6 +189,9 @@ describe("createCli", () => {
       force: false,
       defaults: false,
     });
+    expect(dependencies.syncManagedSkills).toHaveBeenCalledWith({
+      configPath: "/tmp/imp.json",
+    });
   });
 
   it("keeps a stable top-level command surface", () => {
@@ -196,6 +204,7 @@ describe("createCli", () => {
         "log",
         "init",
         "config",
+        "skills",
         "backup",
         "restore",
         "plugin",
@@ -252,6 +261,7 @@ function createDependencies(): CliDependencies {
     getConfigValue: vi.fn(async () => undefined),
     setConfigValue: vi.fn(async () => undefined),
     initConfig: vi.fn(async () => undefined),
+    syncManagedSkills: vi.fn(async () => undefined),
     createBackup: vi.fn(async () => undefined),
     restoreBackup: vi.fn(async () => undefined),
     listPlugins: vi.fn(async () => undefined),

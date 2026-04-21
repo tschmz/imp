@@ -8,6 +8,7 @@ import { createReloadConfigUseCase } from "./application/reload-config-use-case.
 import { createRunDaemonUseCase, type RunDaemonOutcome } from "./application/run-daemon-use-case.js";
 import { createServiceUseCases } from "./application/service-use-cases.js";
 import { createSetConfigValueUseCase } from "./application/set-config-value-use-case.js";
+import { createSyncManagedSkillsUseCase } from "./application/sync-managed-skills-use-case.js";
 import { createValidateConfigUseCase } from "./application/validate-config-use-case.js";
 import { createViewLogsUseCase } from "./application/view-logs-use-case.js";
 import { createCli } from "./cli/create-cli.js";
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
     getConfigValue: createGetConfigValueUseCase(),
     setConfigValue: createSetConfigValueUseCase(),
     initConfig: createInitConfigUseCase(),
+    syncManagedSkills: createSyncManagedSkillsUseCase(),
     createBackup: backupUseCases.createBackup,
     restoreBackup: backupUseCases.restoreBackup,
     listPlugins: pluginUseCases.listPlugins,

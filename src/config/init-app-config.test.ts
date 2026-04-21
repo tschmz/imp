@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildInitialAppConfig } from "./default-app-config.js";
-import { assertInitConfigCanBeCreated, initAppConfig } from "./init-app-config.js";
+import { assertInitConfigCanBeCreated, initAppConfig, syncManagedSkills } from "./init-app-config.js";
 
 const tempDirs: string[] = [];
 
@@ -271,6 +271,44 @@ describe("initAppConfig", () => {
     await expect(
       readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
     ).resolves.toContain(`- workspace catalog for default: \`${join(root, "workspace", ".skills")}\``);
+  });
+
+  it("syncs the managed imp skill from the installed asset", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    const env = {
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
+    const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
+
+    await initAppConfig({ configPath, env });
+    await chmod(skillPath, 0o600);
+    await import("node:fs/promises").then(({ writeFile }) => writeFile(skillPath, "stale skill\n", "utf8"));
+
+    await expect(syncManagedSkills({ configPath })).resolves.toEqual([skillPath]);
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Imp Skill Creator");
+    expect((await stat(skillPath)).mode & 0o777).toBe(0o644);
+  });
+
+  it("creates a backup before syncing an existing managed imp skill", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config.json");
+    const env = {
+      XDG_STATE_HOME: join(root, "state-home"),
+    };
+    const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
+    const backupPath = `${skillPath}.2026-04-05T18-15-00.000Z.bak`;
+
+    await initAppConfig({ configPath, env });
+    await import("node:fs/promises").then(({ writeFile }) => writeFile(skillPath, "stale skill\n", "utf8"));
+
+    await syncManagedSkills({
+      configPath,
+      now: new Date("2026-04-05T18:15:00.000Z"),
+    });
+
+    await expect(readFile(backupPath, "utf8")).resolves.toBe("stale skill\n");
+    expect((await stat(backupPath)).mode & 0o777).toBe(0o644);
   });
 });
 
