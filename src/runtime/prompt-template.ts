@@ -1,4 +1,5 @@
 import { arch, homedir, hostname, platform, type, userInfo } from "node:os";
+import { join } from "node:path";
 import Handlebars from "handlebars";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
@@ -104,6 +105,8 @@ export function createPromptTemplateContext(options: {
     delivery: "endpoint" as const,
     endpointId: options.endpointId,
   };
+  const skillCatalogs = resolveRuntimeSkillCatalogs(options.agent, options.dataRoot, options.conversation);
+  const dynamicWorkspaceSkillsPath = resolveRuntimeWorkspaceSkillsPath(options.agent, options.conversation);
 
   return {
     system: options.system,
@@ -140,8 +143,8 @@ export function createPromptTemplateContext(options: {
     imp: {
       configPath: options.configPath ?? "",
       dataRoot: options.dataRoot ?? "",
-      skillCatalogs: [],
-      dynamicWorkspaceSkillsPath: "",
+      skillCatalogs,
+      dynamicWorkspaceSkillsPath,
     },
     skills: (options.availableSkills ?? []).map((skill) => ({
       name: skill.name,
@@ -150,6 +153,53 @@ export function createPromptTemplateContext(options: {
       filePath: skill.filePath,
     })),
   };
+}
+
+function resolveRuntimeSkillCatalogs(
+  agent: AgentDefinition,
+  dataRoot: string | undefined,
+  conversation: ConversationContext | undefined,
+): PromptTemplateSkillCatalogContext[] {
+  const catalogs: PromptTemplateSkillCatalogContext[] = [];
+
+  if (dataRoot) {
+    catalogs.push({
+      label: "global shared catalog",
+      path: join(dataRoot, "skills"),
+    });
+  }
+
+  if (agent.home) {
+    catalogs.push({
+      label: `agent-home catalog for ${agent.id}`,
+      path: join(agent.home, ".skills"),
+    });
+  }
+
+  for (const path of agent.skills?.paths ?? []) {
+    catalogs.push({
+      label: `configured shared catalog for ${agent.id}`,
+      path,
+    });
+  }
+
+  const workspaceSkillsPath = resolveRuntimeWorkspaceSkillsPath(agent, conversation);
+  if (workspaceSkillsPath) {
+    catalogs.push({
+      label: `workspace catalog for ${agent.id}`,
+      path: workspaceSkillsPath,
+    });
+  }
+
+  return catalogs;
+}
+
+function resolveRuntimeWorkspaceSkillsPath(
+  agent: AgentDefinition,
+  conversation: ConversationContext | undefined,
+): string {
+  const workingDirectory = conversation?.state.workingDirectory ?? agent.workspace?.cwd;
+  return workingDirectory ? join(workingDirectory, ".skills") : "";
 }
 
 function createPromptTemplateRuntimeContext(

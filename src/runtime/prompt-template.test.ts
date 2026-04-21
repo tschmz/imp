@@ -132,6 +132,33 @@ describe("createPromptTemplateContext", () => {
       "global=/var/lib/imp/skills;agent-home for default=/agents/default/.skills;<working-directory>/.skills",
     );
   });
+
+  it("includes resolved runtime skill catalogs from data root, agent home, configured paths, and workspace", () => {
+    const context = createPromptTemplateContext({
+      system: createSystemContext(),
+      agent: createAgent({
+        home: "/agents/default",
+        workspace: {
+          cwd: "/workspace/project",
+        },
+        skills: {
+          paths: ["/shared/skills-a", "/shared/skills-b"],
+        },
+      }),
+      endpointId: "local-cli",
+      transportKind: "cli",
+      dataRoot: "/var/lib/imp",
+    });
+
+    expect(context.imp.skillCatalogs).toEqual([
+      { label: "global shared catalog", path: "/var/lib/imp/skills" },
+      { label: "agent-home catalog for default", path: "/agents/default/.skills" },
+      { label: "configured shared catalog for default", path: "/shared/skills-a" },
+      { label: "configured shared catalog for default", path: "/shared/skills-b" },
+      { label: "workspace catalog for default", path: "/workspace/project/.skills" },
+    ]);
+    expect(context.imp.dynamicWorkspaceSkillsPath).toBe("/workspace/project/.skills");
+  });
 });
 
 function createSystemContext(): PromptTemplateSystemContext {
@@ -145,7 +172,7 @@ function createSystemContext(): PromptTemplateSystemContext {
   };
 }
 
-function createAgent(): AgentDefinition {
+function createAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
   return {
     id: "default",
     name: "Default",
@@ -160,5 +187,6 @@ function createAgent(): AgentDefinition {
     },
     tools: [],
     extensions: [],
+    ...overrides,
   };
 }

@@ -1,12 +1,19 @@
 import { loadSkillFromDirectory } from "../skills/discovery.js";
 import type { SkillDefinition } from "../skills/types.js";
 import type { ToolDefinition } from "../tools/types.js";
+import { renderPromptTemplate, type PromptTemplateContext } from "./prompt-template.js";
 
-export function createConfiguredSkillTools(skills: SkillDefinition[]): ToolDefinition[] {
-  return skills.length > 0 ? [createLoadSkillTool(skills)] : [];
+export function createConfiguredSkillTools(
+  skills: SkillDefinition[],
+  templateContext?: PromptTemplateContext,
+): ToolDefinition[] {
+  return skills.length > 0 ? [createLoadSkillTool(skills, templateContext)] : [];
 }
 
-export function createLoadSkillTool(skills: SkillDefinition[]): ToolDefinition {
+export function createLoadSkillTool(
+  skills: SkillDefinition[],
+  templateContext?: PromptTemplateContext,
+): ToolDefinition {
   const skillByName = new Map(skills.map((skill) => [skill.name, skill]));
   const parameters = {
     type: "object",
@@ -40,8 +47,14 @@ export function createLoadSkillTool(skills: SkillDefinition[]): ToolDefinition {
         name: skill.name,
         description: skill.description,
       };
+      const renderedBody = templateContext
+        ? renderPromptTemplate(loadedSkill.body, {
+            filePath: loadedSkill.filePath,
+            context: templateContext,
+          }).trim()
+        : loadedSkill.body.trim();
       const text = [
-        `<skill_content name="${escapeToolAttribute(loadedSkill.name)}">\n${loadedSkill.body.trim()}\n\nSkill directory: ${loadedSkill.directoryPath}\n\n${renderSkillResources(loadedSkill)}\n</skill_content>`,
+        `<skill_content name="${escapeToolAttribute(loadedSkill.name)}">\n${renderedBody}\n\nSkill directory: ${loadedSkill.directoryPath}\n\n${renderSkillResources(loadedSkill)}\n</skill_content>`,
       ].join("\n\n");
 
       return {

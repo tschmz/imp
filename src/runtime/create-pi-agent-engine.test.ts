@@ -1509,7 +1509,7 @@ describe("createPiAgentEngine", () => {
     await mkdir(skillDirectoryPath, { recursive: true });
     await writeFile(
       skillPath,
-      "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.",
+      "---\nname: commit\ndescription: Stage and commit changes.\n---\n\nUse focused commits.\n\nCatalogs:\n{{#each imp.skillCatalogs}}\n- {{label}}: {{path}}\n{{/each}}\nDynamic: {{imp.dynamicWorkspaceSkillsPath}}",
       "utf8",
     );
     await mkdir(dirname(referencePath), { recursive: true });
@@ -1538,6 +1538,7 @@ describe("createPiAgentEngine", () => {
       conversation: createConversation(),
       message: createIncomingMessage(),
       runtime: {
+        dataRoot: "/var/lib/imp",
         availableSkills: [
           {
             name: "commit",
@@ -1580,8 +1581,12 @@ describe("createPiAgentEngine", () => {
 
     expect(text).toContain('<skill_content name="commit">');
     expect(text).toContain("Use focused commits.");
+    expect(text).toContain("Catalogs:");
+    expect(text).toContain("- global shared catalog: /var/lib/imp/skills");
+    expect(text).toContain("Dynamic:");
     expect(text).not.toContain("description: Stage and commit changes.");
     expect(text).not.toContain("Stale catalog body.");
+    expect(text).not.toContain("{{#each imp.skillCatalogs}}");
     expect(text).toContain(`Skill directory: ${skillDirectoryPath}`);
     expect(text).toContain("<skill_resources>");
     expect(text).toContain(`<file kind="script" path="${scriptPath}">scripts/prepare.sh</file>`);

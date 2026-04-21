@@ -50,6 +50,7 @@ export async function resolveToolsStage(
   const builtInTools = resolveTurnBuiltInTools(
     configuredTools,
     context.input.runtime?.availableSkills ?? [],
+    context.templateContext,
   );
   const resolvedBuiltInTools = builtInTools.map((tool) => tool.name);
   const missingBuiltInTools = configuredBuiltInTools.filter(
@@ -81,6 +82,7 @@ export async function resolveToolsStage(
 function resolveTurnBuiltInTools(
   builtInTools: ReturnType<typeof resolveAgentTools>,
   availableSkills: NonNullable<AgentRunContext["input"]["runtime"]>["availableSkills"],
+  templateContext: ResolvePromptStageContext["templateContext"],
 ): ReturnType<typeof resolveAgentTools> {
   if (!availableSkills || availableSkills.length === 0) {
     return builtInTools;
@@ -88,7 +90,7 @@ function resolveTurnBuiltInTools(
 
   return [
     ...builtInTools.filter((tool) => tool.name !== "load_skill"),
-    createLoadSkillTool(availableSkills),
+    createLoadSkillTool(availableSkills, templateContext),
   ];
 }
 
