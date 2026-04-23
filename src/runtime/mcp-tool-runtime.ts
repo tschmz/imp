@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport, type StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { AgentDefinition } from "../domain/agent.js";
+import { UserVisibleProcessingError } from "../domain/processing-error.js";
 import type { Logger } from "../logging/types.js";
 
 interface McpListedTool {
@@ -220,7 +221,10 @@ function createMcpToolDefinition(
       }
 
       if (result.isError) {
-        throw new Error(getErrorMessage(result.content, prefixedName));
+        throw new UserVisibleProcessingError(
+          "tool_command_execution",
+          getErrorMessage(result.content, prefixedName),
+        );
       }
 
       return {

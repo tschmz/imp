@@ -5,6 +5,7 @@ import type { ToolDefinition } from "../tools/types.js";
 import { createPhoneCallTools } from "./phone-call-tool.js";
 import { resolveBuiltInToolOptions } from "./shell-path.js";
 import { createConfiguredSkillTools } from "./skill-tool.js";
+import { toUserVisibleToolError } from "./user-visible-tool-error.js";
 import {
   createWorkingDirectoryState,
   createWorkingDirectoryTools,
@@ -44,7 +45,12 @@ function createDynamicBuiltInTools(
         throw new Error(`Unknown built-in tool: ${tool.name}`);
       }
 
-      return delegatedTool.execute(toolCallId, params, signal, onUpdate);
+      return delegatedTool.execute(toolCallId, params, signal, onUpdate).catch((error: unknown) => {
+        throw toUserVisibleToolError(error, {
+          fallbackMessage: `Built-in tool "${tool.name}" failed.`,
+          defaultKind: "tool_command_execution",
+        });
+      });
     },
   }));
 }

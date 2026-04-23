@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
+import { UserVisibleProcessingError } from "../domain/processing-error.js";
 import type { Logger } from "../logging/types.js";
 import { resolveMcpTools } from "./mcp-tool-runtime.js";
 
@@ -42,6 +43,51 @@ describe("resolveMcpTools", () => {
 
       const fail = resolution.tools.find((tool) => tool.name === "echo__fail");
       await expect(fail!.execute("2", {})).rejects.toThrow("forced failure");
+    } finally {
+      await resolution.close();
+    }
+  });
+
+  it("maps MCP tool error results to typed processing errors", async () => {
+    const createClient = vi.fn(() => ({
+      connect: vi.fn(async () => {}),
+      listTools: vi.fn(async () => ({
+        tools: [{
+          name: "fail",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        }],
+      })),
+      callTool: vi.fn(async () => ({
+        content: [{ type: "text" as const, text: "forced failure" }],
+        isError: true,
+      })),
+      close: vi.fn(async () => {}),
+    }));
+
+    const resolution = await resolveMcpTools(
+      createAgent({
+        mcp: {
+          servers: [{
+            id: "echo",
+            command: "node",
+          }],
+        },
+      }),
+      {
+        createClient,
+        createTransport: vi.fn((server) => server),
+      },
+    );
+
+    try {
+      const fail = resolution.tools.find((tool) => tool.name === "echo__fail");
+      await expect(fail?.execute("2", {})).rejects.toMatchObject({
+        kind: "tool_command_execution",
+        message: "forced failure",
+      } satisfies Partial<UserVisibleProcessingError>);
     } finally {
       await resolution.close();
     }

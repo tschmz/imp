@@ -2,6 +2,7 @@ import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ToolDefinition } from "../tools/types.js";
+import { createUserVisibleToolError, toUserVisibleToolError } from "./user-visible-tool-error.js";
 
 export interface WorkingDirectoryState {
   get(): string;
@@ -75,9 +76,14 @@ function createSetWorkingDirectoryTool(workingDirectoryState: WorkingDirectorySt
     async execute(_toolCallId, params) {
       const { path } = parseSetWorkingDirectoryParams(params);
       const workingDirectory = resolve(workingDirectoryState.get(), path);
-      const directoryStats = await stat(workingDirectory);
+      const directoryStats = await stat(workingDirectory).catch((error: unknown) => {
+        throw toUserVisibleToolError(error, {
+          fallbackMessage: `Could not change directory to ${workingDirectory}.`,
+          defaultKind: "file_document_persistence",
+        });
+      });
       if (!directoryStats.isDirectory()) {
-        throw new Error(`Not a directory: ${workingDirectory}`);
+        throw createUserVisibleToolError("file_document_persistence", `Not a directory: ${workingDirectory}`);
       }
 
       workingDirectoryState.set(workingDirectory);
@@ -91,12 +97,12 @@ function createSetWorkingDirectoryTool(workingDirectoryState: WorkingDirectorySt
 
 function parseSetWorkingDirectoryParams(params: unknown): { path: string } {
   if (typeof params !== "object" || params === null) {
-    throw new Error("cd requires an object parameter with a path.");
+    throw createUserVisibleToolError("tool_command_execution", "cd requires an object parameter with a path.");
   }
 
   const path = "path" in params ? params.path : undefined;
   if (typeof path !== "string" || path.length === 0) {
-    throw new Error("cd requires a non-empty string path.");
+    throw createUserVisibleToolError("tool_command_execution", "cd requires a non-empty string path.");
   }
 
   return { path };

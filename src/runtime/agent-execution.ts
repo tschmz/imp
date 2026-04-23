@@ -7,6 +7,10 @@ import {
 import type { Api as AiApi, AssistantMessage, Model } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationEvent } from "../domain/conversation.js";
+import {
+  classifyModelProviderFailure,
+  type ModelProviderFailureKind,
+} from "../domain/processing-error.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { ReplyChannelContext } from "./context.js";
 import { getAssistantText, toAgentMessages, toConversationEvents } from "./message-mapping.js";
@@ -67,6 +71,7 @@ export interface AgentExecutionFailureDetails {
   upstreamModel: string;
   upstreamApi: string;
   upstreamResponseId?: string;
+  upstreamFailureKind: ModelProviderFailureKind;
   assistantContentTypes: string[];
   assistantTextLength: number;
   assistantToolCallNames: string[];
@@ -185,6 +190,9 @@ function getAgentExecutionFailureDetails(
     upstreamModel: message.model,
     upstreamApi: message.api,
     ...(message.responseId ? { upstreamResponseId: message.responseId } : {}),
+    upstreamFailureKind: message.stopReason === "aborted"
+      ? "timeout"
+      : classifyModelProviderFailure(message.errorMessage),
     assistantContentTypes: message.content.map((content) => content.type),
     assistantTextLength: message.content
       .filter((content) => content.type === "text")

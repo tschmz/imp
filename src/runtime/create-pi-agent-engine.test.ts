@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationEvent } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
+import { UserVisibleProcessingError } from "../domain/processing-error.js";
 import type { Logger } from "../logging/types.js";
 import type { ToolDefinition } from "../tools/types.js";
 import {
@@ -1684,9 +1685,19 @@ describe("createPiAgentEngine", () => {
         },
       },
     });
-    await expect(loadSkill.execute("load-3", { name: "edited-name" })).rejects.toThrow(
-      "Unknown skill: edited-name. Available skills: commit",
-    );
+    await expect(loadSkill.execute("load-3", { name: "edited-name" })).rejects.toMatchObject({
+      kind: "tool_command_execution",
+      message: "Unknown skill: edited-name. Available skills: commit",
+    } satisfies Partial<UserVisibleProcessingError>);
+  });
+
+  it("maps load_skill parameter validation failures to typed processing errors", async () => {
+    const loadSkill = createLoadSkillTool([]);
+
+    await expect(loadSkill.execute("load-1", undefined)).rejects.toMatchObject({
+      kind: "tool_command_execution",
+      message: "load_skill requires an object parameter with a name.",
+    } satisfies Partial<UserVisibleProcessingError>);
   });
 
   it("allows agents to inspect and change their working directory via tools", async () => {
@@ -1948,9 +1959,74 @@ describe("createPiAgentEngine", () => {
     const registry = createBuiltInToolRegistry(root);
     const setWorkingDirectory = registry.get("cd");
 
-    await expect(setWorkingDirectory!.execute("1", { path: filePath })).rejects.toThrow(
-      `Not a directory: ${filePath}`,
-    );
+    await expect(setWorkingDirectory!.execute("1", { path: filePath })).rejects.toMatchObject({
+      kind: "file_document_persistence",
+      message: `Not a directory: ${filePath}`,
+    } satisfies Partial<UserVisibleProcessingError>);
+  });
+
+  it("maps missing cd targets to typed file operation errors", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-working-directory-"));
+    tempDirs.push(root);
+    const missingPath = join(root, "missing");
+
+    const registry = createBuiltInToolRegistry(root);
+    const setWorkingDirectory = registry.get("cd");
+
+    await expect(setWorkingDirectory!.execute("1", { path: missingPath })).rejects.toMatchObject({
+      kind: "file_document_persistence",
+      message: expect.stringContaining(`stat '${missingPath}'`),
+    } satisfies Partial<UserVisibleProcessingError>);
+  });
+
+  it("maps phone command startup failures to typed tool errors", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-call-"));
+    tempDirs.push(root);
+    const registry = createBuiltInToolRegistry(root, {
+      ...createAgent(),
+      tools: ["phone_call"],
+      phone: {
+        command: join(root, "missing-phone-command"),
+        args: [],
+        contacts: [
+          {
+            id: "office",
+            name: "Office",
+            uri: "sip:+491234567@example.com",
+          },
+        ],
+      },
+    });
+
+    const phoneCall = registry.get("phone_call");
+
+    await expect(phoneCall!.execute("1", { contactId: "office" })).rejects.toMatchObject({
+      kind: "tool_command_execution",
+      message: expect.stringContaining("ENOENT"),
+    } satisfies Partial<UserVisibleProcessingError>);
+  });
+
+  it("maps phone hangup write failures to typed file operation errors", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-hangup-"));
+    tempDirs.push(root);
+    const filePath = join(root, "not-a-directory");
+    await writeFile(filePath, "hello", "utf8");
+
+    const registry = createBuiltInToolRegistry(root, {
+      ...createAgent(),
+      tools: ["phone_hangup"],
+      phone: {
+        controlDir: join(filePath, "control"),
+        contacts: [],
+      },
+    });
+
+    const phoneHangup = registry.get("phone_hangup");
+
+    await expect(phoneHangup!.execute("1", { reason: "done" })).rejects.toMatchObject({
+      kind: "file_document_persistence",
+      message: expect.stringContaining("ENOTDIR"),
+    } satisfies Partial<UserVisibleProcessingError>);
   });
 
   it("fails clearly when a configured tool cannot be resolved", async () => {

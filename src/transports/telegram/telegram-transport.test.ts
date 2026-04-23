@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { inboundCommandMenu } from "../../application/commands/registry.js";
 import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
+import { UserVisibleProcessingError } from "../../domain/processing-error.js";
 import type { Logger } from "../../logging/types.js";
 import { createDeliveryRouter } from "../delivery-router.js";
 import { createTelegramTransport } from "./telegram-transport.js";
@@ -555,7 +556,7 @@ describe("createTelegramTransport", () => {
     });
   });
 
-  it("replies with a stable error message through the error delivery hook", async () => {
+  it("replies with a user-facing error message through the error delivery hook", async () => {
     const bot = createFakeBot();
     const logger = createMockLogger();
     const handler = {
@@ -581,7 +582,7 @@ describe("createTelegramTransport", () => {
       from: { id: 7 },
       message: { message_id: 99, text: "ping" },
     });
-    expect(bot.reply).toHaveBeenCalledWith("Sorry, something went wrong while processing your message.");
+    expect(bot.reply).toHaveBeenCalledWith("I couldn't process your message.\nReason: boom");
     expect(logger.debug).toHaveBeenCalledWith(
       "sending telegram processing error response",
       expect.objectContaining({
@@ -1015,6 +1016,68 @@ describe("createTelegramTransport", () => {
         messageId: "101",
       }),
     );
+  });
+
+  it("maps telegram document persistence failures to typed processing errors", async () => {
+    const bot = createFakeBot();
+    bot.api.getFile = vi.fn(async () => ({ file_path: "documents/report.txt" }));
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      new Response("nope", {
+        status: 503,
+        statusText: "Unavailable",
+      }),
+    );
+    let capturedEvent:
+      | {
+          message: IncomingMessage;
+          prepareMessage?(message: IncomingMessage): Promise<IncomingMessage> | IncomingMessage;
+        }
+      | undefined;
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+        paths: {
+          conversationsDir: "/tmp/imp-telegram-doc-test",
+        },
+      },
+      bot,
+      undefined,
+      { fetch: fetchImpl },
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedEvent = event;
+      }),
+    });
+
+    await bot.emitDocumentMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 102,
+        document: {
+          file_id: "doc-file",
+          file_name: "report.txt",
+        },
+      },
+    });
+
+    await waitForAsync(() => capturedEvent !== undefined, 200);
+    await expect(capturedEvent?.prepareMessage?.({
+      ...capturedEvent.message,
+      conversation: {
+        ...capturedEvent.message.conversation,
+        sessionId: "session-1",
+        agentId: "default",
+      } as IncomingMessage["conversation"] & { sessionId: string; agentId: string },
+    })).rejects.toMatchObject({
+      kind: "file_document_persistence",
+    } satisfies Partial<UserVisibleProcessingError>);
   });
 
   it("replies clearly when voice messages are disabled", async () => {

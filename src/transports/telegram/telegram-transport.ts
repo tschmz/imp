@@ -4,6 +4,7 @@ import { dirname, extname, isAbsolute, join } from "node:path";
 import { Bot, GrammyError, InputFile } from "grammy";
 import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
+import { renderUserFacingError } from "../../application/render-user-facing-error.js";
 import type { TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
 import type {
   IncomingMessage,
@@ -11,6 +12,7 @@ import type {
   OutgoingMessage,
   OutgoingMessageReplayItem,
 } from "../../domain/message.js";
+import { UserVisibleProcessingError } from "../../domain/processing-error.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportContext, TransportHandler, TransportInboundEvent } from "../types.js";
 import {
@@ -470,20 +472,16 @@ async function downloadTelegramFile(
 
   const response = await fetchImpl(`https://api.telegram.org/file/bot${token}/${filePath}`);
   if (!response.ok) {
-    throw new Error(`Telegram file download failed (${response.status} ${response.statusText}).`);
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      `Telegram file download failed (${response.status} ${response.statusText}).`,
+    );
   }
 
   return {
     bytes: new Uint8Array(await response.arrayBuffer()),
     mimeType: response.headers.get("content-type") ?? undefined,
   };
-}
-
-class TelegramDocumentPersistenceError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TelegramDocumentPersistenceError";
-  }
 }
 
 async function persistTelegramDocument(input: {
@@ -494,7 +492,8 @@ async function persistTelegramDocument(input: {
   fetchImpl: typeof fetch;
 }): Promise<IncomingMessage> {
   if (!("sessionId" in input.message.conversation) || !input.message.conversation.sessionId) {
-    throw new TelegramDocumentPersistenceError(
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
       "Telegram document cannot be stored before the conversation session is resolved.",
     );
   }
@@ -503,19 +502,24 @@ async function persistTelegramDocument(input: {
     typeof input.document.file_size === "number" &&
     input.document.file_size > getTelegramDocumentMaxDownloadBytes(input.config)
   ) {
-    throw new TelegramDocumentPersistenceError(
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
       `Telegram document exceeds configured download size limit (${input.document.file_size} > ${getTelegramDocumentMaxDownloadBytes(input.config)}).`,
     );
   }
 
   const file = await input.bot.api.getFile(input.document.file_id);
   if (!file.file_path) {
-    throw new TelegramDocumentPersistenceError("Telegram document metadata did not include file_path.");
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      "Telegram document metadata did not include file_path.",
+    );
   }
 
   const downloadedDocument = await downloadTelegramFile(file.file_path, input.config.token, input.fetchImpl);
   if (downloadedDocument.bytes.byteLength > getTelegramDocumentMaxDownloadBytes(input.config)) {
-    throw new TelegramDocumentPersistenceError(
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
       `Telegram document download exceeded configured size limit (${downloadedDocument.bytes.byteLength} > ${getTelegramDocumentMaxDownloadBytes(input.config)}).`,
     );
   }
@@ -558,10 +562,16 @@ function getTelegramDocumentSavedPath(
       ? message.conversation.agentId
       : undefined;
   if (!sessionId) {
-    throw new TelegramDocumentPersistenceError("Telegram document message did not include a session id.");
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      "Telegram document message did not include a session id.",
+    );
   }
   if (!agentId) {
-    throw new TelegramDocumentPersistenceError("Telegram document message did not include an agent id.");
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      "Telegram document message did not include an agent id.",
+    );
   }
 
   const fileName = document.file_name ?? `telegram-document-${message.messageId}${getDocumentExtension(document)}`;
@@ -593,7 +603,8 @@ function getTelegramDocumentMaxDownloadBytes(config: TelegramTransportRuntimeCon
 
 function getTelegramConversationsDir(config: TelegramTransportRuntimeConfig): string {
   if (!config.paths?.conversationsDir) {
-    throw new TelegramDocumentPersistenceError(
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
       "Telegram document cannot be stored because the endpoint conversations directory is unavailable.",
     );
   }
@@ -848,9 +859,9 @@ function createTelegramInboundEvent(
                 },
                 error,
               );
-              throw error instanceof TelegramDocumentPersistenceError
+              throw error instanceof UserVisibleProcessingError
                 ? error
-                : new TelegramDocumentPersistenceError("Telegram document could not be downloaded or stored.");
+                : toTelegramDocumentPersistenceError(error);
             }
           },
         }
@@ -888,14 +899,47 @@ function createTelegramInboundEvent(
         messageId: String(ctx.message.message_id),
         correlationId,
       });
-      if (error instanceof TelegramDocumentPersistenceError) {
-        await ctx.reply("Sorry, I couldn't download or store that document.");
-        return;
-      }
-
-      await ctx.reply("Sorry, something went wrong while processing your message.");
+      await ctx.reply(renderUserFacingError(error));
     },
   };
+}
+
+function toTelegramDocumentPersistenceError(error: unknown): UserVisibleProcessingError {
+  if (isPermissionDeniedError(error)) {
+    return new UserVisibleProcessingError("permission_denied", getErrorMessage(error));
+  }
+
+  if (isNetworkConnectivityError(error)) {
+    return new UserVisibleProcessingError("network_connectivity", getErrorMessage(error));
+  }
+
+  return new UserVisibleProcessingError(
+    "file_document_persistence",
+    "Telegram document could not be downloaded or stored.",
+  );
+}
+
+function isPermissionDeniedError(error: unknown): boolean {
+  return isErrorWithCode(error, "EACCES") || isErrorWithCode(error, "EPERM");
+}
+
+function isNetworkConnectivityError(error: unknown): boolean {
+  return [
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "ETIMEDOUT",
+  ].some((code) => isErrorWithCode(error, code))
+    || (error instanceof TypeError && /fetch failed|network/i.test(error.message));
+}
+
+function isErrorWithCode(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function sendTelegramReplay(

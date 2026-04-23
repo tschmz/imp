@@ -18,6 +18,7 @@ import {
 } from "@mariozechner/pi-tui";
 import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
+import { renderUserFacingError } from "../../application/render-user-facing-error.js";
 import type { CliEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessageCommand } from "../../domain/message.js";
 import type { OutgoingMessageReplayItem } from "../../domain/message.js";
@@ -256,7 +257,7 @@ function createCliInboundEvent(
         errorType: error instanceof Error ? error.name : typeof error,
       });
       options.chatContainer.addChild(new Text(red("Error"), 0, 0));
-      options.chatContainer.addChild(new Text("Sorry, something went wrong while processing your message.", 1, 0));
+      options.chatContainer.addChild(new Text(renderUserFacingError(error), 1, 0));
       options.chatContainer.addChild(new Spacer(1));
       options.ui.requestRender();
     },

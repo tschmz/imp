@@ -2,6 +2,7 @@ import { loadSkillFromDirectory } from "../skills/discovery.js";
 import type { SkillDefinition } from "../skills/types.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { renderPromptTemplate, type PromptTemplateContext } from "./prompt-template.js";
+import { createUserVisibleToolError, toUserVisibleToolError } from "./user-visible-tool-error.js";
 
 export function createConfiguredSkillTools(
   skills: SkillDefinition[],
@@ -38,10 +39,18 @@ export function createLoadSkillTool(
       const { name } = parseLoadSkillParams(params);
       const skill = skillByName.get(name);
       if (!skill) {
-        throw new Error(`Unknown skill: ${name}. Available skills: ${skills.map((entry) => entry.name).join(", ")}`);
+        throw createUserVisibleToolError(
+          "tool_command_execution",
+          `Unknown skill: ${name}. Available skills: ${skills.map((entry) => entry.name).join(", ")}`,
+        );
       }
 
-      const refreshedSkill = await loadSkillFromDirectory(skill.directoryPath);
+      const refreshedSkill = await loadSkillFromDirectory(skill.directoryPath).catch((error: unknown) => {
+        throw toUserVisibleToolError(error, {
+          fallbackMessage: `Could not load skill: ${name}.`,
+          defaultKind: "file_document_persistence",
+        });
+      });
       const loadedSkill = {
         ...refreshedSkill,
         name: skill.name,
@@ -112,12 +121,12 @@ function toSkillRelativeResourcePath(directoryName: "references" | "scripts", re
 
 function parseLoadSkillParams(params: unknown): { name: string } {
   if (typeof params !== "object" || params === null) {
-    throw new Error("load_skill requires an object parameter with a name.");
+    throw createUserVisibleToolError("tool_command_execution", "load_skill requires an object parameter with a name.");
   }
 
   const name = "name" in params ? params.name : undefined;
   if (typeof name !== "string" || name.trim().length === 0) {
-    throw new Error("load_skill requires a non-empty string name.");
+    throw createUserVisibleToolError("tool_command_execution", "load_skill requires a non-empty string name.");
   }
 
   return { name: name.trim() };

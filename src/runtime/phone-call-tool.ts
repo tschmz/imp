@@ -4,6 +4,7 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentPhoneCallConfig, AgentPhoneContactConfig } from "../domain/agent.js";
 import type { ToolDefinition } from "../tools/types.js";
+import { createUserVisibleToolError, toUserVisibleToolError } from "./user-visible-tool-error.js";
 
 const defaultPhoneCommand = "baresip";
 const defaultPhoneArgs = ["-e", "/dial {uri}"];
@@ -54,10 +55,19 @@ function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: 
       const { contactId, purpose } = parsePhoneCallParams(params);
       const contact = contacts.get(contactId);
       if (!contact) {
-        throw new Error(`Unknown phone contact: ${contactId}. Available contacts: ${[...contacts.keys()].join(", ")}`);
+        throw createUserVisibleToolError(
+          "tool_command_execution",
+          `Unknown phone contact: ${contactId}. Available contacts: ${[...contacts.keys()].join(", ")}`,
+        );
       }
 
-      const result = await runPhoneCommand(config, contact, signal, options.agentId, purpose);
+      const result = await runPhoneCommand(config, contact, signal, options.agentId, purpose).catch((error: unknown) => {
+        throw toUserVisibleToolError(error, {
+          fallbackMessage: "Configured phone command could not be started.",
+          defaultKind: "tool_command_execution",
+          classifyFileErrors: false,
+        });
+      });
       return {
         content: [
           {
@@ -106,7 +116,10 @@ function createPhoneHangupTool(config: AgentPhoneCallConfig, options: { agentId?
       const reason = parsePhoneHangupParams(params).reason ?? "agent-hangup";
       const controlDir = resolvePhoneControlDir(config);
       if (!controlDir) {
-        throw new Error("phone_hangup requires agents[].tools.phone.controlDir or request-call args with --requests-dir.");
+        throw createUserVisibleToolError(
+          "tool_command_execution",
+          "phone_hangup requires agents[].tools.phone.controlDir or request-call args with --requests-dir.",
+        );
       }
 
       const commandPath = await writePhoneControlCommand(controlDir, {
@@ -116,6 +129,11 @@ function createPhoneHangupTool(config: AgentPhoneCallConfig, options: { agentId?
         ...(options.agentId ? { agentId: options.agentId } : {}),
         reason,
         requestedAt: new Date().toISOString(),
+      }).catch((error: unknown) => {
+        throw toUserVisibleToolError(error, {
+          fallbackMessage: "Phone hangup request could not be written.",
+          defaultKind: "file_document_persistence",
+        });
       });
 
       return {
@@ -159,12 +177,15 @@ function parsePhoneHangupParams(params: unknown): PhoneHangupParams {
     return {};
   }
   if (typeof params !== "object") {
-    throw new Error("phone_hangup requires an object parameter when provided.");
+    throw createUserVisibleToolError("tool_command_execution", "phone_hangup requires an object parameter when provided.");
   }
 
   const reason = "reason" in params ? params.reason : undefined;
   if (reason !== undefined && (typeof reason !== "string" || reason.length === 0)) {
-    throw new Error("phone_hangup reason must be a non-empty string when provided.");
+    throw createUserVisibleToolError(
+      "tool_command_execution",
+      "phone_hangup reason must be a non-empty string when provided.",
+    );
   }
 
   return {
@@ -207,17 +228,20 @@ interface PhoneCallResult {
 
 function parsePhoneCallParams(params: unknown): PhoneCallParams {
   if (typeof params !== "object" || params === null) {
-    throw new Error("phone_call requires an object parameter with a contactId.");
+    throw createUserVisibleToolError("tool_command_execution", "phone_call requires an object parameter with a contactId.");
   }
 
   const contactId = "contactId" in params ? params.contactId : undefined;
   if (typeof contactId !== "string" || contactId.length === 0) {
-    throw new Error("phone_call requires a non-empty string contactId.");
+    throw createUserVisibleToolError("tool_command_execution", "phone_call requires a non-empty string contactId.");
   }
 
   const purpose = "purpose" in params ? params.purpose : undefined;
   if (purpose !== undefined && (typeof purpose !== "string" || purpose.length === 0)) {
-    throw new Error("phone_call purpose must be a non-empty string when provided.");
+    throw createUserVisibleToolError(
+      "tool_command_execution",
+      "phone_call purpose must be a non-empty string when provided.",
+    );
   }
 
   return {
