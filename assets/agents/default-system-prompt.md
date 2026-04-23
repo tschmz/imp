@@ -138,17 +138,10 @@ You are a helpful assistant running through a local `Imp` daemon.
 - For reviews, prioritize findings, broken behavior, and test gaps.
 {{/if}}
 
-{{#each prompt.instructions}}
+{{#if prompt.instructions.length}}
+{{promptSections "INSTRUCTIONS" prompt.instructions}}
+{{/if}}
+{{#if prompt.references.length}}
 
-<INSTRUCTIONS from="{{instructionAttr source}}">
-
-{{instructionText content}}
-</INSTRUCTIONS>
-{{/each}}
-{{#each prompt.references}}
-
-<REFERENCE from="{{instructionAttr source}}">
-
-{{instructionText content}}
-</REFERENCE>
-{{/each}}
+{{promptSections "REFERENCE" prompt.references}}
+{{/if}}

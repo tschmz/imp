@@ -3,6 +3,7 @@ import type { AgentDefinition } from "../domain/agent.js";
 import {
   createPromptTemplateContext,
   renderPromptTemplate,
+  renderPromptSections,
   type PromptTemplateSystemContext,
 } from "./prompt-template.js";
 
@@ -158,6 +159,25 @@ describe("createPromptTemplateContext", () => {
       { label: "workspace catalog for default", path: "/workspace/project/.skills" },
     ]);
     expect(context.imp.dynamicWorkspaceSkillsPath).toBe("/workspace/project/.skills");
+  });
+
+  it("renders included prompt sections through the shared helper", () => {
+    const context = createPromptTemplateContext({
+      system: createSystemContext(),
+      agent: createAgent(),
+      endpointId: "local-cli",
+      transportKind: "cli",
+    });
+    context.prompt.instructions = [
+      { source: "/workspace/AGENTS.md", content: "Use facts." },
+    ];
+
+    const rendered = renderPromptTemplate('{{promptSections "INSTRUCTIONS" prompt.instructions}}', {
+      filePath: "/workspace/SYSTEM.md",
+      context,
+    });
+
+    expect(rendered).toBe(renderPromptSections("INSTRUCTIONS", context.prompt.instructions));
   });
 });
 

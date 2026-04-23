@@ -7,6 +7,7 @@ import {
   createEmptyPromptIncludedFiles,
   mapSkillsToPromptTemplateContext,
   renderPromptTemplate,
+  renderPromptSections,
   type PromptTemplateContext,
   type PromptTemplateIncludedFileContext,
 } from "./prompt-template.js";
@@ -305,11 +306,12 @@ function renderSystemPrompt(
     return basePrompt;
   }
 
-  return [
-    basePrompt,
-    ...instructions.map((entry) => formatPromptSection("INSTRUCTIONS", entry.source, entry.content)),
-    ...references.map((entry) => formatPromptSection("REFERENCE", entry.source, entry.content)),
-  ].join("\n\n");
+  const renderedSections = [
+    renderPromptSections("INSTRUCTIONS", instructions),
+    renderPromptSections("REFERENCE", references),
+  ].filter((section) => section.length > 0);
+
+  return [basePrompt, ...renderedSections].join("\n\n");
 }
 
 function hasUsablePromptSource(source: PromptSource): boolean {
@@ -347,16 +349,8 @@ async function resolvePromptSections(
   return sections;
 }
 
-function formatPromptSection(tagName: "INSTRUCTIONS" | "REFERENCE", source: string, content: string): string {
-  return `<${tagName} from="${escapeInstructionAttribute(source)}">\n\n${content}\n</${tagName}>`;
-}
-
 function shouldAppendPromptSections(basePrompt: PromptSource): boolean {
   return basePrompt.text !== undefined;
-}
-
-function escapeInstructionAttribute(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
 export function resolveInstructionSources(
@@ -364,29 +358,60 @@ export function resolveInstructionSources(
   promptWorkingDirectory: string | undefined,
   agentHomeMarkdownFiles: string[] = [],
 ): Array<{ source: PromptSource; optional: boolean }> {
-  const sources: Array<{ source: PromptSource; optional: boolean }> = [
-    ...agentHomeMarkdownFiles.map((file) => ({ source: { file }, optional: false })),
-  ];
+  const sources = dedupeInstructionSources([
+    ...resolveAgentHomeInstructionSources(agentHomeMarkdownFiles),
+    ...resolveConfiguredInstructionSources(agent),
+  ]);
   const seenFiles = new Set(sources.map((entry) => entry.source.file).filter((file): file is string => !!file));
 
-  for (const source of agent.prompt.instructions ?? []) {
-    if (source.file && seenFiles.has(source.file)) {
+  for (const source of resolveWorkspaceInstructionSources(promptWorkingDirectory)) {
+    if (source.source.file && seenFiles.has(source.source.file)) {
       continue;
     }
-    if (source.file) {
-      seenFiles.add(source.file);
+    if (source.source.file) {
+      seenFiles.add(source.source.file);
     }
-    sources.push({ source, optional: false });
-  }
-
-  const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(promptWorkingDirectory);
-  if (
-    workingDirectoryAgentsFile &&
-    !seenFiles.has(workingDirectoryAgentsFile)
-  ) {
-    sources.push({ source: { file: workingDirectoryAgentsFile }, optional: true });
+    sources.push(source);
   }
   return sources;
+}
+
+function resolveAgentHomeInstructionSources(
+  agentHomeMarkdownFiles: string[],
+): Array<{ source: PromptSource; optional: boolean }> {
+  return agentHomeMarkdownFiles.map((file) => ({ source: { file }, optional: false }));
+}
+
+function resolveConfiguredInstructionSources(
+  agent: AgentDefinition,
+): Array<{ source: PromptSource; optional: boolean }> {
+  return (agent.prompt.instructions ?? []).map((source) => ({ source, optional: false }));
+}
+
+function resolveWorkspaceInstructionSources(
+  promptWorkingDirectory: string | undefined,
+): Array<{ source: PromptSource; optional: boolean }> {
+  const workingDirectoryAgentsFile = resolveWorkingDirectoryAgentsFile(promptWorkingDirectory);
+  return workingDirectoryAgentsFile ? [{ source: { file: workingDirectoryAgentsFile }, optional: true }] : [];
+}
+
+function dedupeInstructionSources(
+  sources: Array<{ source: PromptSource; optional: boolean }>,
+): Array<{ source: PromptSource; optional: boolean }> {
+  const deduped: Array<{ source: PromptSource; optional: boolean }> = [];
+  const seenFiles = new Set<string>();
+
+  for (const entry of sources) {
+    if (entry.source.file) {
+      if (seenFiles.has(entry.source.file)) {
+        continue;
+      }
+      seenFiles.add(entry.source.file);
+    }
+    deduped.push(entry);
+  }
+
+  return deduped;
 }
 
 function resolvePromptFileSources(

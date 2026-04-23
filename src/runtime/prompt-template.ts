@@ -164,6 +164,21 @@ export function createEmptyPromptTemplateContext(): PromptTemplateContext {
   };
 }
 
+export function renderPromptSection(
+  tagName: "INSTRUCTIONS" | "REFERENCE",
+  source: string,
+  content: string,
+): string {
+  return `<${tagName} from="${escapeInstructionAttribute(source)}">\n\n${escapeInstructionText(content)}\n</${tagName}>`;
+}
+
+export function renderPromptSections(
+  tagName: "INSTRUCTIONS" | "REFERENCE",
+  sections: PromptTemplateIncludedFileContext[] | undefined,
+): string {
+  return (sections ?? []).map((section) => renderPromptSection(tagName, section.source, section.content)).join("\n\n");
+}
+
 export function createDefaultPromptTemplateSystemContext(): PromptTemplateSystemContext {
   return {
     os: type(),
@@ -357,6 +372,7 @@ const PROMPT_TEMPLATE_KNOWN_HELPERS = {
   eq: true,
   if: true,
   instructionAttr: true,
+  promptSections: true,
   instructionText: true,
   unless: true,
   with: true,
@@ -364,6 +380,14 @@ const PROMPT_TEMPLATE_KNOWN_HELPERS = {
 
 promptHandlebars.registerHelper("instructionAttr", (value: unknown) =>
   escapeInstructionAttribute(String(value ?? "")),
+);
+promptHandlebars.registerHelper(
+  "promptSections",
+  (tagName: unknown, sections: PromptTemplateIncludedFileContext[] | undefined) =>
+    renderPromptSections(
+      tagName === "REFERENCE" ? "REFERENCE" : "INSTRUCTIONS",
+      sections,
+    ),
 );
 promptHandlebars.registerHelper("instructionText", (value: unknown) =>
   escapeInstructionText(String(value ?? "")),
