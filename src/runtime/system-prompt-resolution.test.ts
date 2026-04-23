@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
-import { createInlineBasePrompt, expectSystemPrompt } from "./prompt-test-helpers.js";
+import {
+  createInlineBasePrompt,
+  createPromptTestAgent,
+  createPromptTestContext,
+  expectSystemPrompt,
+} from "./prompt-test-helpers.js";
 import type { PromptTemplateContext } from "./prompt-template.js";
 import { SystemPromptCache } from "./system-prompt-cache.js";
 import { buildSystemPrompt, resolveSystemPrompt } from "./system-prompt-resolution.js";
@@ -629,81 +634,18 @@ describe("resolveSystemPrompt", () => {
 });
 
 function createAgent(): AgentDefinition {
-  return {
-    id: "default",
-    name: "Default",
-    model: { provider: "faux", modelId: "faux-1" },
+  return createPromptTestAgent({
     prompt: {
       base: { text: createInlineBasePrompt("You are concise.") },
       instructions: [{ file: "/workspace/AGENTS.md" }],
     },
-    tools: [],
-    extensions: [],
-  };
+  });
 }
 
 function createTemplateContext(
   now: Partial<PromptTemplateContext["runtime"]["now"]> = {},
 ): PromptTemplateContext {
-  return {
-    system: {
-      os: "Linux",
-      platform: "linux",
-      arch: "x64",
-      hostname: "builder",
-      username: "thomas",
-      homeDir: "/home/thomas",
-    },
-    runtime: {
-      now: {
-        iso: "2026-04-19T12:34:56.000Z",
-        date: "2026-04-19",
-        time: "14:34:56",
-        timeMinute: "14:34",
-        local: "2026-04-19 14:34:56 Europe/Berlin",
-        localMinute: "2026-04-19 14:34 Europe/Berlin",
-        ...now,
-      },
-      timezone: "Europe/Berlin",
-    },
-    endpoint: {
-      id: "private-telegram",
-    },
-    agent: {
-      id: "default",
-      home: "/var/lib/imp/agents/default",
-      model: {
-        provider: "faux",
-        modelId: "faux-1",
-      },
-      workspace: {
-        cwd: "/workspace",
-      },
-    },
-    transport: {
-      kind: "telegram",
-    },
-    conversation: {
-      kind: "",
-      metadata: {},
-    },
-    reply: {
-      channel: {
-        kind: "telegram",
-        delivery: "endpoint",
-        endpointId: "private-telegram",
-      },
-    },
-    imp: {
-      configPath: "/etc/imp/config.json",
-      dataRoot: "/var/lib/imp",
-    },
-    prompt: {
-      instructions: [],
-      references: [],
-    },
-    skills: [],
-  };
+  return createPromptTestContext(now);
 }
 
 async function buildDefaultSystemPrompt(options: {

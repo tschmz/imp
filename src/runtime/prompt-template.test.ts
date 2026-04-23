@@ -6,6 +6,7 @@ import {
   renderPromptSections,
   type PromptTemplateSystemContext,
 } from "./prompt-template.js";
+import { createPromptTestAgent } from "./prompt-test-helpers.js";
 
 describe("createPromptTemplateContext", () => {
   it("defaults reply channel context to the current endpoint transport", () => {
@@ -193,20 +194,5 @@ function createSystemContext(): PromptTemplateSystemContext {
 }
 
 function createAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
-  return {
-    id: "default",
-    name: "Default",
-    model: {
-      provider: "faux",
-      modelId: "faux-1",
-    },
-    prompt: {
-      base: {
-        text: "You are concise.",
-      },
-    },
-    tools: [],
-    extensions: [],
-    ...overrides,
-  };
+  return createPromptTestAgent(overrides);
 }

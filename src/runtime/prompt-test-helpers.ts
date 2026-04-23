@@ -1,4 +1,6 @@
 import { expect } from "vitest";
+import type { AgentDefinition } from "../domain/agent.js";
+import type { PromptTemplateContext } from "./prompt-template.js";
 
 export interface PromptSectionExpectation {
   source: string;
@@ -53,4 +55,84 @@ export function expectSystemPrompt(
 ): void {
   expect(prompt).toBeDefined();
   expect(prompt).toBe(renderSystemPromptForTest(options));
+}
+
+export function createPromptTestAgent(
+  overrides: Partial<AgentDefinition> = {},
+): AgentDefinition {
+  return {
+    id: "default",
+    name: "Default",
+    model: { provider: "faux", modelId: "faux-1" },
+    prompt: {
+      base: { text: "You are concise." },
+    },
+    tools: [],
+    extensions: [],
+    ...overrides,
+  };
+}
+
+export function createPromptTestContext(
+  now: Partial<PromptTemplateContext["runtime"]["now"]> = {},
+): PromptTemplateContext {
+  return {
+    system: {
+      os: "Linux",
+      platform: "linux",
+      arch: "x64",
+      hostname: "builder",
+      username: "thomas",
+      homeDir: "/home/thomas",
+    },
+    runtime: {
+      now: {
+        iso: "2026-04-19T12:34:56.000Z",
+        date: "2026-04-19",
+        time: "14:34:56",
+        timeMinute: "14:34",
+        local: "2026-04-19 14:34:56 Europe/Berlin",
+        localMinute: "2026-04-19 14:34 Europe/Berlin",
+        ...now,
+      },
+      timezone: "Europe/Berlin",
+    },
+    endpoint: {
+      id: "private-telegram",
+    },
+    agent: {
+      id: "default",
+      home: "/var/lib/imp/agents/default",
+      model: {
+        provider: "faux",
+        modelId: "faux-1",
+      },
+      workspace: {
+        cwd: "/workspace",
+      },
+    },
+    transport: {
+      kind: "telegram",
+    },
+    conversation: {
+      kind: "",
+      metadata: {},
+    },
+    reply: {
+      channel: {
+        kind: "telegram",
+        delivery: "endpoint",
+        endpointId: "private-telegram",
+      },
+    },
+    imp: {
+      configPath: "/etc/imp/config.json",
+      dataRoot: "/var/lib/imp",
+    },
+    prompt: {
+      instructions: [],
+      references: [],
+    },
+    skills: [],
+  };
 }

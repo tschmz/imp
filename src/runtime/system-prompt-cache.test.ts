@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
 import { InMemoryCacheStrategy, SystemPromptCache } from "./system-prompt-cache.js";
 import type { PromptTemplateContext } from "./prompt-template.js";
+import { createPromptTestAgent, createPromptTestContext } from "./prompt-test-helpers.js";
 
 describe("SystemPromptCache", () => {
   it("builds cache keys using file fingerprints", async () => {
@@ -91,75 +92,16 @@ describe("SystemPromptCache", () => {
 });
 
 function createAgent(): AgentDefinition {
-  return {
-    id: "default",
-    name: "Default",
-    model: { provider: "faux", modelId: "faux-1" },
-    prompt: {
-      base: {
-        text: "You are concise.",
-      },
-    },
-    tools: [],
-    extensions: [],
-  };
+  return createPromptTestAgent();
 }
 
 function createTemplateContext(): PromptTemplateContext {
+  const context = createPromptTestContext();
   return {
-    system: {
-      os: "Linux",
-      platform: "linux",
-      arch: "x64",
-      hostname: "builder",
-      username: "thomas",
-      homeDir: "/home/thomas",
-    },
-    runtime: {
-      now: {
-        iso: "2026-04-19T12:34:56.000Z",
-        date: "2026-04-19",
-        time: "14:34:56",
-        timeMinute: "14:34",
-        local: "2026-04-19 14:34:56 Europe/Berlin",
-        localMinute: "2026-04-19 14:34 Europe/Berlin",
-      },
-      timezone: "Europe/Berlin",
-    },
-    endpoint: {
-      id: "private-telegram",
-    },
+    ...context,
     agent: {
-      id: "default",
-      home: "/var/lib/imp/agents/default",
-      model: {
-        provider: "faux",
-        modelId: "faux-1",
-      },
+      ...context.agent,
       workspace: {},
     },
-    transport: {
-      kind: "telegram",
-    },
-    conversation: {
-      kind: "",
-      metadata: {},
-    },
-    reply: {
-      channel: {
-        kind: "telegram",
-        delivery: "endpoint",
-        endpointId: "private-telegram",
-      },
-    },
-    imp: {
-      configPath: "/etc/imp/config.json",
-      dataRoot: "/var/lib/imp",
-    },
-    prompt: {
-      instructions: [],
-      references: [],
-    },
-    skills: [],
   };
 }
