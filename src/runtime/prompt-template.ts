@@ -85,6 +85,85 @@ export interface PromptTemplateSkillCatalogContext {
   path: string;
 }
 
+export function createEmptyPromptIncludedFiles(): PromptTemplateContext["prompt"] {
+  return {
+    instructions: [],
+    references: [],
+  };
+}
+
+export function mapSkillsToPromptTemplateContext(
+  skills: SkillDefinition[] | undefined,
+): PromptTemplateSkillContext[] {
+  return (skills ?? []).map((skill) => ({
+    name: skill.name,
+    description: skill.description,
+    directoryPath: skill.directoryPath,
+    filePath: skill.filePath,
+  }));
+}
+
+export function createEmptyPromptTemplateContext(): PromptTemplateContext {
+  return {
+    system: {
+      os: "",
+      platform: "",
+      arch: "",
+      hostname: "",
+      username: "",
+      homeDir: "",
+    },
+    runtime: {
+      now: {
+        iso: "",
+        date: "",
+        time: "",
+        timeMinute: "",
+        local: "",
+        localMinute: "",
+      },
+      timezone: "",
+    },
+    endpoint: {
+      id: "",
+    },
+    agent: {
+      id: "",
+      model: {
+        provider: "",
+        modelId: "",
+      },
+      home: "",
+      authFile: "",
+      workspace: {
+        cwd: "",
+      },
+    },
+    transport: {
+      kind: "",
+    },
+    conversation: {
+      kind: "",
+      metadata: {},
+    },
+    reply: {
+      channel: {
+        kind: "",
+        delivery: "none",
+        endpointId: "",
+      },
+    },
+    imp: {
+      configPath: "",
+      dataRoot: "",
+      skillCatalogs: [],
+      dynamicWorkspaceSkillsPath: "",
+    },
+    prompt: createEmptyPromptIncludedFiles(),
+    skills: [],
+  };
+}
+
 export function createDefaultPromptTemplateSystemContext(): PromptTemplateSystemContext {
   return {
     os: type(),
@@ -155,16 +234,8 @@ export function createPromptTemplateContext(options: {
       skillCatalogs,
       dynamicWorkspaceSkillsPath,
     },
-    prompt: {
-      instructions: [],
-      references: [],
-    },
-    skills: (options.availableSkills ?? []).map((skill) => ({
-      name: skill.name,
-      description: skill.description,
-      directoryPath: skill.directoryPath,
-      filePath: skill.filePath,
-    })),
+    prompt: createEmptyPromptIncludedFiles(),
+    skills: mapSkillsToPromptTemplateContext(options.availableSkills),
   };
 }
 

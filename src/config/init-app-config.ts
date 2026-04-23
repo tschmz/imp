@@ -6,6 +6,7 @@ import { assertManagedFileCanBeWritten, writeManagedFile } from "../files/manage
 import { appConfigSchema } from "./schema.js";
 import type { AppConfig } from "./types.js";
 import {
+  createEmptyPromptTemplateContext,
   renderPromptTemplate,
   type PromptTemplateContext,
   type PromptTemplateSkillCatalogContext,
@@ -113,64 +114,13 @@ function resolveImpSkillPath(config: AppConfig, configPath: string): string {
 function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
   const dataRoot = resolvePathRelativeToConfig(config.paths.dataRoot, dirname(configPath));
   const context: PromptTemplateContext = {
-    system: {
-      os: "",
-      platform: "",
-      arch: "",
-      hostname: "",
-      username: "",
-      homeDir: "",
-    },
-    runtime: {
-      now: {
-        iso: "",
-        date: "",
-        time: "",
-        timeMinute: "",
-        local: "",
-        localMinute: "",
-      },
-      timezone: "",
-    },
-    endpoint: {
-      id: "",
-    },
-    agent: {
-      id: "",
-      home: "",
-      model: {
-        provider: "",
-        modelId: "",
-      },
-      workspace: {
-        cwd: "",
-      },
-    },
-    transport: {
-      kind: "",
-    },
-    conversation: {
-      kind: "",
-      metadata: {},
-    },
-    reply: {
-      channel: {
-        kind: "",
-        delivery: "none",
-        endpointId: "",
-      },
-    },
+    ...createEmptyPromptTemplateContext(),
     imp: {
       configPath,
       dataRoot,
       skillCatalogs: resolveSkillCatalogs(config, configPath),
       dynamicWorkspaceSkillsPath: "<working-directory>/.skills",
     },
-    prompt: {
-      instructions: [],
-      references: [],
-    },
-    skills: [],
   };
 
   return `${renderPromptTemplate(impSkillTemplate, {
