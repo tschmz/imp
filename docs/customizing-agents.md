@@ -11,6 +11,26 @@ An agent combines:
 - an optional tool set
 - optional provider-specific request settings
 
+Model configs can also override built-in model metadata, or define a fully custom model for an OpenAI-compatible local endpoint such as LM Studio. For a custom model, set `model.api`, `model.baseUrl`, `model.reasoning`, `model.input`, `model.contextWindow`, and `model.maxTokens` alongside `model.provider` and `model.modelId`.
+
+Example:
+
+```json
+{
+  "id": "local-lms",
+  "model": {
+    "provider": "openai",
+    "modelId": "qwen/qwen3-coder-next",
+    "api": "openai-responses",
+    "baseUrl": "http://pc:1234/v1",
+    "reasoning": false,
+    "input": ["text"],
+    "contextWindow": 262144,
+    "maxTokens": 32768
+  }
+}
+```
+
 ## Prompt Structure
 
 Agents use the built-in default system prompt when `prompt.base` is omitted. Configure `prompt.base` only when you want to replace that default.

@@ -92,6 +92,29 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts custom model definitions for OpenAI-compatible endpoints", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "local-lms",
+        model: {
+          provider: "openai",
+          modelId: "qwen/qwen3-coder-next",
+          api: "openai-responses",
+          baseUrl: "http://pc:1234/v1",
+          reasoning: false,
+          input: ["text"],
+          contextWindow: 262144,
+          maxTokens: 32768,
+        },
+      }),
+      defaults: {
+        agentId: "local-lms",
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("accepts configs without explicit endpoints", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({

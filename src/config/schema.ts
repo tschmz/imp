@@ -9,6 +9,13 @@ const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
 const modelConfigSchema = z.object({
   provider: z.string().min(1),
   modelId: z.string().min(1),
+  api: z.string().min(1).optional(),
+  baseUrl: z.string().url().optional(),
+  reasoning: z.boolean().optional(),
+  input: z.enum(["text", "image"]).array().min(1).optional(),
+  contextWindow: z.number().int().positive().optional(),
+  maxTokens: z.number().int().positive().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 });
 
 const inferenceSettingsSchema = z.object({

@@ -100,6 +100,10 @@ Common fields:
 - `name`: optional display name
 - `model.provider`: provider ID
 - `model.modelId`: model name or ID
+- `model.api`: optional API type for custom models, for example `openai-responses`
+- `model.baseUrl`: optional base URL override for built-in models or required base URL for custom models
+- `model.reasoning`, `model.input`, `model.contextWindow`, `model.maxTokens`: optional overrides for built-in models and required fields for fully custom models
+- `model.headers`: optional request headers for built-in or custom models
 - `prompt.base`: optional system prompt override, as `text` or `file`; when omitted, `imp` uses the built-in default prompt from the installed code
 - `prompt.instructions`: optional extra instruction files or inline text
 - `prompt.references`: optional context files or inline text
@@ -120,6 +124,7 @@ Important rules:
 - `defaults.agentId` must point to an existing agent
 - prompt sources must specify exactly one of `text` or `file`
 - `authFile` only works with OAuth-capable providers
+- custom models must provide `model.api`, `model.baseUrl`, `model.reasoning`, `model.input`, `model.contextWindow`, and `model.maxTokens`
 
 ## Tools
 

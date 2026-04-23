@@ -1,3 +1,5 @@
+import type { Api } from "@mariozechner/pi-ai";
+
 export interface InferenceSettings {
   maxOutputTokens?: number;
   metadata?: Record<string, unknown>;
@@ -58,6 +60,13 @@ export interface AgentPhoneCallConfig {
 export interface ModelRef {
   provider: string;
   modelId: string;
+  api?: Api;
+  baseUrl?: string;
+  reasoning?: boolean;
+  input?: ("text" | "image")[];
+  contextWindow?: number;
+  maxTokens?: number;
+  headers?: Record<string, string>;
 }
 
 export interface AgentDefinition {

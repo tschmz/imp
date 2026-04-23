@@ -254,6 +254,51 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
+  it("preserves custom model settings in runtime config", async () => {
+    const appConfig = createAppConfig({
+      agents: [
+        {
+          id: "local-lms",
+          model: {
+            provider: "openai",
+            modelId: "qwen/qwen3-coder-next",
+            api: "openai-responses",
+            baseUrl: "http://pc:1234/v1",
+            reasoning: false,
+            input: ["text"],
+            contextWindow: 262144,
+            maxTokens: 32768,
+          },
+          tools: [],
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.model).toEqual({
+      provider: "openai",
+      modelId: "qwen/qwen3-coder-next",
+      api: "openai-responses",
+      baseUrl: "http://pc:1234/v1",
+      reasoning: false,
+      input: ["text"],
+      contextWindow: 262144,
+      maxTokens: 32768,
+    });
+  });
+
   it("uses the global default agent id when the endpoint has no routing override", async () => {
     const appConfig = createAppConfig({
       defaults: {
