@@ -382,20 +382,7 @@ describe("resolveSystemPrompt", () => {
   });
 
   it("templates the built-in default prompt", async () => {
-    const prompt = await buildSystemPrompt(
-      {
-        ...createAgent(),
-        prompt: {
-          base: { builtIn: "default" },
-        },
-      },
-      undefined,
-      createTemplateContext(),
-      [],
-      async (path) => {
-        throw new Error(`unexpected path: ${path}`);
-      },
-    );
+    const prompt = await buildDefaultSystemPrompt();
 
     expect(prompt).toContain("Agent: default");
     expect(prompt).toContain("Model: faux/faux-1");
@@ -404,116 +391,102 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).not.toContain("{{agent.id}}");
   });
 
-  it("renders spoken-output guidance for audio outbox reply channels in the built-in default prompt", async () => {
-    const prompt = await buildSystemPrompt(
-      {
-        ...createAgent(),
-        prompt: {
-          base: { builtIn: "default" },
-        },
-      },
-      undefined,
-      {
-        ...createTemplateContext(),
+  it.each([
+    {
+      name: "spoken-output guidance for audio outbox reply channels",
+      context: {
         reply: {
           channel: {
-            kind: "audio",
-            delivery: "outbox",
+            kind: "audio" as const,
+            delivery: "outbox" as const,
             endpointId: "",
           },
         },
       },
-      [],
-      async (path) => {
-        throw new Error(`unexpected path: ${path}`);
-      },
-    );
-
-    expect(prompt).toContain("Reply: audio");
-    expect(prompt).toContain("The reply will be spoken aloud.");
-    expect(prompt).toContain("preferably one or two short sentences");
-    expect(prompt).toContain("Avoid Markdown, lists, tables, code blocks, links");
-    expect(prompt).toContain("Do not include URLs or file paths in final responses.");
-    expect(prompt).not.toContain("You are chatting through Telegram.");
-  });
-
-  it("renders CLI Markdown guidance in the built-in default prompt", async () => {
-    const prompt = await buildSystemPrompt(
-      {
-        ...createAgent(),
-        prompt: {
-          base: { builtIn: "default" },
-        },
-      },
-      undefined,
-      {
-        ...createTemplateContext(),
+      includes: [
+        "Reply: audio",
+        "The reply will be spoken aloud.",
+        "preferably one or two short sentences",
+        "Avoid Markdown, lists, tables, code blocks, links",
+        "Do not include URLs or file paths in final responses.",
+      ],
+      excludes: ["You are chatting through Telegram."],
+    },
+    {
+      name: "CLI Markdown guidance",
+      context: {
         transport: {
           kind: "cli",
         },
         reply: {
           channel: {
-            kind: "cli",
-            delivery: "endpoint",
+            kind: "cli" as const,
+            delivery: "endpoint" as const,
             endpointId: "local-cli",
           },
         },
       },
-      [],
-      async (path) => {
-        throw new Error(`unexpected path: ${path}`);
-      },
-    );
-
-    expect(prompt).toContain("Reply: cli");
-    expect(prompt).toContain("You are chatting through the interactive CLI.");
-    expect(prompt).toContain("Strikethrough with double tildes");
-    expect(prompt).toContain("Simple GitHub-flavored Markdown tables");
-    expect(prompt).toContain("Avoid task lists, images, raw HTML, footnotes");
-    expect(prompt).not.toContain("You are chatting through Telegram.");
-    expect(prompt).not.toContain("The reply will be spoken aloud.");
-  });
-
-  it("renders the same spoken-output restrictions for all audio reply channels in the built-in default prompt", async () => {
-    const prompt = await buildSystemPrompt(
-      {
-        ...createAgent(),
-        prompt: {
-          base: { builtIn: "default" },
-        },
-      },
-      undefined,
-      {
-        ...createTemplateContext(),
+      includes: [
+        "Reply: cli",
+        "You are chatting through the interactive CLI.",
+        "Strikethrough with double tildes",
+        "Simple GitHub-flavored Markdown tables",
+        "Avoid task lists, images, raw HTML, footnotes",
+      ],
+      excludes: ["You are chatting through Telegram.", "The reply will be spoken aloud."],
+    },
+    {
+      name: "the same spoken-output restrictions for all audio reply channels",
+      context: {
         reply: {
           channel: {
-            kind: "audio",
-            delivery: "endpoint",
+            kind: "audio" as const,
+            delivery: "endpoint" as const,
             endpointId: "speaker-room",
           },
         },
       },
-      [],
-      async (path) => {
-        throw new Error(`unexpected path: ${path}`);
+      includes: [
+        "Reply: audio",
+        "The reply will be spoken aloud.",
+        "Do not include URLs or file paths in final responses.",
+      ],
+      excludes: [],
+    },
+    {
+      name: "neutral guidance for none reply channels",
+      context: {
+        reply: {
+          channel: {
+            kind: "none" as const,
+            delivery: "none" as const,
+            endpointId: "",
+          },
+        },
       },
-    );
+      includes: ["Reply: none", "Keep responses compact by default."],
+      excludes: [
+        "You are chatting through Telegram.",
+        "You are chatting through the interactive CLI.",
+        "The reply will be spoken aloud.",
+      ],
+    },
+  ])("renders $name in the built-in default prompt", async ({ context, includes, excludes }) => {
+    const prompt = await buildDefaultSystemPrompt({
+      templateContext: mergeTemplateContext(createTemplateContext(), context),
+    });
 
-    expect(prompt).toContain("Reply: audio");
-    expect(prompt).toContain("The reply will be spoken aloud.");
-    expect(prompt).toContain("Do not include URLs or file paths in final responses.");
+    for (const snippet of includes) {
+      expect(prompt).toContain(snippet);
+    }
+    for (const snippet of excludes) {
+      expect(prompt).not.toContain(snippet);
+    }
   });
 
   it("renders a minimal phone prompt without technical default sections", async () => {
-    const prompt = await buildSystemPrompt(
-      {
-        ...createAgent(),
-        prompt: {
-          base: { builtIn: "default" },
-        },
-      },
-      undefined,
-      {
+    const prompt = await buildDefaultSystemPrompt({
+      templateContext: {
         ...createTemplateContext(),
         conversation: {
           kind: "phone-call",
@@ -530,7 +503,7 @@ describe("resolveSystemPrompt", () => {
           },
         },
       },
-      [
+      availableSkills: [
         {
           name: "commit",
           description: "Stage and commit changes.",
@@ -542,10 +515,7 @@ describe("resolveSystemPrompt", () => {
           scripts: [],
         },
       ],
-      async (path) => {
-        throw new Error(`unexpected path: ${path}`);
-      },
-    );
+    });
 
     expect(prompt).toContain("You are a helpful assistant in a live phone call.");
     expect(prompt).toContain("You are speaking with Thomas.");
@@ -562,15 +532,8 @@ describe("resolveSystemPrompt", () => {
   });
 
   it("renders phone note-finalization guidance for closed phone calls", async () => {
-    const prompt = await buildSystemPrompt(
-      {
-        ...createAgent(),
-        prompt: {
-          base: { builtIn: "default" },
-        },
-      },
-      undefined,
-      {
+    const prompt = await buildDefaultSystemPrompt({
+      templateContext: {
         ...createTemplateContext(),
         conversation: {
           kind: "phone-call",
@@ -586,48 +549,12 @@ describe("resolveSystemPrompt", () => {
           },
         },
       },
-      [],
-      async (path) => {
-        throw new Error(`unexpected path: ${path}`);
-      },
-    );
+    });
 
     expect(prompt).toContain("You are a helpful assistant in a live phone call.");
     expect(prompt).toContain("The call has ended. Finalize notes");
     expect(prompt).toContain("do not write a reply for the caller");
     expect(prompt).not.toContain("Runtime Context");
-  });
-
-  it("renders neutral guidance for none reply channels in the built-in default prompt", async () => {
-    const prompt = await buildSystemPrompt(
-      {
-        ...createAgent(),
-        prompt: {
-          base: { builtIn: "default" },
-        },
-      },
-      undefined,
-      {
-        ...createTemplateContext(),
-        reply: {
-          channel: {
-            kind: "none",
-            delivery: "none",
-            endpointId: "",
-          },
-        },
-      },
-      [],
-      async (path) => {
-        throw new Error(`unexpected path: ${path}`);
-      },
-    );
-
-    expect(prompt).toContain("Reply: none");
-    expect(prompt).toContain("Keep responses compact by default.");
-    expect(prompt).not.toContain("You are chatting through Telegram.");
-    expect(prompt).not.toContain("You are chatting through the interactive CLI.");
-    expect(prompt).not.toContain("The reply will be spoken aloud.");
   });
 
   it("injects available skill metadata before additional context files", async () => {
@@ -776,5 +703,94 @@ function createTemplateContext(
       references: [],
     },
     skills: [],
+  };
+}
+
+async function buildDefaultSystemPrompt(options: {
+  templateContext?: PromptTemplateContext;
+  availableSkills?: Parameters<typeof buildSystemPrompt>[3];
+} = {}): Promise<string> {
+  return await buildSystemPrompt(
+    {
+      ...createAgent(),
+      prompt: {
+        base: { builtIn: "default" },
+      },
+    },
+    undefined,
+    options.templateContext ?? createTemplateContext(),
+    options.availableSkills ?? [],
+    async (path) => {
+      throw new Error(`unexpected path: ${path}`);
+    },
+  );
+}
+
+function mergeTemplateContext(
+  base: PromptTemplateContext,
+  overrides: Partial<PromptTemplateContext>,
+): PromptTemplateContext {
+  return {
+    ...base,
+    ...overrides,
+    system: {
+      ...base.system,
+      ...overrides.system,
+    },
+    runtime: {
+      ...base.runtime,
+      ...overrides.runtime,
+      now: {
+        ...base.runtime.now,
+        ...overrides.runtime?.now,
+      },
+    },
+    endpoint: {
+      ...base.endpoint,
+      ...overrides.endpoint,
+    },
+    agent: {
+      ...base.agent,
+      ...overrides.agent,
+      model: {
+        ...base.agent.model,
+        ...overrides.agent?.model,
+      },
+      workspace: {
+        ...base.agent.workspace,
+        ...overrides.agent?.workspace,
+      },
+    },
+    transport: {
+      ...base.transport,
+      ...overrides.transport,
+    },
+    conversation: {
+      ...base.conversation,
+      ...overrides.conversation,
+      metadata: {
+        ...base.conversation.metadata,
+        ...overrides.conversation?.metadata,
+      },
+    },
+    reply: {
+      ...base.reply,
+      ...overrides.reply,
+      channel: {
+        ...base.reply.channel,
+        ...overrides.reply?.channel,
+      },
+    },
+    imp: {
+      ...base.imp,
+      ...overrides.imp,
+    },
+    prompt: {
+      ...base.prompt,
+      ...overrides.prompt,
+      instructions: overrides.prompt?.instructions ?? base.prompt.instructions,
+      references: overrides.prompt?.references ?? base.prompt.references,
+    },
+    skills: overrides.skills ?? base.skills,
   };
 }
