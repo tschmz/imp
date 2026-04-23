@@ -45,12 +45,15 @@ describe("createPiAgentEngine", () => {
     registrations.push(registration);
     registration.setResponses([
       (context) => {
-        expect(context.systemPrompt).toBe(
-          "You are concise.\n\n" +
-            '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
-            "Follow the workspace instructions.\n" +
-            "</INSTRUCTIONS>",
-        );
+        expectSystemPrompt(context.systemPrompt, {
+          base: "You are concise.",
+          instructions: [
+            {
+              source: "/workspace/AGENTS.md",
+              content: "Follow the workspace instructions.",
+            },
+          ],
+        });
         expect(context.messages).toHaveLength(3);
         expect(context.messages[0]).toMatchObject({
           role: "user",
@@ -1305,10 +1308,10 @@ describe("createPiAgentEngine", () => {
       correlationId: "corr-2",
       agentId: "default",
       createdAt: expect.any(String),
-      content: [
-        "Base prompt.",
-        `<INSTRUCTIONS from="${instructionFile}">\n\nUse only verified facts.\n</INSTRUCTIONS>`,
-      ].join("\n\n"),
+      content: renderSystemPromptForTest({
+        base: "Base prompt.",
+        instructions: [{ source: instructionFile, content: "Use only verified facts." }],
+      }),
       cacheHit: false,
       sources: expect.objectContaining({
         basePromptSource: "text",
@@ -2102,15 +2105,19 @@ describe("createPiAgentEngine", () => {
     registrations.push(registration);
     registration.setResponses([
       (context) => {
-        expect(context.systemPrompt).toBe(
-          "You are concise.\n\n" +
-            '<INSTRUCTIONS from="/workspace/RULES.md">\n\n' +
-            "Follow the explicit rules.\n" +
-            "</INSTRUCTIONS>\n\n" +
-            '<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n\n' +
-            "Follow the workspace instructions.\n" +
-            "</INSTRUCTIONS>",
-        );
+        expectSystemPrompt(context.systemPrompt, {
+          base: "You are concise.",
+          instructions: [
+            {
+              source: "/workspace/RULES.md",
+              content: "Follow the explicit rules.",
+            },
+            {
+              source: "/workspace/project/AGENTS.md",
+              content: "Follow the workspace instructions.",
+            },
+          ],
+        });
         return fauxAssistantMessage("ok");
       },
     ]);
@@ -2154,9 +2161,19 @@ describe("createPiAgentEngine", () => {
     registrations.push(registration);
     registration.setResponses([
       (context) => {
-        expect(context.systemPrompt).toContain(
-          'You are concise.\n\n<INSTRUCTIONS from="/workspace/RULES.md">\n\nFollow the explicit rules.\n</INSTRUCTIONS>\n\n<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n\nFollow the workspace instructions.\n</INSTRUCTIONS>',
-        );
+        expectSystemPrompt(context.systemPrompt, {
+          base: "You are concise.",
+          instructions: [
+            {
+              source: "/workspace/RULES.md",
+              content: "Follow the explicit rules.",
+            },
+            {
+              source: "/workspace/project/AGENTS.md",
+              content: "Follow the workspace instructions.",
+            },
+          ],
+        });
         return fauxAssistantMessage("ok");
       },
     ]);
@@ -2200,12 +2217,15 @@ describe("createPiAgentEngine", () => {
     registrations.push(registration);
     registration.setResponses([
       (context) => {
-        expect(context.systemPrompt).toBe(
-          "You are concise.\n\n" +
-            '<INSTRUCTIONS from="/workspace/next/AGENTS.md">\n\n' +
-            "Follow the next workspace instructions.\n" +
-            "</INSTRUCTIONS>",
-        );
+        expectSystemPrompt(context.systemPrompt, {
+          base: "You are concise.",
+          instructions: [
+            {
+              source: "/workspace/next/AGENTS.md",
+              content: "Follow the next workspace instructions.",
+            },
+          ],
+        });
         return fauxAssistantMessage("ok");
       },
     ]);
@@ -2254,7 +2274,7 @@ describe("createPiAgentEngine", () => {
     registrations.push(registration);
     registration.setResponses([
       (context) => {
-        expect(context.systemPrompt).toBe("You are concise.");
+        expectSystemPrompt(context.systemPrompt, { base: "You are concise." });
         return fauxAssistantMessage("ok");
       },
     ]);
@@ -2295,12 +2315,15 @@ describe("createPiAgentEngine", () => {
     registrations.push(registration);
     registration.setResponses([
       (context) => {
-        expect(context.systemPrompt).toBe(
-          "You are concise.\n\n" +
-            '<INSTRUCTIONS from="/workspace/project/AGENTS.md">\n\n' +
-            "Follow the workspace instructions.\n" +
-            "</INSTRUCTIONS>",
-        );
+        expectSystemPrompt(context.systemPrompt, {
+          base: "You are concise.",
+          instructions: [
+            {
+              source: "/workspace/project/AGENTS.md",
+              content: "Follow the workspace instructions.",
+            },
+          ],
+        });
         return fauxAssistantMessage("ok");
       },
     ]);
@@ -2718,10 +2741,7 @@ function createAgent(): AgentDefinition {
     name: "Default",
     prompt: {
       base: {
-        text:
-          "You are concise.\n\n" +
-          '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
-          '{{promptSections "REFERENCE" prompt.references}}',
+        text: createInlineBasePrompt("You are concise."),
       },
       instructions: [{ file: "/workspace/AGENTS.md" }],
     },
@@ -2732,6 +2752,58 @@ function createAgent(): AgentDefinition {
     tools: [],
     extensions: [],
   };
+}
+
+function createInlineBasePrompt(
+  base: string,
+  options: {
+    includeInstructions?: boolean;
+    includeReferences?: boolean;
+  } = {},
+): string {
+  const parts = [base];
+  if (options.includeInstructions ?? true) {
+    parts.push('{{promptSections "INSTRUCTIONS" prompt.instructions}}');
+  }
+  if (options.includeReferences ?? true) {
+    parts.push('{{promptSections "REFERENCE" prompt.references}}');
+  }
+  return parts.join("\n\n");
+}
+
+function renderPromptSectionForTest(
+  tagName: "INSTRUCTIONS" | "REFERENCE",
+  source: string,
+  content: string,
+): string {
+  return `<${tagName} from="${source}">\n\n${content}\n</${tagName}>`;
+}
+
+function renderSystemPromptForTest(options: {
+  base: string;
+  instructions?: Array<{ source: string; content: string }>;
+  references?: Array<{ source: string; content: string }>;
+}): string {
+  const parts = [options.base];
+  for (const instruction of options.instructions ?? []) {
+    parts.push(renderPromptSectionForTest("INSTRUCTIONS", instruction.source, instruction.content));
+  }
+  for (const reference of options.references ?? []) {
+    parts.push(renderPromptSectionForTest("REFERENCE", reference.source, reference.content));
+  }
+  return parts.join("\n\n");
+}
+
+function expectSystemPrompt(
+  prompt: string | undefined,
+  options: {
+    base: string;
+    instructions?: Array<{ source: string; content: string }>;
+    references?: Array<{ source: string; content: string }>;
+  },
+): void {
+  expect(prompt).toBeDefined();
+  expect(prompt).toBe(renderSystemPromptForTest(options));
 }
 
 function createConversation(): ConversationContext {

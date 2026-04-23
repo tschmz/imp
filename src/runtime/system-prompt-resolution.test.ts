@@ -129,12 +129,7 @@ describe("resolveSystemPrompt", () => {
       {
         ...createAgent(),
         prompt: {
-          base: {
-            text:
-              "You are concise.\n\n" +
-              '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
-              '{{promptSections "REFERENCE" prompt.references}}',
-          },
+          base: { text: createInlineBasePrompt("You are concise.") },
           instructions: [{ file: "/workspace/AGENTS.md" }],
           references: [{ file: "/workspace/RUNBOOK.md" }],
         },
@@ -155,15 +150,21 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toBe(
-      "You are concise.\n\n" +
-        '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
-        "Endpoint private-telegram on linux for faux/faux-1.\n" +
-        "</INSTRUCTIONS>\n\n" +
-        '<REFERENCE from="/workspace/RUNBOOK.md">\n\n' +
-        "Config /etc/imp/config.json data /var/lib/imp transport telegram reply telegram.\n" +
-        "</REFERENCE>",
-    );
+    expectPromptSections(prompt, {
+      base: "You are concise.",
+      instructions: [
+        {
+          source: "/workspace/AGENTS.md",
+          content: "Endpoint private-telegram on linux for faux/faux-1.",
+        },
+      ],
+      references: [
+        {
+          source: "/workspace/RUNBOOK.md",
+          content: "Config /etc/imp/config.json data /var/lib/imp transport telegram reply telegram.",
+        },
+      ],
+    });
   });
 
   it("loads agent home markdown instructions before configured instructions", async () => {
@@ -172,12 +173,7 @@ describe("resolveSystemPrompt", () => {
         ...createAgent(),
         home: "/var/lib/imp/agents/default",
         prompt: {
-          base: {
-            text:
-              "You are concise.\n\n" +
-              '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
-              '{{promptSections "REFERENCE" prompt.references}}',
-          },
+          base: { text: createInlineBasePrompt("You are concise.") },
           instructions: [
             { file: "/workspace/AGENTS.md" },
             { file: "/var/lib/imp/agents/default/B.md" },
@@ -219,21 +215,29 @@ describe("resolveSystemPrompt", () => {
       ],
     );
 
-    expect(prompt).toBe(
-      "You are concise.\n\n" +
-        '<INSTRUCTIONS from="/var/lib/imp/agents/default/A.md">\n\n' +
-        "Home A at /var/lib/imp/agents/default.\n" +
-        "</INSTRUCTIONS>\n\n" +
-        '<INSTRUCTIONS from="/var/lib/imp/agents/default/B.md">\n\n' +
-        "Home B.\n" +
-        "</INSTRUCTIONS>\n\n" +
-        '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
-        "Workspace instructions.\n" +
-        "</INSTRUCTIONS>\n\n" +
-        '<REFERENCE from="/workspace/RUNBOOK.md">\n\n' +
-        "Reference content.\n" +
-        "</REFERENCE>",
-    );
+    expectPromptSections(prompt, {
+      base: "You are concise.",
+      instructions: [
+        {
+          source: "/var/lib/imp/agents/default/A.md",
+          content: "Home A at /var/lib/imp/agents/default.",
+        },
+        {
+          source: "/var/lib/imp/agents/default/B.md",
+          content: "Home B.",
+        },
+        {
+          source: "/workspace/AGENTS.md",
+          content: "Workspace instructions.",
+        },
+      ],
+      references: [
+        {
+          source: "/workspace/RUNBOOK.md",
+          content: "Reference content.",
+        },
+      ],
+    });
   });
 
   it("fails clearly when a file-backed prompt template references an unknown variable", async () => {
@@ -263,12 +267,7 @@ describe("resolveSystemPrompt", () => {
         authFile: undefined,
         workspace: undefined,
         prompt: {
-          base: {
-            text:
-              "You are concise.\n\n" +
-              '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
-              '{{promptSections "REFERENCE" prompt.references}}',
-          },
+          base: { text: createInlineBasePrompt("You are concise.", { includeReferences: false }) },
           instructions: [{ file: "/workspace/AGENTS.md" }],
         },
       },
@@ -297,12 +296,15 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toBe(
-      "You are concise.\n\n" +
-        '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
-        "auth=[] cwd=[] config=[] data=[]\n" +
-        "</INSTRUCTIONS>",
-    );
+    expectPromptSections(prompt, {
+      base: "You are concise.",
+      instructions: [
+        {
+          source: "/workspace/AGENTS.md",
+          content: "auth=[] cwd=[] config=[] data=[]",
+        },
+      ],
+    });
   });
 
   it("supports Handlebars conditionals and loops in file-backed prompt templates", async () => {
@@ -310,12 +312,7 @@ describe("resolveSystemPrompt", () => {
       {
         ...createAgent(),
         prompt: {
-          base: {
-            text:
-              "You are concise.\n\n" +
-              '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
-              '{{promptSections "REFERENCE" prompt.references}}',
-          },
+          base: { text: createInlineBasePrompt("You are concise.", { includeReferences: false }) },
           instructions: [{ file: "/workspace/AGENTS.md" }],
         },
       },
@@ -351,9 +348,7 @@ describe("resolveSystemPrompt", () => {
         ...createAgent(),
         prompt: {
           base: {
-            text:
-              "Base {{endpoint.id}}\n\n" +
-              '{{promptSections "INSTRUCTIONS" prompt.instructions}}',
+            text: createInlineBasePrompt("Base {{endpoint.id}}", { includeReferences: false }),
           },
           instructions: [{ text: "Inline {{endpoint.id}}" }, { file: "/workspace/AGENTS.md" }],
         },
@@ -370,15 +365,19 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toBe(
-      "Base private-telegram\n\n" +
-        '<INSTRUCTIONS from="inline">\n\n' +
-        "Inline private-telegram\n" +
-        "</INSTRUCTIONS>\n\n" +
-        '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
-        "File private-telegram\n" +
-        "</INSTRUCTIONS>",
-    );
+    expectPromptSections(prompt, {
+      base: "Base private-telegram",
+      instructions: [
+        {
+          source: "inline",
+          content: "Inline private-telegram",
+        },
+        {
+          source: "/workspace/AGENTS.md",
+          content: "File private-telegram",
+        },
+      ],
+    });
   });
 
   it("templates the built-in default prompt", async () => {
@@ -707,12 +706,7 @@ function createAgent(): AgentDefinition {
     name: "Default",
     model: { provider: "faux", modelId: "faux-1" },
     prompt: {
-      base: {
-        text:
-          "You are concise.\n\n" +
-          '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
-          '{{promptSections "REFERENCE" prompt.references}}',
-      },
+      base: { text: createInlineBasePrompt("You are concise.") },
       instructions: [{ file: "/workspace/AGENTS.md" }],
     },
     tools: [],
@@ -782,4 +776,47 @@ function createTemplateContext(
     },
     skills: [],
   };
+}
+
+function createInlineBasePrompt(
+  base: string,
+  options: {
+    includeInstructions?: boolean;
+    includeReferences?: boolean;
+  } = {},
+): string {
+  const sections = [base];
+  if (options.includeInstructions ?? true) {
+    sections.push('{{promptSections "INSTRUCTIONS" prompt.instructions}}');
+  }
+  if (options.includeReferences ?? true) {
+    sections.push('{{promptSections "REFERENCE" prompt.references}}');
+  }
+  return sections.join("\n\n");
+}
+
+function formatPromptSection(
+  tagName: "INSTRUCTIONS" | "REFERENCE",
+  source: string,
+  content: string,
+): string {
+  return `<${tagName} from="${source}">\n\n${content}\n</${tagName}>`;
+}
+
+function expectPromptSections(
+  prompt: string,
+  options: {
+    base: string;
+    instructions?: Array<{ source: string; content: string }>;
+    references?: Array<{ source: string; content: string }>;
+  },
+): void {
+  const parts = [options.base];
+  for (const instruction of options.instructions ?? []) {
+    parts.push(formatPromptSection("INSTRUCTIONS", instruction.source, instruction.content));
+  }
+  for (const reference of options.references ?? []) {
+    parts.push(formatPromptSection("REFERENCE", reference.source, reference.content));
+  }
+  expect(prompt).toBe(parts.join("\n\n"));
 }
