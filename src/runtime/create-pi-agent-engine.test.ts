@@ -1287,7 +1287,11 @@ describe("createPiAgentEngine", () => {
       agent: {
         ...createAgent(),
         prompt: {
-          base: { text: "Base prompt." },
+          base: {
+            text:
+              "Base prompt.\n\n" +
+              '{{promptSections "INSTRUCTIONS" prompt.instructions}}',
+          },
           instructions: [{ file: instructionFile }],
         },
       },
@@ -2222,7 +2226,9 @@ describe("createPiAgentEngine", () => {
         ...createAgent(),
         prompt: {
           base: {
-            text: "You are concise.",
+            text:
+              "You are concise.\n\n" +
+              '{{promptSections "INSTRUCTIONS" prompt.instructions}}',
           },
         },
         workspace: {
@@ -2712,7 +2718,10 @@ function createAgent(): AgentDefinition {
     name: "Default",
     prompt: {
       base: {
-        text: "You are concise.",
+        text:
+          "You are concise.\n\n" +
+          '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
+          '{{promptSections "REFERENCE" prompt.references}}',
       },
       instructions: [{ file: "/workspace/AGENTS.md" }],
     },

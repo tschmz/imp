@@ -129,7 +129,12 @@ describe("resolveSystemPrompt", () => {
       {
         ...createAgent(),
         prompt: {
-          base: { text: "You are concise." },
+          base: {
+            text:
+              "You are concise.\n\n" +
+              '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
+              '{{promptSections "REFERENCE" prompt.references}}',
+          },
           instructions: [{ file: "/workspace/AGENTS.md" }],
           references: [{ file: "/workspace/RUNBOOK.md" }],
         },
@@ -167,7 +172,12 @@ describe("resolveSystemPrompt", () => {
         ...createAgent(),
         home: "/var/lib/imp/agents/default",
         prompt: {
-          base: { text: "You are concise." },
+          base: {
+            text:
+              "You are concise.\n\n" +
+              '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
+              '{{promptSections "REFERENCE" prompt.references}}',
+          },
           instructions: [
             { file: "/workspace/AGENTS.md" },
             { file: "/var/lib/imp/agents/default/B.md" },
@@ -253,7 +263,12 @@ describe("resolveSystemPrompt", () => {
         authFile: undefined,
         workspace: undefined,
         prompt: {
-          base: { text: "You are concise." },
+          base: {
+            text:
+              "You are concise.\n\n" +
+              '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
+              '{{promptSections "REFERENCE" prompt.references}}',
+          },
           instructions: [{ file: "/workspace/AGENTS.md" }],
         },
       },
@@ -295,7 +310,12 @@ describe("resolveSystemPrompt", () => {
       {
         ...createAgent(),
         prompt: {
-          base: { text: "You are concise." },
+          base: {
+            text:
+              "You are concise.\n\n" +
+              '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
+              '{{promptSections "REFERENCE" prompt.references}}',
+          },
           instructions: [{ file: "/workspace/AGENTS.md" }],
         },
       },
@@ -325,12 +345,16 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toContain("commit:Stage and commit changes.");
   });
 
-  it("templates file-backed prompt.base but not inline text sources", async () => {
+  it("templates inline and file-backed prompt sources", async () => {
     const prompt = await buildSystemPrompt(
       {
         ...createAgent(),
         prompt: {
-          base: { file: "/workspace/SYSTEM.md" },
+          base: {
+            text:
+              "Base {{endpoint.id}}\n\n" +
+              '{{promptSections "INSTRUCTIONS" prompt.instructions}}',
+          },
           instructions: [{ text: "Inline {{endpoint.id}}" }, { file: "/workspace/AGENTS.md" }],
         },
       },
@@ -338,13 +362,6 @@ describe("resolveSystemPrompt", () => {
       createTemplateContext(),
       [],
       async (path) => {
-        if (path === "/workspace/SYSTEM.md") {
-          return (
-            "Base {{endpoint.id}}\n\n" +
-            "{{#each prompt.instructions}}<INSTRUCTIONS from=\"{{instructionAttr source}}\">\n\n{{instructionText content}}\n</INSTRUCTIONS>\n\n{{/each}}"
-          );
-        }
-
         if (path === "/workspace/AGENTS.md") {
           return "File {{endpoint.id}}";
         }
@@ -356,7 +373,7 @@ describe("resolveSystemPrompt", () => {
     expect(prompt).toBe(
       "Base private-telegram\n\n" +
         '<INSTRUCTIONS from="inline">\n\n' +
-        "Inline {{endpoint.id}}\n" +
+        "Inline private-telegram\n" +
         "</INSTRUCTIONS>\n\n" +
         '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
         "File private-telegram\n" +
@@ -690,7 +707,12 @@ function createAgent(): AgentDefinition {
     name: "Default",
     model: { provider: "faux", modelId: "faux-1" },
     prompt: {
-      base: { text: "You are concise." },
+      base: {
+        text:
+          "You are concise.\n\n" +
+          '{{promptSections "INSTRUCTIONS" prompt.instructions}}\n\n' +
+          '{{promptSections "REFERENCE" prompt.references}}',
+      },
       instructions: [{ file: "/workspace/AGENTS.md" }],
     },
     tools: [],

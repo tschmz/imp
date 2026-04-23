@@ -7,7 +7,6 @@ import {
   createEmptyPromptIncludedFiles,
   mapSkillsToPromptTemplateContext,
   renderPromptTemplate,
-  renderPromptSections,
   type PromptTemplateContext,
   type PromptTemplateIncludedFileContext,
 } from "./prompt-template.js";
@@ -226,12 +225,7 @@ async function buildSystemPromptWithRuntimeUsage(
   }
 
   return {
-    systemPrompt: renderSystemPrompt(
-      agent.prompt.base,
-      basePrompt,
-      inputs.instructions,
-      inputs.references,
-    ),
+    systemPrompt: renderSystemPrompt(basePrompt),
     runtimeUsage: inputs.runtimeUsage,
   };
 }
@@ -297,21 +291,9 @@ function createBasePromptTemplateContext(
 }
 
 function renderSystemPrompt(
-  basePromptSource: PromptSource,
   basePrompt: string,
-  instructions: PromptTemplateIncludedFileContext[],
-  references: PromptTemplateIncludedFileContext[],
 ): string {
-  if (!shouldAppendPromptSections(basePromptSource)) {
-    return basePrompt;
-  }
-
-  const renderedSections = [
-    renderPromptSections("INSTRUCTIONS", instructions),
-    renderPromptSections("REFERENCE", references),
-  ].filter((section) => section.length > 0);
-
-  return [basePrompt, ...renderedSections].join("\n\n");
+  return basePrompt;
 }
 
 function hasUsablePromptSource(source: PromptSource): boolean {
@@ -347,10 +329,6 @@ async function resolvePromptSections(
   }
 
   return sections;
-}
-
-function shouldAppendPromptSections(basePrompt: PromptSource): boolean {
-  return basePrompt.text !== undefined;
 }
 
 export function resolveInstructionSources(
@@ -477,7 +455,16 @@ async function resolvePromptSourceContent(
   },
 ): Promise<string | undefined> {
   if (source.text !== undefined) {
-    const trimmedContent = source.text.trim();
+    let content = source.text;
+    if (options.templateFileContent) {
+      recordPromptRuntimeUsage(content, options.runtimeUsage);
+      content = renderPromptTemplate(content, {
+        filePath: `${options.kind}:inline`,
+        context: options.templateContext,
+      });
+    }
+
+    const trimmedContent = content.trim();
     if (!trimmedContent) {
       throw new Error(`Configured ${options.kind} for agent "${agent.id}" is empty.`);
     }
