@@ -156,6 +156,10 @@ function createTemplateContext(): PromptTemplateContext {
       configPath: "/etc/imp/config.json",
       dataRoot: "/var/lib/imp",
     },
+    prompt: {
+      instructions: [],
+      references: [],
+    },
     skills: [],
   };
 }

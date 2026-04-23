@@ -339,7 +339,10 @@ describe("resolveSystemPrompt", () => {
       [],
       async (path) => {
         if (path === "/workspace/SYSTEM.md") {
-          return "Base {{endpoint.id}}";
+          return (
+            "Base {{endpoint.id}}\n\n" +
+            "{{#each prompt.instructions}}<INSTRUCTIONS from=\"{{instructionAttr source}}\">\n\n{{instructionText content}}\n</INSTRUCTIONS>\n\n{{/each}}"
+          );
         }
 
         if (path === "/workspace/AGENTS.md") {
@@ -644,7 +647,9 @@ describe("resolveSystemPrompt", () => {
             "<name>\n{{instructionText name}}\n</name>\n" +
             "<description>\n{{instructionText description}}\n</description>\n" +
             "<location>\n{{instructionText filePath}}\n</location>\n" +
-            "</skill>\n\n{{/each}}</available_skills>{{/if}}"
+            "</skill>\n\n{{/each}}</available_skills>{{/if}}\n\n" +
+            "{{#each prompt.instructions}}<INSTRUCTIONS from=\"{{instructionAttr source}}\">\n\n{{instructionText content}}\n</INSTRUCTIONS>\n\n{{/each}}" +
+            "{{#each prompt.references}}<REFERENCE from=\"{{instructionAttr source}}\">\n\n{{instructionText content}}\n</REFERENCE>\n\n{{/each}}"
           );
         }
 
@@ -748,6 +753,10 @@ function createTemplateContext(
     imp: {
       configPath: "/etc/imp/config.json",
       dataRoot: "/var/lib/imp",
+    },
+    prompt: {
+      instructions: [],
+      references: [],
     },
     skills: [],
   };

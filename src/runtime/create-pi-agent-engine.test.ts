@@ -2345,12 +2345,7 @@ describe("createPiAgentEngine", () => {
     registrations.push(registration);
     registration.setResponses([
       (context) => {
-        expect(context.systemPrompt).toBe(
-          "You are defined in a file.\n\n" +
-            '<INSTRUCTIONS from="/workspace/AGENTS.md">\n\n' +
-            "Follow the workspace instructions.\n" +
-            "</INSTRUCTIONS>",
-        );
+        expect(context.systemPrompt).toBe("You are defined in a file.");
         return fauxAssistantMessage("ok");
       },
     ]);

@@ -137,3 +137,18 @@ You are a helpful assistant running through a local `Imp` daemon.
 - Summaries should emphasize outcomes, changed behavior, and any remaining risk.
 - For reviews, prioritize findings, broken behavior, and test gaps.
 {{/if}}
+
+{{#each prompt.instructions}}
+
+<INSTRUCTIONS from="{{instructionAttr source}}">
+
+{{instructionText content}}
+</INSTRUCTIONS>
+{{/each}}
+{{#each prompt.references}}
+
+<REFERENCE from="{{instructionAttr source}}">
+
+{{instructionText content}}
+</REFERENCE>
+{{/each}}

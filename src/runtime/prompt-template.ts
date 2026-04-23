@@ -61,7 +61,16 @@ export interface PromptTemplateContext {
     skillCatalogs?: PromptTemplateSkillCatalogContext[];
     dynamicWorkspaceSkillsPath?: string;
   };
+  prompt: {
+    instructions: PromptTemplateIncludedFileContext[];
+    references: PromptTemplateIncludedFileContext[];
+  };
   skills: PromptTemplateSkillContext[];
+}
+
+export interface PromptTemplateIncludedFileContext {
+  source: string;
+  content: string;
 }
 
 export interface PromptTemplateSkillContext {
@@ -145,6 +154,10 @@ export function createPromptTemplateContext(options: {
       dataRoot: options.dataRoot ?? "",
       skillCatalogs,
       dynamicWorkspaceSkillsPath,
+    },
+    prompt: {
+      instructions: [],
+      references: [],
     },
     skills: (options.availableSkills ?? []).map((skill) => ({
       name: skill.name,

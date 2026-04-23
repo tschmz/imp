@@ -3,7 +3,11 @@ import { join } from "node:path";
 import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
 import type { SkillDefinition } from "../skills/types.js";
-import { renderPromptTemplate, type PromptTemplateContext } from "./prompt-template.js";
+import {
+  renderPromptTemplate,
+  type PromptTemplateContext,
+  type PromptTemplateIncludedFileContext,
+} from "./prompt-template.js";
 import type { PromptTemplateRuntimeUsage, SystemPromptCache } from "./system-prompt-cache.js";
 
 export interface SystemPromptResolutionOptions {
@@ -188,20 +192,52 @@ async function buildSystemPromptWithRuntimeUsage(
   readTextFile: (path: string) => Promise<string>,
   agentHomeMarkdownFiles: string[] = [],
 ): Promise<{ systemPrompt: string; runtimeUsage: PromptTemplateRuntimeUsage }> {
-  const sections: string[] = [];
+  if (!hasUsablePromptSource(agent.prompt.base)) {
+    throw new Error(`Configured base prompt for agent "${agent.id}" must define text, file, or built-in source.`);
+  }
+
   const runtimeUsage = mergeRuntimeUsages([
     detectRuntimeUsageInPromptSource(agent.prompt.base),
     ...(agent.prompt.instructions ?? []).map(detectRuntimeUsageInPromptSource),
     ...(agent.prompt.references ?? []).map(detectRuntimeUsageInPromptSource),
   ]);
-  const promptTemplateContext: PromptTemplateContext = {
+  const baseTemplateContext: PromptTemplateContext = {
     ...templateContext,
+    prompt: {
+      instructions: [],
+      references: [],
+    },
     skills: availableSkills.map((skill) => ({
       name: skill.name,
       description: skill.description,
       directoryPath: skill.directoryPath,
       filePath: skill.filePath,
     })),
+  };
+
+  const instructions = await resolvePromptSections(
+    agent,
+    resolveInstructionSources(agent, promptWorkingDirectory, agentHomeMarkdownFiles),
+    readTextFile,
+    "instruction file",
+    baseTemplateContext,
+    runtimeUsage,
+  );
+  const references = await resolvePromptSections(
+    agent,
+    (agent.prompt.references ?? []).map((source) => ({ source, optional: false })),
+    readTextFile,
+    "reference file",
+    baseTemplateContext,
+    runtimeUsage,
+  );
+
+  const promptTemplateContext: PromptTemplateContext = {
+    ...baseTemplateContext,
+    prompt: {
+      instructions,
+      references,
+    },
   };
 
   const basePrompt = await resolvePromptSourceContent(agent, agent.prompt.base, readTextFile, {
@@ -213,45 +249,56 @@ async function buildSystemPromptWithRuntimeUsage(
   if (!basePrompt) {
     throw new Error(`Configured base prompt for agent "${agent.id}" must define text, file, or built-in source.`);
   }
-  sections.push(basePrompt);
-
-  for (const source of resolveInstructionSources(agent, promptWorkingDirectory, agentHomeMarkdownFiles)) {
-    const content = await resolvePromptSourceContent(agent, source.source, readTextFile, {
-      kind: "instruction file",
-      optional: source.optional,
-      templateFileContent: true,
-      templateContext: promptTemplateContext,
-      runtimeUsage,
-    });
-    if (!content) {
-      continue;
-    }
-
-    sections.push(formatPromptSection("INSTRUCTIONS", describePromptSource(source.source), content));
-  }
-
-  for (const source of agent.prompt.references ?? []) {
-    const content = await resolvePromptSourceContent(agent, source, readTextFile, {
-      kind: "reference file",
-      templateFileContent: true,
-      templateContext: promptTemplateContext,
-      runtimeUsage,
-    });
-    if (!content) {
-      continue;
-    }
-
-    sections.push(formatPromptSection("REFERENCE", describePromptSource(source), content));
-  }
 
   return {
-    systemPrompt: sections.join("\n\n"),
+    systemPrompt: shouldAppendPromptSections(agent.prompt.base)
+      ? [basePrompt, ...instructions.map((entry) => formatPromptSection("INSTRUCTIONS", entry.source, entry.content)), ...references.map((entry) => formatPromptSection("REFERENCE", entry.source, entry.content))].join("\n\n")
+      : basePrompt,
     runtimeUsage,
   };
 }
 
+function hasUsablePromptSource(source: PromptSource): boolean {
+  return source.text !== undefined || source.file !== undefined || source.builtIn !== undefined;
+}
+
+async function resolvePromptSections(
+  agent: AgentDefinition,
+  sources: Array<{ source: PromptSource; optional: boolean }>,
+  readTextFile: (path: string) => Promise<string>,
+  kind: "instruction file" | "reference file",
+  templateContext: PromptTemplateContext,
+  runtimeUsage: PromptTemplateRuntimeUsage,
+): Promise<PromptTemplateIncludedFileContext[]> {
+  const sections: PromptTemplateIncludedFileContext[] = [];
+
+  for (const source of sources) {
+    const content = await resolvePromptSourceContent(agent, source.source, readTextFile, {
+      kind,
+      optional: source.optional,
+      templateFileContent: true,
+      templateContext,
+      runtimeUsage,
+    });
+    if (!content) {
+      continue;
+    }
+
+    sections.push({
+      source: describePromptSource(source.source),
+      content,
+    });
+  }
+
+  return sections;
+}
+
 function formatPromptSection(tagName: "INSTRUCTIONS" | "REFERENCE", source: string, content: string): string {
   return `<${tagName} from="${escapeInstructionAttribute(source)}">\n\n${content}\n</${tagName}>`;
+}
+
+function shouldAppendPromptSections(basePrompt: PromptSource): boolean {
+  return basePrompt.text !== undefined;
 }
 
 function escapeInstructionAttribute(value: string): string {

@@ -166,6 +166,10 @@ function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
       skillCatalogs: resolveSkillCatalogs(config, configPath),
       dynamicWorkspaceSkillsPath: "<working-directory>/.skills",
     },
+    prompt: {
+      instructions: [],
+      references: [],
+    },
     skills: [],
   };
 
