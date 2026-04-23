@@ -4,6 +4,8 @@ import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js"
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
 import type { SkillDefinition } from "../skills/types.js";
 import {
+  createEmptyPromptIncludedFiles,
+  mapSkillsToPromptTemplateContext,
   renderPromptTemplate,
   type PromptTemplateContext,
   type PromptTemplateIncludedFileContext,
@@ -36,6 +38,13 @@ export interface SystemPromptSourceSummary {
   workspaceInstructionFile?: string;
   referenceFiles: string[];
   configuredReferenceFiles: string[];
+}
+
+interface ResolvedPromptBuildInputs {
+  runtimeUsage: PromptTemplateRuntimeUsage;
+  promptTemplateContext: PromptTemplateContext;
+  instructions: PromptTemplateIncludedFileContext[];
+  references: PromptTemplateIncludedFileContext[];
 }
 
 export async function resolveSystemPrompt(
@@ -196,24 +205,53 @@ async function buildSystemPromptWithRuntimeUsage(
     throw new Error(`Configured base prompt for agent "${agent.id}" must define text, file, or built-in source.`);
   }
 
+  const inputs = await resolvePromptBuildInputs(
+    agent,
+    promptWorkingDirectory,
+    templateContext,
+    availableSkills,
+    readTextFile,
+    agentHomeMarkdownFiles,
+  );
+
+  const basePrompt = await resolvePromptSourceContent(agent, agent.prompt.base, readTextFile, {
+    kind: "base prompt",
+    templateFileContent: true,
+    templateContext: inputs.promptTemplateContext,
+    runtimeUsage: inputs.runtimeUsage,
+  });
+  if (!basePrompt) {
+    throw new Error(`Configured base prompt for agent "${agent.id}" must define text, file, or built-in source.`);
+  }
+
+  return {
+    systemPrompt: renderSystemPrompt(
+      agent.prompt.base,
+      basePrompt,
+      inputs.instructions,
+      inputs.references,
+    ),
+    runtimeUsage: inputs.runtimeUsage,
+  };
+}
+
+async function resolvePromptBuildInputs(
+  agent: AgentDefinition,
+  promptWorkingDirectory: string | undefined,
+  templateContext: PromptTemplateContext,
+  availableSkills: SkillDefinition[],
+  readTextFile: (path: string) => Promise<string>,
+  agentHomeMarkdownFiles: string[],
+): Promise<ResolvedPromptBuildInputs> {
   const runtimeUsage = mergeRuntimeUsages([
     detectRuntimeUsageInPromptSource(agent.prompt.base),
     ...(agent.prompt.instructions ?? []).map(detectRuntimeUsageInPromptSource),
     ...(agent.prompt.references ?? []).map(detectRuntimeUsageInPromptSource),
   ]);
-  const baseTemplateContext: PromptTemplateContext = {
-    ...templateContext,
-    prompt: {
-      instructions: [],
-      references: [],
-    },
-    skills: availableSkills.map((skill) => ({
-      name: skill.name,
-      description: skill.description,
-      directoryPath: skill.directoryPath,
-      filePath: skill.filePath,
-    })),
-  };
+  const baseTemplateContext = createBasePromptTemplateContext(
+    templateContext,
+    availableSkills,
+  );
 
   const instructions = await resolvePromptSections(
     agent,
@@ -232,30 +270,46 @@ async function buildSystemPromptWithRuntimeUsage(
     runtimeUsage,
   );
 
-  const promptTemplateContext: PromptTemplateContext = {
-    ...baseTemplateContext,
-    prompt: {
-      instructions,
-      references,
-    },
-  };
-
-  const basePrompt = await resolvePromptSourceContent(agent, agent.prompt.base, readTextFile, {
-    kind: "base prompt",
-    templateFileContent: true,
-    templateContext: promptTemplateContext,
+  return {
     runtimeUsage,
-  });
-  if (!basePrompt) {
-    throw new Error(`Configured base prompt for agent "${agent.id}" must define text, file, or built-in source.`);
+    promptTemplateContext: {
+      ...baseTemplateContext,
+      prompt: {
+        instructions,
+        references,
+      },
+    },
+    instructions,
+    references,
+  };
+}
+
+function createBasePromptTemplateContext(
+  templateContext: PromptTemplateContext,
+  availableSkills: SkillDefinition[],
+): PromptTemplateContext {
+  return {
+    ...templateContext,
+    prompt: createEmptyPromptIncludedFiles(),
+    skills: mapSkillsToPromptTemplateContext(availableSkills),
+  };
+}
+
+function renderSystemPrompt(
+  basePromptSource: PromptSource,
+  basePrompt: string,
+  instructions: PromptTemplateIncludedFileContext[],
+  references: PromptTemplateIncludedFileContext[],
+): string {
+  if (!shouldAppendPromptSections(basePromptSource)) {
+    return basePrompt;
   }
 
-  return {
-    systemPrompt: shouldAppendPromptSections(agent.prompt.base)
-      ? [basePrompt, ...instructions.map((entry) => formatPromptSection("INSTRUCTIONS", entry.source, entry.content)), ...references.map((entry) => formatPromptSection("REFERENCE", entry.source, entry.content))].join("\n\n")
-      : basePrompt,
-    runtimeUsage,
-  };
+  return [
+    basePrompt,
+    ...instructions.map((entry) => formatPromptSection("INSTRUCTIONS", entry.source, entry.content)),
+    ...references.map((entry) => formatPromptSection("REFERENCE", entry.source, entry.content)),
+  ].join("\n\n");
 }
 
 function hasUsablePromptSource(source: PromptSource): boolean {
