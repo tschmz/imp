@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
+import { createInlineBasePrompt, expectSystemPrompt } from "./prompt-test-helpers.js";
 import type { PromptTemplateContext } from "./prompt-template.js";
 import { SystemPromptCache } from "./system-prompt-cache.js";
 import { buildSystemPrompt, resolveSystemPrompt } from "./system-prompt-resolution.js";
@@ -150,7 +151,7 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expectPromptSections(prompt, {
+    expectSystemPrompt(prompt, {
       base: "You are concise.",
       instructions: [
         {
@@ -215,7 +216,7 @@ describe("resolveSystemPrompt", () => {
       ],
     );
 
-    expectPromptSections(prompt, {
+    expectSystemPrompt(prompt, {
       base: "You are concise.",
       instructions: [
         {
@@ -296,7 +297,7 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expectPromptSections(prompt, {
+    expectSystemPrompt(prompt, {
       base: "You are concise.",
       instructions: [
         {
@@ -365,7 +366,7 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expectPromptSections(prompt, {
+    expectSystemPrompt(prompt, {
       base: "Base private-telegram",
       instructions: [
         {
@@ -776,47 +777,4 @@ function createTemplateContext(
     },
     skills: [],
   };
-}
-
-function createInlineBasePrompt(
-  base: string,
-  options: {
-    includeInstructions?: boolean;
-    includeReferences?: boolean;
-  } = {},
-): string {
-  const sections = [base];
-  if (options.includeInstructions ?? true) {
-    sections.push('{{promptSections "INSTRUCTIONS" prompt.instructions}}');
-  }
-  if (options.includeReferences ?? true) {
-    sections.push('{{promptSections "REFERENCE" prompt.references}}');
-  }
-  return sections.join("\n\n");
-}
-
-function formatPromptSection(
-  tagName: "INSTRUCTIONS" | "REFERENCE",
-  source: string,
-  content: string,
-): string {
-  return `<${tagName} from="${source}">\n\n${content}\n</${tagName}>`;
-}
-
-function expectPromptSections(
-  prompt: string,
-  options: {
-    base: string;
-    instructions?: Array<{ source: string; content: string }>;
-    references?: Array<{ source: string; content: string }>;
-  },
-): void {
-  const parts = [options.base];
-  for (const instruction of options.instructions ?? []) {
-    parts.push(formatPromptSection("INSTRUCTIONS", instruction.source, instruction.content));
-  }
-  for (const reference of options.references ?? []) {
-    parts.push(formatPromptSection("REFERENCE", reference.source, reference.content));
-  }
-  expect(prompt).toBe(parts.join("\n\n"));
 }

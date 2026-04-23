@@ -16,6 +16,11 @@ import {
   createPiAgentEngine,
   mergeShellPathEntries,
 } from "./create-pi-agent-engine.js";
+import {
+  createInlineBasePrompt,
+  expectSystemPrompt,
+  renderSystemPromptForTest,
+} from "./prompt-test-helpers.js";
 import { createLoadSkillTool } from "./tool-resolution.js";
 import { toAgentMessages } from "./message-mapping.js";
 
@@ -2752,58 +2757,6 @@ function createAgent(): AgentDefinition {
     tools: [],
     extensions: [],
   };
-}
-
-function createInlineBasePrompt(
-  base: string,
-  options: {
-    includeInstructions?: boolean;
-    includeReferences?: boolean;
-  } = {},
-): string {
-  const parts = [base];
-  if (options.includeInstructions ?? true) {
-    parts.push('{{promptSections "INSTRUCTIONS" prompt.instructions}}');
-  }
-  if (options.includeReferences ?? true) {
-    parts.push('{{promptSections "REFERENCE" prompt.references}}');
-  }
-  return parts.join("\n\n");
-}
-
-function renderPromptSectionForTest(
-  tagName: "INSTRUCTIONS" | "REFERENCE",
-  source: string,
-  content: string,
-): string {
-  return `<${tagName} from="${source}">\n\n${content}\n</${tagName}>`;
-}
-
-function renderSystemPromptForTest(options: {
-  base: string;
-  instructions?: Array<{ source: string; content: string }>;
-  references?: Array<{ source: string; content: string }>;
-}): string {
-  const parts = [options.base];
-  for (const instruction of options.instructions ?? []) {
-    parts.push(renderPromptSectionForTest("INSTRUCTIONS", instruction.source, instruction.content));
-  }
-  for (const reference of options.references ?? []) {
-    parts.push(renderPromptSectionForTest("REFERENCE", reference.source, reference.content));
-  }
-  return parts.join("\n\n");
-}
-
-function expectSystemPrompt(
-  prompt: string | undefined,
-  options: {
-    base: string;
-    instructions?: Array<{ source: string; content: string }>;
-    references?: Array<{ source: string; content: string }>;
-  },
-): void {
-  expect(prompt).toBeDefined();
-  expect(prompt).toBe(renderSystemPromptForTest(options));
 }
 
 function createConversation(): ConversationContext {
