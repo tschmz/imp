@@ -1,5 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
-import type { PhrasingContent, RootContent } from "mdast";
+import type { List, ListItem, PhrasingContent, RootContent } from "mdast";
 
 type Segment =
   | { type: "text"; value: string }
@@ -202,6 +202,8 @@ function parseRichText(text: string): RichTextSegment[] {
 
 function renderMarkdownNodeAsSegments(node: RootContent, source: string): RichTextSegment[] {
   switch (node.type) {
+    case "list":
+      return renderListNodeAsSegments(node, source);
     case "paragraph":
     case "heading":
       return renderPhrasingNodesAsSegments(node.children, source);
@@ -222,6 +224,38 @@ function renderMarkdownNodeAsSegments(node: RootContent, source: string): RichTe
     default:
       return [{ type: "text", value: source.slice(getStartOffset(node) ?? 0, getEndOffset(node) ?? source.length) }];
   }
+}
+
+function renderListNodeAsSegments(node: List, source: string): RichTextSegment[] {
+  const segments: RichTextSegment[] = [];
+
+  node.children.forEach((item, index) => {
+    if (index > 0) {
+      segments.push({ type: "text", value: node.spread || item.spread ? "\n\n" : "\n" });
+    }
+
+    segments.push(...renderListItemAsSegments(item, source, node.ordered ? `${(node.start ?? 1) + index}. ` : "- "));
+  });
+
+  return segments;
+}
+
+function renderListItemAsSegments(
+  item: ListItem,
+  source: string,
+  marker: string,
+): RichTextSegment[] {
+  const segments: RichTextSegment[] = [{ type: "text", value: marker }];
+
+  item.children.forEach((child, index) => {
+    if (index > 0) {
+      segments.push({ type: "text", value: "\n" });
+    }
+
+    segments.push(...renderMarkdownNodeAsSegments(child, source));
+  });
+
+  return segments;
 }
 
 function renderPhrasingNodesAsSegments(nodes: PhrasingContent[], source: string): RichTextSegment[] {

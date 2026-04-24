@@ -162,6 +162,18 @@ describe("renderTelegramMessage", () => {
     );
   });
 
+  it("renders inline code inside markdown list items", () => {
+    expect(renderTelegramMessage("- `npm test`")).toBe("- <code>npm test</code>");
+  });
+
+  it("renders mixed formatting inside markdown list items", () => {
+    expect(
+      renderTelegramMessage("- **Run** `npm test` and [docs](https://example.com) with _care_."),
+    ).toBe(
+      '- <b>Run</b> <code>npm test</code> and <a href="https://example.com">docs</a> with <i>care</i>.',
+    );
+  });
+
   it("chunks long plain text messages", () => {
     expect(renderTelegramMessages("hello world there", 11)).toEqual(["hello ", "world there"]);
   });
