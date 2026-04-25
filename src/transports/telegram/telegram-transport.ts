@@ -707,10 +707,11 @@ async function persistTelegramImage(input: {
   await writeFile(savedPath, downloadedImage.bytes);
 
   const sourceImage = input.image.kind === "document" ? input.image.document : input.image.photo;
-  const mimeType =
-    input.image.kind === "document"
-      ? input.image.document.mime_type ?? downloadedImage.mimeType
-      : downloadedImage.mimeType ?? inferImageMimeType(file.file_path);
+  const mimeType = resolveTelegramImageMimeType(
+    input.image.kind === "document" ? input.image.document.mime_type : undefined,
+    downloadedImage.mimeType,
+    file.file_path,
+  );
 
   return {
     ...input.message,
@@ -890,6 +891,26 @@ function getTelegramImageFileName(
   return image.kind === "photo"
     ? `telegram-photo-${message.messageId}${extension}`
     : `telegram-image-${message.messageId}${extension}`;
+}
+
+function resolveTelegramImageMimeType(
+  declaredMimeType: string | undefined,
+  downloadedMimeType: string | undefined,
+  filePath: string,
+): string | undefined {
+  if (isSupportedImageMimeType(declaredMimeType)) {
+    return declaredMimeType;
+  }
+
+  if (isSupportedImageMimeType(downloadedMimeType)) {
+    return downloadedMimeType;
+  }
+
+  return inferImageMimeType(filePath);
+}
+
+function isSupportedImageMimeType(value: string | undefined): value is string {
+  return typeof value === "string" && value.startsWith("image/");
 }
 
 function getImageExtension(

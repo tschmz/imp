@@ -1052,6 +1052,100 @@ describe("createTelegramTransport", () => {
     await expect(readFile(capturedMessage?.source?.image?.savedPath ?? "", "utf8")).resolves.toBe("image-bytes");
   });
 
+
+  it("infers an image mime type for telegram photos when Telegram returns application/octet-stream", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-telegram-photo-octet-stream-"));
+    tempDirs.push(root);
+    const bot = createFakeBot();
+    bot.api.getFile = vi.fn(async () => ({ file_path: "photos/file_1.jpg" }));
+    const fetchImpl = vi.fn(async () => new Response("jpeg-bytes", {
+      headers: {
+        "content-type": "application/octet-stream",
+      },
+    }));
+    let capturedEvent:
+      | {
+          message: IncomingMessage;
+          prepareMessage?(message: IncomingMessage): Promise<IncomingMessage> | IncomingMessage;
+        }
+      | undefined;
+
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+        document: {
+          maxDownloadBytes: 1024,
+        },
+        paths: {
+          conversationsDir: join(root, "conversations"),
+        },
+      },
+      bot,
+      undefined,
+      { fetch: fetchImpl },
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedEvent = event;
+      }),
+    });
+
+    await bot.emitPhotoMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 102,
+        caption: "Read this screenshot",
+        photo: [
+          {
+            file_id: "photo-file-small",
+            file_unique_id: "photo-unique-small",
+            file_size: 50,
+            width: 320,
+            height: 240,
+          },
+          {
+            file_id: "photo-file-large",
+            file_unique_id: "photo-unique-large",
+            file_size: 120,
+            width: 1280,
+            height: 720,
+          },
+        ],
+      },
+    });
+
+    await waitForAsync(() => capturedEvent !== undefined, 200);
+    const capturedMessage = await capturedEvent?.prepareMessage?.({
+      ...capturedEvent.message,
+      conversation: {
+        ...capturedEvent.message.conversation,
+        sessionId: "session-1",
+        agentId: "default",
+      } as IncomingMessage["conversation"] & { sessionId: string; agentId: string },
+    });
+
+    expect(capturedMessage).toMatchObject({
+      text: "Read this screenshot",
+      source: {
+        kind: "telegram-image",
+        image: {
+          fileId: "photo-file-large",
+          fileUniqueId: "photo-unique-large",
+          mimeType: "image/jpeg",
+          sizeBytes: 120,
+          width: 1280,
+          height: 720,
+          telegramType: "photo",
+        },
+      },
+    });
+  });
+
   it("accepts telegram photos, downloads them, and persists them as image input", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-telegram-photo-"));
     tempDirs.push(root);
