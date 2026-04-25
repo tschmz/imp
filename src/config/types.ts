@@ -38,10 +38,17 @@ export interface AgentMcpToolsConfig {
   servers: string[];
 }
 
+export interface AgentDelegationToolConfig {
+  agentId: string;
+  toolName?: string;
+  description?: string;
+}
+
 export interface AgentToolsConfigObject {
   builtIn?: string[];
   mcp?: AgentMcpToolsConfig;
   phone?: AgentPhoneCallConfig;
+  agents?: AgentDelegationToolConfig[];
 }
 
 export type AgentToolsConfig = string[] | AgentToolsConfigObject;

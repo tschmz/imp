@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import type { AgentConfig, AgentToolsConfig, AppConfig, EndpointConfig, FileEndpointConfig } from "./types.js";
+import type {
+  AgentConfig,
+  AgentToolsConfig,
+  AppConfig,
+  EndpointConfig,
+  FileEndpointConfig,
+} from "./types.js";
 import { getTransport, listTransportTypes } from "../transports/registry.js";
 
 type RefinementContext<T> = z.core.$RefinementCtx<T>;
@@ -108,6 +114,12 @@ const phoneCallConfigSchema = z.object({
   controlDir: z.string().min(1).optional(),
 });
 
+const agentDelegationConfigSchema = z.object({
+  agentId: z.string().min(1),
+  toolName: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+});
+
 const agentToolsConfigSchema = z
   .union([
     z.string().min(1).array(),
@@ -119,6 +131,7 @@ const agentToolsConfigSchema = z
         })
         .optional(),
       phone: phoneCallConfigSchema.optional(),
+      agents: agentDelegationConfigSchema.array().min(1).optional(),
     }),
   ])
   .superRefine(validateAgentToolsConfig);
@@ -245,6 +258,21 @@ function validateAgentToolsConfig(
 
     serverRefs.add(serverId);
   }
+
+  const delegationToolNames = new Set<string>();
+  for (const [index, delegation] of (tools.agents ?? []).entries()) {
+    const toolName = delegation.toolName ?? deriveDelegationToolName(delegation.agentId);
+    if (delegationToolNames.has(toolName)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["agents", index, "toolName"],
+        message: `Duplicate delegated agent tool name "${toolName}". Delegated agent tool names must be unique per agent.`,
+      });
+      continue;
+    }
+
+    delegationToolNames.add(toolName);
+  }
 }
 
 function validateAgentConfig(agent: AgentConfig, ctx: RefinementContext<AgentConfig>): void {
@@ -349,6 +377,7 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
 
   validateDefaultAgent(config, knownAgentIds, ctx);
   validateAgentMcpServerReferences(config, mcpServerIds, ctx);
+  validateAgentDelegationReferences(config, knownAgentIds, ctx);
   validateEndpointDefaultAgents(config, knownAgentIds, ctx);
   validateFileEndpoints(config, endpointIds, enabledEndpointIds, pluginIds, enabledPluginIds, ctx);
 }
@@ -373,6 +402,38 @@ function validateAgentMcpServerReferences(
         path: ["agents", agentIndex, "tools", "mcp", "servers", serverIndex],
         message: `Unknown MCP server id "${serverId}" for agent "${agent.id}".`,
       });
+    }
+  }
+}
+
+function validateAgentDelegationReferences(
+  config: AppConfig,
+  knownAgentIds: Set<string>,
+  ctx: RefinementContext<AppConfig>,
+): void {
+  for (const [agentIndex, agent] of config.agents.entries()) {
+    if (Array.isArray(agent.tools)) {
+      continue;
+    }
+
+    for (const [delegationIndex, delegation] of (agent.tools?.agents ?? []).entries()) {
+      if (!knownAgentIds.has(delegation.agentId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["agents", agentIndex, "tools", "agents", delegationIndex, "agentId"],
+          message:
+            `Unknown delegated agent id "${delegation.agentId}" for agent "${agent.id}". ` +
+            `Expected one of: ${formatKnownIds(knownAgentIds)}.`,
+        });
+      }
+
+      if (delegation.agentId === agent.id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["agents", agentIndex, "tools", "agents", delegationIndex, "agentId"],
+          message: `Agent "${agent.id}" cannot delegate to itself.`,
+        });
+      }
     }
   }
 }
@@ -497,4 +558,15 @@ function validateFileEndpointResponseTarget(
 
 function formatKnownIds(ids: Set<string>): string {
   return [...ids].sort().map((id) => `"${id}"`).join(", ");
+}
+
+export function deriveDelegationToolName(agentId: string): string {
+  const sanitized = agentId
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return `ask_${sanitized || "agent"}`;
 }

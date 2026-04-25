@@ -254,6 +254,89 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
+  it("resolves delegated agent tool config with derived default tool names", async () => {
+    const appConfig = createAppConfig({
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          tools: {
+            builtIn: ["read"],
+            agents: [
+              {
+                agentId: "helper.agent",
+              },
+              {
+                agentId: "writer",
+                toolName: "draft_copy",
+                description: "Ask the writer agent for a draft.",
+              },
+            ],
+          },
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+        },
+        {
+          id: "helper.agent",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          tools: [],
+          prompt: {
+            base: {
+              text: "You help.",
+            },
+          },
+        },
+        {
+          id: "writer",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          tools: [],
+          prompt: {
+            base: {
+              text: "You write.",
+            },
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.delegations).toEqual([
+      {
+        agentId: "helper.agent",
+        toolName: "ask_helper_agent",
+      },
+      {
+        agentId: "writer",
+        toolName: "draft_copy",
+        description: "Ask the writer agent for a draft.",
+      },
+    ]);
+  });
+
   it("preserves custom model settings in runtime config", async () => {
     const appConfig = createAppConfig({
       agents: [

@@ -1,4 +1,5 @@
 import type {
+  AgentDelegationConfig,
   AgentMcpConfig,
   AgentPhoneCallConfig,
   AgentPromptConfig,
@@ -139,6 +140,7 @@ export interface ConfiguredAgent {
   skillCatalog?: SkillDefinition[];
   skillIssues?: string[];
   tools?: string[];
+  delegations?: AgentDelegationConfig[];
   mcp?: AgentMcpConfig;
   phone?: AgentPhoneCallConfig;
 }

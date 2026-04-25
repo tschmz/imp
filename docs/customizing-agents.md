@@ -226,8 +226,32 @@ Optional additional tools:
 - `pwd`
 - `cd`
 - `phone_call`
+- delegated agent tools from `agents[].tools.agents`
 
 See [Built-in tools](./tools.md) for the full reference.
+
+Example delegated agent tool config:
+
+```json
+{
+  "id": "default",
+  "tools": {
+    "builtIn": ["read", "bash"],
+    "agents": [
+      {
+        "agentId": "ops"
+      },
+      {
+        "agentId": "writer",
+        "toolName": "draft_copy",
+        "description": "Ask the writer agent for draft copy."
+      }
+    ]
+  }
+}
+```
+
+This keeps delegation explicit. Each entry creates one tool, runs the child agent ephemerally, returns only the child's final text, blocks self-calls, and prevents delegated children from delegating again.
 
 ## Multiple Agents
 

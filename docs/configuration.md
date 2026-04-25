@@ -113,6 +113,7 @@ Common fields:
 - `tools.builtIn`: built-in tools the agent may use
 - `tools.mcp.servers`: global MCP server IDs the agent may use
 - `tools.phone`: allowlisted phone call tool configuration
+- `tools.agents`: explicit delegated agent tools exposed as allowlisted one-tool-per-agent calls
 - `workspace.cwd`: working directory for file and shell tools
 - `workspace.shellPath`: extra PATH entries for the `bash` tool
 - `skills.paths`: optional shared skill directories for this agent
@@ -124,6 +125,7 @@ Important rules:
 - `defaults.agentId` must point to an existing agent
 - prompt sources must specify exactly one of `text` or `file`
 - `authFile` only works with OAuth-capable providers
+- `tools.agents[].agentId` must point to another configured agent and cannot reference the current agent
 - custom models must provide `model.api`, `model.baseUrl`, `model.reasoning`, `model.input`, `model.contextWindow`, and `model.maxTokens`
 
 ## Tools
@@ -169,6 +171,40 @@ Agents reference global MCP servers by ID:
   ]
 }
 ```
+
+Agents can also expose other configured agents as explicit tools:
+
+```json
+{
+  "agents": [
+    {
+      "id": "default",
+      "tools": {
+        "builtIn": ["read", "bash"],
+        "agents": [
+          {
+            "agentId": "ops"
+          },
+          {
+            "agentId": "writer",
+            "toolName": "draft_copy",
+            "description": "Ask the writer agent for draft copy."
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Behavior:
+
+- each `tools.agents[]` entry creates one tool for the parent agent
+- omitted `toolName` defaults to `ask_<agent-id>` with invalid characters normalized to `_`
+- delegated runs are ephemeral: they do not persist child conversation state and do not change the child's selected session
+- delegated agents run with their own prompt, model, tools, and workspace
+- delegated tools accept only `{ "input": "<string>" }`
+- delegation nesting is limited to one level; a delegated child cannot delegate again
 
 ## Data Root Layout
 

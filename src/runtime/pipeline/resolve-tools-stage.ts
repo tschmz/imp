@@ -1,7 +1,10 @@
+import type { AgentRegistry } from "../../agents/registry.js";
 import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
 import type { ToolRegistry } from "../../tools/registry.js";
 import type { McpToolCache } from "../mcp-tool-cache.js";
+import { createAgentDelegationTools } from "../agent-delegation-tool.js";
+import { validateResolvedToolNames } from "../validate-resolved-tool-names.js";
 import {
   createOnPayloadOverride,
   createLoadSkillTool,
@@ -10,7 +13,7 @@ import {
   resolveWorkingDirectory,
   type WorkingDirectoryState,
 } from "../tool-resolution.js";
-import type { AgentRunContext } from "../types.js";
+import type { AgentEngine, AgentRunContext } from "../types.js";
 import type { ResolvePromptStageContext } from "./resolve-prompt-stage.js";
 
 export interface ResolveToolsStageContext extends ResolvePromptStageContext {
@@ -38,6 +41,8 @@ export async function resolveToolsStage(
       agent?: AgentDefinition,
     ) => ToolRegistry;
     mcpToolCache: McpToolCache;
+    agentRegistry?: AgentRegistry;
+    runDelegatedAgent?: AgentEngine["run"];
   },
 ): Promise<ResolveToolsStageContext> {
   const initialWorkingDirectory = resolveConversationWorkingDirectory(context.agent, context.conversation);
@@ -52,14 +57,33 @@ export async function resolveToolsStage(
     context.input.runtime?.availableSkills ?? [],
     context.templateContext,
   );
+  const delegationTools =
+    dependencies.agentRegistry && dependencies.runDelegatedAgent
+      ? createAgentDelegationTools(
+          context.agent,
+          context.conversation,
+          context.input.message,
+          context.input.runtime,
+          {
+            agentRegistry: dependencies.agentRegistry,
+            runDelegatedAgent: dependencies.runDelegatedAgent,
+          },
+        )
+      : [];
   const resolvedBuiltInTools = builtInTools.map((tool) => tool.name);
+  const resolvedDelegationTools = delegationTools.map((tool) => tool.name);
   const missingBuiltInTools = configuredBuiltInTools.filter(
     (name) => !resolvedBuiltInTools.includes(name),
   );
   const mcpToolResolution = await dependencies.mcpToolCache.resolve(context.agent);
   const configuredMcpServers = context.agent.mcp?.servers.map((server) => server.id) ?? [];
   const resolvedMcpTools = mcpToolResolution.tools.map((tool) => tool.name);
-  const resolvedTools = [...resolvedBuiltInTools, ...resolvedMcpTools];
+  validateResolvedToolNames(context.agent.id, {
+    builtIn: resolvedBuiltInTools,
+    delegation: resolvedDelegationTools,
+    mcp: resolvedMcpTools,
+  });
+  const resolvedTools = [...resolvedBuiltInTools, ...resolvedDelegationTools, ...resolvedMcpTools];
 
   return {
     ...context,
@@ -75,7 +99,7 @@ export async function resolveToolsStage(
       resolvedMcpTools,
       resolvedTools,
     },
-    tools: [...builtInTools, ...mcpToolResolution.tools],
+    tools: [...builtInTools, ...delegationTools, ...mcpToolResolution.tools],
   };
 }
 

@@ -8,6 +8,7 @@ import {
   resolveAgentTools,
   resolveWorkingDirectory,
 } from "../runtime/create-pi-agent-engine.js";
+import { validateResolvedToolNames } from "../runtime/validate-resolved-tool-names.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { TransportFactory } from "../transports/types.js";
 import {
@@ -54,7 +55,10 @@ export function createDaemon(
 
       try {
         for (const endpointConfig of config.activeEndpoints) {
-          runtimes.push(await bootstrapRuntime(config, endpointConfig, dependencies));
+          runtimes.push(await bootstrapRuntime(config, endpointConfig, {
+            ...dependencies,
+            agentRegistry,
+          }));
         }
       } catch (error) {
         await Promise.all(
@@ -103,8 +107,14 @@ export function validateAgentRegistry(
 ): void {
   for (const agent of agentRegistry.list()) {
     validateAgentPrompt(agent);
+    validateAgentDelegations(agent, agentRegistry);
     const registry = toolRegistry ?? createBuiltInRegistry(resolveWorkingDirectory(agent), agent);
-    resolveAgentTools(agent, registry);
+    const resolvedBuiltInTools = resolveAgentTools(agent, registry).map((tool) => tool.name);
+    validateResolvedToolNames(agent.id, {
+      builtIn: resolvedBuiltInTools,
+      delegation: (agent.delegations ?? []).map((delegation) => delegation.toolName),
+      mcp: [],
+    });
   }
 }
 
@@ -128,6 +138,7 @@ export function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefi
       ...(configuredAgent.skills ? { skills: configuredAgent.skills } : {}),
       ...(configuredAgent.skillCatalog ? { skillCatalog: configuredAgent.skillCatalog } : {}),
       ...(configuredAgent.skillIssues ? { skillIssues: configuredAgent.skillIssues } : {}),
+      ...(configuredAgent.delegations ? { delegations: configuredAgent.delegations } : {}),
       ...(configuredAgent.mcp ? { mcp: configuredAgent.mcp } : {}),
       ...(configuredAgent.phone ? { phone: configuredAgent.phone } : {}),
       tools: configuredAgent.tools ?? [],
@@ -138,6 +149,23 @@ export function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefi
 
 function validateAgentPrompt(agent: AgentDefinition): void {
   validatePromptBase(agent.id, agent.prompt.base);
+}
+
+function validateAgentDelegations(
+  agent: AgentDefinition,
+  agentRegistry: ReturnType<typeof createAgentRegistry>,
+): void {
+  for (const delegation of agent.delegations ?? []) {
+    if (delegation.agentId === agent.id) {
+      throw new ConfigurationError(`Agent "${agent.id}" cannot delegate to itself.`);
+    }
+
+    if (!agentRegistry.get(delegation.agentId)) {
+      throw new ConfigurationError(
+        `Unknown delegated agent id "${delegation.agentId}" for agent "${agent.id}".`,
+      );
+    }
+  }
 }
 
 function validatePromptBase(

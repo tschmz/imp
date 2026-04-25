@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationEvent } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
@@ -1048,6 +1049,191 @@ describe("createPiAgentEngine", () => {
     expect(capturedTools).toEqual([tool]);
   });
 
+  it("registers delegated agent tools and executes child runs with the child's prompt, model, tools, and workspace", async () => {
+    let parentTools: ToolDefinition[] | undefined;
+    let childTools: ToolDefinition[] | undefined;
+    let childSystemPrompt: string | undefined;
+    let childModelId: string | undefined;
+
+    const parentAgent: AgentDefinition = {
+      ...createAgent(),
+      model: {
+        provider: "openai",
+        modelId: "parent-model",
+      },
+      delegations: [
+        {
+          agentId: "helper",
+          toolName: "ask_helper",
+        },
+      ],
+    };
+    const childAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "helper",
+      name: "Helper",
+      prompt: {
+        base: {
+          text: createInlineBasePrompt("You are the helper."),
+        },
+      },
+      model: {
+        provider: "openai",
+        modelId: "child-model",
+      },
+      tools: ["pwd"],
+      workspace: {
+        cwd: "/tmp/child-workspace",
+      },
+      delegations: [],
+    };
+
+    const engine = createPiAgentEngine({
+      agentRegistry: createAgentRegistry([parentAgent, childAgent]),
+      resolveModel: (provider, modelId) =>
+        ({
+          id: modelId,
+          provider,
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        const modelId = (options.initialState?.model as { id: string }).id;
+        const tools = options.initialState?.tools as ToolDefinition[];
+
+        if (modelId === "parent-model") {
+          parentTools = tools;
+          return createAgentDouble({ messages: [fauxAssistantMessage("parent ready")] });
+        }
+
+        childTools = tools;
+        childModelId = modelId;
+        childSystemPrompt = options.initialState?.systemPrompt;
+        return createAgentDouble({ messages: [fauxAssistantMessage("child final text")] });
+      },
+    });
+
+    await engine.run({
+      agent: parentAgent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(parentTools?.map((tool) => tool.name)).toContain("ask_helper");
+
+    const delegationTool = parentTools?.find((tool) => tool.name === "ask_helper");
+    const result = await delegationTool!.execute("tool-1", { input: "Summarize this" });
+
+    expect(result).toMatchObject({
+      content: [{ type: "text", text: "child final text" }],
+      details: {
+        delegatedAgentId: "helper",
+        toolName: "ask_helper",
+      },
+    });
+    expect(childModelId).toBe("child-model");
+    expect(childSystemPrompt).toContain("You are the helper.");
+    expect(childTools?.map((tool) => tool.name)).toContain("pwd");
+
+    const pwdResult = await childTools!.find((tool) => tool.name === "pwd")!.execute("tool-2", {});
+    expect(pwdResult).toMatchObject({
+      content: [{ type: "text", text: "/tmp/child-workspace" }],
+    });
+  });
+
+  it("rejects self-delegation tool execution clearly", async () => {
+    let capturedTools: ToolDefinition[] | undefined;
+    const agent: AgentDefinition = {
+      ...createAgent(),
+      delegations: [
+        {
+          agentId: "default",
+          toolName: "ask_self",
+        },
+      ],
+    };
+
+    const engine = createPiAgentEngine({
+      agentRegistry: createAgentRegistry([agent]),
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        capturedTools = options.initialState?.tools as ToolDefinition[];
+        return createAgentDouble({ messages: [fauxAssistantMessage("parent ready")] });
+      },
+    });
+
+    await engine.run({
+      agent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    await expect(
+      capturedTools!.find((tool) => tool.name === "ask_self")!.execute("tool-1", { input: "hello" }),
+    ).rejects.toMatchObject({
+      kind: "tool_command_execution",
+      message: 'Agent "default" cannot delegate to itself.',
+    } satisfies Partial<UserVisibleProcessingError>);
+  });
+
+  it("rejects nested delegated agent calls after depth one", async () => {
+    let capturedTools: ToolDefinition[] | undefined;
+    const childAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "child",
+      name: "Child",
+      delegations: [
+        {
+          agentId: "helper",
+          toolName: "ask_helper",
+        },
+      ],
+    };
+    const helperAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "helper",
+      name: "Helper",
+      delegations: [],
+    };
+
+    const engine = createPiAgentEngine({
+      agentRegistry: createAgentRegistry([childAgent, helperAgent]),
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        capturedTools = options.initialState?.tools as ToolDefinition[];
+        return createAgentDouble({ messages: [fauxAssistantMessage("child ready")] });
+      },
+    });
+
+    await engine.run({
+      agent: childAgent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+      runtime: {
+        delegationDepth: 1,
+      },
+    });
+
+    await expect(
+      capturedTools!.find((tool) => tool.name === "ask_helper")!.execute("tool-1", { input: "hello" }),
+    ).rejects.toMatchObject({
+      kind: "tool_command_execution",
+      message: 'Delegated agent calls may only nest one level. Agent "child" cannot delegate again from this run.',
+    } satisfies Partial<UserVisibleProcessingError>);
+  });
+
   it("merges resolved MCP tools into the agent runtime and reuses them across agents", async () => {
     let capturedTools: Array<{ name: string }> | undefined;
     const close = vi.fn(async () => {});
@@ -1135,6 +1321,78 @@ describe("createPiAgentEngine", () => {
     await engine.close?.();
 
     expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails tool resolution when a delegated agent tool collides with an MCP tool", async () => {
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      resolveMcpTools: async () => ({
+        tools: [
+          {
+            name: "ask_helper",
+            label: "ask_helper",
+            description: "conflicting MCP tool",
+            parameters: Type.Object({}),
+            async execute() {
+              return {
+                content: [{ type: "text" as const, text: "ok" }],
+                details: {},
+              };
+            },
+          },
+        ],
+        initializedServerIds: ["echo"],
+        failedServerIds: [],
+        close: async () => {},
+      }),
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("ok")] }),
+      agentRegistry: createAgentRegistry([
+        createAgent(),
+        {
+          ...createAgent(),
+          id: "helper",
+          name: "helper",
+          prompt: {
+            base: {
+              text: "You are the helper.",
+            },
+          },
+        },
+      ]),
+    });
+
+    await expect(
+      engine.run({
+        agent: {
+          ...createAgent(),
+          delegations: [
+            {
+              agentId: "helper",
+              toolName: "ask_helper",
+            },
+          ],
+          mcp: {
+            servers: [
+              {
+                id: "echo",
+                command: process.execPath,
+                args: ["echo"],
+              },
+            ],
+          },
+        },
+        conversation: createConversation(),
+        message: createIncomingMessage(),
+      }),
+    ).rejects.toThrow(
+      'Duplicate tool names for agent "default": ask_helper. Tool names must be unique across built-in tools, delegated agent tools, and MCP tools.',
+    );
   });
 
   it("closes initialized MCP runtimes exactly once", async () => {

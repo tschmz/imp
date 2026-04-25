@@ -450,6 +450,159 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts explicit delegated agent tools under agents.tools.agents", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        tools: {
+          agents: [
+            {
+              agentId: "helper",
+            },
+            {
+              agentId: "writer",
+              toolName: "draft_copy",
+              description: "Ask the writer agent for draft copy.",
+            },
+          ],
+        },
+      }),
+      agents: [
+        {
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          tools: {
+            agents: [
+              {
+                agentId: "helper",
+              },
+              {
+                agentId: "writer",
+                toolName: "draft_copy",
+                description: "Ask the writer agent for draft copy.",
+              },
+            ],
+          },
+        },
+        {
+          id: "helper",
+          prompt: {
+            base: {
+              text: "You help.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+        },
+        {
+          id: "writer",
+          prompt: {
+            base: {
+              text: "You write.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects delegated agent tools that reference unknown agents", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        tools: {
+          agents: [
+            {
+              agentId: "missing",
+            },
+          ],
+        },
+      }),
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["agents", 0, "tools", "agents", 0, "agentId"],
+        message: 'Unknown delegated agent id "missing" for agent "default". Expected one of: "default".',
+      }),
+    );
+  });
+
+  it("rejects self-delegation", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        tools: {
+          agents: [
+            {
+              agentId: "default",
+            },
+          ],
+        },
+      }),
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["agents", 0, "tools", "agents", 0, "agentId"],
+        message: 'Agent "default" cannot delegate to itself.',
+      }),
+    );
+  });
+
   it("accepts allowlisted phone call config under agents.tools.phone", () => {
     const result = appConfigSchema.safeParse(
       createConfig({

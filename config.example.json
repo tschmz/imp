@@ -49,6 +49,11 @@
           "find",
           "ls"
         ],
+        "agents": [
+          {
+            "agentId": "ops"
+          }
+        ],
         "mcp": {
           "servers": [
             "docs"

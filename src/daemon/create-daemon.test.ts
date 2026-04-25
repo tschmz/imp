@@ -266,6 +266,109 @@ describe("createDaemon", () => {
     expect(startTransport).not.toHaveBeenCalled();
   });
 
+  it("fails startup when an agent references an unknown delegated agent", async () => {
+    const root = await createTempDir();
+    const endpointConfig = createEndpointConfig(root);
+    const startTransport = vi.fn();
+
+    const daemon = createDaemon(
+      {
+        ...createConfig(endpointConfig),
+        agents: [
+          {
+            id: "default",
+            prompt: {
+              base: {
+                text: "You are configured from json.",
+              },
+            },
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+            delegations: [
+              {
+                agentId: "missing",
+                toolName: "ask_missing",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        engine: {
+          run: vi.fn(),
+        },
+        createTransport: () => ({
+          start: startTransport,
+        }),
+      },
+    );
+
+    await expect(daemon.start()).rejects.toThrow(
+      'Unknown delegated agent id "missing" for agent "default".',
+    );
+    expect(startTransport).not.toHaveBeenCalled();
+  });
+
+  it("fails startup when a delegated agent tool collides with a built-in tool", async () => {
+    const root = await createTempDir();
+    const endpointConfig = createEndpointConfig(root);
+    const startTransport = vi.fn();
+
+    const daemon = createDaemon(
+      {
+        ...createConfig(endpointConfig),
+        agents: [
+          {
+            id: "default",
+            prompt: {
+              base: {
+                text: "You are configured from json.",
+              },
+            },
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+            tools: ["bash"],
+            delegations: [
+              {
+                agentId: "helper",
+                toolName: "bash",
+              },
+            ],
+          },
+          {
+            id: "helper",
+            prompt: {
+              base: {
+                text: "You are the helper.",
+              },
+            },
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+          },
+        ],
+      },
+      {
+        engine: {
+          run: vi.fn(),
+        },
+        createTransport: () => ({
+          start: startTransport,
+        }),
+      },
+    );
+
+    await expect(daemon.start()).rejects.toThrow(
+      'Duplicate tool names for agent "default": bash. Tool names must be unique across built-in tools, delegated agent tools, and MCP tools.',
+    );
+    expect(startTransport).not.toHaveBeenCalled();
+  });
+
   it("fails fast when an agent does not define a usable base prompt", async () => {
     const root = await createTempDir();
     const endpointConfig = createEndpointConfig(root);

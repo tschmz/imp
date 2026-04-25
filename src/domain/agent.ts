@@ -57,6 +57,12 @@ export interface AgentPhoneCallConfig {
   controlDir?: string;
 }
 
+export interface AgentDelegationConfig {
+  agentId: string;
+  toolName: string;
+  description?: string;
+}
+
 export interface ModelRef {
   provider: string;
   modelId: string;
@@ -82,6 +88,7 @@ export interface AgentDefinition {
   skillCatalog?: import("../skills/types.js").SkillDefinition[];
   skillIssues?: string[];
   tools: string[];
+  delegations?: AgentDelegationConfig[];
   mcp?: AgentMcpConfig;
   phone?: AgentPhoneCallConfig;
   extensions: string[];

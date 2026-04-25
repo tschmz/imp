@@ -26,6 +26,10 @@ Additional built-in tools are available when configured:
 | `phone_call` | Start an allowlisted SIP phone call through a configured local command. |
 | `phone_hangup` | End the currently active imp-phone call through a control command. |
 
+Configured delegated agent tools are also available when listed under `agents[].tools.agents`. Each entry creates one explicit tool such as `ask_ops` or a custom `toolName`, takes only `{ "input": string }`, and returns only the delegated agent's final text response.
+
+Delegated runs are ephemeral: `imp` does not persist the child conversation or switch the child's active session. The child agent still runs with its own prompt, model, tools, and workspace. Delegation nesting is limited to one level.
+
 When an agent has available skills from configured `skills.paths`, `paths.dataRoot/skills`, `agent.home/.skills`, or workspace `.skills`, `imp` also enables `load_skill` automatically for that turn. It loads the skill's `SKILL.md` instructions, reports the absolute skill directory, and lists bundled files under `scripts/` and `references/` without reading their contents.
 
 ## Bash PATH

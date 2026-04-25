@@ -12,6 +12,7 @@ export interface AgentRunRuntimeContext {
   dataRoot?: string;
   availableSkills?: SkillDefinition[];
   replyChannel?: ReplyChannelContext;
+  delegationDepth?: number;
 }
 
 export interface ReplyChannelContext {

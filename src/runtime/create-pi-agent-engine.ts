@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import type { AgentOptions } from "@mariozechner/pi-agent-core";
+import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { Logger } from "../logging/types.js";
 import { createHookRunner } from "../extensions/hook-runner.js";
@@ -41,6 +42,7 @@ interface PiAgentEngineDependencies {
     workingDirectory: string | WorkingDirectoryState,
     agent?: AgentDefinition,
   ) => ToolRegistry;
+  agentRegistry?: AgentRegistry;
   resolveMcpTools?: (
     agent: AgentDefinition,
     options: {
@@ -116,6 +118,127 @@ export function createPiAgentEngine(
   });
   const hookRunner = createHookRunner(dependencies.agentEngineHooks, { logger });
   let closed = false;
+  const runInternal: AgentEngine["run"] = async (input) => {
+    const context: EngineLogContext = {
+      endpointId: input.message.endpointId,
+      transport: input.message.conversation.transport,
+      conversationId: input.message.conversation.externalId,
+      messageId: input.message.messageId,
+      correlationId: input.message.correlationId,
+      agentId: input.agent.id,
+    };
+    const startedAt = Date.now();
+
+    try {
+      await hookRunner.run(
+        "onAgentEngineRunStart",
+        (hooks) => hooks.onAgentEngineRunStart,
+        { input },
+      );
+
+      const runContext: AgentRunContext = {
+        input,
+        agent: input.agent,
+        conversation: input.conversation,
+      };
+
+      await logPipelineEvent(logger, context, { step: "model-resolution", status: "started" });
+      const modelContext = resolveModelStage(runContext, { resolveModel });
+      await logPipelineEvent(logger, context, { step: "model-resolution", status: "completed" });
+
+      await logPipelineEvent(logger, context, { step: "system-prompt-resolution", status: "started" });
+      const promptContext = await resolvePromptStage(modelContext, {
+        readTextFile,
+        systemPromptCache,
+        promptTemplateSystemContext,
+      });
+      await logPipelineEvent(logger, context, {
+        step: "system-prompt-resolution",
+        status: "completed",
+        cacheHit: promptContext.systemPromptResolution.cacheHit,
+      });
+      await logSystemPromptSources(logger, context, promptContext.systemPromptResolution);
+      if (!promptContext.systemPromptResolution.cacheHit) {
+        await input.onSystemPromptResolved?.({
+          messageId: input.message.messageId,
+          correlationId: input.message.correlationId,
+          agentId: input.agent.id,
+          createdAt: new Date().toISOString(),
+          content: promptContext.systemPromptResolution.systemPrompt,
+          cacheHit: promptContext.systemPromptResolution.cacheHit,
+          sources: promptContext.systemPromptResolution.sources,
+          ...(promptContext.promptWorkingDirectory
+            ? { promptWorkingDirectory: promptContext.promptWorkingDirectory }
+            : {}),
+        });
+      }
+
+      await logPipelineEvent(logger, context, { step: "tool-resolution", status: "started" });
+      const toolContext = await resolveToolsStage(promptContext, {
+        toolRegistry: dependencies.toolRegistry,
+        createBuiltInToolRegistry: buildToolRegistry,
+        mcpToolCache,
+        agentRegistry: dependencies.agentRegistry,
+        runDelegatedAgent: runInternal,
+      });
+      await logPipelineEvent(logger, context, {
+        step: "tool-resolution",
+        status: "completed",
+        initialWorkingDirectory: toolContext.initialWorkingDirectory,
+        configuredBuiltInTools: toolContext.toolResolution.configuredBuiltInTools,
+        resolvedBuiltInTools: toolContext.toolResolution.resolvedBuiltInTools,
+        missingBuiltInTools: toolContext.toolResolution.missingBuiltInTools,
+        configuredMcpServers: toolContext.toolResolution.configuredMcpServers,
+        initializedMcpServers: toolContext.toolResolution.initializedMcpServers,
+        failedMcpServers: toolContext.toolResolution.failedMcpServers,
+        resolvedMcpTools: toolContext.toolResolution.resolvedMcpTools,
+        resolvedTools: toolContext.toolResolution.resolvedTools,
+      });
+
+      await logPipelineEvent(logger, context, { step: "agent-execution", status: "started" });
+      const executionContext = await executeAgentStage(toolContext, {
+        createAgent: dependencies.createAgent,
+        getApiKey: dependencies.getApiKey,
+      });
+      await logPipelineEvent(logger, context, { step: "agent-execution", status: "completed" });
+
+      await logPipelineEvent(logger, context, {
+        step: "pipeline",
+        status: "completed",
+        durationMs: Date.now() - startedAt,
+      });
+
+      await hookRunner.run(
+        "onAgentEngineRunSuccess",
+        (hooks) => hooks.onAgentEngineRunSuccess,
+        {
+          input,
+          result: executionContext.result,
+          durationMs: Date.now() - startedAt,
+        },
+      );
+
+      return executionContext.result;
+    } catch (error) {
+      await logPipelineEvent(logger, context, {
+        step: "pipeline",
+        status: "failed",
+        durationMs: Date.now() - startedAt,
+        ...getPipelineErrorFields(error),
+        error,
+      });
+      await hookRunner.runErrorHook(
+        "onAgentEngineRunError",
+        (hooks) => hooks.onAgentEngineRunError,
+        {
+          input,
+          error,
+          durationMs: Date.now() - startedAt,
+        },
+      );
+      throw error;
+    }
+  };
 
   return {
     async run(input) {
@@ -123,123 +246,7 @@ export function createPiAgentEngine(
         throw new Error("Agent engine is closed.");
       }
 
-      const context: EngineLogContext = {
-        endpointId: input.message.endpointId,
-        transport: input.message.conversation.transport,
-        conversationId: input.message.conversation.externalId,
-        messageId: input.message.messageId,
-        correlationId: input.message.correlationId,
-        agentId: input.agent.id,
-      };
-      const startedAt = Date.now();
-
-      try {
-        await hookRunner.run(
-          "onAgentEngineRunStart",
-          (hooks) => hooks.onAgentEngineRunStart,
-          { input },
-        );
-
-        const runContext: AgentRunContext = {
-          input,
-          agent: input.agent,
-          conversation: input.conversation,
-        };
-
-        await logPipelineEvent(logger, context, { step: "model-resolution", status: "started" });
-        const modelContext = resolveModelStage(runContext, { resolveModel });
-        await logPipelineEvent(logger, context, { step: "model-resolution", status: "completed" });
-
-        await logPipelineEvent(logger, context, { step: "system-prompt-resolution", status: "started" });
-        const promptContext = await resolvePromptStage(modelContext, {
-          readTextFile,
-          systemPromptCache,
-          promptTemplateSystemContext,
-        });
-        await logPipelineEvent(logger, context, {
-          step: "system-prompt-resolution",
-          status: "completed",
-          cacheHit: promptContext.systemPromptResolution.cacheHit,
-        });
-        await logSystemPromptSources(logger, context, promptContext.systemPromptResolution);
-        if (!promptContext.systemPromptResolution.cacheHit) {
-          await input.onSystemPromptResolved?.({
-            messageId: input.message.messageId,
-            correlationId: input.message.correlationId,
-            agentId: input.agent.id,
-            createdAt: new Date().toISOString(),
-            content: promptContext.systemPromptResolution.systemPrompt,
-            cacheHit: promptContext.systemPromptResolution.cacheHit,
-            sources: promptContext.systemPromptResolution.sources,
-            ...(promptContext.promptWorkingDirectory
-              ? { promptWorkingDirectory: promptContext.promptWorkingDirectory }
-              : {}),
-          });
-        }
-
-        await logPipelineEvent(logger, context, { step: "tool-resolution", status: "started" });
-        const toolContext = await resolveToolsStage(promptContext, {
-          toolRegistry: dependencies.toolRegistry,
-          createBuiltInToolRegistry: buildToolRegistry,
-          mcpToolCache,
-        });
-        await logPipelineEvent(logger, context, {
-          step: "tool-resolution",
-          status: "completed",
-          initialWorkingDirectory: toolContext.initialWorkingDirectory,
-          configuredBuiltInTools: toolContext.toolResolution.configuredBuiltInTools,
-          resolvedBuiltInTools: toolContext.toolResolution.resolvedBuiltInTools,
-          missingBuiltInTools: toolContext.toolResolution.missingBuiltInTools,
-          configuredMcpServers: toolContext.toolResolution.configuredMcpServers,
-          initializedMcpServers: toolContext.toolResolution.initializedMcpServers,
-          failedMcpServers: toolContext.toolResolution.failedMcpServers,
-          resolvedMcpTools: toolContext.toolResolution.resolvedMcpTools,
-          resolvedTools: toolContext.toolResolution.resolvedTools,
-        });
-
-        await logPipelineEvent(logger, context, { step: "agent-execution", status: "started" });
-        const executionContext = await executeAgentStage(toolContext, {
-          createAgent: dependencies.createAgent,
-          getApiKey: dependencies.getApiKey,
-        });
-        await logPipelineEvent(logger, context, { step: "agent-execution", status: "completed" });
-
-        await logPipelineEvent(logger, context, {
-          step: "pipeline",
-          status: "completed",
-          durationMs: Date.now() - startedAt,
-        });
-
-        await hookRunner.run(
-          "onAgentEngineRunSuccess",
-          (hooks) => hooks.onAgentEngineRunSuccess,
-          {
-            input,
-            result: executionContext.result,
-            durationMs: Date.now() - startedAt,
-          },
-        );
-
-        return executionContext.result;
-      } catch (error) {
-        await logPipelineEvent(logger, context, {
-          step: "pipeline",
-          status: "failed",
-          durationMs: Date.now() - startedAt,
-          ...getPipelineErrorFields(error),
-          error,
-        });
-        await hookRunner.runErrorHook(
-          "onAgentEngineRunError",
-          (hooks) => hooks.onAgentEngineRunError,
-          {
-            input,
-            error,
-            durationMs: Date.now() - startedAt,
-          },
-        );
-        throw error;
-      }
+      return runInternal(input);
     },
     async close() {
       if (closed) {

@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path";
 import type {
+  AgentDelegationConfig,
   AgentMcpConfig,
   AgentMcpServerConfig,
   AgentPhoneCallConfig,
@@ -10,6 +11,7 @@ import type {
 import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
 import { getTransport } from "../transports/registry.js";
+import { deriveDelegationToolName } from "./schema.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
 import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig } from "./types.js";
 
@@ -148,7 +150,7 @@ function resolveAgentTools(
   tools: AgentToolsConfig | undefined,
   mcpServers: Map<string, AgentMcpServerConfig>,
   configDir: string,
-): Pick<DaemonConfig["agents"][number], "tools" | "mcp" | "phone"> {
+): Pick<DaemonConfig["agents"][number], "tools" | "delegations" | "mcp" | "phone"> {
   if (!tools) {
     return {};
   }
@@ -161,9 +163,20 @@ function resolveAgentTools(
 
   return {
     ...(tools.builtIn ? { tools: tools.builtIn } : {}),
+    ...(tools.agents ? { delegations: resolveAgentDelegations(tools.agents) } : {}),
     ...(tools.mcp ? { mcp: resolveAgentMcpConfig(tools.mcp, mcpServers) } : {}),
     ...(tools.phone ? { phone: resolveAgentPhoneCallConfig(tools.phone, configDir) } : {}),
   };
+}
+
+function resolveAgentDelegations(
+  delegations: NonNullable<NonNullable<Exclude<AgentToolsConfig, string[]>>["agents"]>,
+): AgentDelegationConfig[] {
+  return delegations.map((delegation) => ({
+    agentId: delegation.agentId,
+    toolName: delegation.toolName ?? deriveDelegationToolName(delegation.agentId),
+    ...(delegation.description ? { description: delegation.description } : {}),
+  }));
 }
 
 function resolveGlobalMcpServers(appConfig: AppConfig, configDir: string): Map<string, AgentMcpServerConfig> {

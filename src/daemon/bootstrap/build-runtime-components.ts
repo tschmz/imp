@@ -1,3 +1,4 @@
+import type { AgentRegistry } from "../../agents/registry.js";
 import type { AgentDefinition } from "../../domain/agent.js";
 import { createAgentLoggers, type AgentLoggers } from "../../logging/agent-loggers.js";
 import { createFileLogger } from "../../logging/file-logger.js";
@@ -25,6 +26,7 @@ export interface RuntimeComponents {
 }
 
 export interface BuildRuntimeComponentsDependencies {
+  agentRegistry?: AgentRegistry;
   engine?: AgentEngine;
   toolRegistry?: ToolRegistry;
   createBuiltInToolRegistry?: (
@@ -58,6 +60,7 @@ export function buildRuntimeComponents(
     createPiAgentEngine({
       logger,
       getApiKey,
+      ...(dependencies.agentRegistry ? { agentRegistry: dependencies.agentRegistry } : {}),
       ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
       createBuiltInToolRegistry: createBuiltInRegistry,
     });
