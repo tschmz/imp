@@ -1,9 +1,10 @@
 import { access, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { parseConfigJson } from "../config/config-json.js";
 import { appConfigSchema } from "../config/schema.js";
 import { discoverConfigPath } from "../config/discover-config-path.js";
-import { setValueAtKeyPath } from "./config-key-path.js";
+import { getValueAtKeyPath, setValueAtKeyPath } from "./config-key-path.js";
 
 interface SetConfigValueUseCaseDependencies {
   writeOutput: (line: string) => void;
@@ -28,14 +29,16 @@ export function createSetConfigValueUseCase(
       errorPrefix: `Invalid input config file ${resolvedConfigPath}`,
     });
 
+    const parsedValue = parseConfigValue(value);
+
     try {
-      setValueAtKeyPath(parsed, keyPath, parseConfigValue(value));
+      setValueAtKeyPath(parsed, keyPath, parsedValue);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`Invalid target key path: ${keyPath}\n${message}`);
     }
 
-    assertUpdatedConfigIsValid(parsed, resolvedConfigPath);
+    assertUpdatedConfigIsValid(parsed, resolvedConfigPath, keyPath, parsedValue);
 
     await writeFile(resolvedConfigPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
     deps.writeOutput(`Updated config ${resolvedConfigPath}: ${keyPath}`);
@@ -59,12 +62,27 @@ async function resolveWritableConfigPath(configPath?: string): Promise<string> {
   return resolvedConfigPath;
 }
 
-function assertUpdatedConfigIsValid(config: unknown, configPath: string): void {
+function assertUpdatedConfigIsValid(
+  config: unknown,
+  configPath: string,
+  keyPath: string,
+  targetValue: unknown,
+): void {
   const result = appConfigSchema.safeParse(config);
 
   if (!result.success) {
     throw new Error(
       formatSchemaError(`Config update violates schema: ${configPath}`, result.error.issues),
+    );
+  }
+
+  const acceptedValue = getValueAtKeyPath(result.data, keyPath);
+  if (!isDeepStrictEqual(acceptedValue, targetValue)) {
+    throw new Error(
+      [
+        `Config update targets an unsupported key path or value: ${keyPath}`,
+        "The updated value was not accepted by the config schema.",
+      ].join("\n"),
     );
   }
 }

@@ -23,7 +23,7 @@ export function setValueAtKeyPath(root: unknown, keyPath: string, value: unknown
   let current: unknown = root;
 
   for (const segment of segments) {
-    current = getChildValue(current, segment);
+    current = getOrCreateChildValue(current, segment);
 
     if (current === undefined) {
       throw new Error(`Config key not found: ${keyPath}`);
@@ -45,10 +45,6 @@ export function setValueAtKeyPath(root: unknown, keyPath: string, value: unknown
     return;
   }
 
-  if (!Object.hasOwn(current, lastSegment)) {
-    throw new Error(`Config key not found: ${keyPath}`);
-  }
-
   (current as Record<string, unknown>)[lastSegment] = value;
 }
 
@@ -63,6 +59,24 @@ function getChildValue(current: unknown, segment: string): unknown {
   }
 
   return (current as Record<string, unknown>)[segment];
+}
+
+function getOrCreateChildValue(current: unknown, segment: string): unknown {
+  if (typeof current !== "object" || current === null) {
+    return undefined;
+  }
+
+  if (Array.isArray(current)) {
+    const index = getArrayIndex(current, segment);
+    return index === undefined ? undefined : current[index];
+  }
+
+  const record = current as Record<string, unknown>;
+  if (!Object.hasOwn(record, segment)) {
+    record[segment] = {};
+  }
+
+  return record[segment];
 }
 
 function getArrayIndex(items: unknown[], segment: string): number | undefined {

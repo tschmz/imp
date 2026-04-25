@@ -72,6 +72,70 @@ describe("createSetConfigValueUseCase", () => {
     expect(config.endpoints[0]?.enabled).toBe(false);
   });
 
+  it("creates a missing optional leaf on an existing config object", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
+
+    await writeConfig(configPath);
+
+    await createSetConfigValueUseCase({ writeOutput: vi.fn() })({
+      keyPath: "agents.default.home",
+      value: "./agents/default",
+    });
+
+    const config = JSON.parse(await readFile(configPath, "utf8")) as {
+      agents: Array<{ home?: string }>;
+    };
+    expect(config.agents[0]?.home).toBe("./agents/default");
+  });
+
+  it("creates missing optional object branches for agent prompt context", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
+
+    const config = createConfig(join(root, "state-home", "imp"));
+    delete (config.agents[0] as { prompt?: unknown }).prompt;
+    await writeRawFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+    await createSetConfigValueUseCase({ writeOutput: vi.fn() })({
+      keyPath: "agents.default.prompt.instructions",
+      value: '[{"file":"./agents/default/AGENTS.md"}]',
+    });
+
+    const updated = JSON.parse(await readFile(configPath, "utf8")) as {
+      agents: Array<{ prompt?: { instructions?: Array<{ file: string }> } }>;
+    };
+    expect(updated.agents[0]?.prompt?.instructions).toEqual([
+      { file: "./agents/default/AGENTS.md" },
+    ]);
+  });
+
+  it("creates missing optional object branches for an agent workspace", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
+
+    await writeConfig(configPath);
+
+    await createSetConfigValueUseCase({ writeOutput: vi.fn() })({
+      keyPath: "agents.default.workspace.cwd",
+      value: "/workspace/project",
+    });
+
+    const config = JSON.parse(await readFile(configPath, "utf8")) as {
+      agents: Array<{ workspace?: { cwd?: string } }>;
+    };
+    expect(config.agents[0]?.workspace?.cwd).toBe("/workspace/project");
+  });
+
   it("updates a BOM-prefixed config file", async () => {
     const root = await createTempDir();
     const configPath = join(root, "custom", "imp.json");
@@ -121,7 +185,7 @@ describe("createSetConfigValueUseCase", () => {
     ).rejects.toThrow(`Invalid input config file ${configPath}`);
   });
 
-  it("fails with a key-path error when the requested config key is missing", async () => {
+  it("fails with a key-path error when the requested array item is missing", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
     vi.stubEnv("HOME", root);
@@ -132,12 +196,31 @@ describe("createSetConfigValueUseCase", () => {
 
     await expect(
       createSetConfigValueUseCase()({
-        keyPath: "endpoints.private-telegram.missing",
+        keyPath: "endpoints.missing.enabled",
         value: "false",
       }),
-    ).rejects.toThrow("Invalid target key path: endpoints.private-telegram.missing");
+    ).rejects.toThrow("Invalid target key path: endpoints.missing.enabled");
   });
 
+  it("fails without modifying the file when a created key is not accepted by the schema", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config-home", "imp", "config.json");
+    vi.stubEnv("HOME", root);
+    vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
+    vi.stubEnv("IMP_CONFIG_PATH", "");
+
+    await writeConfig(configPath);
+    const before = await readFile(configPath, "utf8");
+
+    await expect(
+      createSetConfigValueUseCase()({
+        keyPath: "agents.default.unknown.value",
+        value: "custom",
+      }),
+    ).rejects.toThrow("Config update targets an unsupported key path or value: agents.default.unknown.value");
+
+    await expect(readFile(configPath, "utf8")).resolves.toBe(before);
+  });
 
   it("allows updating a slightly inconsistent config when the mutation restores schema validity", async () => {
     const root = await createTempDir();
