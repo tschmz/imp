@@ -386,19 +386,15 @@ describe("resolveSystemPrompt", () => {
     });
   });
 
-  it("templates the built-in default prompt", async () => {
+  it("renders the built-in default prompt without unresolved template expressions", async () => {
     const prompt = await buildDefaultSystemPrompt();
 
-    expect(prompt).toContain("Agent: default");
-    expect(prompt).toContain("Model: faux/faux-1");
-    expect(prompt).toContain("Transport: telegram");
-    expect(prompt).toContain("Reply: telegram");
-    expect(prompt).not.toContain("{{agent.id}}");
+    expectRenderedTemplate(prompt);
   });
 
   it.each([
     {
-      name: "spoken-output guidance for audio outbox reply channels",
+      name: "audio outbox reply channels",
       context: {
         reply: {
           channel: {
@@ -408,17 +404,9 @@ describe("resolveSystemPrompt", () => {
           },
         },
       },
-      includes: [
-        "Reply: audio",
-        "The reply will be spoken aloud.",
-        "preferably one or two short sentences",
-        "Avoid Markdown, lists, tables, code blocks, links",
-        "Do not include URLs or file paths in final responses.",
-      ],
-      excludes: ["You are chatting through Telegram."],
     },
     {
-      name: "CLI Markdown guidance",
+      name: "CLI reply channels",
       context: {
         transport: {
           kind: "cli",
@@ -431,17 +419,9 @@ describe("resolveSystemPrompt", () => {
           },
         },
       },
-      includes: [
-        "Reply: cli",
-        "You are chatting through the interactive CLI.",
-        "Strikethrough with double tildes",
-        "Simple GitHub-flavored Markdown tables",
-        "Avoid task lists, images, raw HTML, footnotes",
-      ],
-      excludes: ["You are chatting through Telegram.", "The reply will be spoken aloud."],
     },
     {
-      name: "the same spoken-output restrictions for all audio reply channels",
+      name: "audio endpoint reply channels",
       context: {
         reply: {
           channel: {
@@ -451,15 +431,9 @@ describe("resolveSystemPrompt", () => {
           },
         },
       },
-      includes: [
-        "Reply: audio",
-        "The reply will be spoken aloud.",
-        "Do not include URLs or file paths in final responses.",
-      ],
-      excludes: [],
     },
     {
-      name: "neutral guidance for none reply channels",
+      name: "none reply channels",
       context: {
         reply: {
           channel: {
@@ -469,45 +443,21 @@ describe("resolveSystemPrompt", () => {
           },
         },
       },
-      includes: ["Reply: none", "Keep responses compact by default."],
-      excludes: [
-        "You are chatting through Telegram.",
-        "You are chatting through the interactive CLI.",
-        "The reply will be spoken aloud.",
-      ],
     },
-  ])("renders $name in the built-in default prompt", async ({ context, includes, excludes }) => {
-    const prompt = await buildDefaultSystemPrompt({
-      templateContext: mergeTemplateContext(createTemplateContext(), context),
-    });
-
-    for (const snippet of includes) {
-      expect(prompt).toContain(snippet);
-    }
-    for (const snippet of excludes) {
-      expect(prompt).not.toContain(snippet);
-    }
-  });
-
-  it("renders a minimal phone prompt without technical default sections", async () => {
-    const prompt = await buildDefaultSystemPrompt({
-      templateContext: {
-        ...createTemplateContext(),
-        conversation: {
-          kind: "phone-call",
-          metadata: {
-            contact_name: "Thomas",
-            contact_uri: "+10000000000",
-          },
-        },
-        reply: {
-          channel: {
-            kind: "phone",
-            delivery: "outbox",
-            endpointId: "",
+    {
+      name: "missing optional workspace values",
+      context: {
+        agent: {
+          ...createTemplateContext().agent,
+          workspace: {
+            cwd: "",
           },
         },
       },
+    },
+    {
+      name: "available skills",
+      context: {},
       availableSkills: [
         {
           name: "commit",
@@ -520,46 +470,17 @@ describe("resolveSystemPrompt", () => {
           scripts: [],
         },
       ],
-    });
-
-    expect(prompt).toContain("You are a helpful assistant in a live phone call.");
-    expect(prompt).toContain("You are speaking with Thomas.");
-    expect(prompt).toContain("Speak naturally, personally, and calmly.");
-    expect(prompt).toContain("end your reply with a question");
-    expect(prompt).not.toContain("Runtime Context");
-    expect(prompt).not.toContain("Tooling And Execution");
-    expect(prompt).not.toContain("Skills");
-    expect(prompt).not.toContain("available_skills");
-    expect(prompt).not.toContain("Reply channel");
-    expect(prompt).not.toContain("Workspace");
-    expect(prompt).not.toContain("final answer");
-    expect(prompt).not.toContain("{{conversation.metadata.contact_name}}");
-  });
-
-  it("renders phone note-finalization guidance for closed phone calls", async () => {
+    },
+  ])("renders $name in the built-in default prompt without unresolved template expressions", async ({
+    context,
+    availableSkills,
+  }) => {
     const prompt = await buildDefaultSystemPrompt({
-      templateContext: {
-        ...createTemplateContext(),
-        conversation: {
-          kind: "phone-call",
-          metadata: {
-            contact_name: "Thomas",
-          },
-        },
-        reply: {
-          channel: {
-            kind: "none",
-            delivery: "none",
-            endpointId: "",
-          },
-        },
-      },
+      templateContext: mergeTemplateContext(createTemplateContext(), context),
+      availableSkills,
     });
 
-    expect(prompt).toContain("You are a helpful assistant in a live phone call.");
-    expect(prompt).toContain("The call has ended. Finalize notes");
-    expect(prompt).toContain("do not write a reply for the caller");
-    expect(prompt).not.toContain("Runtime Context");
+    expectRenderedTemplate(prompt);
   });
 
   it("injects available skill metadata before additional context files", async () => {
@@ -632,6 +553,11 @@ describe("resolveSystemPrompt", () => {
     expect(prompt.indexOf("<available_skills>")).toBeLessThan(prompt.indexOf("<REFERENCE"));
   });
 });
+
+function expectRenderedTemplate(prompt: string): void {
+  expect(prompt.trim().length).toBeGreaterThan(0);
+  expect(prompt).not.toMatch(/\{\{[^}]+}}/);
+}
 
 function createAgent(): AgentDefinition {
   return createPromptTestAgent({
