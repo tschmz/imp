@@ -1,104 +1,117 @@
 # Troubleshooting
 
-## `imp start` Cannot Find A Config
+Start with the failing command and the active config. Most setup problems are caused by targeting a different config file than expected, missing credentials, or a service environment that differs from the interactive shell.
 
-Check where `imp` looks for the config:
+## `imp start` Cannot Find a Config
 
-- `--config /path/to/config.json`
-- `IMP_CONFIG_PATH`
-- `XDG_CONFIG_HOME/imp/config.json`
-- `~/.config/imp/config.json`
-- `/etc/imp/config.json`
+Check where Imp looks for config:
 
-If needed, create a fresh config:
+1. `--config /path/to/config.json`
+2. `IMP_CONFIG_PATH`
+3. `XDG_CONFIG_HOME/imp/config.json`, when `XDG_CONFIG_HOME` is set
+4. `~/.config/imp/config.json`, when `XDG_CONFIG_HOME` is not set
+5. `/etc/imp/config.json`
 
-```bash
+Create a fresh config when needed:
+
+```sh
 imp init
+```
+
+Use `--config` when you want to remove ambiguity:
+
+```sh
+imp start --config /path/to/config.json
 ```
 
 ## Config Validation Fails
 
 Validate explicitly:
 
-```bash
+```sh
 imp config validate
 ```
 
-Common causes:
+Common causes are:
 
-- duplicate agent IDs
-- duplicate endpoint IDs
+- Duplicate agent IDs
+- Duplicate endpoint IDs
 - `defaults.agentId` points to a missing agent
-- an endpoint routes to a missing agent
-- a prompt source defines both `text` and `file`
-- all endpoints are disabled
-- a Telegram token env reference points to a variable that is not set
-- a Telegram token file reference points to a missing, unreadable, or empty file
+- An endpoint routes to a missing agent
+- A prompt source defines both `text` and `file`
+- A Telegram token environment variable is missing
+- A Telegram token file is missing, unreadable, or empty
 
-If validation fails on a token reference, check whether:
+If `imp start` reports `Config must enable at least one daemon endpoint.`, enable a non-CLI endpoint such as Telegram, or use `imp chat` for a local CLI chat.
 
-- the configured environment variable exists in the current shell or service environment
-- the referenced secret file path is correct relative to the config file
-- the secret file is readable by the user running `imp`
-- the secret file contains the token rather than being empty
-
-## Telegram Endpoint Does Not Respond
+## Telegram Does Not Respond
 
 Check these first:
 
-- the endpoint token is valid
-- the endpoint is enabled
-- your Telegram user ID is listed in `access.allowedUserIds`
-- you are messaging the endpoint in a private chat
+- The endpoint is enabled
+- The bot token is valid
+- Your Telegram user ID is listed in `access.allowedUserIds`
+- You are messaging the bot in a private chat
+- The daemon or service is running
 
-Use `/whoami` to inspect the current Telegram user and chat IDs once the endpoint is reachable.
+Once the endpoint is reachable, use `/whoami` to confirm the user and chat IDs.
 
-## Service Starts Differently From The Shell
+## Service Differs From the Shell
 
-This usually means the service environment is missing provider credentials or PATH entries.
+This usually means the service environment is missing provider credentials, token variables, OAuth files, or PATH entries.
 
-Check:
+Check the variables required by the configured provider and any endpoint token references. On Linux, refresh the managed service environment:
 
-- API key variables required by the chosen provider
-- OAuth credential files such as `authFile`
-- service-specific environment files
-
-On Linux, refresh the managed service environment:
-
-```bash
+```sh
 imp service install --force
 ```
 
-## Prompt Or Reference Files Are Not Found
+Then restart the service.
 
-Remember that relative paths are resolved relative to the config file directory, not the current shell directory.
+## Prompt Files Are Not Found
 
-If in doubt, switch to absolute paths for:
+Relative paths are resolved from the config file directory, not from the current shell directory.
+
+Check these fields:
 
 - `prompt.base.file`
 - `prompt.instructions[].file`
 - `prompt.references[].file`
 - `authFile`
 - `workspace.cwd`
+- `endpoints[].token.file`
+
+Use absolute paths if the config is edited or executed from different directories.
 
 ## Prompt Templating Fails
 
-Prompt templating only applies to file-backed `prompt.base`, `prompt.instructions`, and `prompt.references` entries.
+Prompt text and prompt files can use template variables. Templating fails when the prompt references an unknown variable or unsupported helper.
 
-Common causes:
+Check:
 
-- the file uses an unknown variable such as `{{agent.unknownField}}`
-- the file uses an unknown helper or custom helper not provided by `imp`
-- you expected templating in inline `text`, which is not supported
+- The file path named in the error
+- The exact variable name
+- Whether the value exists in the current runtime context
+- Whether the helper is one of the built-in helpers documented in [Agent Context](./agent-context.md)
 
-If templating fails, check:
+Known variables with no runtime value render as an empty string. Unknown variables fail during prompt assembly.
 
-- the exact file path named in the error
-- whether the variable is one of the documented template variables
-- whether the helper is one of `if`, `unless`, `each`, `with`, `eq`, `instructionAttr`, or `instructionText`
+## Tools Are Missing
+
+Tools must be enabled for the active agent. Check the selected agent first:
+
+```sh
+imp config get agents.default.tools
+```
+
+For Telegram chats, `/agent` shows the selected agent and its configured tools.
+
+See [Agent Tools](./agent-tools.md) for built-in tools, MCP servers, delegated agents, and skills.
 
 ## Need More Detail
 
-- See [Telegram commands](./telegram.md)
-- See [Supported providers](./providers.md)
-- See [Built-in tools](./tools.md)
+- [Configuration](./configuration.md)
+- [Telegram](./telegram.md)
+- [Providers](./providers.md)
+- [Agent Context](./agent-context.md)
+- [Agent Tools](./agent-tools.md)

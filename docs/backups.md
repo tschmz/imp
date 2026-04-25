@@ -1,65 +1,59 @@
 # Backups
 
-`imp` can create and restore backup archives for the active installation.
+Imp can create and restore backup archives for the active installation. Backups are useful before changing config, moving an installation, or replacing a machine.
 
-## Create A Backup
+## Create a Backup
 
 Create a full backup:
 
-```bash
+```sh
 imp backup create
 ```
 
-Write to a specific archive path:
+Write the archive to a specific path:
 
-```bash
+```sh
 imp backup create --output /tmp/imp-backup.tar
 ```
 
 Overwrite an existing archive:
 
-```bash
+```sh
 imp backup create --force
 ```
 
-## Backup Scopes
+## Choose Backup Scopes
 
-You can limit the backup to selected scopes:
+By default, a backup includes:
 
-- `config`
-- `agents`
-- `conversations`
+- The active config file
+- Prompt and auth files referenced by the config
+- Conversations under `paths.dataRoot/conversations`
 
-Examples:
+Limit the backup to selected scopes when needed:
 
-```bash
+```sh
 imp backup create --only conversations
 imp backup create --only config,agents
 ```
 
-By default, backups include:
+Available scopes are `config`, `agents`, and `conversations`.
 
-- the active config file
-- prompt and auth files referenced by the config
-- the shared conversation store under `paths.dataRoot/conversations`
-
-Current backup behavior does **not** include Telegram token secret files referenced via `endpoints[].token.file`.
-Those files stay outside the archive and must be backed up separately if you use file-based token references.
-Environment-variable-based token references also do not embed the secret value into the backup archive.
+Telegram token secret files referenced through `endpoints[].token.file` are not included in the archive. Back them up separately if you use file-based token references. Environment-variable token references also do not embed the secret value into the archive.
 
 If a referenced prompt or auth file is missing, backup creation fails instead of producing a partial archive.
 
-## Restore A Backup
+## Restore a Backup
 
 Restore everything and overwrite existing files:
 
-```bash
+```sh
 imp restore /path/to/imp-backup.tar --force
 ```
 
 Restore into a different installation target:
 
-```bash
+```sh
 imp restore /path/to/imp-backup.tar \
   --config /path/to/config.json \
   --data-root /path/to/data-root \
@@ -68,14 +62,12 @@ imp restore /path/to/imp-backup.tar \
 
 Restore only selected scopes:
 
-```bash
+```sh
 imp restore /path/to/imp-backup.tar --only conversations --force
 ```
 
-## Important Restore Behavior
+## Restore Behavior
 
-- conversation restores replace the shared conversation subtree
-- unrelated runtime data under `paths.dataRoot` is left untouched
-- `--only agents` is stricter and requires either `config` to be restored too, or an already existing target config
+Conversation restores replace the shared conversation store. Other runtime data under `paths.dataRoot` is left untouched.
 
-This prevents agent files from being restored into an undefined layout.
+`--only agents` requires either a restored config or an already existing target config, because agent files need a defined installation layout.

@@ -1,21 +1,5 @@
-# imp
+# Imp
 
-`imp` is a local daemon for running personal AI agents behind persistent conversation endpoints.
+Imp is a local service for running personal AI agents. It is designed for users who want AI assistants they can reach from familiar places, such as Telegram or a local terminal, while keeping the runtime under their own control.
 
-It is meant for personal automation where conversation sessions should keep context, agents should be reachable through communication channels such as Telegram, and the runtime should remain under local control.
-
-`imp` is early-stage and can still change.
-
-## Core Concepts
-
-### Agents
-
-Agents define how `imp` should answer within a conversation. An agent combines a model, prompt customization, tools, optional skills, and an optional workspace. Multiple agents can live in one daemon so different roles can share the same runtime while keeping their own behavior and working context.
-
-### Endpoints
-
-Endpoints define where conversations enter the system. Telegram and local CLI chat are supported endpoint types. Endpoints are transport-facing and own their runtime files. Conversation sessions are shared per agent across endpoints, while each endpoint chat remembers which agent it is currently talking to and defaults to its configured routing agent. The local CLI chat endpoint is started directly with `imp chat`; it is not started by the daemon service.
-
-### Transports
-
-Transports connect endpoint types to external systems. The built-in Telegram transport receives Telegram messages, sends them into `imp`, and delivers responses back to Telegram. The built-in CLI transport powers `imp chat` for a local terminal conversation.
+See [the documentation](./docs/index.md) to get started.

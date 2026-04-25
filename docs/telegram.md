@@ -1,42 +1,96 @@
-# Telegram Commands
+# Telegram
 
-Telegram endpoints register their command menu automatically on startup for each configured endpoint.
+Telegram endpoints let you chat with an Imp agent from a private Telegram chat. The endpoint needs a bot token and an allowlist of Telegram user IDs.
 
-These commands are part of the built-in Telegram UX. They control sessions, diagnostics, and daemon lifecycle from chat.
+## Configure Telegram
 
-Current commands:
+The interactive setup can create a Telegram endpoint:
 
-- `/help` shows the available commands.
-- `/whoami` shows the current endpoint, chat, and user IDs.
-- `/new` starts a fresh session for the chat's current agent and keeps the previous session available in `/history`.
-- `/start` is an alias for `/new`.
-- `/rename <title>` sets a title for the current agent's active session.
-- `/reset` resets the messages in the current agent's active session while preserving its title and agent.
-- `/status` shows the current agent's active session details, including title, agent, message count, timestamps, working directory, and how many previous sessions are available.
-- `/history` lists previous sessions for the current agent and their transcript entry counts.
-- `/resume <n>` switches the current agent to session `n` from `/history` and replays the visible user and assistant messages into the chat.
-- `/export` writes the current agent's active session transcript to an HTML file and replies with the file path and link. Use `/export full` to include complete tool arguments, tool output, and technical details; the default readable export keeps tool details compact.
-- `/ping` returns a simple liveness response.
-- `/config` shows runtime and config details for the current endpoint, including instance name, config path, data root, logging level, enabled endpoints, and the endpoint's default agent.
-- `/agent` shows the chat's currently selected agent details, including provider, model, base prompt, home, auth file, instructions, references, workspace, skills, tools, and available agent IDs.
-- `/agent <id>` switches this chat to that agent's active session and shows its details.
-- `/logs` shows the last 20 daemon log lines for the current endpoint.
-- `/logs <lines>` shows that many recent daemon log lines for the current endpoint for this command invocation only.
-- `/whoami` shows the current endpoint, chat, and user IDs. This is useful when filling `access.allowedUserIds`.
-- `/reload` sends the reply first, then exits the daemon so a supervisor can restart it and reload config from disk.
-- `/restart` sends the reply first, then exits the daemon so a supervisor can restart it.
+```sh
+imp init
+```
 
-Notes:
+If your config already contains an endpoint named `private-telegram`, set its token from an environment variable:
 
-- `/start` is treated as an alias for `/new`.
-- A chat's selected agent defaults from the endpoint's `routing.defaultAgentId`. Switching agents does not rewrite an existing session; it points the chat at the selected agent's active session.
-- Active sessions are agent-scoped. If one surface starts a new session for an agent, later messages to that same agent from another surface continue in that new session.
-- `/reload` and `/restart` are most useful when `imp` is installed under a service manager.
-- `/logs` reads the endpoint's daemon log file. If no log file exists yet, the command says so instead of inferring that the endpoint is live.
-- If `endpoints[].voice.enabled` is configured, private Telegram voice messages are accepted, transcribed, echoed back as a `Transcript` message, and then processed like normal user text.
-- Voice transcription uses OpenAI only and requires `OPENAI_API_KEY` in the daemon environment.
-- Private Telegram document attachments from allowed users are downloaded into the active session under `attachments/`.
-- Document captions become the user message text. If no caption is present, imp sends the agent a text message that explicitly says a document was uploaded.
-- Document messages include explicit attachment context for the agent, including Telegram metadata and the local saved path.
-- Document downloads are limited by `endpoints[].document.maxDownloadBytes`, which defaults to `20971520` bytes.
-- Photos are not supported and are not treated as document or image-understanding input.
+```sh
+imp config set endpoints.private-telegram.token '{"env":"IMP_TELEGRAM_BOT_TOKEN"}'
+```
+
+Allow your Telegram user ID:
+
+```sh
+imp config set endpoints.private-telegram.access.allowedUserIds '["123456789"]'
+```
+
+Validate the config:
+
+```sh
+imp config validate
+```
+
+Use `/whoami` in a reachable Telegram chat to see the current chat and user IDs.
+
+## Start the Endpoint
+
+Start enabled daemon endpoints:
+
+```sh
+imp start
+```
+
+If Imp is installed as a background service, restart or reload the service after changing endpoint config.
+
+## Commands
+
+Enter `/help` in Telegram to view available commands.
+
+Common commands are:
+
+- `/new`: start a fresh session for the current agent
+- `/start`: same as `/new`
+- `/status`: show the current session details
+- `/history`: list previous sessions for the current agent
+- `/resume <n>`: resume a session from `/history`
+- `/rename <title>`: rename the current session
+- `/reset`: clear the current session messages while keeping its title and agent
+- `/export`: export the current session transcript
+- `/agent`: show the selected agent
+- `/agent <id>`: switch this chat to another configured agent
+- `/config`: show runtime and config details for the endpoint
+- `/logs`: show recent daemon log lines
+- `/reload`: ask the daemon to exit so a supervisor can restart it with fresh config
+- `/restart`: same restart behavior as `/reload`
+- `/ping`: check whether the endpoint is alive
+- `/whoami`: show endpoint, chat, and user IDs
+
+## Agent Selection
+
+A chat's selected agent starts from the endpoint's `routing.defaultAgentId`, or from `defaults.agentId` when the endpoint has no override.
+
+Switching agents does not rewrite an existing session. It points the chat at the selected agent's active session.
+
+## Voice Messages
+
+Private Telegram voice messages can be transcribed before they reach the agent:
+
+```sh
+imp config set endpoints.private-telegram.voice '{"enabled":true,"transcription":{"provider":"openai","model":"gpt-4o-mini-transcribe"}}'
+```
+
+Voice transcription requires `OPENAI_API_KEY` in the runtime environment. The transcript is shown in Telegram and stored as text in the session.
+
+## Documents And Images
+
+Private Telegram document attachments from allowed users are downloaded into the active session under `attachments/`.
+
+Captions become the user message text. If a document has no caption, Imp sends the agent a message that says a document was uploaded and includes the local saved path.
+
+Image documents and Telegram photos are also downloaded into `attachments/`. If the selected model supports image input, Imp sends the image bytes to the agent along with the text context. If the model does not support image input, the agent still receives the saved path, relative path, MIME type, size, and Telegram file IDs as text context.
+
+Set a document download limit when needed:
+
+```sh
+imp config set endpoints.private-telegram.document.maxDownloadBytes 20971520
+```
+
+The same download limit applies to normal documents, image documents, and Telegram photos. The default limit is 20 MiB.
