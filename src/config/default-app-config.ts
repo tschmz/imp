@@ -5,7 +5,6 @@ import type { AppConfig } from "./types.js";
 
 const defaultAgentId = "default";
 const defaultEndpointId = "private-telegram";
-const defaultTelegramToken = "replace-me";
 const defaultTools = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 
 export interface InitialConfigAnswers {
@@ -95,10 +94,6 @@ export function buildInitialAppConfig(
   };
 }
 
-export function getDefaultTelegramToken(): string {
-  return defaultTelegramToken;
-}
-
 export function getSuggestedModelId(provider: string): string {
   switch (provider) {
     case "anthropic":
@@ -119,13 +114,6 @@ export function getSuggestedModelId(provider: string): string {
 export function parseCommaSeparatedValues(raw: string): string[] {
   return raw
     .split(",")
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0);
-}
-
-export function parsePathEntries(raw: string): string[] {
-  return raw
-    .split(":")
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
 }

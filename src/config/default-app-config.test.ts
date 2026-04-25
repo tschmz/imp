@@ -4,7 +4,6 @@ import {
   buildInitialAppConfig,
   createDefaultAppConfig,
   parseCommaSeparatedValues,
-  parsePathEntries,
   validateTelegramUserIds,
 } from "./default-app-config.js";
 
@@ -136,14 +135,6 @@ describe("default app config helpers", () => {
 
   it("parses comma-separated values", () => {
     expect(parseCommaSeparatedValues(" 1, 2 ,,3 ")).toEqual(["1", "2", "3"]);
-  });
-
-  it("parses colon-separated path entries", () => {
-    expect(parsePathEntries(" /usr/local/bin : /usr/bin::/bin ")).toEqual([
-      "/usr/local/bin",
-      "/usr/bin",
-      "/bin",
-    ]);
   });
 
   it("validates Telegram user IDs", () => {

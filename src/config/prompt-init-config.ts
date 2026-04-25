@@ -3,10 +3,8 @@ import { join } from "node:path";
 import {
   buildInitialAppConfig,
   createDefaultAppConfig,
-  getDefaultTelegramToken,
   getSuggestedModelId,
   parseCommaSeparatedValues,
-  parsePathEntries,
   validateTelegramUserIds,
 } from "./default-app-config.js";
 import type { AppConfig } from "./types.js";
@@ -76,18 +74,6 @@ export async function promptForInitialAppConfig(
     validate: requireNonEmpty("Model ID is required."),
   });
 
-  const telegramToken = await dependencies.input({
-    message: "Telegram endpoint token",
-    default: getDefaultTelegramToken(),
-    validate: requireNonEmpty("Telegram endpoint token is required."),
-  });
-
-  const allowedUserIdsRaw = await dependencies.input({
-    message: "Allowed Telegram user IDs (comma-separated, optional)",
-    default: "",
-    validate: validateTelegramUserIds,
-  });
-
   const workingDirectory = await dependencies.input({
     message: "Workspace directory for the agent (optional)",
     default: "",
@@ -101,23 +87,23 @@ export async function promptForInitialAppConfig(
         })
       : false;
 
-  const extraContextFilesRaw = await dependencies.input({
-    message: "Additional reference files for the prompt (comma-separated, optional)",
+  const telegramTokenRaw = await dependencies.input({
+    message: "Telegram bot token (optional, leave empty to skip)",
     default: "",
   });
+  const telegramToken = telegramTokenRaw.trim();
+  const configureTelegram = telegramToken.length > 0;
 
-  const shellPathRaw = await dependencies.input({
-    message: "Workspace shell PATH for the bash tool (colon-separated, optional)",
-    default: "",
-  });
+  const allowedUserIdsRaw = configureTelegram
+    ? await dependencies.input({
+        message: "Allowed Telegram user IDs (comma-separated)",
+        default: "",
+        validate: validateRequiredTelegramUserIds,
+      })
+    : "";
 
   const installService =
-    process.platform === "win32"
-      ? false
-      : await dependencies.confirm({
-          message: "Install and start imp as a background service now?",
-          default: true,
-        });
+    configureTelegram && (process.platform === "linux" || process.platform === "darwin");
 
   const serviceEnvironment =
     installService && process.platform === "linux"
@@ -130,14 +116,12 @@ export async function promptForInitialAppConfig(
       dataRoot,
       provider,
       modelId,
-      telegramToken,
+      ...(configureTelegram ? { telegramToken } : {}),
       allowedUserIds: parseCommaSeparatedValues(allowedUserIdsRaw),
       ...(workingDirectory.length > 0 ? { workingDirectory } : {}),
       instructionFiles: [
         ...(includeAgentsFile ? [join(workingDirectory, "AGENTS.md")] : []),
       ],
-      referenceFiles: parseCommaSeparatedValues(extraContextFilesRaw),
-      shellPath: parsePathEntries(shellPathRaw),
     }),
     installService,
     ...(serviceEnvironment ? { serviceEnvironment } : {}),
@@ -187,6 +171,15 @@ function requireNonEmpty(message: string): (value: string) => true | string {
 
     return message;
   };
+}
+
+function validateRequiredTelegramUserIds(raw: string): true | string {
+  const values = parseCommaSeparatedValues(raw);
+  if (values.length === 0) {
+    return "At least one Telegram user ID is required when Telegram is configured.";
+  }
+
+  return validateTelegramUserIds(raw);
 }
 
 export function getProviderEnvironmentVariables(provider: string): string[] {

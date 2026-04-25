@@ -187,7 +187,6 @@ describe("createCli", () => {
     expect(dependencies.initConfig).toHaveBeenCalledWith({
       configPath: "/tmp/imp.json",
       force: false,
-      defaults: false,
     });
     expect(dependencies.syncManagedSkills).toHaveBeenCalledWith({
       configPath: "/tmp/imp.json",

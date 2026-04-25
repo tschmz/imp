@@ -61,14 +61,12 @@ export function createCli(dependencies: CliDependencies): Command {
     program
       .command("init")
       .description("Create an initial config file")
-      .option("-f, --force", "Overwrite an existing config file")
-      .option("--defaults", "Skip prompts and write the default config template"),
+      .option("-f, --force", "Overwrite an existing config file"),
   ).action(
-    withAsyncAction(async (options: { config?: string; force?: boolean; defaults?: boolean }) => {
+    withAsyncAction(async (options: { config?: string; force?: boolean }) => {
       await dependencies.initConfig({
         configPath: options.config,
         force: booleanWithDefault(options.force, false),
-        defaults: booleanWithDefault(options.defaults, false),
       });
     }),
   );

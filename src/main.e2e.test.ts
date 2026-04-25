@@ -57,57 +57,13 @@ describe("imp CLI e2e", () => {
     expect(stdout.trim()).toBe(packageJson.version);
   }, cliE2eTimeoutMs);
 
-  it("creates a default config through `imp init --defaults`", async () => {
-    const root = await createTempDir();
-    const env = createTestEnv(root);
-
-    const { stdout } = await runCli(["init", "--defaults"], env);
-    const configPath = join(root, "config-home", "imp", "config.json");
-    const environmentPath = join(root, "config-home", "imp", "service.env");
-    const servicePath =
-      process.platform === "darwin"
-        ? join(root, "Library", "LaunchAgents", "dev.imp.plist")
-        : process.platform === "linux"
-          ? join(root, ".config", "systemd", "user", "imp.service")
-          : null;
-    const raw = await readFile(configPath, "utf8");
-    const config = JSON.parse(raw) as {
-      paths: { dataRoot: string };
-      agents: Array<{ id: string; prompt?: { base?: { file?: string } } }>;
-      endpoints: unknown[];
-    };
-
-    expect(stdout).toContain(`Created config at ${configPath}`);
-    if (servicePath) {
-      expect(stdout).not.toContain(`Installed`);
-      await expect(stat(servicePath)).rejects.toMatchObject({
-        code: "ENOENT",
-      });
-    }
-    if (process.platform === "linux") {
-      await expect(readFile(environmentPath, "utf8")).rejects.toMatchObject({
-        code: "ENOENT",
-      });
-    }
-    expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
-    expect(config.agents[0]?.id).toBe("default");
-    expect(config.agents[0]?.prompt).toBeUndefined();
-    expect(config.endpoints).toEqual([]);
-    await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-    await expect(
-      readFile(join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain(`- global shared catalog: \`${join(root, "state-home", "imp", "skills")}\``);
-  }, cliE2eTimeoutMs);
-
   it("refreshes the managed imp skill through `imp skills sync-managed`", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
     const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
 
-    await runCli(["init", "--defaults"], env);
+    await writeDefaultConfig(root);
     await writeTextFile(skillPath, "stale skill\n");
 
     const { stdout } = await runCli(["skills", "sync-managed", "--config", configPath], env);
@@ -126,7 +82,7 @@ describe("imp CLI e2e", () => {
     const authPath = join(dataRoot, "auth.json");
     const conversationPath = join(dataRoot, "conversations", "agents", "default", "sessions", "session-1", "meta.json");
 
-    await runCli(["init", "--defaults"], env);
+    await writeDefaultConfig(root);
     await overwriteConfig(configPath, {
       instance: {
         name: "default",
@@ -222,7 +178,7 @@ describe("imp CLI e2e", () => {
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
 
-    await runCli(["init", "--defaults"], env);
+    await writeDefaultConfig(root);
     await overwriteConfig(configPath, {
       instance: {
         name: "default",
@@ -271,7 +227,7 @@ describe("imp CLI e2e", () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
 
-    await runCli(["init", "--defaults"], env);
+    await writeDefaultConfig(root);
 
     const configPath = join(root, "config-home", "imp", "config.json");
 
@@ -301,7 +257,7 @@ describe("imp CLI e2e", () => {
     const configPath = join(root, "config-home", "imp", "config.json");
     const dataRoot = join(root, "state-home", "imp");
 
-    await runCli(["init", "--defaults"], env);
+    await writeDefaultConfig(root);
     await overwriteConfig(configPath, {
       instance: {
         name: "default",
@@ -372,7 +328,7 @@ describe("imp CLI e2e", () => {
     const configPath = join(root, "config-home", "imp", "config.json");
     const logFilePath = join(root, "state-home", "imp", "logs", "endpoints", "private-telegram.log");
 
-    await runCli(["init", "--defaults"], env);
+    await writeDefaultConfig(root);
     await overwriteConfig(configPath, {
       instance: {
         name: "default",
@@ -419,13 +375,13 @@ describe("imp CLI e2e", () => {
     expect(stdout).toBe("two\nthree\n");
   }, cliE2eTimeoutMs);
 
-  it("rejects non-interactive init without --defaults", async () => {
+  it("rejects non-interactive init", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
 
     await expect(runCli(["init"], env)).rejects.toMatchObject({
       stderr: expect.stringContaining(
-        "`imp init` requires an interactive terminal. Re-run with --defaults to skip prompts.",
+        "`imp init` requires an interactive terminal.",
       ),
     });
   }, cliE2eTimeoutMs);
@@ -476,6 +432,42 @@ async function overwriteConfig(path: string, config: unknown): Promise<void> {
   const { mkdir, writeFile } = await import("node:fs/promises");
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+async function writeDefaultConfig(root: string): Promise<void> {
+  await overwriteConfig(join(root, "config-home", "imp", "config.json"), {
+    instance: {
+      name: "default",
+    },
+    paths: {
+      dataRoot: join(root, "state-home", "imp"),
+    },
+    logging: {
+      level: "info",
+    },
+    defaults: {
+      agentId: "default",
+    },
+    agents: [
+      {
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
+        inference: {
+          metadata: {
+            app: "imp",
+          },
+          request: {
+            store: true,
+          },
+        },
+      },
+    ],
+    endpoints: [],
+  });
 }
 
 async function writeLogFile(path: string, lines: string[]): Promise<void> {
