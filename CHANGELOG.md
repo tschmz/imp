@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.13.0 - 2026-04-25
+
+### Added
+
+- Add agent delegation tools so agents can call configured child agents and return only their final text response.
+- Add telegram image input handling for vision-capable models, including persisted image replay for later turns.
+- Add support for custom model metadata in agent config for OpenAI-compatible local or custom models.
+- Add clearer user-facing processing errors for agent, tool, and runtime failures.
+
+### Changed
+
+- Refactor prompt template and system prompt resolution to share context, section, and source helpers while centralizing prompt context file rendering.
+
+### Fixed
+
+- Render markdown lists correctly in telegram messages.
+- Infer telegram photo MIME types during image handling.
+- Keep `imp.service` running during `just install`.
+
 ## 0.12.0 - 2026-04-21
 
 ### Added
