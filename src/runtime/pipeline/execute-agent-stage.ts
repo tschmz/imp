@@ -3,7 +3,6 @@ import type { AgentDefinition } from "../../domain/agent.js";
 import type { AgentHandle } from "../agent-execution.js";
 import { executeAgent } from "../agent-execution.js";
 import type { AgentRunResult } from "../context.js";
-import { renderIncomingMessageTextForAgent } from "../message-mapping.js";
 import { createOnPayloadOverride } from "./resolve-tools-stage.js";
 import type { ResolveToolsStageContext } from "./resolve-tools-stage.js";
 
@@ -28,7 +27,7 @@ export async function executeAgentStage(
     model: context.model,
     systemPrompt: context.systemPromptResolution.systemPrompt,
     tools: context.tools,
-    userText: renderIncomingMessageTextForAgent(context.input.message),
+    message: context.input.message,
     conversationMessages: context.conversation.messages,
     onPayload: createOnPayloadOverride(context.agent),
     workingDirectoryState: context.workingDirectoryState,

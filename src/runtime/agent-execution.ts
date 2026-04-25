@@ -5,6 +5,7 @@ import {
   type AgentOptions,
 } from "@mariozechner/pi-agent-core";
 import type { Api as AiApi, AssistantMessage, Model } from "@mariozechner/pi-ai";
+import type { IncomingMessage } from "../domain/message.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationEvent } from "../domain/conversation.js";
 import {
@@ -13,7 +14,12 @@ import {
 } from "../domain/processing-error.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { ReplyChannelContext } from "./context.js";
-import { getAssistantText, toAgentMessages, toConversationEvents } from "./message-mapping.js";
+import {
+  getAssistantText,
+  renderIncomingMessageForAgent,
+  toAgentMessages,
+  toConversationEvents,
+} from "./message-mapping.js";
 import type { WorkingDirectoryState } from "./tool-resolution.js";
 
 export type AgentHandle =
@@ -35,7 +41,7 @@ export interface ExecuteAgentOptions {
   model: Model<AiApi>;
   systemPrompt: string;
   tools: ToolDefinition[];
-  userText: string;
+  message: IncomingMessage;
   conversationMessages: Parameters<typeof toAgentMessages>[0];
   onPayload: AgentOptions["onPayload"];
   workingDirectoryState: WorkingDirectoryState;
@@ -49,6 +55,7 @@ export interface ExecuteAgentOptions {
   replyChannel?: ReplyChannelContext;
   onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
   continueFromContext?: boolean;
+  readBinaryFile?: (path: string) => Promise<Uint8Array>;
 }
 
 export interface ExecuteAgentResult {
@@ -97,7 +104,12 @@ export function defaultCreateAgent(options: AgentOptions): AgentHandle {
 
 export async function executeAgent(options: ExecuteAgentOptions): Promise<ExecuteAgentResult> {
   const createAgent = options.createAgent ?? defaultCreateAgent;
-  const initialMessages = toAgentMessages(options.conversationMessages, options.model);
+  const initialMessages = await toAgentMessages(options.conversationMessages, options.model, {
+    readBinaryFile: options.readBinaryFile,
+  });
+  const currentTurn = await renderIncomingMessageForAgent(options.message, options.model, {
+    readBinaryFile: options.readBinaryFile,
+  });
   const initialTurnIndexes = countExistingTurnEvents(options.conversationMessages, options.parentMessageId);
 
   const agent = createAgent({
@@ -131,7 +143,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       }
       await agent.continue();
     } else {
-      await agent.prompt(options.userText);
+      await agent.prompt(currentTurn.text, currentTurn.images);
     }
   } finally {
     eventMessages.unsubscribe?.();

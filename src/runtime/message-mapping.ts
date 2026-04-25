@@ -2,6 +2,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type {
   Api as AiApi,
   AssistantMessage,
+  ImageContent,
   Model,
   ToolResultMessage,
   UserMessage,
@@ -18,16 +19,23 @@ const TRANSCRIBED_MESSAGE_PREFIX =
 
 const TELEGRAM_DOCUMENT_CONTEXT =
   "Telegram document uploaded. The file has been downloaded and saved locally for this conversation.";
+const TELEGRAM_IMAGE_CONTEXT =
+  "Telegram image uploaded. The image has been downloaded and saved locally for this conversation.";
 
-export function toAgentMessages(
+export async function toAgentMessages(
   messages: ConversationEvent[],
   model: Model<AiApi>,
-): Array<UserMessage | AssistantMessage | ToolResultMessage> {
-  return messages.map<UserMessage | AssistantMessage | ToolResultMessage>((message) => {
+  dependencies: {
+    readBinaryFile?: (path: string) => Promise<Uint8Array>;
+  } = {},
+): Promise<Array<UserMessage | AssistantMessage | ToolResultMessage>> {
+  const readBinaryFile = dependencies.readBinaryFile ?? defaultReadBinaryFile;
+
+  return Promise.all(messages.map(async (message): Promise<UserMessage | AssistantMessage | ToolResultMessage> => {
     if (message.role === "user") {
       return {
         role: "user",
-        content: renderUserMessageContent(message),
+        content: await renderUserMessageContent(message, model, readBinaryFile),
         timestamp: resolveMessageTimestamp(message),
       };
     }
@@ -56,7 +64,7 @@ export function toAgentMessages(
       ...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),
       timestamp: resolveMessageTimestamp(message),
     };
-  });
+  }));
 }
 
 export function toConversationEvents(
@@ -117,9 +125,15 @@ export function toConversationEvents(
   });
 }
 
-function renderUserMessageContent(
+async function renderUserMessageContent(
   message: ConversationUserMessage,
-): UserMessage["content"] {
+  model: Model<AiApi>,
+  readBinaryFile: (path: string) => Promise<Uint8Array>,
+): Promise<UserMessage["content"]> {
+  if (message.source?.kind === "telegram-image") {
+    return renderImageMessageContent(message.content, message.source, model, readBinaryFile);
+  }
+
   if (message.source?.kind === "telegram-document") {
     return renderTextWithSourceContext(message.content, message.source);
   }
@@ -129,6 +143,25 @@ function renderUserMessageContent(
   }
 
   return renderTextWithSourceContext(message.content, message.source);
+}
+
+async function renderImageMessageContent(
+  content: UserMessage["content"],
+  source: IncomingMessageSource,
+  model: Model<AiApi>,
+  readBinaryFile: (path: string) => Promise<Uint8Array>,
+): Promise<UserMessage["content"]> {
+  const imageContent = await tryReadTelegramImage(source, model, readBinaryFile);
+  const textContent = renderTextWithSourceContext(content, source);
+  if (!imageContent) {
+    return textContent;
+  }
+
+  if (typeof textContent === "string") {
+    return [{ type: "text", text: textContent }, imageContent];
+  }
+
+  return [...textContent, imageContent];
 }
 
 function renderTextWithSourceContext(
@@ -153,6 +186,20 @@ export function renderIncomingMessageTextForAgent(message: IncomingMessage): str
   return `${renderSourceContext(message.source)}${message.text}`;
 }
 
+export async function renderIncomingMessageForAgent(
+  message: IncomingMessage,
+  model: Model<AiApi>,
+  dependencies: {
+    readBinaryFile?: (path: string) => Promise<Uint8Array>;
+  } = {},
+): Promise<{ text: string; images?: ImageContent[] }> {
+  const text = renderIncomingMessageTextForAgent(message);
+  const readBinaryFile = dependencies.readBinaryFile ?? defaultReadBinaryFile;
+  const image = await tryReadTelegramImage(message.source, model, readBinaryFile);
+
+  return image ? { text, images: [image] } : { text };
+}
+
 function renderSourceContext(source: IncomingMessageSource): string {
   if (source.kind === "telegram-voice-transcript") {
     return TRANSCRIBED_MESSAGE_PREFIX;
@@ -175,7 +222,62 @@ function renderSourceContext(source: IncomingMessageSource): string {
     return `[${lines.join("\n")}]\n`;
   }
 
+  if (source.kind === "telegram-image" && source.image) {
+    const lines = [
+      TELEGRAM_IMAGE_CONTEXT,
+      ...(source.image.savedPath ? [`Saved path: ${source.image.savedPath}`] : []),
+      ...(source.image.relativePath ? [`Relative path: ${source.image.relativePath}`] : []),
+      ...(source.image.fileName ? [`File name: ${source.image.fileName}`] : []),
+      ...(source.image.mimeType ? [`MIME type: ${source.image.mimeType}`] : []),
+      ...(typeof source.image.sizeBytes === "number"
+        ? [`Size: ${source.image.sizeBytes} bytes`]
+        : []),
+      ...(typeof source.image.width === "number" && typeof source.image.height === "number"
+        ? [`Dimensions: ${source.image.width}x${source.image.height}`]
+        : []),
+      ...(source.image.telegramType ? [`Telegram image type: ${source.image.telegramType}`] : []),
+      `Telegram file id: ${source.image.fileId}`,
+      ...(source.image.fileUniqueId ? [`Telegram unique file id: ${source.image.fileUniqueId}`] : []),
+    ];
+
+    return `[${lines.join("\n")}]\n`;
+  }
+
   return "";
+}
+
+async function tryReadTelegramImage(
+  source: IncomingMessageSource | undefined,
+  model: Model<AiApi>,
+  readBinaryFile: (path: string) => Promise<Uint8Array>,
+): Promise<ImageContent | undefined> {
+  if (source?.kind !== "telegram-image" || !source.image?.savedPath || !source.image.mimeType) {
+    return undefined;
+  }
+
+  if (!modelSupportsImages(model)) {
+    return undefined;
+  }
+
+  try {
+    const bytes = await readBinaryFile(source.image.savedPath);
+    return {
+      type: "image",
+      data: Buffer.from(bytes).toString("base64"),
+      mimeType: source.image.mimeType,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function modelSupportsImages(model: Model<AiApi>): boolean {
+  return Array.isArray(model.input) && model.input.includes("image");
+}
+
+async function defaultReadBinaryFile(path: string): Promise<Uint8Array> {
+  const { readFile } = await import("node:fs/promises");
+  return new Uint8Array(await readFile(path));
 }
 
 function resolveMessageTimestamp(

@@ -217,6 +217,93 @@ describe("createFsConversationStore", () => {
     expect(raw).not.toContain(savedPath);
   });
 
+  it("persists and reloads telegram image attachment metadata", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const created = await store.create(createChatRef(), {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const savedPath = join(
+      root,
+      "conversations",
+      "agents",
+      "default",
+      "sessions",
+      created.state.conversation.sessionId!,
+      "attachments",
+      "msg-1-image.png",
+    );
+    const next: ConversationContext = {
+      state: {
+        ...created.state,
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+      messages: [
+        {
+          kind: "message",
+          id: "msg-1",
+          role: "user",
+          content: "Describe this image",
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
+          createdAt: "2026-04-05T00:01:00.000Z",
+          source: {
+            kind: "telegram-image",
+            image: {
+              fileId: "img-file",
+              fileUniqueId: "img-unique",
+              fileName: "image.png",
+              mimeType: "image/png",
+              sizeBytes: 13,
+              width: 640,
+              height: 480,
+              savedPath,
+              telegramType: "photo",
+            },
+          },
+        },
+      ],
+    };
+
+    await store.put(next);
+
+    await expect(store.get(created.state.conversation)).resolves.toMatchObject({
+      messages: [
+        {
+          source: {
+            kind: "telegram-image",
+            image: {
+              fileId: "img-file",
+              fileUniqueId: "img-unique",
+              fileName: "image.png",
+              mimeType: "image/png",
+              sizeBytes: 13,
+              width: 640,
+              height: 480,
+              relativePath: "attachments/msg-1-image.png",
+              savedPath,
+              telegramType: "photo",
+            },
+          },
+        },
+      ],
+    });
+    const raw = await readFile(
+      join(
+        root,
+        "conversations",
+        "agents",
+        "default",
+        "sessions",
+        created.state.conversation.sessionId!,
+        "events.jsonl",
+      ),
+      "utf8",
+    );
+    expect(raw).toContain('"relativePath":"attachments/msg-1-image.png"');
+    expect(raw).not.toContain(savedPath);
+  });
+
   it("materializes telegram document saved paths after moving a conversation tree", async () => {
     const sourceRoot = await createTempDir();
     const sourceStore = createFsConversationStore(createRuntimePaths(sourceRoot));

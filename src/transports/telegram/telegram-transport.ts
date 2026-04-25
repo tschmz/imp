@@ -63,6 +63,14 @@ interface TelegramDocument {
   file_size?: number;
 }
 
+interface TelegramPhotoSize {
+  file_id: string;
+  file_unique_id?: string;
+  file_size?: number;
+  width: number;
+  height: number;
+}
+
 interface TelegramMessage {
   entities?: Array<{
     type: string;
@@ -75,6 +83,7 @@ interface TelegramMessage {
     file_id: string;
     mime_type?: string;
   };
+  photo?: TelegramPhotoSize[];
   document?: TelegramDocument;
   caption?: string;
 }
@@ -268,6 +277,55 @@ export function createTelegramTransport(
         }
 
         const documentMessage = getTelegramDocumentMessage(safeContext.message);
+        const photoMessage = getTelegramPhotoMessage(safeContext.message);
+        if (photoMessage) {
+          const correlationId = randomUUID();
+          const messageId = String(photoMessage.message_id);
+          const conversationId = String(safeContext.chat.id);
+          const photo = getLargestTelegramPhoto(photoMessage);
+          if (!photo) {
+            return;
+          }
+          const sizeBytes = photo?.file_size;
+
+          const maxDownloadBytes = getTelegramDocumentMaxDownloadBytes(config);
+          if (typeof sizeBytes === "number" && sizeBytes > maxDownloadBytes) {
+            await logger?.error("telegram image exceeds configured download size limit", {
+              endpointId: config.id,
+              transport: "telegram",
+              conversationId,
+              messageId,
+              correlationId,
+            });
+            await safeContext.reply(
+              `Sorry, that image is too large. The current limit is ${maxDownloadBytes} bytes.`,
+            );
+            return;
+          }
+
+          dispatchTelegramEvent(
+            handler,
+            createTelegramInboundEvent(
+              config.id,
+              correlationId,
+              safeContext,
+              bot,
+              {
+                text: getTelegramPhotoUserText(photoMessage),
+                image: {
+                  kind: "photo",
+                  photo,
+                },
+                config,
+                fetchImpl,
+              },
+              logger,
+            ),
+            logger,
+          );
+          return;
+        }
+
         if (!documentMessage) {
           return;
         }
@@ -276,18 +334,24 @@ export function createTelegramTransport(
         const messageId = String(documentMessage.message_id);
         const conversationId = String(safeContext.chat.id);
         const sizeBytes = documentMessage.document.file_size;
+        const isImageDocument = isTelegramImageDocument(documentMessage.document);
 
         const maxDownloadBytes = getTelegramDocumentMaxDownloadBytes(config);
         if (typeof sizeBytes === "number" && sizeBytes > maxDownloadBytes) {
-          await logger?.error("telegram document exceeds configured download size limit", {
+          await logger?.error(
+            isImageDocument
+              ? "telegram image exceeds configured download size limit"
+              : "telegram document exceeds configured download size limit",
+            {
             endpointId: config.id,
             transport: "telegram",
             conversationId,
             messageId,
             correlationId,
-          });
+            },
+          );
           await safeContext.reply(
-            `Sorry, that document is too large. The current limit is ${maxDownloadBytes} bytes.`,
+            `Sorry, that ${isImageDocument ? "image" : "document"} is too large. The current limit is ${maxDownloadBytes} bytes.`,
           );
           return;
         }
@@ -301,7 +365,16 @@ export function createTelegramTransport(
             bot,
             {
               text: getTelegramDocumentUserText(documentMessage),
-              document: documentMessage.document,
+              ...(isImageDocument
+                ? {
+                    image: {
+                      kind: "document" as const,
+                      document: documentMessage.document,
+                    },
+                  }
+                : {
+                    document: documentMessage.document,
+                  }),
               config,
               fetchImpl,
             },
@@ -420,13 +493,40 @@ function getTelegramDocumentMessage(
     : undefined;
 }
 
+function getTelegramPhotoMessage(
+  message: TelegramMessage,
+): (TelegramMessage & { photo: TelegramPhotoSize[] }) | undefined {
+  return Array.isArray(message.photo) && message.photo.length > 0
+    ? (message as TelegramMessage & { photo: TelegramPhotoSize[] })
+    : undefined;
+}
+
+function getLargestTelegramPhoto(
+  message: TelegramMessage & { photo: TelegramPhotoSize[] },
+): TelegramPhotoSize | undefined {
+  return message.photo.at(-1);
+}
+
 function getTelegramDocumentUserText(message: TelegramMessage & { document: TelegramDocument }): string {
   const caption = message.caption?.trim();
   if (caption) {
     return caption;
   }
 
+  if (isTelegramImageDocument(message.document)) {
+    return `A Telegram image was uploaded: ${message.document.file_name ?? "unnamed image"}.`;
+  }
+
   return `A Telegram document was uploaded: ${message.document.file_name ?? "unnamed document"}.`;
+}
+
+function getTelegramPhotoUserText(message: TelegramMessage & { photo: TelegramPhotoSize[] }): string {
+  const caption = message.caption?.trim();
+  if (caption) {
+    return caption;
+  }
+
+  return "A Telegram image was uploaded.";
 }
 
 async function transcribeTelegramVoiceMessage(
@@ -548,6 +648,96 @@ async function persistTelegramDocument(input: {
   };
 }
 
+async function persistTelegramImage(input: {
+  message: IncomingMessage;
+  image:
+    | {
+        kind: "document";
+        document: TelegramDocument;
+      }
+    | {
+        kind: "photo";
+        photo: TelegramPhotoSize;
+      };
+  config: TelegramTransportRuntimeConfig;
+  bot: TelegramBotAdapter;
+  fetchImpl: typeof fetch;
+}): Promise<IncomingMessage> {
+  if (!("sessionId" in input.message.conversation) || !input.message.conversation.sessionId) {
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      "Telegram image cannot be stored before the conversation session is resolved.",
+    );
+  }
+
+  const fileId = input.image.kind === "document" ? input.image.document.file_id : input.image.photo.file_id;
+  const declaredSize = input.image.kind === "document"
+    ? input.image.document.file_size
+    : input.image.photo.file_size;
+
+  if (
+    typeof declaredSize === "number" &&
+    declaredSize > getTelegramDocumentMaxDownloadBytes(input.config)
+  ) {
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      `Telegram image exceeds configured download size limit (${declaredSize} > ${getTelegramDocumentMaxDownloadBytes(input.config)}).`,
+    );
+  }
+
+  const file = await input.bot.api.getFile(fileId);
+  if (!file.file_path) {
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      "Telegram image metadata did not include file_path.",
+    );
+  }
+
+  const downloadedImage = await downloadTelegramFile(file.file_path, input.config.token, input.fetchImpl);
+  if (downloadedImage.bytes.byteLength > getTelegramDocumentMaxDownloadBytes(input.config)) {
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      `Telegram image download exceeded configured size limit (${downloadedImage.bytes.byteLength} > ${getTelegramDocumentMaxDownloadBytes(input.config)}).`,
+    );
+  }
+
+  const savedPath = getTelegramImageSavedPath(input.config, input.message, input.image, file.file_path, downloadedImage.mimeType);
+  const relativePath = getTelegramImageRelativePath(input.message, input.image, file.file_path, downloadedImage.mimeType);
+  await mkdir(dirname(savedPath), { recursive: true });
+  await writeFile(savedPath, downloadedImage.bytes);
+
+  const sourceImage = input.image.kind === "document" ? input.image.document : input.image.photo;
+  const mimeType =
+    input.image.kind === "document"
+      ? input.image.document.mime_type ?? downloadedImage.mimeType
+      : downloadedImage.mimeType ?? inferImageMimeType(file.file_path);
+
+  return {
+    ...input.message,
+    source: {
+      kind: "telegram-image",
+      image: {
+        fileId: sourceImage.file_id,
+        ...(sourceImage.file_unique_id ? { fileUniqueId: sourceImage.file_unique_id } : {}),
+        ...(input.image.kind === "document" && input.image.document.file_name
+          ? { fileName: input.image.document.file_name }
+          : {}),
+        ...(mimeType ? { mimeType } : {}),
+        sizeBytes: declaredSize ?? downloadedImage.bytes.byteLength,
+        ...(input.image.kind === "photo"
+          ? {
+              width: input.image.photo.width,
+              height: input.image.photo.height,
+            }
+          : {}),
+        relativePath,
+        savedPath,
+        telegramType: input.image.kind,
+      },
+    },
+  };
+}
+
 function getTelegramDocumentSavedPath(
   config: TelegramTransportRuntimeConfig,
   message: IncomingMessage,
@@ -597,6 +787,64 @@ function getTelegramDocumentRelativePath(
   );
 }
 
+function getTelegramImageSavedPath(
+  config: TelegramTransportRuntimeConfig,
+  message: IncomingMessage,
+  image:
+    | { kind: "document"; document: TelegramDocument }
+    | { kind: "photo"; photo: TelegramPhotoSize },
+  filePath: string,
+  downloadedMimeType?: string,
+): string {
+  const sessionId =
+    "sessionId" in message.conversation && typeof message.conversation.sessionId === "string"
+      ? message.conversation.sessionId
+      : undefined;
+  const agentId =
+    "agentId" in message.conversation && typeof message.conversation.agentId === "string"
+      ? message.conversation.agentId
+      : undefined;
+  if (!sessionId) {
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      "Telegram image message did not include a session id.",
+    );
+  }
+  if (!agentId) {
+    throw new UserVisibleProcessingError(
+      "file_document_persistence",
+      "Telegram image message did not include an agent id.",
+    );
+  }
+
+  const fileName = getTelegramImageFileName(message, image, filePath, downloadedMimeType);
+  return join(
+    getTelegramConversationsDir(config),
+    "agents",
+    sanitizePathSegment(agentId),
+    "sessions",
+    sanitizePathSegment(sessionId),
+    "attachments",
+    `${sanitizePathSegment(message.messageId)}-${sanitizeFileName(fileName)}`,
+  );
+}
+
+function getTelegramImageRelativePath(
+  message: IncomingMessage,
+  image:
+    | { kind: "document"; document: TelegramDocument }
+    | { kind: "photo"; photo: TelegramPhotoSize },
+  filePath: string,
+  downloadedMimeType?: string,
+): string {
+  return join(
+    "attachments",
+    `${sanitizePathSegment(message.messageId)}-${sanitizeFileName(
+      getTelegramImageFileName(message, image, filePath, downloadedMimeType),
+    )}`,
+  );
+}
+
 function getTelegramDocumentMaxDownloadBytes(config: TelegramTransportRuntimeConfig): number {
   return config.document?.maxDownloadBytes ?? defaultTelegramDocumentMaxDownloadBytes;
 }
@@ -618,6 +866,77 @@ function getDocumentExtension(document: TelegramDocument): string {
   }
 
   return "";
+}
+
+function getTelegramImageFileName(
+  message: IncomingMessage,
+  image:
+    | { kind: "document"; document: TelegramDocument }
+    | { kind: "photo"; photo: TelegramPhotoSize },
+  filePath: string,
+  downloadedMimeType?: string,
+): string {
+  if (image.kind === "document" && image.document.file_name) {
+    return image.document.file_name;
+  }
+
+  const extension = getImageExtension(
+    image.kind === "document" ? image.document.file_name : undefined,
+    image.kind === "document" ? image.document.mime_type : undefined,
+    downloadedMimeType,
+    filePath,
+  );
+
+  return image.kind === "photo"
+    ? `telegram-photo-${message.messageId}${extension}`
+    : `telegram-image-${message.messageId}${extension}`;
+}
+
+function getImageExtension(
+  fileName: string | undefined,
+  mimeType: string | undefined,
+  downloadedMimeType: string | undefined,
+  filePath: string,
+): string {
+  const fileNameExtension = extname(fileName ?? "");
+  if (fileNameExtension) {
+    return fileNameExtension;
+  }
+
+  const mime = mimeType ?? downloadedMimeType ?? inferImageMimeType(filePath);
+  if (mime === "image/png") {
+    return ".png";
+  }
+  if (mime === "image/webp") {
+    return ".webp";
+  }
+  if (mime === "image/gif") {
+    return ".gif";
+  }
+
+  return ".jpg";
+}
+
+function inferImageMimeType(filePath: string): string | undefined {
+  const extension = extname(filePath).toLowerCase();
+  if (extension === ".png") {
+    return "image/png";
+  }
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+  if (extension === ".gif") {
+    return "image/gif";
+  }
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return "image/jpeg";
+  }
+
+  return undefined;
+}
+
+function isTelegramImageDocument(document: TelegramDocument): boolean {
+  return typeof document.mime_type === "string" && document.mime_type.startsWith("image/");
 }
 
 function sanitizeFileName(value: string): string {
@@ -799,13 +1118,22 @@ function createTelegramInboundEvent(
     text: string;
     transcript?: string;
     source?: {
-      kind: "text" | "telegram-voice-transcript" | "telegram-document";
+      kind: "text" | "telegram-voice-transcript" | "telegram-document" | "telegram-image";
       transcript?: {
         provider: string;
         model: string;
       };
     };
     document?: TelegramDocument;
+    image?:
+      | {
+          kind: "document";
+          document: TelegramDocument;
+        }
+      | {
+          kind: "photo";
+          photo: TelegramPhotoSize;
+        };
     config?: TelegramTransportRuntimeConfig;
     fetchImpl?: typeof fetch;
     options?: { command: IncomingMessageCommand; commandArgs?: string };
@@ -827,18 +1155,26 @@ function createTelegramInboundEvent(
       ...(payload.source ? { source: payload.source } : {}),
       ...(payload.options ? payload.options : {}),
     },
-    ...(payload.document && payload.config && payload.fetchImpl
+    ...((payload.document || payload.image) && payload.config && payload.fetchImpl
       ? {
           async prepareMessage(message: IncomingMessage): Promise<IncomingMessage> {
             try {
-              const prepared = await persistTelegramDocument({
-                message,
-                document: payload.document!,
-                config: payload.config!,
-                bot,
-                fetchImpl: payload.fetchImpl!,
-              });
-              await logger?.debug("stored telegram document", {
+              const prepared = payload.image
+                ? await persistTelegramImage({
+                    message,
+                    image: payload.image,
+                    config: payload.config!,
+                    bot,
+                    fetchImpl: payload.fetchImpl!,
+                  })
+                : await persistTelegramDocument({
+                    message,
+                    document: payload.document!,
+                    config: payload.config!,
+                    bot,
+                    fetchImpl: payload.fetchImpl!,
+                  });
+              await logger?.debug(payload.image ? "stored telegram image" : "stored telegram document", {
                 endpointId,
                 transport: "telegram",
                 conversationId: String(ctx.chat.id),
@@ -848,7 +1184,7 @@ function createTelegramInboundEvent(
               return prepared;
             } catch (error) {
               await logger?.error(
-                "failed to store telegram document",
+                payload.image ? "failed to store telegram image" : "failed to store telegram document",
                 {
                   endpointId,
                   transport: "telegram",

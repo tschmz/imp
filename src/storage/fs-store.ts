@@ -958,23 +958,43 @@ function normalizeConversationMessageSource(
     materializeAttachmentPaths: boolean;
   },
 ): ConversationUserMessage["source"] {
-  if (message.source?.kind !== "telegram-document" || !message.source.document) {
+  if (message.source?.kind === "telegram-document" && message.source.document) {
+    const document = message.source.document;
+    const relativePath = normalizeAttachmentRelativePath(
+      document.relativePath ?? inferAttachmentRelativePath(message, options.conversation),
+    );
+    const savedPath =
+      options.materializeAttachmentPaths && relativePath
+        ? materializeAttachmentPath(options.conversationsDir, options.conversation, options.agentId, relativePath)
+        : document.savedPath;
+
+    return {
+      ...message.source,
+      document: {
+        ...document,
+        ...(relativePath ? { relativePath } : {}),
+        ...(savedPath ? { savedPath } : {}),
+      },
+    };
+  }
+
+  if (message.source?.kind !== "telegram-image" || !message.source.image) {
     return message.source;
   }
 
-  const document = message.source.document;
+  const image = message.source.image;
   const relativePath = normalizeAttachmentRelativePath(
-    document.relativePath ?? inferAttachmentRelativePath(message, options.conversation),
+    image.relativePath ?? inferAttachmentRelativePath(message, options.conversation),
   );
   const savedPath =
     options.materializeAttachmentPaths && relativePath
       ? materializeAttachmentPath(options.conversationsDir, options.conversation, options.agentId, relativePath)
-      : document.savedPath;
+      : image.savedPath;
 
   return {
     ...message.source,
-    document: {
-      ...document,
+    image: {
+      ...image,
       ...(relativePath ? { relativePath } : {}),
       ...(savedPath ? { savedPath } : {}),
     },
@@ -986,12 +1006,41 @@ function toStorageEvent(
   context: ConversationContext,
   conversationsDir: string,
 ): ConversationEvent {
-  if (message.role !== "user" || message.source?.kind !== "telegram-document" || !message.source.document) {
+  if (message.role !== "user" || !message.source) {
+    return message;
+  }
+
+  if (message.source.kind === "telegram-document" && message.source.document) {
+    const relativePath = normalizeAttachmentRelativePath(
+      message.source.document.relativePath ??
+        getAttachmentRelativePathFromSavedPath(
+          conversationsDir,
+          context.state.conversation,
+          context.state.agentId,
+          message,
+        ),
+    );
+    const document = {
+      ...message.source.document,
+      ...(relativePath ? { relativePath } : {}),
+    };
+    delete document.savedPath;
+
+    return {
+      ...message,
+      source: {
+        ...message.source,
+        document,
+      },
+    };
+  }
+
+  if (message.source.kind !== "telegram-image" || !message.source.image) {
     return message;
   }
 
   const relativePath = normalizeAttachmentRelativePath(
-    message.source.document.relativePath ??
+    message.source.image.relativePath ??
       getAttachmentRelativePathFromSavedPath(
         conversationsDir,
         context.state.conversation,
@@ -999,17 +1048,17 @@ function toStorageEvent(
         message,
       ),
   );
-  const document = {
-    ...message.source.document,
+  const image = {
+    ...message.source.image,
     ...(relativePath ? { relativePath } : {}),
   };
-  delete document.savedPath;
+  delete image.savedPath;
 
   return {
     ...message,
     source: {
       ...message.source,
-      document,
+      image,
     },
   };
 }
@@ -1020,7 +1069,7 @@ function getAttachmentRelativePathFromSavedPath(
   agentId: string,
   message: ConversationUserMessage,
 ): string | undefined {
-  const savedPath = message.source?.document?.savedPath;
+  const savedPath = getSourceAttachmentSavedPath(message);
   if (!savedPath || !isAbsolute(savedPath)) {
     return savedPath;
   }
@@ -1038,7 +1087,7 @@ function inferAttachmentRelativePath(
   message: ConversationUserMessage,
   conversation: ConversationRef,
 ): string | undefined {
-  const savedPath = message.source?.document?.savedPath;
+  const savedPath = getSourceAttachmentSavedPath(message);
   if (!savedPath) {
     return undefined;
   }
@@ -1048,6 +1097,18 @@ function inferAttachmentRelativePath(
   const markerIndex = normalized.lastIndexOf(marker);
   if (markerIndex >= 0) {
     return normalized.slice(markerIndex + marker.length);
+  }
+
+  return undefined;
+}
+
+function getSourceAttachmentSavedPath(message: ConversationUserMessage): string | undefined {
+  if (message.source?.kind === "telegram-document") {
+    return message.source.document?.savedPath;
+  }
+
+  if (message.source?.kind === "telegram-image") {
+    return message.source.image?.savedPath;
   }
 
   return undefined;

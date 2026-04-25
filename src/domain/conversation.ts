@@ -55,12 +55,13 @@ export type ConversationEvent =
   | ConversationToolResultMessage;
 
 export interface ConversationMessageSource {
-  kind: "text" | "telegram-voice-transcript" | "telegram-document" | "plugin-event";
+  kind: "text" | "telegram-voice-transcript" | "telegram-document" | "telegram-image" | "plugin-event";
   transcript?: {
     provider: string;
     model: string;
   };
   document?: ConversationDocumentAttachment;
+  image?: ConversationImageAttachment;
   plugin?: ConversationPluginSource;
 }
 
@@ -79,6 +80,19 @@ export interface ConversationDocumentAttachment {
   sizeBytes?: number;
   relativePath?: string;
   savedPath?: string;
+}
+
+export interface ConversationImageAttachment {
+  fileId: string;
+  fileUniqueId?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  width?: number;
+  height?: number;
+  relativePath?: string;
+  savedPath?: string;
+  telegramType?: "photo" | "document";
 }
 
 export interface ConversationState {

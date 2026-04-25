@@ -33,12 +33,13 @@ export interface IncomingMessage {
 }
 
 export interface IncomingMessageSource {
-  kind: "text" | "telegram-voice-transcript" | "telegram-document" | "plugin-event";
+  kind: "text" | "telegram-voice-transcript" | "telegram-document" | "telegram-image" | "plugin-event";
   transcript?: {
     provider: string;
     model: string;
   };
   document?: IncomingMessageDocumentAttachment;
+  image?: IncomingMessageImageAttachment;
   plugin?: IncomingMessagePluginSource;
 }
 
@@ -57,6 +58,19 @@ export interface IncomingMessageDocumentAttachment {
   sizeBytes?: number;
   relativePath?: string;
   savedPath?: string;
+}
+
+export interface IncomingMessageImageAttachment {
+  fileId: string;
+  fileUniqueId?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  width?: number;
+  height?: number;
+  relativePath?: string;
+  savedPath?: string;
+  telegramType?: "photo" | "document";
 }
 
 export interface OutgoingMessage {

@@ -1,7 +1,20 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Model } from "@mariozechner/pi-ai";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { ConversationEvent } from "../domain/conversation.js";
-import { renderIncomingMessageTextForAgent, toAgentMessages } from "./message-mapping.js";
+import {
+  renderIncomingMessageForAgent,
+  renderIncomingMessageTextForAgent,
+  toAgentMessages,
+} from "./message-mapping.js";
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
 
 const reasoningResponsesModel: Model<"openai-responses"> = {
   id: "gpt-5-mini",
@@ -21,9 +34,16 @@ const reasoningResponsesModel: Model<"openai-responses"> = {
   maxTokens: 100000,
 };
 
+const visionResponsesModel: Model<"openai-responses"> = {
+  ...reasoningResponsesModel,
+  id: "gpt-4.1-mini",
+  name: "GPT-4.1 Mini",
+  input: ["text", "image"],
+};
+
 describe("toAgentMessages", () => {
-  it("adds telegram document context when replaying persisted user messages", () => {
-    const messages = toAgentMessages(
+  it("adds telegram document context when replaying persisted user messages", async () => {
+    const messages = await toAgentMessages(
       [
         {
           kind: "message",
@@ -55,8 +75,84 @@ describe("toAgentMessages", () => {
     expect(String(messages[0]?.content)).toContain("Please inspect this report");
   });
 
-  it("replays persisted OpenAI reasoning and tool history as native messages", () => {
-    const messages = toAgentMessages(
+  it("replays persisted telegram images to vision-capable models", async () => {
+    const imagePath = await writeTempFile("history-image.png", "png-bytes");
+    const messages = await toAgentMessages(
+      [
+        {
+          kind: "message",
+          id: "1:user",
+          role: "user",
+          content: "What is shown here?",
+          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
+          createdAt: "2026-04-05T00:00:00.000Z",
+          source: {
+            kind: "telegram-image",
+            image: {
+              fileId: "img-file",
+              fileName: "history-image.png",
+              mimeType: "image/png",
+              savedPath: imagePath,
+              telegramType: "document",
+            },
+          },
+        },
+      ] satisfies ConversationEvent[],
+      visionResponsesModel,
+    );
+
+    expect(messages[0]).toEqual({
+      role: "user",
+      content: [
+        expect.objectContaining({
+          type: "text",
+          text: expect.stringContaining("Telegram image uploaded"),
+        }),
+        {
+          type: "image",
+          data: Buffer.from("png-bytes").toString("base64"),
+          mimeType: "image/png",
+        },
+      ],
+      timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
+    });
+  });
+
+  it("replays persisted telegram images as text only for non-vision models", async () => {
+    const imagePath = await writeTempFile("history-image.png", "png-bytes");
+    const messages = await toAgentMessages(
+      [
+        {
+          kind: "message",
+          id: "1:user",
+          role: "user",
+          content: "What is shown here?",
+          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
+          createdAt: "2026-04-05T00:00:00.000Z",
+          source: {
+            kind: "telegram-image",
+            image: {
+              fileId: "img-file",
+              fileName: "history-image.png",
+              mimeType: "image/png",
+              savedPath: imagePath,
+              telegramType: "photo",
+            },
+          },
+        },
+      ] satisfies ConversationEvent[],
+      reasoningResponsesModel,
+    );
+
+    expect(messages[0]).toMatchObject({
+      role: "user",
+      content: expect.stringContaining("Telegram image uploaded"),
+    });
+    expect(String(messages[0]?.content)).toContain("What is shown here?");
+  });
+
+  it("replays persisted OpenAI reasoning and tool history as native messages", async () => {
+    const messages = await toAgentMessages(
       [
         {
           kind: "message",
@@ -164,8 +260,8 @@ describe("toAgentMessages", () => {
     ]);
   });
 
-  it("preserves replay metadata needed for openai-responses message replay", () => {
-    const messages = toAgentMessages(
+  it("preserves replay metadata needed for openai-responses message replay", async () => {
+    const messages = await toAgentMessages(
       [
         {
           kind: "message",
@@ -263,8 +359,8 @@ describe("toAgentMessages", () => {
     ]);
   });
 
-  it("defaults missing tool result error flags to successful replay results", () => {
-    const messages = toAgentMessages(
+  it("defaults missing tool result error flags to successful replay results", async () => {
+    const messages = await toAgentMessages(
       [
         {
           kind: "message",
@@ -321,3 +417,52 @@ describe("renderIncomingMessageTextForAgent", () => {
     expect(text).toContain("Please inspect this report");
   });
 });
+
+describe("renderIncomingMessageForAgent", () => {
+  it("adds current-turn image input for vision-capable models", async () => {
+    const imagePath = await writeTempFile("current-image.png", "png-bytes");
+
+    const rendered = await renderIncomingMessageForAgent(
+      {
+        endpointId: "private-telegram",
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+        },
+        messageId: "100",
+        correlationId: "corr-100",
+        userId: "7",
+        text: "Describe this image",
+        receivedAt: "2026-04-05T00:00:00.000Z",
+        source: {
+          kind: "telegram-image",
+          image: {
+            fileId: "img-file",
+            fileName: "current-image.png",
+            mimeType: "image/png",
+            savedPath: imagePath,
+            telegramType: "photo",
+          },
+        },
+      },
+      visionResponsesModel,
+    );
+
+    expect(rendered.text).toContain("Telegram image uploaded");
+    expect(rendered.images).toEqual([
+      {
+        type: "image",
+        data: Buffer.from("png-bytes").toString("base64"),
+        mimeType: "image/png",
+      },
+    ]);
+  });
+});
+
+async function writeTempFile(fileName: string, content: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "imp-message-mapping-"));
+  tempDirs.push(dir);
+  const path = join(dir, fileName);
+  await writeFile(path, content, "utf8");
+  return path;
+}

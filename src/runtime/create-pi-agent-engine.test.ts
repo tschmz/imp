@@ -410,12 +410,13 @@ describe("createPiAgentEngine", () => {
     };
     const finalAssistantMessage = fauxAssistantMessage("Final answer");
     const conversation = createConversation();
+    const initialMessages = await toAgentMessages(conversation.messages, resolvedModel);
 
     const createAgentHandle = (_options: AgentOptions) => {
       void _options;
       return createAgentDouble({
         messages: [
-          ...toAgentMessages(conversation.messages, resolvedModel),
+          ...initialMessages,
           toolCallAssistantMessage,
           toolResultMessage,
           finalAssistantMessage,
@@ -818,6 +819,60 @@ describe("createPiAgentEngine", () => {
     });
 
     expect(result.message.text).toBe("I can inspect the saved file.");
+  });
+
+  it("passes current-turn telegram images to vision-capable models", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-engine-image-"));
+    tempDirs.push(root);
+    const imagePath = join(root, "current-image.png");
+    await writeFile(imagePath, "png-bytes", "utf8");
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-vision", name: "Faux Vision", input: ["text", "image"] }],
+    });
+    registrations.push(registration);
+    const onPrompt = vi.fn();
+
+    const engine = createPiAgentEngine({
+      createAgent: () => createAgentDouble({
+        messages: [fauxAssistantMessage("Looks like an image.")],
+        events: [{ type: "message_end", message: fauxAssistantMessage("Looks like an image.") }],
+        onPrompt,
+      }),
+      resolveModel: () => registration.getModel("faux-vision"),
+      readTextFile: async () => "unused context",
+    });
+
+    const result = await engine.run({
+      agent: createAgent(),
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        text: "Describe this image",
+        source: {
+          kind: "telegram-image",
+          image: {
+            fileId: "img-file",
+            fileName: "current-image.png",
+            mimeType: "image/png",
+            savedPath: imagePath,
+            telegramType: "photo",
+          },
+        },
+      },
+    });
+
+    expect(result.message.text).toBe("Looks like an image.");
+    expect(onPrompt).toHaveBeenCalledWith(
+      expect.stringContaining("Telegram image uploaded"),
+      [
+        {
+          type: "image",
+          data: Buffer.from("png-bytes").toString("base64"),
+          mimeType: "image/png",
+        },
+      ],
+    );
   });
 
   it("surfaces upstream agent errors instead of masking them as empty text", async () => {
