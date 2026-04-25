@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Install local packages from packed tarballs during `just install`, refresh managed plugins from those tarballs, and restart `imp.service` when present.
+- Install local packages from packed tarballs during `just install`, refresh managed plugins from those tarballs, and keep the running `imp.service` untouched while managed plugin services still restart when present.
 - Simplify the default system prompt runtime context to report only `Reply: <channel>`.
 - Ship the default system prompt and the managed `imp-skill-creator` skill as packaged assets.
 - Refresh the managed `imp-skill-creator` skill with concrete catalog paths, stronger validation guidance, and fuller bundled-resource examples.

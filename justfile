@@ -67,7 +67,7 @@ install:
   npm install -g "$phone_package"
   just _install-managed-plugin "$voice_package"
   just _install-managed-plugin "$phone_package"
-  if command -v systemctl >/dev/null && systemctl --user list-unit-files imp.service >/dev/null 2>&1; then systemctl --user restart imp.service; fi
+  # Keep the currently running imp daemon alive during local installs; only managed plugin services are restarted here.
   if command -v systemctl >/dev/null && systemctl --user list-unit-files imp-voice-in.service >/dev/null 2>&1; then systemctl --user restart imp-voice-in.service imp-voice-out.service; fi
   if command -v systemctl >/dev/null && systemctl --user list-unit-files imp-phone-controller.service >/dev/null 2>&1; then systemctl --user restart imp-phone-controller.service; fi
 
