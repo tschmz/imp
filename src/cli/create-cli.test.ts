@@ -38,6 +38,7 @@ describe("createCli", () => {
 
     expect(findCommand(configCommand, "validate").helpInformation()).toContain("Usage: imp config validate");
     expect(findCommand(configCommand, "validate").helpInformation()).toContain("--config <path>");
+    expect(findCommand(configCommand, "schema").helpInformation()).toContain("Usage: imp config schema");
 
     const configGetHelp = findCommand(configCommand, "get").helpInformation();
     expect(configGetHelp).toContain("Usage: imp config get");
@@ -100,6 +101,7 @@ describe("createCli", () => {
     const cli = createCli(dependencies);
 
     await cli.parseAsync(["node", "imp", "log", "--endpoint", "ops", "--follow", "--lines", "2", "--config", "/tmp/imp.json"]);
+    await cli.parseAsync(["node", "imp", "config", "schema"]);
     await cli.parseAsync(["node", "imp", "config", "set", "--config", "/tmp/imp.json", "endpoints.0.enabled", "false"]);
     await cli.parseAsync(["node", "imp", "chat", "--endpoint", "local-cli", "--config", "/tmp/imp.json"]);
     await cli.parseAsync(["node", "imp", "restore", "/tmp/backup.tar", "--config", "/tmp/imp.json", "--data-root", "/tmp/state", "--only", "agents", "--force"]);
@@ -132,6 +134,7 @@ describe("createCli", () => {
       follow: true,
       lines: 2,
     });
+    expect(dependencies.showConfigSchema).toHaveBeenCalledWith();
     expect(dependencies.setConfigValue).toHaveBeenCalledWith({
       configPath: "/tmp/imp.json",
       keyPath: "endpoints.0.enabled",
@@ -256,6 +259,7 @@ function createDependencies(): CliDependencies {
     startChat: vi.fn(async () => undefined),
     viewLogs: vi.fn(async () => undefined),
     validateConfig: vi.fn(async () => undefined),
+    showConfigSchema: vi.fn(async () => undefined),
     reloadConfig: vi.fn(async () => undefined),
     getConfigValue: vi.fn(async () => undefined),
     setConfigValue: vi.fn(async () => undefined),

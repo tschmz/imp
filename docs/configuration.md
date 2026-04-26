@@ -56,6 +56,14 @@ Validate after changes:
 imp config validate
 ```
 
+Print the JSON Schema for config-shape reference:
+
+```sh
+imp config schema
+```
+
+The schema describes field structure and basic value constraints. Use `imp config validate` for cross-reference checks, duplicate-id rules, and secret-reference validation.
+
 Use [Agent Context](./agent-context.md), [Agent Tools](./agent-tools.md), and [Providers](./providers.md) for the most common agent-specific settings.
 
 ## Main Config Areas

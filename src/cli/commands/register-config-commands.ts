@@ -43,6 +43,12 @@ export function registerConfigCommands(programOrSubcommand: Command, deps: CliDe
     }),
   );
 
+  configCommand.command("schema").description("Print the Imp config JSON Schema").action(
+    withAsyncAction(async () => {
+      await deps.showConfigSchema();
+    }),
+  );
+
   addConfigOption(
     configCommand.command("reload").description("Reload a discovered or explicit config in the installed service"),
   ).action(
