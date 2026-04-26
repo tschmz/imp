@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -145,6 +145,45 @@ describe("imp-phone controller", () => {
       reason: "conversation complete",
     });
     await expect(controller.consumeHangupCommand()).resolves.toBeUndefined();
+  });
+
+  it("surfaces persistent rename failures for matching replies", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
+    tempDirs.push(root);
+    const controller = new PhoneController({
+      inboxDir: join(root, "inbox"),
+      outboxDir: join(root, "outbox"),
+      requestsDir: join(root, "requests"),
+      requestProcessingDir: join(root, "request-processing"),
+      requestProcessedDir: join(root, "request-processed"),
+      requestFailedDir: join(root, "request-failed"),
+      controlDir: join(root, "control"),
+      recordingsDir: join(root, "recordings"),
+      statusFile: join(root, "status.json"),
+      userId: "imp-phone",
+      pollIntervalMs: 5,
+      conversation: {
+        responseTimeoutSeconds: 1,
+        holdMessageAfterSeconds: 60,
+        holdMessageIntervalSeconds: 60,
+        holdMessageText: "",
+      },
+    });
+    await controller.ensureDirs();
+
+    await writeJsonAtomic(join(root, "outbox", "0001-match.json"), {
+      eventId: "event-1",
+      correlationId: "correlation-1",
+      text: "matched reply",
+    });
+    await mkdir(join(root, "outbox", "0001-match.json.processing"));
+
+    await expect(
+      controller.waitForOutboxReply(
+        { eventId: "event-1", correlationId: "correlation-1" },
+        { id: "thomas", name: "Thomas", uri: "+10000000000" },
+      ),
+    ).rejects.toThrow("Failed to lock outbox reply 0001-match.json");
   });
 
   it("waits for matching outbox reply when first file does not match and second file matches", async () => {
