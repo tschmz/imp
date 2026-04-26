@@ -361,70 +361,74 @@ export class PhoneController {
         ? this.config.conversation.holdMessageIntervalSeconds
         : this.config.conversation.holdMessageAfterSeconds) * 1000;
     while (Date.now() < deadline && !this.stopped) {
-      const filePath = await this.nextOutboxFile();
-      if (!filePath) {
-        if (Date.now() >= nextHoldAt) {
-          await this.playHoldMessage(contact).catch((error) => {
-            this.log(`Hold message could not be played: ${error instanceof Error ? error.message : String(error)}`);
-          });
-          nextHoldAt = Date.now() + this.config.conversation.holdMessageIntervalSeconds * 1000;
-        }
-        await sleep(this.config.pollIntervalMs);
-        continue;
-      }
+      const filePaths = await this.nextOutboxFile();
+      for (const filePath of filePaths) {
+        let payload;
+        try {
+          payload = JSON.parse(await readFile(filePath, "utf8"));
+          this.outboxParseFailures.delete(filePath);
+        } catch (error) {
+          const now = Date.now();
+          const fileStats = await stat(filePath).catch(() => undefined);
+          const lastModifiedAt = fileStats?.mtimeMs ?? now;
+          const isLikelyStillWriting = now - lastModifiedAt < parseFailureGraceMs;
+          if (isLikelyStillWriting) {
+            continue;
+          }
 
-      let payload;
-      try {
-        payload = JSON.parse(await readFile(filePath, "utf8"));
-        this.outboxParseFailures.delete(filePath);
-      } catch (error) {
-        const now = Date.now();
-        const fileStats = await stat(filePath).catch(() => undefined);
-        const lastModifiedAt = fileStats?.mtimeMs ?? now;
-        const isLikelyStillWriting = now - lastModifiedAt < parseFailureGraceMs;
-        if (isLikelyStillWriting) {
-          await sleep(this.config.pollIntervalMs);
+          const failure = this.outboxParseFailures.get(filePath) ?? { firstFailedAt: now, attempts: 0 };
+          failure.attempts += 1;
+          this.outboxParseFailures.set(filePath, failure);
+          if (now - failure.firstFailedAt < parseFailureGraceMs) {
+            continue;
+          }
+
+          const failedPath = join(dirname(filePath), `${basename(filePath)}.failed`);
+          await rename(filePath, failedPath).catch(() => undefined);
+          await writeJsonAtomic(`${failedPath}.error`, {
+            failedAt: new Date().toISOString(),
+            file: basename(filePath),
+            attempts: failure.attempts,
+            error: error instanceof Error ? error.message : String(error),
+          }).catch(() => undefined);
+          this.outboxParseFailures.delete(filePath);
+          this.log(
+            `Outbox reply file ${basename(filePath)} could not be parsed and was quarantined: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+          continue;
+        }
+        if (payload.eventId !== event.eventId && payload.correlationId !== event.correlationId) {
           continue;
         }
 
-        const failure = this.outboxParseFailures.get(filePath) ?? { firstFailedAt: now, attempts: 0 };
-        failure.attempts += 1;
-        this.outboxParseFailures.set(filePath, failure);
-        if (now - failure.firstFailedAt < parseFailureGraceMs) {
-          await sleep(this.config.pollIntervalMs);
-          continue;
+        const processingPath = join(dirname(filePath), `${basename(filePath)}.processing`);
+        try {
+          await rename(filePath, processingPath);
+        } catch (error) {
+          if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+            continue;
+          }
+          throw new Error(
+            `Failed to lock outbox reply ${basename(filePath)}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
-
-        const failedPath = join(dirname(filePath), `${basename(filePath)}.failed`);
-        await rename(filePath, failedPath).catch(() => undefined);
-        await writeJsonAtomic(`${failedPath}.error`, {
-          failedAt: new Date().toISOString(),
-          file: basename(filePath),
-          attempts: failure.attempts,
-          error: error instanceof Error ? error.message : String(error),
-        }).catch(() => undefined);
-        this.outboxParseFailures.delete(filePath);
-        this.log(
-          `Outbox reply file ${basename(filePath)} could not be parsed and was quarantined: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        await sleep(this.config.pollIntervalMs);
-        continue;
-      }
-      if (payload.eventId !== event.eventId && payload.correlationId !== event.correlationId) {
-        await sleep(this.config.pollIntervalMs);
-        continue;
+        const reply = {
+          text: String(payload.text ?? ""),
+          speech: typeof payload.speech === "object" && payload.speech !== null ? payload.speech : {},
+        };
+        await rm(processingPath, { force: true });
+        return reply;
       }
 
-      const processingPath = join(dirname(filePath), `${basename(filePath)}.processing`);
-      await rename(filePath, processingPath);
-      const reply = {
-        text: String(payload.text ?? ""),
-        speech: typeof payload.speech === "object" && payload.speech !== null ? payload.speech : {},
-      };
-      await rm(processingPath, { force: true });
-      return reply;
+      if (Date.now() >= nextHoldAt) {
+        await this.playHoldMessage(contact).catch((error) => {
+          this.log(`Hold message could not be played: ${error instanceof Error ? error.message : String(error)}`);
+        });
+        nextHoldAt = Date.now() + this.config.conversation.holdMessageIntervalSeconds * 1000;
+      }
+      await sleep(this.config.pollIntervalMs);
     }
 
     throw new Error(`Timed out waiting for agent reply to phone event ${event.eventId}.`);
@@ -432,11 +436,11 @@ export class PhoneController {
 
   async nextOutboxFile() {
     const entries = await readdir(this.config.outboxDir, { withFileTypes: true }).catch(() => []);
-    const candidate = entries
+    return entries
       .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
       .map((entry) => entry.name)
-      .sort()[0];
-    return candidate ? join(this.config.outboxDir, candidate) : undefined;
+      .sort()
+      .map((name) => join(this.config.outboxDir, name));
   }
 
   async consumeHangupCommand() {
