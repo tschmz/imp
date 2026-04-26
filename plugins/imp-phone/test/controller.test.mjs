@@ -147,6 +147,54 @@ describe("imp-phone controller", () => {
     await expect(controller.consumeHangupCommand()).resolves.toBeUndefined();
   });
 
+  it("waits for matching outbox reply when first file does not match and second file matches", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
+    tempDirs.push(root);
+    const controller = new PhoneController({
+      inboxDir: join(root, "inbox"),
+      outboxDir: join(root, "outbox"),
+      requestsDir: join(root, "requests"),
+      requestProcessingDir: join(root, "request-processing"),
+      requestProcessedDir: join(root, "request-processed"),
+      requestFailedDir: join(root, "request-failed"),
+      controlDir: join(root, "control"),
+      recordingsDir: join(root, "recordings"),
+      statusFile: join(root, "status.json"),
+      userId: "imp-phone",
+      pollIntervalMs: 5,
+      conversation: {
+        responseTimeoutSeconds: 1,
+        holdMessageAfterSeconds: 60,
+        holdMessageIntervalSeconds: 60,
+        holdMessageText: "",
+      },
+    });
+    await controller.ensureDirs();
+
+    await writeJsonAtomic(join(root, "outbox", "0001-other.json"), {
+      eventId: "other-event",
+      correlationId: "other-correlation",
+      text: "ignore me",
+    });
+    await writeJsonAtomic(join(root, "outbox", "0002-match.json"), {
+      eventId: "event-1",
+      correlationId: "correlation-1",
+      text: "matched reply",
+    });
+
+    await expect(
+      controller.waitForOutboxReply(
+        { eventId: "event-1", correlationId: "correlation-1" },
+        { id: "thomas", name: "Thomas", uri: "+10000000000" },
+      ),
+    ).resolves.toMatchObject({
+      text: "matched reply",
+    });
+
+    const outboxFiles = await readdir(join(root, "outbox"));
+    expect(outboxFiles).toContain("0001-other.json");
+  });
+
   it("supports ElevenLabs TTS", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
     tempDirs.push(root);
