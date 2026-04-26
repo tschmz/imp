@@ -363,6 +363,17 @@ async function continueInterruptedRun(
     runtime: {
       configPath: runtime.configPath,
       dataRoot: runtime.endpointConfig.paths.dataRoot,
+      invocation: {
+        kind: "direct",
+      },
+      ingress: {
+        endpointId: message.endpointId,
+        transportKind: message.conversation.transport,
+      },
+      output: {
+        mode: "reply-channel",
+        replyChannel: dependencies.replyChannel,
+      },
       replyChannel: dependencies.replyChannel,
     },
   });

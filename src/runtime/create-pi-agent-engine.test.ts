@@ -1154,7 +1154,7 @@ describe("createPiAgentEngine", () => {
       name: "Helper",
       prompt: {
         base: {
-          text: createInlineBasePrompt("You are the helper."),
+          text: createInlineBasePrompt("Child mode {{invocation.kind}} {{output.mode}} {{reply.channel.kind}}."),
         },
       },
       model: {
@@ -1212,7 +1212,7 @@ describe("createPiAgentEngine", () => {
       },
     });
     expect(childModelId).toBe("child-model");
-    expect(childSystemPrompt).toContain("You are the helper.");
+    expect(childSystemPrompt).toContain("Child mode delegated delegated-tool none.");
     expect(childTools?.map((tool) => tool.name)).toContain("pwd");
 
     const pwdResult = await childTools!.find((tool) => tool.name === "pwd")!.execute("tool-2", {});

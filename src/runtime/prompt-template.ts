@@ -4,7 +4,12 @@ import Handlebars from "handlebars";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { SkillDefinition } from "../skills/types.js";
-import type { ReplyChannelContext } from "./context.js";
+import type {
+  AgentIngressContext,
+  AgentInvocationContext,
+  AgentOutputContext,
+  ReplyChannelContext,
+} from "./context.js";
 
 export interface PromptTemplateSystemContext {
   os: string;
@@ -29,6 +34,25 @@ export interface PromptTemplateContext {
   runtime: {
     now: PromptTemplateRuntimeNowContext;
     timezone: string;
+  };
+  invocation: {
+    kind: AgentInvocationContext["kind"];
+    parentAgentId: string;
+    toolName: string;
+  };
+  ingress: {
+    endpoint: {
+      id: string;
+    };
+    transport: {
+      kind: string;
+    };
+  };
+  output: {
+    mode: AgentOutputContext["mode"];
+    reply: {
+      channel: ReplyChannelContext;
+    };
   };
   endpoint: {
     id: string;
@@ -124,6 +148,29 @@ export function createEmptyPromptTemplateContext(): PromptTemplateContext {
       },
       timezone: "",
     },
+    invocation: {
+      kind: "direct",
+      parentAgentId: "",
+      toolName: "",
+    },
+    ingress: {
+      endpoint: {
+        id: "",
+      },
+      transport: {
+        kind: "",
+      },
+    },
+    output: {
+      mode: "reply-channel",
+      reply: {
+        channel: {
+          kind: "",
+          delivery: "none",
+          endpointId: "",
+        },
+      },
+    },
     endpoint: {
       id: "",
     },
@@ -190,6 +237,34 @@ export function createDefaultPromptTemplateSystemContext(): PromptTemplateSystem
   };
 }
 
+function resolvePromptOutputContext(options: {
+  output?: AgentOutputContext;
+  replyChannel?: ReplyChannelContext;
+  ingress: AgentIngressContext;
+}): { mode: AgentOutputContext["mode"]; replyChannel: ReplyChannelContext } {
+  if (options.output?.mode === "delegated-tool") {
+    return {
+      mode: "delegated-tool",
+      replyChannel: {
+        kind: "none",
+        delivery: "none",
+      },
+    };
+  }
+
+  const replyChannel = options.output?.replyChannel ?? options.replyChannel ?? {
+    kind: options.ingress.transportKind,
+    delivery: "endpoint" as const,
+    endpointId: options.ingress.endpointId,
+  };
+
+  return {
+    mode: "reply-channel",
+    replyChannel,
+  };
+}
+
+
 export function createPromptTemplateContext(options: {
   system: PromptTemplateSystemContext;
   agent: AgentDefinition;
@@ -197,25 +272,59 @@ export function createPromptTemplateContext(options: {
   transportKind: string;
   conversation?: ConversationContext;
   replyChannel?: ReplyChannelContext;
+  invocation?: AgentInvocationContext;
+  ingress?: AgentIngressContext;
+  output?: AgentOutputContext;
   configPath?: string;
   dataRoot?: string;
   availableSkills?: SkillDefinition[];
   now?: Date;
   timezone?: string;
 }): PromptTemplateContext {
-  const replyChannel = options.replyChannel ?? {
-    kind: options.transportKind,
-    delivery: "endpoint" as const,
-    endpointId: options.endpointId,
+
+  const invocation = options.invocation ?? {
+    kind: "direct" as const,
   };
+  const ingress = options.ingress ?? {
+    endpointId: options.endpointId,
+    transportKind: options.transportKind,
+  };
+  const output = resolvePromptOutputContext({
+    output: options.output,
+    replyChannel: options.replyChannel,
+    ingress,
+  });
   const skillCatalogs = resolveRuntimeSkillCatalogs(options.agent, options.dataRoot, options.conversation);
   const dynamicWorkspaceSkillsPath = resolveRuntimeWorkspaceSkillsPath(options.agent, options.conversation);
 
   return {
     system: options.system,
     runtime: createPromptTemplateRuntimeContext(options.now ?? new Date(), options.timezone),
+    invocation: {
+      kind: invocation.kind,
+      parentAgentId: invocation.parentAgentId ?? "",
+      toolName: invocation.toolName ?? "",
+    },
+    ingress: {
+      endpoint: {
+        id: ingress.endpointId,
+      },
+      transport: {
+        kind: ingress.transportKind,
+      },
+    },
+    output: {
+      mode: output.mode,
+      reply: {
+        channel: {
+          kind: output.replyChannel.kind,
+          delivery: output.replyChannel.delivery,
+          endpointId: output.replyChannel.endpointId ?? "",
+        },
+      },
+    },
     endpoint: {
-      id: options.endpointId,
+      id: ingress.endpointId,
     },
     agent: {
       id: options.agent.id,
@@ -230,7 +339,7 @@ export function createPromptTemplateContext(options: {
       },
     },
     transport: {
-      kind: options.transportKind,
+      kind: ingress.transportKind,
     },
     conversation: {
       kind: options.conversation?.state.kind ?? "",
@@ -238,9 +347,9 @@ export function createPromptTemplateContext(options: {
     },
     reply: {
       channel: {
-        kind: replyChannel.kind,
-        delivery: replyChannel.delivery,
-        endpointId: replyChannel.endpointId ?? "",
+        kind: output.replyChannel.kind,
+        delivery: output.replyChannel.delivery,
+        endpointId: output.replyChannel.endpointId ?? "",
       },
     },
     imp: {

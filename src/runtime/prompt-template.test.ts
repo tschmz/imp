@@ -9,7 +9,7 @@ import {
 import { createPromptTestAgent } from "./prompt-test-helpers.js";
 
 describe("createPromptTemplateContext", () => {
-  it("defaults reply channel context to the current endpoint transport", () => {
+  it("defaults direct invocation, ingress, and reply output context", () => {
     const context = createPromptTemplateContext({
       system: createSystemContext(),
       agent: createAgent(),
@@ -17,11 +17,61 @@ describe("createPromptTemplateContext", () => {
       transportKind: "cli",
     });
 
+    expect(context.invocation).toEqual({
+      kind: "direct",
+      parentAgentId: "",
+      toolName: "",
+    });
+    expect(context.ingress).toEqual({
+      endpoint: {
+        id: "local-cli",
+      },
+      transport: {
+        kind: "cli",
+      },
+    });
+    expect(context.output).toEqual({
+      mode: "reply-channel",
+      reply: {
+        channel: {
+          kind: "cli",
+          delivery: "endpoint",
+          endpointId: "local-cli",
+        },
+      },
+    });
     expect(context.reply.channel).toEqual({
       kind: "cli",
       delivery: "endpoint",
       endpointId: "local-cli",
     });
+  });
+
+  it("renders delegated invocation and tool output context in prompt templates", () => {
+    const context = createPromptTemplateContext({
+      system: createSystemContext(),
+      agent: createAgent(),
+      endpointId: "private-telegram",
+      transportKind: "telegram",
+      invocation: {
+        kind: "delegated",
+        parentAgentId: "default",
+        toolName: "ask_helper",
+      },
+      output: {
+        mode: "delegated-tool",
+      },
+    });
+
+    const rendered = renderPromptTemplate(
+      '{{invocation.kind}} {{invocation.parentAgentId}} {{invocation.toolName}} {{ingress.transport.kind}} {{output.mode}} {{reply.channel.kind}}',
+      {
+        filePath: "/workspace/SYSTEM.md",
+        context,
+      },
+    );
+
+    expect(rendered).toBe("delegated default ask_helper telegram delegated-tool none");
   });
 
   it("renders explicit reply channel context in prompt templates", () => {

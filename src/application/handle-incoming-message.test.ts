@@ -156,6 +156,16 @@ describe("createHandleIncomingMessage", () => {
         runtime: {
           configPath: "/tmp/config.json",
           dataRoot: "/tmp/data",
+          invocation: {
+            kind: "direct",
+          },
+          ingress: {
+            endpointId: "private-telegram",
+            transportKind: "telegram",
+          },
+          output: {
+            mode: "reply-channel",
+          },
         },
       }),
     );
@@ -181,6 +191,16 @@ describe("createHandleIncomingMessage", () => {
     expect(runInput?.runtime).toEqual({
       configPath: "/tmp/config.json",
       dataRoot: "/tmp/data",
+      invocation: {
+        kind: "direct",
+      },
+      ingress: {
+        endpointId: "private-telegram",
+        transportKind: "telegram",
+      },
+      output: {
+        mode: "reply-channel",
+      },
     });
   });
 
@@ -557,6 +577,16 @@ describe("createHandleIncomingMessage", () => {
     expect(runInput?.runtime).toEqual({
       configPath: "/tmp/config.json",
       dataRoot: "/tmp/data",
+      invocation: {
+        kind: "direct",
+      },
+      ingress: {
+        endpointId: "private-telegram",
+        transportKind: "telegram",
+      },
+      output: {
+        mode: "reply-channel",
+      },
     });
   });
 

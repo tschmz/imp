@@ -101,6 +101,18 @@ function createAgentDelegationTool(
           ...(runtime?.configPath ? { configPath: runtime.configPath } : {}),
           ...(runtime?.dataRoot ? { dataRoot: runtime.dataRoot } : {}),
           ...(runtime?.availableSkills ? { availableSkills: runtime.availableSkills } : {}),
+          invocation: {
+            kind: "delegated",
+            parentAgentId: parentAgent.id,
+            toolName: delegation.toolName,
+          },
+          ingress: runtime?.ingress ?? {
+            endpointId: parentMessage.endpointId,
+            transportKind: parentMessage.conversation.transport,
+          },
+          output: {
+            mode: "delegated-tool",
+          },
           delegationDepth: currentDepth + 1,
         },
       }).catch((error: unknown) => {

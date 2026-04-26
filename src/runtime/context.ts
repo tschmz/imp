@@ -7,10 +7,29 @@ import type {
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import type { SkillDefinition } from "../skills/types.js";
 
+export interface AgentInvocationContext {
+  kind: "direct" | "delegated";
+  parentAgentId?: string;
+  toolName?: string;
+}
+
+export interface AgentIngressContext {
+  endpointId: string;
+  transportKind: string;
+}
+
+export interface AgentOutputContext {
+  mode: "reply-channel" | "delegated-tool";
+  replyChannel?: ReplyChannelContext;
+}
+
 export interface AgentRunRuntimeContext {
   configPath?: string;
   dataRoot?: string;
   availableSkills?: SkillDefinition[];
+  invocation?: AgentInvocationContext;
+  ingress?: AgentIngressContext;
+  output?: AgentOutputContext;
   replyChannel?: ReplyChannelContext;
   delegationDepth?: number;
 }

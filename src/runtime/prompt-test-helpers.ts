@@ -97,6 +97,29 @@ export function createPromptTestContext(
       },
       timezone: "Europe/Berlin",
     },
+    invocation: {
+      kind: "direct",
+      parentAgentId: "",
+      toolName: "",
+    },
+    ingress: {
+      endpoint: {
+        id: "private-telegram",
+      },
+      transport: {
+        kind: "telegram",
+      },
+    },
+    output: {
+      mode: "reply-channel",
+      reply: {
+        channel: {
+          kind: "telegram",
+          delivery: "endpoint",
+          endpointId: "private-telegram",
+        },
+      },
+    },
     endpoint: {
       id: "private-telegram",
     },

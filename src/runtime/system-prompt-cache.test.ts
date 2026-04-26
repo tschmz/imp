@@ -20,6 +20,9 @@ describe("SystemPromptCache", () => {
     });
 
     expect(key).toContain('"files":["/workspace/AGENTS.md:/workspace/AGENTS.md:fp"]');
+    expect(key).toContain('"invocation":{"kind":"direct","parentAgentId":"","toolName":""}');
+    expect(key).toContain('"ingress":{"endpoint":{"id":"private-telegram"},"transport":{"kind":"telegram"}}');
+    expect(key).toContain('"output":{"mode":"reply-channel","reply":{"channel":{"kind":"telegram","delivery":"endpoint","endpointId":"private-telegram"}}}');
     expect(key).toContain('"endpoint":{"id":"private-telegram"}');
     expect(key).toContain('"reply":{"channel":{"kind":"telegram","delivery":"endpoint","endpointId":"private-telegram"}}');
   });

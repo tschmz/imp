@@ -718,6 +718,21 @@ describe("createRuntimeEntries", () => {
     expect(runtime.engine.run).toHaveBeenCalledWith(
       expect.objectContaining({
         runtime: expect.objectContaining({
+          invocation: {
+            kind: "direct",
+          },
+          ingress: {
+            endpointId: "private-telegram",
+            transportKind: "telegram",
+          },
+          output: {
+            mode: "reply-channel",
+            replyChannel: {
+              kind: "telegram",
+              delivery: "endpoint",
+              endpointId: "private-telegram",
+            },
+          },
           replyChannel: {
             kind: "telegram",
             delivery: "endpoint",
@@ -809,6 +824,21 @@ describe("createRuntimeEntries", () => {
     expect(pluginRuntime.engine.run).toHaveBeenCalledWith(
       expect.objectContaining({
         runtime: expect.objectContaining({
+          invocation: {
+            kind: "direct",
+          },
+          ingress: {
+            endpointId: "audio-ingress",
+            transportKind: "file",
+          },
+          output: {
+            mode: "reply-channel",
+            replyChannel: {
+              kind: "telegram",
+              delivery: "endpoint",
+              endpointId: "private-telegram",
+            },
+          },
           replyChannel: {
             kind: "telegram",
             delivery: "endpoint",
@@ -943,6 +973,20 @@ describe("createRuntimeEntries", () => {
     expect(outboxRuntime.engine.run).toHaveBeenCalledWith(
       expect.objectContaining({
         runtime: expect.objectContaining({
+          invocation: {
+            kind: "direct",
+          },
+          ingress: {
+            endpointId: "audio-ingress",
+            transportKind: "file",
+          },
+          output: {
+            mode: "reply-channel",
+            replyChannel: {
+              kind: "audio",
+              delivery: "outbox",
+            },
+          },
           replyChannel: {
             kind: "audio",
             delivery: "outbox",
@@ -953,6 +997,20 @@ describe("createRuntimeEntries", () => {
     expect(noneRuntime.engine.run).toHaveBeenCalledWith(
       expect.objectContaining({
         runtime: expect.objectContaining({
+          invocation: {
+            kind: "direct",
+          },
+          ingress: {
+            endpointId: "silent-ingress",
+            transportKind: "file",
+          },
+          output: {
+            mode: "reply-channel",
+            replyChannel: {
+              kind: "none",
+              delivery: "none",
+            },
+          },
           replyChannel: {
             kind: "none",
             delivery: "none",
@@ -1035,6 +1093,20 @@ describe("createRuntimeEntries", () => {
     expect(runtime.engine.run).toHaveBeenCalledWith(
       expect.objectContaining({
         runtime: expect.objectContaining({
+          invocation: {
+            kind: "direct",
+          },
+          ingress: {
+            endpointId: "phone-ingress",
+            transportKind: "file",
+          },
+          output: {
+            mode: "reply-channel",
+            replyChannel: {
+              kind: "none",
+              delivery: "none",
+            },
+          },
           replyChannel: {
             kind: "none",
             delivery: "none",

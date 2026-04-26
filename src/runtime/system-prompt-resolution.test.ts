@@ -391,6 +391,32 @@ describe("resolveSystemPrompt", () => {
 
     expectRenderedTemplate(prompt);
   });
+  it("uses delegated communication rules for delegated child runs", async () => {
+    const prompt = await buildDefaultSystemPrompt({
+      templateContext: mergeTemplateContext(createTemplateContext(), {
+        invocation: {
+          kind: "delegated",
+          parentAgentId: "default",
+          toolName: "ask_helper",
+        },
+        output: {
+          mode: "delegated-tool",
+          reply: {
+            channel: {
+              kind: "none",
+              delivery: "none",
+              endpointId: "",
+            },
+          },
+        },
+      }),
+    });
+
+    expect(prompt).toContain("- Invocation: delegated");
+    expect(prompt).toContain("- Output: delegated-tool");
+    expect(prompt).toContain("You are running as a delegated child agent through a tool call");
+    expect(prompt).not.toContain("You are chatting through Telegram.");
+  });
 
   it.each([
     {
@@ -598,6 +624,14 @@ function mergeTemplateContext(
   base: PromptTemplateContext,
   overrides: Partial<PromptTemplateContext>,
 ): PromptTemplateContext {
+  const ingressEndpointId = overrides.ingress?.endpoint?.id ?? overrides.endpoint?.id ?? base.ingress.endpoint.id;
+  const ingressTransportKind = overrides.ingress?.transport?.kind ?? overrides.transport?.kind ?? base.ingress.transport.kind;
+  const outputReplyChannel = {
+    ...base.output.reply.channel,
+    ...overrides.reply?.channel,
+    ...overrides.output?.reply?.channel,
+  };
+
   return {
     ...base,
     ...overrides,
@@ -613,9 +647,37 @@ function mergeTemplateContext(
         ...overrides.runtime?.now,
       },
     },
+    invocation: {
+      ...base.invocation,
+      ...overrides.invocation,
+    },
+    ingress: {
+      ...base.ingress,
+      ...overrides.ingress,
+      endpoint: {
+        ...base.ingress.endpoint,
+        ...overrides.ingress?.endpoint,
+        id: ingressEndpointId,
+      },
+      transport: {
+        ...base.ingress.transport,
+        ...overrides.ingress?.transport,
+        kind: ingressTransportKind,
+      },
+    },
+    output: {
+      ...base.output,
+      ...overrides.output,
+      reply: {
+        ...base.output.reply,
+        ...overrides.output?.reply,
+        channel: outputReplyChannel,
+      },
+    },
     endpoint: {
       ...base.endpoint,
       ...overrides.endpoint,
+      id: ingressEndpointId,
     },
     agent: {
       ...base.agent,
@@ -632,6 +694,7 @@ function mergeTemplateContext(
     transport: {
       ...base.transport,
       ...overrides.transport,
+      kind: ingressTransportKind,
     },
     conversation: {
       ...base.conversation,
@@ -644,10 +707,7 @@ function mergeTemplateContext(
     reply: {
       ...base.reply,
       ...overrides.reply,
-      channel: {
-        ...base.reply.channel,
-        ...overrides.reply?.channel,
-      },
+      channel: outputReplyChannel,
     },
     imp: {
       ...base.imp,

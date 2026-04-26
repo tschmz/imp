@@ -58,6 +58,17 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
       runtime: {
         configPath: context.dependencies.runtimeInfo.configPath,
         dataRoot: context.dependencies.runtimeInfo.dataRoot,
+        invocation: {
+          kind: "direct",
+        },
+        ingress: {
+          endpointId: context.message.endpointId,
+          transportKind: context.message.conversation.transport,
+        },
+        output: {
+          mode: "reply-channel",
+          ...(replyChannel ? { replyChannel } : {}),
+        },
         ...(replyChannel ? { replyChannel } : {}),
         ...(context.availableSkills.length > 0 ? { availableSkills: context.availableSkills } : {}),
       },
