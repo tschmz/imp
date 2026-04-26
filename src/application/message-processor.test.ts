@@ -52,6 +52,47 @@ describe("createMessageProcessor", () => {
     await Promise.all([first, second]);
   });
 
+  it("keeps endpoint queues isolated for the same transport/external conversation id", async () => {
+    const starts: string[] = [];
+    const releases = new Map<string, () => void>();
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => {
+        starts.push(`${message.messageId}:${message.endpointId}`);
+        await new Promise<void>((resolve) => {
+          releases.set(message.messageId, resolve);
+        });
+        return {
+          conversation: message.conversation,
+          text: `reply:${message.messageId}`,
+        };
+      }),
+    };
+
+    const processor = createMessageProcessor({
+      handler,
+      maxParallel: 2,
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "shared-chat", "endpoint-a")));
+    const second = processor.handle(createEvent(createIncomingMessage("2", "shared-chat", "endpoint-b")));
+    const third = processor.handle(createEvent(createIncomingMessage("3", "shared-chat", "endpoint-a")));
+
+    await tick();
+
+    expect(starts).toEqual(["1:endpoint-a", "2:endpoint-b"]);
+
+    releases.get("2")?.();
+    await second;
+    expect(starts).toEqual(["1:endpoint-a", "2:endpoint-b"]);
+
+    releases.get("1")?.();
+    await tick();
+    expect(starts).toEqual(["1:endpoint-a", "2:endpoint-b", "3:endpoint-a"]);
+
+    releases.get("3")?.();
+    await Promise.all([first, third]);
+  });
+
   it("preserves conversation order when prepareMessage is async", async () => {
     const prepareStarts: string[] = [];
     const starts: string[] = [];
@@ -698,9 +739,9 @@ async function tick(): Promise<void> {
   });
 }
 
-function createIncomingMessage(messageId: string, externalId: string): IncomingMessage {
+function createIncomingMessage(messageId: string, externalId: string, endpointId = "private-telegram"): IncomingMessage {
   return {
-    endpointId: "private-telegram",
+    endpointId,
     conversation: {
       transport: "telegram",
       externalId,

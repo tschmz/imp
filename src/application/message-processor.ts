@@ -53,10 +53,11 @@ export function createMessageProcessor(
     event: TransportInboundEvent,
     operation: () => Promise<void>,
   ): Promise<void> {
+    const endpointKey = event.message.endpointId;
     const key =
       "sessionId" in event.message.conversation && event.message.conversation.sessionId
-        ? `session/${event.message.conversation.sessionId}`
-        : `${event.message.conversation.transport}/${event.message.conversation.externalId}`;
+        ? `session/${endpointKey}/${event.message.conversation.sessionId}`
+        : `${endpointKey}/${event.message.conversation.transport}/${event.message.conversation.externalId}`;
     const previous = conversationQueues.get(key) ?? Promise.resolve();
     let release: (() => void) | undefined;
     const current = new Promise<void>((resolve) => {
