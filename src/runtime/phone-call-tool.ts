@@ -51,6 +51,7 @@ function createPhoneCallTool(config: AgentPhoneCallConfig, options: { agentId?: 
       `Start an allowlisted SIP phone call through the configured local phone command. ` +
       `Allowed contacts: ${contactList}.`,
     parameters,
+    executionMode: "sequential",
     async execute(_toolCallId, params, signal) {
       const { contactId, purpose } = parsePhoneCallParams(params);
       const contact = contacts.get(contactId);
@@ -112,6 +113,7 @@ function createPhoneHangupTool(config: AgentPhoneCallConfig, options: { agentId?
     description:
       "End the currently active imp-phone call. Use this after a brief goodbye when the phone conversation is done.",
     parameters,
+    executionMode: "sequential",
     async execute(_toolCallId, params) {
       const reason = parsePhoneHangupParams(params).reason ?? "agent-hangup";
       const controlDir = resolvePhoneControlDir(config);

@@ -13,6 +13,8 @@ import {
   type WorkingDirectoryState,
 } from "./working-directory-tools.js";
 
+const sequentialDynamicToolNames = new Set(["bash", "edit", "write"]);
+
 export function createBuiltInToolRegistry(
   workingDirectory: string | WorkingDirectoryState,
   agent?: AgentDefinition,
@@ -39,6 +41,7 @@ function createDynamicBuiltInTools(
 ): ToolDefinition[] {
   return createBaseBuiltInTools(workingDirectoryState.get(), agent).map((tool) => ({
     ...tool,
+    ...(sequentialDynamicToolNames.has(tool.name) ? { executionMode: "sequential" as const } : {}),
     async execute(toolCallId, params, signal, onUpdate) {
       const delegatedTool = createBaseBuiltInTools(workingDirectoryState.get(), agent).find(
         (candidate) => candidate.name === tool.name,

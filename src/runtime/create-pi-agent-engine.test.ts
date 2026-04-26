@@ -1005,6 +1005,7 @@ describe("createPiAgentEngine", () => {
 
   it("passes resolved configured tools into the agent runtime", async () => {
     let capturedTools: unknown[] | undefined;
+    let capturedToolExecution: AgentOptions["toolExecution"] | undefined;
     const tool = {
       name: "read_file",
       label: "Read File",
@@ -1033,6 +1034,7 @@ describe("createPiAgentEngine", () => {
       },
       createAgent: (options) => {
         capturedTools = options.initialState?.tools as unknown[];
+        capturedToolExecution = options.toolExecution;
         return createAgentDouble({ messages: [fauxAssistantMessage("tool-ready")] });
       },
     });
@@ -1047,6 +1049,84 @@ describe("createPiAgentEngine", () => {
     });
 
     expect(capturedTools).toEqual([tool]);
+    expect(capturedToolExecution).toBe("parallel");
+  });
+
+  it("executes independent tool calls in parallel through the agent core", async () => {
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+
+    const executionEvents: string[] = [];
+    const createSlowTool = (name: string): ToolDefinition => ({
+      name,
+      label: name,
+      description: `${name} test tool`,
+      parameters: Type.Object({}),
+      async execute() {
+        executionEvents.push(`${name}:start`);
+        await new Promise<void>((resolve) => setTimeout(resolve, 100));
+        executionEvents.push(`${name}:end`);
+        return {
+          content: [{ type: "text", text: `${name} done` }],
+          details: { name },
+        };
+      },
+    });
+    const slowA = createSlowTool("slow_a");
+    const slowB = createSlowTool("slow_b");
+    const tools = [slowA, slowB];
+
+    registration.setResponses([
+      () =>
+        fauxAssistantMessage(
+          [
+            {
+              type: "toolCall",
+              id: "call-a",
+              name: "slow_a",
+              arguments: {},
+            },
+            {
+              type: "toolCall",
+              id: "call-b",
+              name: "slow_b",
+              arguments: {},
+            },
+          ],
+          { stopReason: "toolUse" },
+        ),
+      () => fauxAssistantMessage("parallel done"),
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async () => "unused context",
+      toolRegistry: {
+        list: () => tools,
+        get: (name) => tools.find((tool) => tool.name === name),
+        pick: (names) => names.flatMap((name) => tools.find((tool) => tool.name === name) ?? []),
+      },
+    });
+
+    const result = await engine.run({
+      agent: {
+        ...createAgent(),
+        tools: ["slow_a", "slow_b"],
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(result.message.text).toBe("parallel done");
+    expect(executionEvents.indexOf("slow_b:start")).toBeLessThan(
+      executionEvents.indexOf("slow_a:end"),
+    );
+    expect(executionEvents.indexOf("slow_a:start")).toBeLessThan(
+      executionEvents.indexOf("slow_b:end"),
+    );
   });
 
   it("registers delegated agent tools and executes child runs with the child's prompt, model, tools, and workspace", async () => {
@@ -2095,6 +2175,29 @@ describe("createPiAgentEngine", () => {
       kind: "tool_command_execution",
       message: "update_plan accepts at most one in_progress step.",
     } satisfies Partial<UserVisibleProcessingError>);
+  });
+
+  it("marks stateful and mutating built-in tools for sequential execution", () => {
+    const registry = createBuiltInToolRegistry(process.cwd(), {
+      ...createAgent(),
+      phone: {
+        contacts: [
+          {
+            id: "office",
+            name: "Office",
+            uri: "sip:office@example.com",
+          },
+        ],
+      },
+    });
+
+    for (const toolName of ["bash", "edit", "write", "cd", "update_plan", "phone_call", "phone_hangup"]) {
+      expect(registry.get(toolName)?.executionMode).toBe("sequential");
+    }
+
+    for (const toolName of ["read", "grep", "find", "ls", "pwd"]) {
+      expect(registry.get(toolName)?.executionMode).toBeUndefined();
+    }
   });
 
   it("allows agents to inspect and change their working directory via tools", async () => {

@@ -73,6 +73,7 @@ function createSetWorkingDirectoryTool(workingDirectoryState: WorkingDirectorySt
     label: "cd",
     description: "Set the working directory used by subsequent filesystem and shell tool calls.",
     parameters,
+    executionMode: "sequential",
     async execute(_toolCallId, params) {
       const { path } = parseSetWorkingDirectoryParams(params);
       const workingDirectory = resolve(workingDirectoryState.get(), path);

@@ -120,6 +120,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       tools: options.tools,
       messages: initialMessages,
     },
+    toolExecution: "parallel",
     ...(options.getApiKey
       ? {
           getApiKey: (provider: string) => options.getApiKey?.(provider, options.agent),

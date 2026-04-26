@@ -55,6 +55,7 @@ export function createUpdatePlanTool(): ToolDefinition {
     description:
       "Update the visible task plan for multi-step work. Provide the full plan with at most one in_progress step.",
     parameters,
+    executionMode: "sequential",
     async execute(_toolCallId, params) {
       const details = parseUpdatePlanParams(params);
       return {
