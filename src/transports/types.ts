@@ -17,6 +17,7 @@ export interface TransportInboundEvent {
   prepareMessage?(message: IncomingMessage): Promise<IncomingMessage> | IncomingMessage;
   runWithProcessing<T>(operation: () => Promise<T>): Promise<T>;
   deliver(message: OutgoingMessage): Promise<void>;
+  deliverProgress?(message: OutgoingMessage): Promise<void>;
   deliverError?(error: unknown): Promise<void>;
 }
 

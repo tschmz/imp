@@ -247,6 +247,12 @@ function createCliInboundEvent(
       renderCliReplay(message.replay ?? [], options.chatContainer);
       options.ui.requestRender();
     },
+    async deliverProgress(message): Promise<void> {
+      options.chatContainer.addChild(new Text(cyan("imp"), 0, 0));
+      options.chatContainer.addChild(new Markdown(message.text, 1, 0, markdownTheme));
+      options.chatContainer.addChild(new Spacer(1));
+      options.ui.requestRender();
+    },
     async deliverError(error): Promise<void> {
       await options.logger?.debug("sending cli processing error response", {
         endpointId: config.id,

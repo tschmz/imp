@@ -110,9 +110,14 @@ async function processEvent(
   for (;;) {
     try {
       await event.runWithProcessing(async () => {
-        const response = await dependencies.handler.handle(event.message, {
-          deliverProgress: (message) => event.deliver(message),
-        });
+        const response = await dependencies.handler.handle(
+          event.message,
+          event.deliverProgress
+            ? {
+                deliverProgress: (message) => event.deliverProgress!(message),
+              }
+            : undefined,
+        );
         await event.deliver(response);
         if (response.deliveryAction) {
           await dependencies.afterDeliveryAction?.(response.deliveryAction, event);

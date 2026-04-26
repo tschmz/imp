@@ -1248,6 +1248,24 @@ function createTelegramInboundEvent(
       await sendTelegramAttachments(bot, ctx.chat.id, message);
       await sendTelegramReplay(bot, ctx.chat.id, message);
     },
+    async deliverProgress(message): Promise<void> {
+      if (payload.transcript) {
+        for (const chunk of renderTelegramMessages(`**Transcript**
+${payload.transcript}`)) {
+          await ctx.reply(chunk, {
+            parse_mode: "HTML",
+          });
+        }
+      }
+
+      for (const chunk of renderTelegramMessages(message.text)) {
+        await ctx.reply(chunk, {
+          parse_mode: "HTML",
+        });
+      }
+      await sendTelegramAttachments(bot, ctx.chat.id, message);
+      await sendTelegramReplay(bot, ctx.chat.id, message);
+    },
     async deliverError(error?: unknown): Promise<void> {
       await logger?.debug("sending telegram processing error response", {
         endpointId,

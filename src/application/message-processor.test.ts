@@ -123,6 +123,7 @@ describe("createMessageProcessor", () => {
 
     const first = processor.handle(
       createEvent(createIncomingMessage("1", "42"), {
+        deliverProgress: vi.fn(async () => {}),
         prepareMessage: async (message) => {
           prepareStarts.push(message.messageId);
           await new Promise<void>((resolve) => {
@@ -138,6 +139,7 @@ describe("createMessageProcessor", () => {
     await tick();
     const second = processor.handle(
       createEvent(createIncomingMessage("2", "42"), {
+        deliverProgress: vi.fn(async () => {}),
         prepareMessage: async (message) => {
           prepareStarts.push(message.messageId);
           return {
@@ -168,6 +170,35 @@ describe("createMessageProcessor", () => {
       2,
       expect.objectContaining({ messageId: "2", text: "prepared-2" }),
       expect.objectContaining({ deliverProgress: expect.any(Function) }),
+    );
+  });
+
+  it("only wires progress delivery when the transport exposes it", async () => {
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => ({
+        conversation: message.conversation,
+        text: `reply:${message.messageId}`,
+      })),
+    };
+
+    const processor = createMessageProcessor({
+      handler,
+    });
+
+    const deliverProgress = vi.fn(async () => {});
+
+    await processor.handle(createEvent(createIncomingMessage("1", "42"), { deliverProgress }));
+    await processor.handle(createEvent(createIncomingMessage("2", "42")));
+
+    expect(handler.handle).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ messageId: "1" }),
+      expect.objectContaining({ deliverProgress: expect.any(Function) }),
+    );
+    expect(handler.handle).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ messageId: "2" }),
+      undefined,
     );
   });
 
@@ -781,6 +812,7 @@ function createEvent(
   message: IncomingMessage,
   overrides: Partial<{
     deliver: (message: OutgoingMessage) => Promise<void>;
+    deliverProgress: (message: OutgoingMessage) => Promise<void>;
     deliverError: (error: unknown) => Promise<void>;
     prepareMessage: (message: IncomingMessage) => Promise<IncomingMessage> | IncomingMessage;
     runWithProcessing: <T>(operation: () => Promise<T>) => Promise<T>;
@@ -790,6 +822,7 @@ function createEvent(
     message,
     prepareMessage: overrides.prepareMessage,
     deliver: overrides.deliver ?? vi.fn(async () => {}),
+    ...(overrides.deliverProgress ? { deliverProgress: overrides.deliverProgress } : {}),
     deliverError: overrides.deliverError,
     runWithProcessing:
       overrides.runWithProcessing ??
