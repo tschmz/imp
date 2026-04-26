@@ -453,7 +453,7 @@ function resolveTargetDataRoot(options: {
   archiveConfig?: AppConfig;
   selection: ScopeSelection;
 }): string | undefined {
-  if (!options.selection.conversations) {
+  if (!options.selection.agents && !options.selection.conversations) {
     return undefined;
   }
 

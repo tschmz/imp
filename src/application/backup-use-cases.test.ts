@@ -345,6 +345,62 @@ describe("backup use cases", () => {
     );
   });
 
+  it("relocates absolute data-root agent files during agents-only restore", async () => {
+    const sourceRoot = await createTempDir();
+    const sourceConfigPath = join(sourceRoot, "config", "config.json");
+    const sourceDataRoot = join(sourceRoot, "state");
+    const sourcePromptPath = join(sourceDataRoot, "agents", "SYSTEM.md");
+    const backupPath = join(sourceRoot, "backup.tar");
+    const targetRoot = await createTempDir();
+    const targetConfigPath = join(targetRoot, "config", "config.json");
+    const targetDataRoot = join(targetRoot, "state");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await writeTextFile(
+      sourceConfigPath,
+      `${JSON.stringify(
+        {
+          instance: { name: "default" },
+          paths: { dataRoot: sourceDataRoot },
+          logging: { level: "info" },
+          defaults: { agentId: "default" },
+          agents: [
+            {
+              id: "default",
+              model: { provider: "openai-codex", modelId: "gpt-5.4" },
+              prompt: {
+                base: { file: sourcePromptPath },
+              },
+            },
+          ],
+          endpoints: [],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeTextFile(sourcePromptPath, "base prompt\n");
+    await writeConfig(targetConfigPath, targetDataRoot);
+
+    await useCases.createBackup({
+      configPath: sourceConfigPath,
+      outputPath: backupPath,
+      only: "agents",
+      force: false,
+    });
+
+    await useCases.restoreBackup({
+      inputPath: backupPath,
+      configPath: targetConfigPath,
+      only: "agents",
+      force: true,
+    });
+
+    await expect(readFile(join(targetDataRoot, "agents", "SYSTEM.md"), "utf8")).resolves.toBe("base prompt\n");
+  });
+
   it("restores absolute agent file paths into the target layout and rewrites config references", async () => {
     const sourceRoot = await createTempDir();
     const sourceConfigPath = join(sourceRoot, "config", "config.json");
