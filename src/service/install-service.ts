@@ -68,7 +68,15 @@ export async function installService(options: {
     if (!environmentPath) {
       throw new Error("Linux service installation requires an environment file path.");
     }
+  }
 
+  await assertServiceInstallCanProceed({
+    definitionPath,
+    environmentPath,
+    force: options.force,
+  });
+
+  if (environmentPath) {
     await writeManagedFile({
       path: environmentPath,
       resourceLabel: "Service environment file",

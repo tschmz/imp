@@ -177,6 +177,30 @@ describe("installService", () => {
     );
   });
 
+  it("does not create a linux environment file when the service definition already exists", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, ".config", "imp", "config.json");
+    const definitionPath = join(root, ".config", "systemd", "user", "imp.service");
+    const environmentPath = join(root, ".config", "imp", "service.env");
+
+    await mkdir(join(root, ".config", "systemd", "user"), { recursive: true });
+    await writeFile(definitionPath, "existing service\n", "utf8");
+
+    await expect(
+      installService({
+        platform: "linux",
+        homeDir: root,
+        configPath,
+        execPath: "/usr/bin/node",
+        argv: ["/usr/bin/node", "/app/dist/main.js"],
+        installer: {
+          async run() {},
+        },
+      }),
+    ).rejects.toThrowError(`Service definition already exists: ${definitionPath}\nRe-run with --force to overwrite.`);
+    await expect(readFile(environmentPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("allows overwriting an existing service definition with force", async () => {
     const root = await createTempDir();
     const definitionPath = join(root, ".config", "systemd", "user", "imp.service");
