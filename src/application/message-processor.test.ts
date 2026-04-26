@@ -683,6 +683,68 @@ describe("createMessageProcessor", () => {
     expect(deliveredErrors).toHaveLength(1);
   });
 
+  it.each([NaN, -1, Number.POSITIVE_INFINITY])(
+    "treats invalid retry delay %p as immediate retry without throwing",
+    async (invalidDelay) => {
+      const handler = {
+        handle: vi
+          .fn<(message: IncomingMessage) => Promise<OutgoingMessage>>()
+          .mockRejectedValueOnce(new Error("transient"))
+          .mockResolvedValue({
+            conversation: createIncomingMessage("1", "42").conversation,
+            text: "ok",
+          }),
+      };
+      const onRetry = vi.fn(async () => {});
+      const onError = vi.fn(async () => {});
+      const processor = createMessageProcessor({
+        handler,
+        shouldRetry: vi.fn(async (_error, attempt) => attempt === 1),
+        retryDelayMs: vi.fn(async () => invalidDelay),
+        onRetry,
+        onError,
+      });
+
+      await expect(processor.handle(createEvent(createIncomingMessage("1", "42")))).resolves.toBeUndefined();
+
+      expect(handler.handle).toHaveBeenCalledTimes(2);
+      expect(onRetry).toHaveBeenCalledTimes(1);
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
+
+  it("caps retry delay to keep the retry flow deterministic", async () => {
+    vi.useFakeTimers();
+    try {
+      const handler = {
+        handle: vi
+          .fn<(message: IncomingMessage) => Promise<OutgoingMessage>>()
+          .mockRejectedValueOnce(new Error("transient"))
+          .mockResolvedValue({
+            conversation: createIncomingMessage("1", "42").conversation,
+            text: "ok",
+          }),
+      };
+      const processor = createMessageProcessor({
+        handler,
+        shouldRetry: vi.fn(async (_error, attempt) => attempt === 1),
+        retryDelayMs: vi.fn(async () => 60_000),
+      });
+
+      const processing = processor.handle(createEvent(createIncomingMessage("1", "42")));
+
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(handler.handle).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await processing;
+
+      expect(handler.handle).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("runs deferred delivery actions after the response is sent", async () => {
     const afterDeliveryAction = vi.fn(async () => {});
     const deliver = vi.fn(async () => {});
