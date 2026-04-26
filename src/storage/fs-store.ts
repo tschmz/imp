@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { appendFile, mkdir, readFile, readdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, rename } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import type {
   ToolResultMessage,
@@ -671,21 +671,18 @@ async function readSessionMeta(
   ref: ConversationRef,
   conversationsDir: string,
 ): Promise<StoredConversationMeta | undefined> {
-  try {
-    const raw = await readFile(getSessionMetaPath(conversationsDir, ref, agentId), "utf8");
-    const parsed = JSON.parse(raw) as StoredConversationMeta;
-    return {
-      ...parsed,
-      conversation: parsed.conversation ?? ref,
-      agentId: parsed.agentId ?? agentId,
-      version: parsed.version ?? 1,
-    };
-  } catch (error: unknown) {
-    if (isMissingFileError(error)) {
-      return undefined;
-    }
-    throw error;
+  const metaPath = getSessionMetaPath(conversationsDir, ref, agentId);
+  const parsed = await readJsonFile<StoredConversationMeta>(metaPath);
+  if (!parsed) {
+    return undefined;
   }
+
+  return {
+    ...parsed,
+    conversation: parsed.conversation ?? ref,
+    agentId: parsed.agentId ?? agentId,
+    version: parsed.version ?? 1,
+  };
 }
 
 async function readSessionMetaByAgentAndSessionId(
@@ -797,21 +794,12 @@ async function readSelectedAgentId(
   ref: ChatRef,
 ): Promise<string | undefined> {
   const selectedAgentPath = getSelectedAgentPath(conversationsDir, ref);
-
-  try {
-    const raw = await readFile(selectedAgentPath, "utf8");
-    const parsed = JSON.parse(raw) as { agentId?: unknown };
-    if (typeof parsed.agentId !== "string" || parsed.agentId.length === 0) {
-      return undefined;
-    }
-
-    return parsed.agentId;
-  } catch (error: unknown) {
-    if (isMissingFileError(error)) {
-      return undefined;
-    }
-    throw error;
+  const parsed = await readJsonFile<{ agentId?: unknown }>(selectedAgentPath);
+  if (!parsed || typeof parsed.agentId !== "string" || parsed.agentId.length === 0) {
+    return undefined;
   }
+
+  return parsed.agentId;
 }
 
 async function writeSelectedAgentId(
@@ -836,33 +824,58 @@ async function readActiveAgentConversationRef(
   agentId: string,
 ): Promise<ConversationRef | undefined> {
   const activePath = getAgentActiveSessionPath(conversationsDir, agentId);
+  const parsed = await readJsonFile<{
+    transport?: unknown;
+    externalId?: unknown;
+    sessionId?: unknown;
+  }>(activePath);
+  if (
+    !parsed ||
+    typeof parsed.transport !== "string" ||
+    typeof parsed.externalId !== "string" ||
+    typeof parsed.sessionId !== "string" ||
+    parsed.sessionId.length === 0
+  ) {
+    return undefined;
+  }
 
+  return {
+    transport: parsed.transport,
+    externalId: parsed.externalId,
+    sessionId: parsed.sessionId,
+  };
+}
+
+async function readJsonFile<T>(path: string): Promise<T | undefined> {
+  let raw: string;
   try {
-    const raw = await readFile(activePath, "utf8");
-    const parsed = JSON.parse(raw) as {
-      transport?: unknown;
-      externalId?: unknown;
-      sessionId?: unknown;
-    };
-    if (
-      typeof parsed.transport !== "string" ||
-      typeof parsed.externalId !== "string" ||
-      typeof parsed.sessionId !== "string" ||
-      parsed.sessionId.length === 0
-    ) {
-      return undefined;
-    }
-
-    return {
-      transport: parsed.transport,
-      externalId: parsed.externalId,
-      sessionId: parsed.sessionId,
-    };
+    raw = await readFile(path, "utf8");
   } catch (error: unknown) {
     if (isMissingFileError(error)) {
       return undefined;
     }
     throw error;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error: unknown) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
+
+    const quarantinePath = `${path}.corrupt-${Date.now()}`;
+    console.warn(`Ignoring corrupt JSON file at ${path}; moved to ${quarantinePath}`);
+
+    try {
+      await rename(path, quarantinePath);
+    } catch (renameError: unknown) {
+      if (!isMissingFileError(renameError)) {
+        throw renameError;
+      }
+    }
+
+    return undefined;
   }
 }
 
