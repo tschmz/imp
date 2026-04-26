@@ -1,6 +1,6 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import npa from "npm-package-arg";
 import type { AppConfig } from "../config/types.js";
@@ -99,13 +99,19 @@ async function installNpmPackage(options: {
   env?: NodeJS.ProcessEnv;
 }): Promise<{ packageRoot: string }> {
   await ensurePackageStore(options.storeRoot);
+  const installedBefore = await listInstalledTopLevelPackageNames(options.storeRoot, options.env);
   await execFileAsync("npm", ["install", options.packageSpec, "--omit=dev", "--no-audit", "--no-fund"], {
     cwd: options.storeRoot,
     env: options.env ? { ...process.env, ...options.env } : undefined,
   });
+  const installedAfter = await listInstalledTopLevelPackageNames(options.storeRoot, options.env);
+  const newlyInstalledPackageNames = installedAfter.filter((name) => !installedBefore.includes(name));
 
   return {
-    packageRoot: await resolveInstalledPackageRoot(options),
+    packageRoot: await resolveInstalledPackageRoot({
+      ...options,
+      candidatePackageNames: newlyInstalledPackageNames.length > 0 ? newlyInstalledPackageNames : installedAfter,
+    }),
   };
 }
 
@@ -130,10 +136,20 @@ async function ensurePackageStore(storeRoot: string): Promise<void> {
   }
 }
 
-async function resolveInstalledPackageRoot(options: {
+async function listInstalledTopLevelPackageNames(storeRoot: string, env?: NodeJS.ProcessEnv): Promise<string[]> {
+  const { stdout } = await execFileAsync("npm", ["ls", "--json", "--depth=0"], {
+    cwd: storeRoot,
+    env: env ? { ...process.env, ...env } : undefined,
+  });
+  const report = JSON.parse(stdout) as { dependencies?: Record<string, unknown> };
+  return Object.keys(report.dependencies ?? {});
+}
+
+export async function resolveInstalledPackageRoot(options: {
   packageSpec: string;
   packageName?: string;
   storeRoot: string;
+  candidatePackageNames: string[];
 }): Promise<string> {
   if (options.packageName) {
     const packageRoot = join(options.storeRoot, "node_modules", ...options.packageName.split("/"));
@@ -141,18 +157,32 @@ async function resolveInstalledPackageRoot(options: {
     return packageRoot;
   }
 
-  const lockfilePath = join(options.storeRoot, "package-lock.json");
-  const lockfile = JSON.parse(await readFile(lockfilePath, "utf8")) as {
-    packages?: Record<string, { resolved?: string }>;
-  };
-  const packageEntry = Object.entries(lockfile.packages ?? {}).find(([path, entry]) => {
-    return path.startsWith("node_modules/") && entry.resolved?.includes(basename(options.packageSpec));
-  });
-  if (!packageEntry) {
-    throw new Error(`Could not resolve installed package root for "${options.packageSpec}".`);
+  const pluginCandidates: string[] = [];
+  for (const candidateName of options.candidatePackageNames) {
+    const packageRoot = join(options.storeRoot, "node_modules", ...candidateName.split("/"));
+    const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8")) as {
+      name?: string;
+    };
+    if (packageManifest.name !== candidateName) {
+      continue;
+    }
+    try {
+      await access(join(packageRoot, PLUGIN_MANIFEST_FILE));
+      pluginCandidates.push(packageRoot);
+    } catch {
+      // ignore non-plugin package candidates
+    }
   }
 
-  const packageRoot = join(options.storeRoot, packageEntry[0]);
-  await access(join(packageRoot, PLUGIN_MANIFEST_FILE));
-  return packageRoot;
+  if (pluginCandidates.length === 1) {
+    return pluginCandidates[0];
+  }
+  if (pluginCandidates.length === 0) {
+    throw new Error(
+      `Could not resolve installed package root for "${options.packageSpec}": no plugin package found among candidates ${options.candidatePackageNames.join(", ")}.`,
+    );
+  }
+  throw new Error(
+    `Could not resolve installed package root for "${options.packageSpec}": multiple plugin packages matched (${pluginCandidates.join(", ")}).`,
+  );
 }
