@@ -695,8 +695,17 @@ function assertSafeManifestRelativePath(path: string, label: string): void {
     throw new Error(`Invalid backup archive: unsafe manifest path (${label})`);
   }
 
-  const segments = toPortablePath(path).split("/");
-  if (segments.some((segment) => segment === ".." || segment.length === 0)) {
+  const portablePath = toPortablePath(path);
+  const segments = portablePath.split("/");
+  if (segments.some((segment) => segment === ".." || segment === "." || segment.length === 0)) {
+    throw new Error(`Invalid backup archive: unsafe manifest path (${label})`);
+  }
+
+  const expectsFilePath =
+    label === "manifest.config.archivePath" ||
+    label.startsWith("manifest.agentFiles[") ||
+    label.startsWith("manifest.conversations[");
+  if (expectsFilePath && (portablePath.endsWith("/") || portablePath === ".")) {
     throw new Error(`Invalid backup archive: unsafe manifest path (${label})`);
   }
 }
