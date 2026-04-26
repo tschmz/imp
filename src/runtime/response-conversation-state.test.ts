@@ -74,6 +74,55 @@ describe("resolvePreviousResponseState", () => {
     });
   });
 
+  it("falls back to full replay when the latest matching responses assistant ended in error", () => {
+    const messages = [
+      {
+        kind: "message",
+        id: "1:user",
+        role: "user",
+        content: "hello",
+        timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
+        createdAt: "2026-04-05T00:00:00.000Z",
+      },
+      {
+        kind: "message",
+        id: "1:assistant:1",
+        role: "assistant",
+        content: [{ type: "text", text: "Let me check." }],
+        api: "openai-responses",
+        provider: "openai",
+        model: "gpt-5-mini",
+        responseId: "resp_123",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "error",
+        errorMessage: "upstream failed",
+        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+        createdAt: "2026-04-05T00:00:01.000Z",
+      },
+      {
+        kind: "message",
+        id: "2:user",
+        role: "user",
+        content: "retry",
+        timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
+        createdAt: "2026-04-05T00:00:02.000Z",
+      },
+    ] satisfies ConversationEvent[];
+
+    const state = resolvePreviousResponseState(messages, responsesModel);
+
+    expect(state).toEqual({
+      conversationMessages: messages,
+    });
+  });
+
   it("falls back to full replay when the latest assistant is not a matching responses message", () => {
     const messages = [
       {

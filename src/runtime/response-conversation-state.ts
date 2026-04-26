@@ -19,7 +19,9 @@ export function resolvePreviousResponseState(
     !latestAssistant ||
     latestAssistant.api !== model.api ||
     latestAssistant.provider !== model.provider ||
-    !latestAssistant.responseId
+    !latestAssistant.responseId ||
+    latestAssistant.stopReason === "error" ||
+    latestAssistant.stopReason === "aborted"
   ) {
     return { conversationMessages: messages };
   }
