@@ -42,7 +42,7 @@ export function supportsPreviousResponseId(
   }
 
   if (model.api === "openai-codex-responses") {
-    return model.provider === "openai-codex";
+    return false;
   }
 
   if (model.api !== "openai-responses" || model.provider !== "openai") {

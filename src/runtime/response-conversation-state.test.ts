@@ -43,7 +43,7 @@ describe("supportsPreviousResponseId", () => {
       ...responsesModel,
       api: "openai-codex-responses",
       provider: "openai-codex",
-    })).toBe(true);
+    })).toBe(false);
   });
 });
 
