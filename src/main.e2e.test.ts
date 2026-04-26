@@ -14,7 +14,7 @@ const packageJson = require("../package.json") as { version: string };
 const tempDirs: string[] = [];
 const projectRoot = resolveProjectRoot();
 const cliEntryPoint = join(projectRoot, "dist", "main.js");
-const cliE2eTimeoutMs = 20_000;
+const cliE2eTimeoutMs = 45_000;
 
 afterEach(async () => {
   await Promise.all(

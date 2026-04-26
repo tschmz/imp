@@ -661,7 +661,7 @@ describe("plugin use cases", () => {
           command: "node",
           args: ["bin/speaker-outbox.mjs"],
           env: {
-            OPENAI_API_KEY: "required",
+            IMP_PLUGIN_TEST_REQUIRED_SECRET: "required",
           },
         },
       ],
@@ -698,7 +698,7 @@ describe("plugin use cases", () => {
     ).rejects.toThrow(
       [
         'Plugin "imp-voice" service installation requires missing environment variables:',
-        "- out: OPENAI_API_KEY",
+        "- out: IMP_PLUGIN_TEST_REQUIRED_SECRET",
         "Export the variables before installing plugin services.",
       ].join("\n"),
     );

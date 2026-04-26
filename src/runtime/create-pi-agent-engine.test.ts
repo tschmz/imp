@@ -1,6 +1,6 @@
 import type { Agent, AgentEvent, AgentMessage, AgentOptions } from "@mariozechner/pi-agent-core";
 import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration, type ImageContent } from "@mariozechner/pi-ai";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
