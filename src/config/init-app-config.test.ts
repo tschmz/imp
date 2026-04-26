@@ -69,6 +69,7 @@ describe("initAppConfig", () => {
       "grep",
       "find",
       "ls",
+      "update_plan",
     ]);
     expect(config.agents[0]?.workspace).toBeUndefined();
     expect(config.agents[0]?.inference).toEqual({

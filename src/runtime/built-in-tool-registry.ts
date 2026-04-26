@@ -5,6 +5,7 @@ import type { ToolDefinition } from "../tools/types.js";
 import { createPhoneCallTools } from "./phone-call-tool.js";
 import { resolveBuiltInToolOptions } from "./shell-path.js";
 import { createConfiguredSkillTools } from "./skill-tool.js";
+import { createUpdatePlanTool } from "./update-plan-tool.js";
 import { toUserVisibleToolError } from "./user-visible-tool-error.js";
 import {
   createWorkingDirectoryState,
@@ -21,6 +22,7 @@ export function createBuiltInToolRegistry(
   return createToolRegistry([
     ...createDynamicBuiltInTools(workingDirectoryState, agent),
     ...createConfiguredSkillTools(agent?.skillCatalog ?? []),
+    createUpdatePlanTool(),
     ...createWorkingDirectoryTools(workingDirectoryState),
   ]);
 }

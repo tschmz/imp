@@ -47,7 +47,8 @@
           "write",
           "grep",
           "find",
-          "ls"
+          "ls",
+          "update_plan"
         ],
         "agents": [
           {
@@ -96,7 +97,8 @@
         "write",
         "grep",
         "find",
-        "ls"
+        "ls",
+        "update_plan"
       ],
       "prompt": {
         "base": {

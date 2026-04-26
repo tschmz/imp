@@ -2025,6 +2025,78 @@ describe("createPiAgentEngine", () => {
     } satisfies Partial<UserVisibleProcessingError>);
   });
 
+  it("allows agents to update a visible multi-step plan", async () => {
+    const registry = createBuiltInToolRegistry(process.cwd());
+    const updatePlan = registry.get("update_plan");
+
+    expect(updatePlan).toBeDefined();
+    expect(updatePlan?.parameters).toMatchObject({
+      properties: {
+        plan: {
+          items: {
+            properties: {
+              status: {
+                enum: ["pending", "in_progress", "completed"],
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const result = await updatePlan!.execute("plan-1", {
+      explanation: "After inspecting the repo.",
+      plan: [
+        { step: "Inspect tool registry", status: "completed" },
+        { step: "Implement update_plan", status: "in_progress" },
+        { step: "Run tests", status: "pending" },
+      ],
+    });
+
+    expect(result).toEqual({
+      content: [
+        {
+          type: "text",
+          text:
+            "Plan updated.\n" +
+            "Explanation: After inspecting the repo.\n" +
+            "completed: Inspect tool registry\n" +
+            "in_progress: Implement update_plan\n" +
+            "pending: Run tests",
+        },
+      ],
+      details: {
+        explanation: "After inspecting the repo.",
+        plan: [
+          { step: "Inspect tool registry", status: "completed" },
+          { step: "Implement update_plan", status: "in_progress" },
+          { step: "Run tests", status: "pending" },
+        ],
+      },
+    });
+  });
+
+  it("maps update_plan parameter validation failures to typed processing errors", async () => {
+    const updatePlan = createBuiltInToolRegistry(process.cwd()).get("update_plan");
+
+    await expect(updatePlan!.execute("plan-1", undefined)).rejects.toMatchObject({
+      kind: "tool_command_execution",
+      message: "update_plan requires an object parameter with a plan array.",
+    } satisfies Partial<UserVisibleProcessingError>);
+
+    await expect(
+      updatePlan!.execute("plan-2", {
+        plan: [
+          { step: "First active step", status: "in_progress" },
+          { step: "Second active step", status: "in_progress" },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      kind: "tool_command_execution",
+      message: "update_plan accepts at most one in_progress step.",
+    } satisfies Partial<UserVisibleProcessingError>);
+  });
+
   it("allows agents to inspect and change their working directory via tools", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-working-directory-"));
     tempDirs.push(root);

@@ -9,7 +9,7 @@ The examples use `agents.default` to address the agent with the ID `default`.
 Set the built-in tools for an agent:
 
 ```sh
-imp config set agents.default.tools '["read","bash","edit","write","grep","find","ls"]'
+imp config set agents.default.tools '["read","bash","edit","write","grep","find","ls","update_plan"]'
 ```
 
 Common built-in tools are:
@@ -21,6 +21,7 @@ Common built-in tools are:
 - `grep`: search file contents
 - `find`: search for files by pattern
 - `ls`: list directory contents
+- `update_plan`: maintain a concise progress plan for multi-step work
 - `pwd`: show the current working directory
 - `cd`: change the working directory for later file and shell tool calls
 

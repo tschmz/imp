@@ -455,7 +455,7 @@ async function writeDefaultConfig(root: string): Promise<void> {
           provider: "openai",
           modelId: "gpt-5.4",
         },
-        tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
+        tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "update_plan"],
         inference: {
           metadata: {
             app: "imp",

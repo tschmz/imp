@@ -5,7 +5,7 @@ import type { AppConfig } from "./types.js";
 
 const defaultAgentId = "default";
 const defaultEndpointId = "private-telegram";
-const defaultTools = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+const defaultTools = ["read", "bash", "edit", "write", "grep", "find", "ls", "update_plan"];
 
 export interface InitialConfigAnswers {
   instanceName: string;
