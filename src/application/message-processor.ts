@@ -98,6 +98,7 @@ async function processEvent(
   event: TransportInboundEvent,
   dependencies: MessageProcessorDependencies,
 ): Promise<void> {
+  const maxRetryDelayMs = 30_000;
   let attempt = 1;
 
   for (;;) {
@@ -114,7 +115,10 @@ async function processEvent(
       const shouldRetry = await dependencies.shouldRetry?.(error, attempt, event);
       if (shouldRetry) {
         await dependencies.onRetry?.(error, attempt, event);
-        const retryDelayMs = (await dependencies.retryDelayMs?.(attempt, event)) ?? 0;
+        const retryDelayMs = normalizeRetryDelayMs(
+          await dependencies.retryDelayMs?.(attempt, event),
+          maxRetryDelayMs,
+        );
         if (retryDelayMs > 0) {
           await delay(retryDelayMs);
         }
@@ -139,6 +143,14 @@ async function processEvent(
       return;
     }
   }
+}
+
+function normalizeRetryDelayMs(value: number | undefined, maxDelayMs: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+
+  return Math.min(value, maxDelayMs);
 }
 
 function createSemaphore(maxPermits: number): {
