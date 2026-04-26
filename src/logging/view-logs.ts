@@ -36,9 +36,12 @@ export async function viewDaemonLogs(options: {
   const targets = resolveLogTargets(options.runtimeConfig, options.endpointId);
   const multiEndpoint = targets.length > 1;
 
+  const initialOffsets = new Map<string, number>();
+
   for (const target of targets) {
-    const recentLines = await readRecentLogLines(target.logFilePath, lines, readFileImpl);
-    writeLogLines(stdout, target.endpointId, recentLines, multiEndpoint);
+    const snapshot = await readLogSnapshot(target.logFilePath, lines, readFileImpl);
+    initialOffsets.set(target.endpointId, snapshot.offset);
+    writeLogLines(stdout, target.endpointId, snapshot.recentLines, multiEndpoint);
   }
 
   if (!options.follow) {
@@ -52,6 +55,7 @@ export async function viewDaemonLogs(options: {
     multiEndpoint,
     readFile: readFileImpl,
     watch: watchImpl,
+    initialOffsets,
   });
 }
 
@@ -81,6 +85,15 @@ export async function readRecentLogLines(
   lines: number,
   readFileImpl: ReadLogFile = readFile,
 ): Promise<string[]> {
+  const snapshot = await readLogSnapshot(logFilePath, lines, readFileImpl);
+  return snapshot.recentLines;
+}
+
+async function readLogSnapshot(
+  logFilePath: string,
+  lines: number,
+  readFileImpl: ReadLogFile,
+): Promise<{ recentLines: string[]; offset: number }> {
   try {
     const content = await readFileImpl(logFilePath, "utf8");
     const allLines = content
@@ -88,7 +101,10 @@ export async function readRecentLogLines(
       .map((line) => line.trimEnd())
       .filter((line) => line.length > 0);
 
-    return allLines.slice(-lines);
+    return {
+      recentLines: allLines.slice(-lines),
+      offset: content.length,
+    };
   } catch (error) {
     if (isMissingFileError(error)) {
       throw new Error(`Log file not found: ${logFilePath}`);
@@ -105,25 +121,27 @@ async function followLogTargets(options: {
   multiEndpoint: boolean;
   readFile: ReadLogFile;
   watch: WatchLogFile;
+  initialOffsets: Map<string, number>;
 }): Promise<void> {
   const abortController = options.signal ? undefined : new AbortController();
   const signal = options.signal ?? abortController?.signal;
   const cleanup = registerFollowCleanup(abortController);
-  const offsets = new Map<string, number>();
+  const offsets = new Map(options.initialOffsets);
   const watchers: AsyncIterable<{ eventType: string }>[] = [];
   const pendingWatchTasks: Promise<void>[] = [];
 
   try {
     for (const target of options.targets) {
-      const content = await options.readFile(target.logFilePath, "utf8");
-      offsets.set(target.endpointId, content.length);
-
       const watcher = options.watch(target.logFilePath, {
         signal,
       });
       watchers.push(watcher);
 
       pendingWatchTasks.push(watchTarget(watcher, target, options, offsets));
+    }
+
+    for (const target of options.targets) {
+      await writeNewLogLines(target, options, offsets);
     }
 
     if (!signal) {
@@ -154,18 +172,7 @@ async function watchTarget(
         continue;
       }
 
-      const content = await options.readFile(target.logFilePath, "utf8");
-      const previousOffset = offsets.get(target.endpointId) ?? 0;
-      const effectiveOffset = content.length < previousOffset ? 0 : previousOffset;
-      const nextChunk = content.slice(effectiveOffset);
-
-      const newLines = nextChunk
-        .split("\n")
-        .map((line) => line.trimEnd())
-        .filter((line) => line.length > 0);
-
-      writeLogLines(options.stdout, target.endpointId, newLines, options.multiEndpoint);
-      offsets.set(target.endpointId, content.length);
+      await writeNewLogLines(target, options, offsets);
     }
   } catch (error) {
     if (isAbortError(error)) {
@@ -174,6 +181,29 @@ async function watchTarget(
 
     throw error;
   }
+}
+
+async function writeNewLogLines(
+  target: LogTarget,
+  options: {
+    stdout: NodeJS.WritableStream;
+    multiEndpoint: boolean;
+    readFile: ReadLogFile;
+  },
+  offsets: Map<string, number>,
+): Promise<void> {
+  const content = await options.readFile(target.logFilePath, "utf8");
+  const previousOffset = offsets.get(target.endpointId) ?? 0;
+  const effectiveOffset = content.length < previousOffset ? 0 : previousOffset;
+  const nextChunk = content.slice(effectiveOffset);
+
+  const newLines = nextChunk
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0);
+
+  writeLogLines(options.stdout, target.endpointId, newLines, options.multiEndpoint);
+  offsets.set(target.endpointId, content.length);
 }
 
 function writeLogLines(

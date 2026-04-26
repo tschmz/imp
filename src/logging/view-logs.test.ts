@@ -117,7 +117,7 @@ describe("viewDaemonLogs", () => {
       dependencies: {
         async readFile() {
           readCount += 1;
-          if (readCount <= 2) {
+          if (readCount <= 1) {
             return "one\n";
           }
 
@@ -130,6 +130,59 @@ describe("viewDaemonLogs", () => {
               options.signal?.addEventListener("abort", () => resolve(undefined), { once: true });
             });
           })();
+        },
+      },
+    });
+
+    expect(chunks.join("")).toBe("one\ntwo\n");
+  });
+
+  it("does not miss log lines appended between the initial read and the first watch event", async () => {
+    const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram"]);
+    const stdout = new PassThrough();
+    const chunks: string[] = [];
+    const abortController = new AbortController();
+    let readCount = 0;
+
+    stdout.on("data", (chunk) => {
+      chunks.push(String(chunk));
+    });
+
+    setTimeout(() => {
+      abortController.abort();
+    }, 10);
+
+    await viewDaemonLogs({
+      runtimeConfig,
+      follow: true,
+      stdout,
+      signal: abortController.signal,
+      dependencies: {
+        async readFile() {
+          readCount += 1;
+          if (readCount === 1) {
+            return "one\n";
+          }
+
+          return "one\ntwo\n";
+        },
+        watch(_path, options) {
+          return {
+            [Symbol.asyncIterator]() {
+              return {
+                async next() {
+                  await new Promise((resolve) => {
+                    options.signal?.addEventListener("abort", () => resolve(undefined), { once: true });
+                  });
+
+                  return {
+                    done: true,
+                    value: undefined,
+                  };
+                },
+              };
+            },
+          };
         },
       },
     });
@@ -160,7 +213,7 @@ describe("viewDaemonLogs", () => {
       dependencies: {
         async readFile() {
           readCount += 1;
-          if (readCount <= 2) {
+          if (readCount <= 1) {
             return "one\ntwo\n";
           }
 
@@ -188,6 +241,7 @@ describe("viewDaemonLogs", () => {
     const watchTask = viewDaemonLogs({
       runtimeConfig,
       follow: true,
+      stdout: new PassThrough(),
       signal: abortController.signal,
       dependencies: {
         async readFile() {
