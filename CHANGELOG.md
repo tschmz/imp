@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.14.0 - 2026-04-26
+
+### Added
+
+- Simplify the `imp init` flow.
+- Improve path creation in `imp config set`.
+- Add the `update_plan` tool and parallel developer tool execution for delegated agents.
+- Add `imp config schema`, wildcard lookups in `imp config get`, and effective-value rendering in config reads.
+- Add a delegated runtime prompt mode.
+
+### Changed
+
+- Move bundled phone tools into the `imp-phone` plugin package.
+
+### Fixed
+
+- Isolate delegated agent prompt context.
+
 ## 0.13.0 - 2026-04-25
 
 ### Added
