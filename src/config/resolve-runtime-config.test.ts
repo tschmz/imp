@@ -593,8 +593,22 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
-  it("resolves phone call cwd relative to the config directory", async () => {
+  it("preserves phone contact config for plugin tools", async () => {
     const appConfig = createAppConfig({
+      tools: {
+        mcp: {
+          servers: [
+            {
+              id: "imp-phone",
+              command: "node",
+              args: ["bin/mcp-server.mjs"],
+              env: {
+                IMP_PHONE_AGENT_ID: "{{agent.id}}",
+              },
+            },
+          ],
+        },
+      },
       agents: [
         {
           id: "default",
@@ -608,11 +622,10 @@ describe("resolveRuntimeConfig", () => {
             },
           },
           tools: {
-            builtIn: ["phone_call"],
+            mcp: {
+              servers: ["imp-phone"],
+            },
             phone: {
-              cwd: "./phone",
-              command: "baresip",
-              args: ["-e", "/dial {uri}"],
               contacts: [
                 {
                   id: "office",
@@ -640,11 +653,20 @@ describe("resolveRuntimeConfig", () => {
 
     const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
-    expect(result.agents[0]?.tools).toEqual(["phone_call"]);
+    expect(result.agents[0]?.tools).toBeUndefined();
+    expect(result.agents[0]?.mcp).toEqual({
+      servers: [
+        {
+          id: "imp-phone",
+          command: "node",
+          args: ["bin/mcp-server.mjs"],
+          env: {
+            IMP_PHONE_AGENT_ID: "default",
+          },
+        },
+      ],
+    });
     expect(result.agents[0]?.phone).toEqual({
-      cwd: "/etc/imp/phone",
-      command: "baresip",
-      args: ["-e", "/dial {uri}"],
       contacts: [
         {
           id: "office",

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "imp-phone",
   "name": "imp Phone",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Turn-based SIP phone conversation frontend for imp.",
   "capabilities": ["endpoint", "service", "audio", "voice", "speech-output"],
   "endpoints": [
@@ -44,8 +44,23 @@
       }
     }
   ],
+  "mcpServers": [
+    {
+      "id": "imp-phone",
+      "description": "Exposes phone_call and phone_hangup tools for allowlisted agent phone contacts.",
+      "command": "node",
+      "cwd": "{{plugin.rootDir}}",
+      "args": ["bin/mcp-server.mjs"],
+      "env": {
+        "IMP_CONFIG_PATH": "{{config.path}}",
+        "IMP_PHONE_AGENT_ID": "{{agent.id}}",
+        "IMP_PHONE_REQUESTS_DIR": "{{paths.dataRoot}}/runtime/plugins/{{plugin.id}}/requests",
+        "IMP_PHONE_CONTROL_DIR": "{{paths.dataRoot}}/runtime/plugins/{{plugin.id}}/requests/control"
+      }
+    }
+  ],
   "init": {
     "configTemplate": "config/default.json",
-    "postInstallMessage": "Configure agents[].tools.phone with allowlisted contacts and the installed bin/request-call.mjs path."
+    "postInstallMessage": "Configure agents[].tools.mcp.servers with \"imp-phone\" and agents[].tools.phone with allowlisted contacts."
   }
 }

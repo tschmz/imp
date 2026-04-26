@@ -33,7 +33,7 @@ export async function writeCallRequest(options) {
 
   await writeJsonAtomic(path, payload);
   if (options.wait) {
-    return await waitForCallRequestResult(resultPath, options.pollIntervalMs);
+    return await waitForCallRequestResult(resultPath, options.pollIntervalMs, options.timeoutMs);
   }
   return path;
 }
@@ -64,6 +64,8 @@ export function parseRequestCliArgs(argv) {
       parsed.correlationId = argv[++index];
     } else if (arg === "--wait") {
       parsed.wait = true;
+    } else if (arg === "--timeout-ms") {
+      parsed.timeoutMs = parsePositiveInteger(argv[++index], "timeoutMs");
     } else if (arg === "--help" || arg === "-h") {
       parsed.help = true;
     } else {
@@ -73,13 +75,17 @@ export function parseRequestCliArgs(argv) {
   return parsed;
 }
 
-async function waitForCallRequestResult(resultPath, pollIntervalMs = 250) {
+async function waitForCallRequestResult(resultPath, pollIntervalMs = 250, timeoutMs) {
+  const startedAt = Date.now();
   while (true) {
     try {
       return JSON.parse(await readFile(resultPath, "utf8"));
     } catch (error) {
       if (!isMissingFileError(error)) {
         throw error;
+      }
+      if (typeof timeoutMs === "number" && Date.now() - startedAt >= timeoutMs) {
+        throw new Error(`Timed out waiting for call request result: ${resultPath}`);
       }
       await sleep(pollIntervalMs);
     }
@@ -109,4 +115,12 @@ function optionalString(value, name) {
     throw new Error(`${name} must be a string when provided.`);
   }
   return value;
+}
+
+function parsePositiveInteger(value, name) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+  return parsed;
 }

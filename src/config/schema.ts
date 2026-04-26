@@ -106,6 +106,7 @@ const phoneCallConfigSchema = z.object({
     })
     .array()
     .min(1),
+  requestsDir: z.string().min(1).optional(),
   command: z.string().min(1).optional(),
   args: z.string().array().optional(),
   env: z.record(z.string(), z.string()).optional(),

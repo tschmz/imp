@@ -58,7 +58,7 @@ export async function resolveRuntimeConfig(
           ...(agent.inference ? { inference: agent.inference } : {}),
           ...(skillCatalog.skills.length > 0 ? { skillCatalog: skillCatalog.skills } : {}),
           ...(skillCatalog.issues.length > 0 ? { skillIssues: skillCatalog.issues } : {}),
-          ...resolveAgentTools(agent.tools, mcpServers, configDir),
+          ...resolveAgentTools(agent, mcpServers, configDir),
         };
       }),
     ),
@@ -147,10 +147,11 @@ function resolveAgentSkills(
 }
 
 function resolveAgentTools(
-  tools: AgentToolsConfig | undefined,
+  agent: AppConfig["agents"][number],
   mcpServers: Map<string, AgentMcpServerConfig>,
   configDir: string,
 ): Pick<DaemonConfig["agents"][number], "tools" | "delegations" | "mcp" | "phone"> {
+  const tools = agent.tools;
   if (!tools) {
     return {};
   }
@@ -164,7 +165,7 @@ function resolveAgentTools(
   return {
     ...(tools.builtIn ? { tools: tools.builtIn } : {}),
     ...(tools.agents ? { delegations: resolveAgentDelegations(tools.agents) } : {}),
-    ...(tools.mcp ? { mcp: resolveAgentMcpConfig(tools.mcp, mcpServers) } : {}),
+    ...(tools.mcp ? { mcp: resolveAgentMcpConfig(tools.mcp, mcpServers, agent) } : {}),
     ...(tools.phone ? { phone: resolveAgentPhoneCallConfig(tools.phone, configDir) } : {}),
   };
 }
@@ -199,6 +200,7 @@ function resolveGlobalMcpServers(appConfig: AppConfig, configDir: string): Map<s
 function resolveAgentMcpConfig(
   mcp: AgentMcpToolsConfig,
   mcpServers: Map<string, AgentMcpServerConfig>,
+  agent: AppConfig["agents"][number],
 ): AgentMcpConfig {
   return {
     servers: mcp.servers.map((serverId) => {
@@ -207,9 +209,36 @@ function resolveAgentMcpConfig(
         throw new Error(`Unknown MCP server id "${serverId}".`);
       }
 
-      return server;
+      return renderAgentMcpServerTemplates(server, agent);
     }),
   };
+}
+
+function renderAgentMcpServerTemplates(
+  server: AgentMcpServerConfig,
+  agent: AppConfig["agents"][number],
+): AgentMcpServerConfig {
+  return {
+    ...server,
+    command: renderAgentTemplate(server.command, agent),
+    ...(server.args ? { args: server.args.map((arg) => renderAgentTemplate(arg, agent)) } : {}),
+    ...(server.inheritEnv ? { inheritEnv: server.inheritEnv.map((entry) => renderAgentTemplate(entry, agent)) } : {}),
+    ...(server.env ? { env: mapRecordValues(server.env, (value) => renderAgentTemplate(value, agent)) } : {}),
+    ...(server.cwd ? { cwd: renderAgentTemplate(server.cwd, agent) } : {}),
+  };
+}
+
+function mapRecordValues(
+  record: Record<string, string>,
+  mapValue: (value: string) => string,
+): Record<string, string> {
+  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, mapValue(value)]));
+}
+
+function renderAgentTemplate(value: string, agent: AppConfig["agents"][number]): string {
+  return value
+    .replaceAll("{{agent.id}}", agent.id)
+    .replaceAll("{{agent.name}}", agent.name ?? agent.id);
 }
 
 function resolveAgentPhoneCallConfig(
@@ -218,6 +247,7 @@ function resolveAgentPhoneCallConfig(
 ): AgentPhoneCallConfig {
   return {
     ...phone,
+    ...(phone.requestsDir ? { requestsDir: resolveConfigPath(phone.requestsDir, configDir) } : {}),
     ...(phone.cwd ? { cwd: resolveConfigPath(phone.cwd, configDir) } : {}),
     ...(phone.controlDir ? { controlDir: resolveConfigPath(phone.controlDir, configDir) } : {}),
   };

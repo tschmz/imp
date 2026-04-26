@@ -71,13 +71,13 @@ Each delegated tool accepts a single text input and returns the delegated agent'
 
 ## Phone Tools
 
-When an agent has a phone configuration, Imp can expose `phone_call` and `phone_hangup` as built-in tools. The tools are still allowlisted through `builtIn`, and calls are limited to the configured contacts.
+The `imp-phone` plugin exposes phone tools through its packaged MCP server. Install the plugin, then allow an agent to use the `imp-phone` MCP server and configure its contact allowlist under `agents[].tools.phone`.
 
 ```sh
-imp config set agents.default.tools '{"builtIn":["phone_call","phone_hangup"],"phone":{"contacts":[{"id":"office","name":"Office","uri":"sip:office@example.com"}],"command":"imp-phone","args":["request-call"]}}'
+imp config set agents.default.tools '{"mcp":{"servers":["imp-phone"]},"phone":{"contacts":[{"id":"office","name":"Office","uri":"sip:office@example.com"}]}}'
 ```
 
-Use `phone.controlDir` when the hangup tool needs to write a local control request for the active phone call.
+Imp prefixes MCP tools with the server id, so the model sees `imp-phone__phone_call` and `imp-phone__phone_hangup`. Calls are limited to the configured contacts. Use `phone.requestsDir` or `phone.controlDir` only when overriding the paths installed by the plugin.
 
 ## Skills
 

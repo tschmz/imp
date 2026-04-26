@@ -1,6 +1,6 @@
 {
   "name": "@tschmz/imp-phone",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "type": "module",
   "description": "Turn-based SIP phone conversation frontend for imp",
@@ -16,10 +16,15 @@
   },
   "bin": {
     "imp-phone-controller": "bin/controller.mjs",
+    "imp-phone-mcp-server": "bin/mcp-server.mjs",
     "imp-phone-request-call": "bin/request-call.mjs"
   },
   "engines": {
     "node": ">=20.6.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.0.1"
   },
   "scripts": {
     "test": "vitest run test/*.test.mjs"

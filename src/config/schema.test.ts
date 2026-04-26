@@ -605,33 +605,46 @@ describe("appConfigSchema", () => {
 
   it("accepts allowlisted phone call config under agents.tools.phone", () => {
     const result = appConfigSchema.safeParse(
-      createConfig({
-        id: "default",
-        prompt: {
-          base: {
-            text: "You are concise.",
+      {
+        ...createConfig({
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
           },
-        },
-        model: {
-          provider: "openai",
-          modelId: "gpt-5.4",
-        },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
+          tools: {
+            mcp: {
+              servers: ["imp-phone"],
+            },
+            phone: {
+              contacts: [
+                {
+                  id: "office",
+                  name: "Office",
+                  uri: "sip:+491234567@example.com",
+                  comment: "work colleague",
+                },
+              ],
+            },
+          },
+        }),
         tools: {
-          builtIn: ["phone_call"],
-          phone: {
-            command: "baresip",
-            args: ["-e", "/dial {uri}"],
-            contacts: [
+          mcp: {
+            servers: [
               {
-                id: "office",
-                name: "Office",
-                uri: "sip:+491234567@example.com",
-                comment: "work colleague",
+                id: "imp-phone",
+                command: "node",
+                args: ["bin/mcp-server.mjs"],
               },
             ],
           },
         },
-      }),
+      },
     );
 
     expect(result.success).toBe(true);

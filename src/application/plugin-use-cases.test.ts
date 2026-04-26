@@ -146,6 +146,12 @@ describe("plugin use cases", () => {
           id: "voice-control",
           command: "node",
           args: ["dist/mcp-server.js"],
+          cwd: ".",
+          env: {
+            IMP_CONFIG_PATH: "{{config.path}}",
+            IMP_DATA_ROOT: "{{paths.dataRoot}}",
+            IMP_AGENT_ID: "{{agent.id}}",
+          },
         },
       ],
     });
@@ -178,8 +184,14 @@ describe("plugin use cases", () => {
         servers: [
           {
             id: "voice-control",
-            command: "node",
+            command: process.execPath,
             args: ["dist/mcp-server.js"],
+            cwd: join(root, "imp-voice"),
+            env: {
+              IMP_CONFIG_PATH: configPath,
+              IMP_DATA_ROOT: "/tmp/imp",
+              IMP_AGENT_ID: "{{agent.id}}",
+            },
           },
         ],
       },

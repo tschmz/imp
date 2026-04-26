@@ -99,7 +99,7 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
         packageInstaller,
         writeOutput,
       });
-      const updatedConfig = installPluginIntoConfig(config, plugin);
+      const updatedConfig = installPluginIntoConfig(config, plugin, configPath);
       await configInstaller.writeConfig(configPath, updatedConfig);
       for (const line of renderPluginInstallSummary({
         pluginId: plugin.manifest.id,

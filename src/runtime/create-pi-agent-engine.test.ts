@@ -2178,20 +2178,9 @@ describe("createPiAgentEngine", () => {
   });
 
   it("marks stateful and mutating built-in tools for sequential execution", () => {
-    const registry = createBuiltInToolRegistry(process.cwd(), {
-      ...createAgent(),
-      phone: {
-        contacts: [
-          {
-            id: "office",
-            name: "Office",
-            uri: "sip:office@example.com",
-          },
-        ],
-      },
-    });
+    const registry = createBuiltInToolRegistry(process.cwd(), createAgent());
 
-    for (const toolName of ["bash", "edit", "write", "cd", "update_plan", "phone_call", "phone_hangup"]) {
+    for (const toolName of ["bash", "edit", "write", "cd", "update_plan"]) {
       expect(registry.get(toolName)?.executionMode).toBe("sequential");
     }
 
@@ -2290,99 +2279,22 @@ describe("createPiAgentEngine", () => {
     expect(outputEntries.slice(0, 3)).toEqual(["/custom/bin", "/usr/bin", "/bin"]);
   });
 
-  it("registers an allowlisted phone call tool when configured", async () => {
-    const root = await mkdtemp(join(tmpdir(), "imp-phone-call-"));
-    tempDirs.push(root);
-    const registry = createBuiltInToolRegistry(root, {
+  it("does not register phone tools as built-ins", () => {
+    const registry = createBuiltInToolRegistry(process.cwd(), {
       ...createAgent(),
-      id: "imp.telebot",
-      tools: ["phone_call", "phone_hangup"],
       phone: {
-        command: process.execPath,
-        args: [
-          "-e",
-          "console.log(JSON.stringify({schemaVersion:1,status:'answered',requestId:'call-1',conversationId:'imp-phone-call-1'}))",
-          "{contactId}",
-          "{contactName}",
-          "{uri}",
-          "{purpose}",
-        ],
-        controlDir: join(root, "control"),
         contacts: [
           {
             id: "office",
             name: "Office",
-            uri: "sip:+491234567@example.com",
-            comment: "work colleague",
+            uri: "sip:office@example.com",
           },
         ],
       },
     });
-    const phoneCall = registry.get("phone_call");
-    const phoneHangup = registry.get("phone_hangup");
-
-    expect(phoneCall).toBeDefined();
-    expect(phoneHangup).toBeDefined();
-    expect(phoneCall?.parameters).toMatchObject({
-      properties: {
-        contactId: {
-          enum: ["office"],
-        },
-      },
-    });
-
-    const result = await phoneCall!.execute("1", {
-      contactId: "office",
-      purpose: "Test call",
-    });
-    const output = result.content
-      .flatMap((item) => (item.type === "text" ? [item.text] : []))
-      .join("\n");
-
-    expect(output).toContain("Phone call to Office (office) was answered.");
-    expect(output).toContain("Conversation id: imp-phone-call-1.");
-    expect(output).toContain("Purpose: Test call");
-    expect(result.details).toMatchObject({
-      contactComment: "work colleague",
-      callResult: {
-        status: "answered",
-        requestId: "call-1",
-        conversationId: "imp-phone-call-1",
-      },
-    });
-    expect(result.details).toMatchObject({
-      contactId: "office",
-      contactName: "Office",
-      command: process.execPath,
-      args: [
-        "-e",
-        "console.log(JSON.stringify({schemaVersion:1,status:'answered',requestId:'call-1',conversationId:'imp-phone-call-1'}))",
-        "office",
-        "Office",
-        "sip:+491234567@example.com",
-        "Test call",
-      ],
-      exitCode: 0,
-    });
-
-    const hangupResult = await phoneHangup!.execute("2", {
-      reason: "conversation complete",
-    });
-    const hangupOutput = hangupResult.content
-      .flatMap((item) => (item.type === "text" ? [item.text] : []))
-      .join("\n");
-
-    expect(hangupOutput).toContain("Phone hangup requested.");
-    expect(hangupResult.details).toMatchObject({
-      controlDir: join(root, "control"),
-      reason: "conversation complete",
-    });
-  });
-
-  it("does not register phone call tools without phone config", () => {
-    const registry = createBuiltInToolRegistry(process.cwd(), createAgent());
 
     expect(registry.get("phone_call")).toBeUndefined();
+    expect(registry.get("phone_hangup")).toBeUndefined();
   });
 
   it("preserves the existing Windows PATH key and delimiter when merging shell path entries", () => {
@@ -2476,56 +2388,6 @@ describe("createPiAgentEngine", () => {
     await expect(setWorkingDirectory!.execute("1", { path: missingPath })).rejects.toMatchObject({
       kind: "file_document_persistence",
       message: expect.stringContaining(`stat '${missingPath}'`),
-    } satisfies Partial<UserVisibleProcessingError>);
-  });
-
-  it("maps phone command startup failures to typed tool errors", async () => {
-    const root = await mkdtemp(join(tmpdir(), "imp-phone-call-"));
-    tempDirs.push(root);
-    const registry = createBuiltInToolRegistry(root, {
-      ...createAgent(),
-      tools: ["phone_call"],
-      phone: {
-        command: join(root, "missing-phone-command"),
-        args: [],
-        contacts: [
-          {
-            id: "office",
-            name: "Office",
-            uri: "sip:+491234567@example.com",
-          },
-        ],
-      },
-    });
-
-    const phoneCall = registry.get("phone_call");
-
-    await expect(phoneCall!.execute("1", { contactId: "office" })).rejects.toMatchObject({
-      kind: "tool_command_execution",
-      message: expect.stringContaining("ENOENT"),
-    } satisfies Partial<UserVisibleProcessingError>);
-  });
-
-  it("maps phone hangup write failures to typed file operation errors", async () => {
-    const root = await mkdtemp(join(tmpdir(), "imp-phone-hangup-"));
-    tempDirs.push(root);
-    const filePath = join(root, "not-a-directory");
-    await writeFile(filePath, "hello", "utf8");
-
-    const registry = createBuiltInToolRegistry(root, {
-      ...createAgent(),
-      tools: ["phone_hangup"],
-      phone: {
-        controlDir: join(filePath, "control"),
-        contacts: [],
-      },
-    });
-
-    const phoneHangup = registry.get("phone_hangup");
-
-    await expect(phoneHangup!.execute("1", { reason: "done" })).rejects.toMatchObject({
-      kind: "file_document_persistence",
-      message: expect.stringContaining("ENOTDIR"),
     } satisfies Partial<UserVisibleProcessingError>);
   });
 

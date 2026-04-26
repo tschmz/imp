@@ -47,6 +47,7 @@ The install command updates the config by adding:
 - Package metadata such as the plugin path, version, and manifest hash
 
 Plugin MCP servers are not attached to agents automatically. Enable them per agent in [Agent Tools](./agent-tools.md).
+Manifest MCP server `command`, `args`, `cwd`, `inheritEnv`, and `env` values may use `{{config.path}}`, `{{config.dir}}`, `{{paths.dataRoot}}`, `{{plugin.id}}`, and `{{plugin.rootDir}}`. `{{agent.id}}` and `{{agent.name}}` are resolved when an agent enables the server.
 
 ## Check a Plugin
 

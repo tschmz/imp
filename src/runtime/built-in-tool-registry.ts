@@ -2,7 +2,6 @@ import { createFindTool, createGrepTool, createLsTool, createCodingTools } from 
 import type { AgentDefinition } from "../domain/agent.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
-import { createPhoneCallTools } from "./phone-call-tool.js";
 import { resolveBuiltInToolOptions } from "./shell-path.js";
 import { createConfiguredSkillTools } from "./skill-tool.js";
 import { createUpdatePlanTool } from "./update-plan-tool.js";
@@ -64,7 +63,6 @@ function createBaseBuiltInTools(workingDirectory: string, agent?: AgentDefinitio
   const toolOptions = resolveBuiltInToolOptions(agent);
   return [
     ...createCodingTools(workingDirectory, toolOptions),
-    ...createPhoneCallTools(agent?.phone, { agentId: agent?.id }),
     createGrepTool(workingDirectory),
     createFindTool(workingDirectory),
     createLsTool(workingDirectory),

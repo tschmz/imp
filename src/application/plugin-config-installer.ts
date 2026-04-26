@@ -55,8 +55,13 @@ export function parseAndValidateConfig(rawConfig: string, configPath: string): A
   return configResult.data;
 }
 
-export function installPluginIntoConfig(config: AppConfig, plugin: DiscoveredPluginManifest): AppConfig {
+export function installPluginIntoConfig(
+  config: AppConfig,
+  plugin: DiscoveredPluginManifest,
+  configPath: string,
+): AppConfig {
   assertPluginCanBeInstalled(config, plugin);
+  const pluginTemplateContext = createPluginConfigTemplateContext(config, configPath, plugin);
 
   const pluginConfig: PluginConfig = {
     id: plugin.manifest.id,
@@ -80,11 +85,13 @@ export function installPluginIntoConfig(config: AppConfig, plugin: DiscoveredPlu
   }));
   const mcpServerConfigs = (plugin.manifest.mcpServers ?? []).map((server) => ({
     id: server.id,
-    command: server.command,
-    ...(server.args ? { args: server.args } : {}),
-    ...(server.inheritEnv ? { inheritEnv: server.inheritEnv } : {}),
-    ...(server.env ? { env: server.env } : {}),
-    ...(server.cwd ? { cwd: server.cwd } : {}),
+    command: resolvePluginMcpCommand(renderPluginConfigTemplate(server.command, pluginTemplateContext)),
+    ...(server.args ? { args: server.args.map((arg) => renderPluginConfigTemplate(arg, pluginTemplateContext)) } : {}),
+    ...(server.inheritEnv
+      ? { inheritEnv: server.inheritEnv.map((entry) => renderPluginConfigTemplate(entry, pluginTemplateContext)) }
+      : {}),
+    ...(server.env ? { env: mapRecordValues(server.env, (value) => renderPluginConfigTemplate(value, pluginTemplateContext)) } : {}),
+    ...(server.cwd ? { cwd: resolvePluginConfigPath(server.cwd, pluginTemplateContext) } : {}),
   }));
 
   const updatedConfig: AppConfig = {
@@ -113,6 +120,57 @@ export function installPluginIntoConfig(config: AppConfig, plugin: DiscoveredPlu
   }
 
   return result.data;
+}
+
+interface PluginConfigTemplateContext {
+  configPath: string;
+  configDir: string;
+  dataRoot: string;
+  pluginId: string;
+  pluginRoot: string;
+}
+
+function createPluginConfigTemplateContext(
+  config: AppConfig,
+  configPath: string,
+  plugin: DiscoveredPluginManifest,
+): PluginConfigTemplateContext {
+  const configDir = dirname(configPath);
+  return {
+    configPath,
+    configDir,
+    dataRoot: resolvePathRelativeToConfig(config.paths.dataRoot, configDir),
+    pluginId: plugin.manifest.id,
+    pluginRoot: plugin.rootDir,
+  };
+}
+
+function resolvePluginConfigPath(value: string, context: PluginConfigTemplateContext): string {
+  const rendered = renderPluginConfigTemplate(value, context);
+  if (rendered === value && !value.includes("{{")) {
+    return resolvePathRelativeToConfig(value, context.pluginRoot);
+  }
+  return rendered;
+}
+
+function renderPluginConfigTemplate(value: string, context: PluginConfigTemplateContext): string {
+  return value
+    .replaceAll("{{config.path}}", context.configPath)
+    .replaceAll("{{config.dir}}", context.configDir)
+    .replaceAll("{{paths.dataRoot}}", context.dataRoot)
+    .replaceAll("{{plugin.id}}", context.pluginId)
+    .replaceAll("{{plugin.rootDir}}", context.pluginRoot);
+}
+
+function resolvePluginMcpCommand(command: string): string {
+  return command === "node" ? process.execPath : command;
+}
+
+function mapRecordValues(
+  record: Record<string, string>,
+  mapValue: (value: string) => string,
+): Record<string, string> {
+  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, mapValue(value)]));
 }
 
 export async function findConfiguredPluginManifest(options: {

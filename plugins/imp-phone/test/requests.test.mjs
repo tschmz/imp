@@ -72,6 +72,22 @@ describe("imp-phone call requests", () => {
     });
   });
 
+  it("times out while waiting for a missing controller call result", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-request-"));
+    tempDirs.push(root);
+
+    await expect(writeCallRequest({
+      requestsDir: root,
+      id: "call-1",
+      contactId: "thomas",
+      contactName: "Thomas",
+      uri: "+10000000000",
+      wait: true,
+      pollIntervalMs: 10,
+      timeoutMs: 20,
+    })).rejects.toThrow("Timed out waiting for call request result");
+  });
+
   it("uses the phone agent environment variable when no agent id argument is provided", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-phone-request-"));
     tempDirs.push(root);

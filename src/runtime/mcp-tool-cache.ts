@@ -1,4 +1,4 @@
-import type { AgentDefinition } from "../domain/agent.js";
+import type { AgentDefinition, AgentMcpServerConfig } from "../domain/agent.js";
 import type { Logger } from "../logging/types.js";
 import type { ResolvedMcpTools } from "./mcp-tool-runtime.js";
 
@@ -36,7 +36,8 @@ export function createMcpToolCache(options: {
 
       const resolutions = await Promise.all(
         servers.map(async (server) => {
-          const cached = cache.get(server.id);
+          const cacheKey = createServerCacheKey(server);
+          const cached = cache.get(cacheKey);
           if (cached) {
             await options.logger?.debug(`reusing cached MCP runtime for server "${server.id}"`);
             return cached.promise;
@@ -52,10 +53,10 @@ export function createMcpToolCache(options: {
             },
             { logger: options.logger },
           ).catch((error) => {
-            cache.delete(server.id);
+            cache.delete(cacheKey);
             throw error;
           });
-          cache.set(server.id, { promise });
+          cache.set(cacheKey, { promise });
 
           const resolution = await promise;
           await options.logger?.debug(`cached MCP runtime ready for server "${server.id}"`);
@@ -92,4 +93,19 @@ export function createMcpToolCache(options: {
       await options.logger?.debug("closed cached MCP runtimes");
     },
   };
+}
+
+function createServerCacheKey(server: AgentMcpServerConfig): string {
+  return JSON.stringify({
+    id: server.id,
+    command: server.command,
+    args: server.args ?? [],
+    cwd: server.cwd,
+    inheritEnv: server.inheritEnv ?? [],
+    env: sortRecord(server.env ?? {}),
+  });
+}
+
+function sortRecord(record: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right)));
 }
