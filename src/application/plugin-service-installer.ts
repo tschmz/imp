@@ -44,7 +44,7 @@ export async function installPluginServices(options: {
     config: options.config,
     configPath: options.configPath,
     plugin: options.plugin,
-    platform: dependencies.setupPlatform ?? dependencies.platform,
+    platform: dependencies.setupPlatform,
   });
   const plans = services.map((service) => ({
     service,

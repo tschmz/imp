@@ -579,6 +579,67 @@ describe("plugin use cases", () => {
     ]);
   });
 
+  it("defaults plugin setup platform to host OS when service platform differs", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    const dataRoot = join(root, "state");
+    const setupCalls: Array<{ command: string; args: string[] }> = [];
+    await writeManifest(root, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+      services: [
+        {
+          id: "in",
+          autoStart: true,
+          command: "node",
+          args: ["bin/wake-phrase.mjs"],
+        },
+      ],
+      setup: {
+        python: {
+          requirements: "requirements.txt",
+        },
+      },
+    });
+    await writeFile(configPath, `${JSON.stringify({ ...createConfig(), paths: { dataRoot } }, null, 2)}\n`, "utf8");
+    const useCases = createPluginUseCases({
+      platform: "windows-winsw",
+      homeDir: root,
+      installer: {
+        async run() {
+          // no-op
+        },
+      },
+      setupRunner: {
+        async run(command, args) {
+          setupCalls.push({ command, args });
+        },
+      },
+    });
+
+    await expect(
+      useCases.installPlugin({
+        root,
+        configPath,
+        id: "imp-voice",
+      }),
+    ).rejects.toThrow("Automatic Windows service installation is not implemented yet.");
+
+    const expectedPython = process.platform === "win32" ? "Scripts/python.exe" : "bin/python";
+    expect(setupCalls).toEqual([
+      {
+        command: "python3",
+        args: ["-m", "venv", join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv")],
+      },
+      {
+        command: join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv", expectedPython),
+        args: ["-m", "pip", "install", "-r", join(root, "imp-voice", "requirements.txt")],
+      },
+    ]);
+  });
+
   it("rejects plugin service installation before starting services when required env is missing", async () => {
     const root = await createPluginRoot();
     const configPath = join(root, "config.json");
