@@ -45,6 +45,19 @@ describe("discoverPluginManifests", () => {
     });
   });
 
+
+  it("discovers bundled plugin manifests", async () => {
+    const result = await discoverPluginManifests([join(process.cwd(), "plugins")]);
+
+    expect(result.issues).toEqual([]);
+    expect(result.plugins.map((plugin) => plugin.manifest.id)).toContain("imp-devkit");
+    expect(result.plugins.find((plugin) => plugin.manifest.id === "imp-devkit")?.manifest).toMatchObject({
+      runtime: { module: "./plugin.mjs" },
+      agents: [expect.objectContaining({ id: "developer" })],
+      skills: [{ path: "./skills" }],
+    });
+  });
+
   it("reports invalid manifests without failing the full discovery run", async () => {
     const root = await createTempRoot();
     await mkdir(join(root, "broken"), { recursive: true });

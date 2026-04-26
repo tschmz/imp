@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "imp-devkit",
+  "name": "Imp DevKit",
+  "version": "0.1.0",
+  "description": "Specialized development agent, skills, and tools for extending Imp.",
+  "runtime": {
+    "module": "./plugin.mjs"
+  },
+  "skills": [
+    {
+      "path": "./skills"
+    }
+  ],
+  "agents": [
+    {
+      "id": "developer",
+      "name": "Imp Developer",
+      "model": {
+        "provider": "openai",
+        "modelId": "gpt-5.1-codex"
+      },
+      "prompt": {
+        "base": {
+          "file": "./prompts/imp-developer.md"
+        },
+        "references": [
+          {
+            "file": "./README.md"
+          }
+        ]
+      },
+      "tools": {
+        "builtIn": [
+          "read",
+          "grep",
+          "find",
+          "ls",
+          "bash",
+          "edit",
+          "write",
+          "update_plan",
+          "load_skill",
+          "pwd",
+          "cd",
+          "describeManifest"
+        ]
+      },
+      "skills": {
+        "paths": [
+          "./skills"
+        ]
+      }
+    }
+  ]
+}
