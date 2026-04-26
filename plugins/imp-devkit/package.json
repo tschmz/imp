@@ -1,0 +1,23 @@
+{
+  "name": "@tschmz/imp-devkit",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Reference development plugin for extending Imp",
+  "files": [
+    "plugin.json",
+    "README.md",
+    "plugin.mjs",
+    "prompts",
+    "skills"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "test": "vitest run test/*.test.mjs"
+  }
+}
