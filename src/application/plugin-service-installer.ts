@@ -161,7 +161,7 @@ function createPluginServiceEnvironment(options: {
   env?: NodeJS.ProcessEnv;
   setup: PluginSetupPaths;
 }): { environment: NodeJS.ProcessEnv; missingRequiredEnv: string[] } {
-  const env = options.env ?? process.env;
+  const env = { ...process.env, ...options.env };
   const environment: NodeJS.ProcessEnv = {
     IMP_CONFIG_PATH: options.configPath,
     IMP_PLUGIN_ID: options.plugin.manifest.id,
