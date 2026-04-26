@@ -37,6 +37,7 @@ export function createPluginServiceOrchestrator(dependencies: PluginServiceOrche
         dependencies: {
           env: dependencies.env,
           platform: dependencies.platform,
+          setupPlatform: dependencies.setupPlatform,
           homeDir: dependencies.homeDir,
           uid: dependencies.uid,
           installer: dependencies.installer,
@@ -63,6 +64,7 @@ export function createPluginServiceOrchestrator(dependencies: PluginServiceOrche
         dependencies: {
           env: dependencies.env,
           platform: dependencies.platform,
+          setupPlatform: dependencies.setupPlatform,
           homeDir: dependencies.homeDir,
           uid: dependencies.uid,
           installer: dependencies.installer,

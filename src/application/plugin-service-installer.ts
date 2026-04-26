@@ -15,6 +15,7 @@ const execFileAsync = promisify(execFile);
 export interface PluginServiceInstallDependencies {
   env?: NodeJS.ProcessEnv;
   platform?: ServicePlatformInput;
+  setupPlatform?: ServicePlatformInput;
   homeDir?: string;
   uid?: number;
   installer?: ServiceInstaller;
@@ -43,6 +44,7 @@ export async function installPluginServices(options: {
     config: options.config,
     configPath: options.configPath,
     plugin: options.plugin,
+    platform: dependencies.setupPlatform ?? dependencies.platform,
   });
   const plans = services.map((service) => ({
     service,
@@ -235,6 +237,7 @@ function createPluginSetupPaths(options: {
   config: AppConfig;
   configPath: string;
   plugin: DiscoveredPluginManifest;
+  platform?: ServicePlatformInput;
 }): PluginSetupPaths {
   const pythonSetup = options.plugin.manifest.setup?.python;
   if (!pythonSetup) {
@@ -247,7 +250,10 @@ function createPluginSetupPaths(options: {
     dataRoot,
     pythonSetup.venv ?? join("plugins", "state", options.plugin.manifest.id, "python", ".venv"),
   );
-  const venvPython = join(venvDir, "bin", "python");
+  const venvPython = resolveVenvPythonPath({
+    venvDir,
+    platform: options.platform,
+  });
 
   return {
     python: {
@@ -257,6 +263,31 @@ function createPluginSetupPaths(options: {
       pythonCommand: pythonSetup.python ?? "python3",
     },
   };
+}
+
+function resolveVenvPythonPath(options: { venvDir: string; platform?: ServicePlatformInput }): string {
+  const platform = resolveNodePlatform(options.platform);
+  if (platform === "win32") {
+    return join(options.venvDir, "Scripts", "python.exe");
+  }
+
+  return join(options.venvDir, "bin", "python");
+}
+
+function resolveNodePlatform(platform: ServicePlatformInput = process.platform): NodeJS.Platform {
+  if (platform === "windows-winsw") {
+    return "win32";
+  }
+
+  if (platform === "linux-systemd-user") {
+    return "linux";
+  }
+
+  if (platform === "macos-launchd-agent") {
+    return "darwin";
+  }
+
+  return platform;
 }
 
 async function preparePluginSetup(options: {

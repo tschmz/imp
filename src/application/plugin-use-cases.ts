@@ -55,6 +55,7 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
   const services = createPluginServiceOrchestrator({
     env: dependencies.env,
     platform: dependencies.platform,
+    setupPlatform: dependencies.setupPlatform,
     homeDir: dependencies.homeDir,
     uid: dependencies.uid,
     installer: dependencies.installer,
