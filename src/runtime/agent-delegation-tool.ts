@@ -4,6 +4,7 @@ import type { AgentDefinition, AgentDelegationConfig } from "../domain/agent.js"
 import type { ConversationContext } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
+import { resolveEffectiveSkills } from "../skills/resolve-effective-skills.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { AgentRunRuntimeContext } from "./context.js";
 import type { AgentEngine } from "./types.js";
@@ -86,6 +87,7 @@ function createAgentDelegationTool(
 
       const nestedMessage = createNestedMessage(parentMessage, toolCallId, childInput.input);
       const nestedConversation = createNestedConversation(conversation, childAgent.id, nestedMessage.receivedAt);
+      const childSkills = await resolveDelegatedAgentSkills(childAgent, nestedConversation, runtime, dependencies.logger, nestedMessage);
 
       await dependencies.logger?.debug("starting delegated agent run", {
         agentId: childAgent.id,
@@ -100,7 +102,7 @@ function createAgentDelegationTool(
         runtime: {
           ...(runtime?.configPath ? { configPath: runtime.configPath } : {}),
           ...(runtime?.dataRoot ? { dataRoot: runtime.dataRoot } : {}),
-          ...(runtime?.availableSkills ? { availableSkills: runtime.availableSkills } : {}),
+          ...(childSkills.length > 0 ? { availableSkills: childSkills } : {}),
           invocation: {
             kind: "delegated",
             parentAgentId: parentAgent.id,
@@ -158,6 +160,87 @@ function parseDelegationParams(toolName: string, params: unknown): { input: stri
   return { input };
 }
 
+async function resolveDelegatedAgentSkills(
+  childAgent: AgentDefinition,
+  conversation: ConversationContext,
+  runtime: AgentRunRuntimeContext | undefined,
+  logger: Logger | undefined,
+  message: IncomingMessage,
+) {
+  try {
+    const resolution = await resolveEffectiveSkills({
+      agent: childAgent,
+      dataRoot: runtime?.dataRoot,
+      conversation,
+    });
+
+    for (const issue of resolution.issues) {
+      await logger?.info(issue, {
+        endpointId: message.endpointId,
+        transport: message.conversation.transport,
+        conversationId: message.conversation.externalId,
+        messageId: message.messageId,
+        correlationId: message.correlationId,
+        agentId: childAgent.id,
+        ...(resolution.globalSkillsPath ? { globalSkillsPath: resolution.globalSkillsPath } : {}),
+        ...(resolution.agentHomeSkillsPath ? { agentHomeSkillsPath: resolution.agentHomeSkillsPath } : {}),
+        ...(resolution.workspaceDirectory ? { workspaceDirectory: resolution.workspaceDirectory } : {}),
+        ...(resolution.workspaceSkillsPath ? { workspaceSkillsPath: resolution.workspaceSkillsPath } : {}),
+      });
+    }
+
+    if (resolution.overriddenSkillNames.length > 0) {
+      await logger?.info("auto-discovered skills override earlier agent skills for turn", {
+        endpointId: message.endpointId,
+        transport: message.conversation.transport,
+        conversationId: message.conversation.externalId,
+        messageId: message.messageId,
+        correlationId: message.correlationId,
+        agentId: childAgent.id,
+        ...(resolution.globalSkillsPath ? { globalSkillsPath: resolution.globalSkillsPath } : {}),
+        ...(resolution.agentHomeSkillsPath ? { agentHomeSkillsPath: resolution.agentHomeSkillsPath } : {}),
+        ...(resolution.workspaceDirectory ? { workspaceDirectory: resolution.workspaceDirectory } : {}),
+        ...(resolution.workspaceSkillsPath ? { workspaceSkillsPath: resolution.workspaceSkillsPath } : {}),
+        overriddenSkillNames: resolution.overriddenSkillNames,
+      });
+    }
+
+    await logger?.debug("resolved effective agent skills for turn", {
+      endpointId: message.endpointId,
+      transport: message.conversation.transport,
+      conversationId: message.conversation.externalId,
+      messageId: message.messageId,
+      correlationId: message.correlationId,
+      agentId: childAgent.id,
+      skillCount: resolution.skills.length,
+      skillNames: resolution.skills.map((skill) => skill.name),
+      ...(resolution.globalSkillsPath ? { globalSkillsPath: resolution.globalSkillsPath } : {}),
+      ...(resolution.agentHomeSkillsPath ? { agentHomeSkillsPath: resolution.agentHomeSkillsPath } : {}),
+      ...(resolution.workspaceDirectory ? { workspaceDirectory: resolution.workspaceDirectory } : {}),
+      ...(resolution.workspaceSkillsPath ? { workspaceSkillsPath: resolution.workspaceSkillsPath } : {}),
+      ...(resolution.overriddenSkillNames.length > 0
+        ? { overriddenSkillNames: resolution.overriddenSkillNames }
+        : {}),
+    });
+
+    return resolution.skills;
+  } catch (error) {
+    void logger?.error(
+      "failed to resolve effective agent skills for turn; continuing without skills",
+      {
+        endpointId: message.endpointId,
+        transport: message.conversation.transport,
+        conversationId: message.conversation.externalId,
+        messageId: message.messageId,
+        correlationId: message.correlationId,
+        agentId: childAgent.id,
+      },
+      error,
+    );
+    return [];
+  }
+}
+
 function createNestedMessage(
   parentMessage: IncomingMessage,
   toolCallId: string,
@@ -166,9 +249,11 @@ function createNestedMessage(
   const receivedAt = new Date().toISOString();
 
   return {
-    ...parentMessage,
+    endpointId: parentMessage.endpointId,
+    conversation: parentMessage.conversation,
     messageId: `${parentMessage.messageId}:delegate:${toolCallId}:${randomUUID()}`,
     correlationId: `${parentMessage.correlationId}:delegate:${toolCallId}`,
+    userId: parentMessage.userId,
     text,
     receivedAt,
   };

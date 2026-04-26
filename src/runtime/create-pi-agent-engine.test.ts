@@ -1,7 +1,7 @@
 import type { Agent, AgentEvent, AgentMessage, AgentOptions } from "@mariozechner/pi-agent-core";
 import { fauxAssistantMessage, registerFauxProvider, type FauxProviderRegistration, type ImageContent } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -1219,6 +1219,222 @@ describe("createPiAgentEngine", () => {
     expect(pwdResult).toMatchObject({
       content: [{ type: "text", text: "/tmp/child-workspace" }],
     });
+  });
+
+  it("resolves delegated child skills and workspace instructions from the child agent", async () => {
+    let parentTools: ToolDefinition[] | undefined;
+    let childSystemPrompt: string | undefined;
+
+    const root = await mkdtemp(join(tmpdir(), "imp-delegation-child-context-test-"));
+    tempDirs.push(root);
+    const dataRoot = join(root, "data");
+    const parentWorkspace = join(root, "parent-workspace");
+    const childWorkspace = join(root, "child-workspace");
+    const childHome = join(root, "child-home");
+
+    await writeSkillFile(
+      join(dataRoot, "skills", "shared-child", "SKILL.md"),
+      createSkillFile("shared-child", "Shared child skill."),
+    );
+    await writeSkillFile(
+      join(childHome, ".skills", "home-child", "SKILL.md"),
+      createSkillFile("home-child", "Home child skill."),
+    );
+    await writeSkillFile(
+      join(childWorkspace, ".skills", "workspace-child", "SKILL.md"),
+      createSkillFile("workspace-child", "Workspace child skill."),
+    );
+    await writeTextFile(join(parentWorkspace, "AGENTS.md"), "Parent workspace instructions.");
+    await writeTextFile(join(childWorkspace, "AGENTS.md"), "Child workspace instructions.");
+
+    const parentAgent: AgentDefinition = {
+      ...createAgent(),
+      prompt: {
+        base: {
+          text: createInlineBasePrompt("Parent."),
+        },
+      },
+      model: {
+        provider: "openai",
+        modelId: "parent-model",
+      },
+      workspace: {
+        cwd: parentWorkspace,
+      },
+      delegations: [
+        {
+          agentId: "helper",
+          toolName: "ask_helper",
+        },
+      ],
+    };
+    const childAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "helper",
+      name: "Helper",
+      prompt: {
+        base: {
+          text: createInlineBasePrompt(
+            "Agent={{agent.id}} Skills={{#each skills}}{{name}}|{{/each}} Instructions={{#each prompt.instructions}}{{content}}|{{/each}}",
+          ),
+        },
+      },
+      model: {
+        provider: "openai",
+        modelId: "child-model",
+      },
+      home: childHome,
+      workspace: {
+        cwd: childWorkspace,
+      },
+      tools: [],
+      delegations: [],
+    };
+
+    const engine = createPiAgentEngine({
+      agentRegistry: createAgentRegistry([parentAgent, childAgent]),
+      resolveModel: (provider, modelId) =>
+        ({
+          id: modelId,
+          provider,
+          api: "openai-responses",
+        }) as never,
+      readTextFile: (path) => readFile(path, "utf8"),
+      createAgent: (options) => {
+        const modelId = (options.initialState?.model as { id: string }).id;
+        const tools = options.initialState?.tools as ToolDefinition[];
+
+        if (modelId === "parent-model") {
+          parentTools = tools;
+          return createAgentDouble({ messages: [fauxAssistantMessage("parent ready")] });
+        }
+
+        childSystemPrompt = options.initialState?.systemPrompt;
+        return createAgentDouble({ messages: [fauxAssistantMessage("child final text")] });
+      },
+    });
+
+    await engine.run({
+      agent: parentAgent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+      runtime: {
+        dataRoot,
+        availableSkills: [
+          {
+            name: "parent-only",
+            description: "Parent skill only.",
+            directoryPath: join(root, "parent-skill"),
+            filePath: join(root, "parent-skill", "SKILL.md"),
+            body: "Parent skill only.",
+            content: createSkillFile("parent-only", "Parent skill only."),
+            references: [],
+            scripts: [],
+          },
+        ],
+      },
+    });
+
+    const delegationTool = parentTools?.find((tool) => tool.name === "ask_helper");
+    await delegationTool!.execute("tool-1", { input: "Summarize this" });
+
+    expect(childSystemPrompt).toContain("Agent=helper");
+    expect(childSystemPrompt).toContain("shared-child");
+    expect(childSystemPrompt).toContain("home-child");
+    expect(childSystemPrompt).toContain("workspace-child");
+    expect(childSystemPrompt).toContain("Child workspace instructions.");
+    expect(childSystemPrompt).not.toContain("parent-only");
+    expect(childSystemPrompt).not.toContain("Parent workspace instructions.");
+  });
+
+  it("does not inherit parent message source metadata in delegated child runs", async () => {
+    let parentTools: ToolDefinition[] | undefined;
+    let childPromptInput: AgentMessage | AgentMessage[] | string | undefined;
+    let childPromptImages: ImageContent[] | undefined;
+
+    const parentAgent: AgentDefinition = {
+      ...createAgent(),
+      model: {
+        provider: "openai",
+        modelId: "parent-model",
+      },
+      prompt: {
+        base: {
+          text: createInlineBasePrompt("Parent."),
+        },
+      },
+      delegations: [
+        {
+          agentId: "helper",
+          toolName: "ask_helper",
+        },
+      ],
+    };
+    const childAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "helper",
+      name: "Helper",
+      prompt: {
+        base: {
+          text: createInlineBasePrompt("Child."),
+        },
+      },
+      model: {
+        provider: "openai",
+        modelId: "child-model",
+      },
+      delegations: [],
+    };
+
+    const engine = createPiAgentEngine({
+      agentRegistry: createAgentRegistry([parentAgent, childAgent]),
+      resolveModel: (provider, modelId) =>
+        ({
+          id: modelId,
+          provider,
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        const modelId = (options.initialState?.model as { id: string }).id;
+        const tools = options.initialState?.tools as ToolDefinition[];
+
+        if (modelId === "parent-model") {
+          parentTools = tools;
+          return createAgentDouble({ messages: [fauxAssistantMessage("parent ready")] });
+        }
+
+        return createAgentDouble({
+          messages: [fauxAssistantMessage("child final text")],
+          onPrompt: async (input, images) => {
+            childPromptInput = input;
+            childPromptImages = images;
+          },
+        });
+      },
+    });
+
+    await engine.run({
+      agent: parentAgent,
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        source: {
+          kind: "telegram-image",
+          image: {
+            fileId: "file-1",
+            mimeType: "image/png",
+            savedPath: "/tmp/parent-image.png",
+          },
+        },
+      },
+    });
+
+    const delegationTool = parentTools?.find((tool) => tool.name === "ask_helper");
+    await delegationTool!.execute("tool-1", { input: "Delegated request" });
+
+    expect(childPromptInput).toBe("Delegated request");
+    expect(childPromptImages).toBeUndefined();
   });
 
   it("rejects self-delegation tool execution clearly", async () => {
@@ -3088,6 +3304,25 @@ function createAgentDouble(options: AgentDoubleOptions = {}): AgentDouble {
       };
     },
   };
+}
+
+async function writeTextFile(path: string, content: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, "utf8");
+}
+
+async function writeSkillFile(path: string, content: string): Promise<void> {
+  await writeTextFile(path, content);
+}
+
+function createSkillFile(name: string, description: string): string {
+  return `---
+name: ${name}
+description: ${description}
+---
+
+${description}
+`;
 }
 
 function createAgent(): AgentDefinition {
