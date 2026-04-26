@@ -101,6 +101,10 @@ function isProcessRunning(pid: number): boolean {
       return false;
     }
 
+    if (isPermissionProcessError(error)) {
+      return true;
+    }
+
     throw error;
   }
 }
@@ -111,4 +115,8 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
 
 function isMissingProcessError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ESRCH";
+}
+
+function isPermissionProcessError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "EPERM";
 }
