@@ -517,6 +517,68 @@ describe("plugin use cases", () => {
     );
   });
 
+  it("uses Windows virtualenv Python path for plugin setup", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    const dataRoot = join(root, "state");
+    const setupCalls: Array<{ command: string; args: string[] }> = [];
+    await writeManifest(root, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+      services: [
+        {
+          id: "in",
+          autoStart: true,
+          command: "node",
+          args: ["bin/wake-phrase.mjs"],
+          env: {
+            IMP_VOICE_PYTHON: "{{setup.python.venvPython}}",
+          },
+        },
+      ],
+      setup: {
+        python: {
+          requirements: "requirements.txt",
+        },
+      },
+    });
+    await writeFile(configPath, `${JSON.stringify({ ...createConfig(), paths: { dataRoot } }, null, 2)}\n`, "utf8");
+    const useCases = createPluginUseCases({
+      platform: "linux",
+      setupPlatform: "win32",
+      homeDir: root,
+      installer: {
+        async run() {
+          // no-op
+        },
+      },
+      setupRunner: {
+        async run(command, args) {
+          setupCalls.push({ command, args });
+        },
+      },
+    });
+
+    await useCases.installPlugin({
+      root,
+      configPath,
+      id: "imp-voice",
+    });
+
+    expect(setupCalls).toEqual([
+      {
+        command: "python3",
+        args: ["-m", "venv", join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv")],
+      },
+      {
+        command: join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv", "Scripts", "python.exe"),
+        args: ["-m", "pip", "install", "-r", join(root, "imp-voice", "requirements.txt")],
+      },
+    ]);
+  });
+
   it("rejects plugin service installation before starting services when required env is missing", async () => {
     const root = await createPluginRoot();
     const configPath = join(root, "config.json");
