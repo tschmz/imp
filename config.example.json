@@ -147,6 +147,10 @@
       "package": {
         "path": "/opt/imp/plugins/pi-audio"
       }
+    },
+    {
+      "id": "notes",
+      "enabled": false
     }
   ],
   "endpoints": [
