@@ -11,6 +11,7 @@ import type {
 import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
 import { getTransport } from "../transports/registry.js";
+import { loadEnabledRuntimePlugins } from "./plugin-runtime.js";
 import { deriveDelegationToolName } from "./schema.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
 import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig } from "./types.js";
@@ -34,7 +35,9 @@ export async function resolveRuntimeConfig(
     throw new Error("Config must enable at least one daemon endpoint.");
   }
   const configDir = dirname(configPath);
-  const mcpServers = resolveGlobalMcpServers(appConfig, configDir);
+  const runtimePlugins = await loadEnabledRuntimePlugins(appConfig, configDir);
+  const effectiveAgents = mergeConfiguredAgents(appConfig.agents, runtimePlugins.agents);
+  const mcpServers = resolveGlobalMcpServers(appConfig, configDir, runtimePlugins.mcpServers);
 
   return {
     configPath,
@@ -42,8 +45,11 @@ export async function resolveRuntimeConfig(
       level: appConfig.logging?.level ?? "info",
     },
     agents: await Promise.all(
-      appConfig.agents.map(async (agent) => {
-        const skillPaths = agent.skills?.paths.map((path) => resolveConfigPath(path, configDir)) ?? [];
+      effectiveAgents.map(async (agent) => {
+        const skillPaths = [
+          ...(agent.skills?.paths.map((path) => resolveConfigPath(path, configDir)) ?? []),
+          ...runtimePlugins.skillPaths,
+        ];
         const skillCatalog = await discoverSkills(skillPaths);
 
         return {
@@ -62,6 +68,7 @@ export async function resolveRuntimeConfig(
         };
       }),
     ),
+    commandTools: runtimePlugins.commandTools,
     activeEndpoints: await Promise.all(
       enabledEndpoints.map(async (endpoint) => {
         const transport = getTransport(endpoint.type);
@@ -84,6 +91,19 @@ export async function resolveRuntimeConfig(
       }),
     ),
   };
+}
+
+
+function mergeConfiguredAgents(configAgents: AppConfig["agents"], pluginAgents: AppConfig["agents"]): AppConfig["agents"] {
+  const agentIds = new Set(configAgents.map((agent) => agent.id));
+  for (const agent of pluginAgents) {
+    if (agentIds.has(agent.id)) {
+      throw new Error(`Plugin agent id "${agent.id}" conflicts with a configured agent id.`);
+    }
+    agentIds.add(agent.id);
+  }
+
+  return [...configAgents, ...pluginAgents];
 }
 
 async function resolveEndpointRuntimeSecrets(
@@ -180,11 +200,15 @@ function resolveAgentDelegations(
   }));
 }
 
-function resolveGlobalMcpServers(appConfig: AppConfig, configDir: string): Map<string, AgentMcpServerConfig> {
+function resolveGlobalMcpServers(
+  appConfig: AppConfig,
+  configDir: string,
+  pluginMcpServers: AgentMcpServerConfig[] = [],
+): Map<string, AgentMcpServerConfig> {
   const globalInheritEnv = appConfig.tools?.mcp?.inheritEnv ?? [];
 
   return new Map(
-    (appConfig.tools?.mcp?.servers ?? []).map((server) => [
+    [...(appConfig.tools?.mcp?.servers ?? []), ...pluginMcpServers].map((server) => [
       server.id,
       {
         ...server,

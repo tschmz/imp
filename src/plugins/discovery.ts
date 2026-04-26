@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { parseConfigJson } from "../config/config-json.js";
-import { PLUGIN_MANIFEST_FILE, pluginManifestSchema, type PluginManifest } from "./manifest.js";
+import { PLUGIN_MANIFEST_FILE, USER_PLUGIN_MANIFEST_FILE, pluginManifestSchema, type PluginManifest } from "./manifest.js";
 
 export interface DiscoveredPluginManifest {
   rootDir: string;
@@ -33,8 +33,7 @@ export async function discoverPluginManifests(rootDirs: string[]): Promise<Plugi
       }
 
       const pluginRoot = join(rootDir, entry.name);
-      const manifestPath = join(pluginRoot, PLUGIN_MANIFEST_FILE);
-      const discovered = await readPluginManifest(pluginRoot, manifestPath);
+      const discovered = await readPluginManifestFromDirectory(pluginRoot);
       if ("issue" in discovered) {
         issues.push(discovered.issue);
         continue;
@@ -50,6 +49,23 @@ export async function discoverPluginManifests(rootDirs: string[]): Promise<Plugi
     plugins,
     issues,
   };
+}
+
+export async function readPluginManifestFromDirectory(rootDir: string): Promise<
+  | {
+      plugin: DiscoveredPluginManifest;
+    }
+  | {
+      issue: PluginDiscoveryIssue;
+    }
+> {
+  const primaryManifestPath = join(rootDir, USER_PLUGIN_MANIFEST_FILE);
+  const primary = await readPluginManifest(rootDir, primaryManifestPath);
+  if ("plugin" in primary || !isMissingFileError(primary.issue.message)) {
+    return primary;
+  }
+
+  return readPluginManifest(rootDir, join(rootDir, PLUGIN_MANIFEST_FILE));
 }
 
 export async function readPluginManifest(rootDir: string, manifestPath: string): Promise<
@@ -111,4 +127,8 @@ async function readPluginRootEntries(rootDir: string, issues: PluginDiscoveryIss
 
 function uniqueResolvedPaths(paths: string[]): string[] {
   return Array.from(new Set(paths.map((path) => resolve(path))));
+}
+
+function isMissingFileError(message: string): boolean {
+  return message.includes("ENOENT") || message.includes("no such file or directory");
 }

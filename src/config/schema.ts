@@ -70,6 +70,14 @@ const mcpServerIdSchema = z
     "MCP server ids may only contain letters, numbers, hyphens, and underscores.",
   );
 
+const mcpServerReferenceSchema = z
+  .string()
+  .min(1)
+  .regex(
+    /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?$/,
+    "MCP server references may only contain letters, numbers, hyphens, underscores, and one plugin namespace dot.",
+  );
+
 const mcpServerConfigSchema = z.object({
   id: mcpServerIdSchema,
   command: z.string().min(1),
@@ -128,7 +136,7 @@ const agentToolsConfigSchema = z
       builtIn: z.string().min(1).array().optional(),
       mcp: z
         .object({
-          servers: mcpServerIdSchema.array().min(1),
+          servers: mcpServerReferenceSchema.array().min(1),
         })
         .optional(),
       phone: phoneCallConfigSchema.optional(),
@@ -377,7 +385,7 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
   }
 
   validateDefaultAgent(config, knownAgentIds, ctx);
-  validateAgentMcpServerReferences(config, mcpServerIds, ctx);
+  validateAgentMcpServerReferences(config, mcpServerIds, enabledPluginIds, ctx);
   validateAgentDelegationReferences(config, knownAgentIds, ctx);
   validateEndpointDefaultAgents(config, knownAgentIds, ctx);
   validateFileEndpoints(config, endpointIds, enabledEndpointIds, pluginIds, enabledPluginIds, ctx);
@@ -386,6 +394,7 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
 function validateAgentMcpServerReferences(
   config: AppConfig,
   mcpServerIds: Set<string>,
+  enabledPluginIds: Set<string>,
   ctx: RefinementContext<AppConfig>,
 ): void {
   for (const [agentIndex, agent] of config.agents.entries()) {
@@ -394,7 +403,7 @@ function validateAgentMcpServerReferences(
     }
 
     for (const [serverIndex, serverId] of (agent.tools?.mcp?.servers ?? []).entries()) {
-      if (mcpServerIds.has(serverId)) {
+      if (mcpServerIds.has(serverId) || referencesEnabledPlugin(serverId, enabledPluginIds)) {
         continue;
       }
 
@@ -570,4 +579,9 @@ export function deriveDelegationToolName(agentId: string): string {
     .replace(/^_+|_+$/g, "");
 
   return `ask_${sanitized || "agent"}`;
+}
+
+function referencesEnabledPlugin(id: string, enabledPluginIds: Set<string>): boolean {
+  const [pluginId, capabilityId] = id.split(".", 2);
+  return Boolean(pluginId && capabilityId && enabledPluginIds.has(pluginId));
 }

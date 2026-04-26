@@ -10,10 +10,11 @@ import {
   createPiAgentEngine,
 } from "../../runtime/create-pi-agent-engine.js";
 import { createOAuthApiKeyResolver } from "../../runtime/create-oauth-api-key-resolver.js";
+import { createCommandToolDefinitions } from "../../runtime/command-tool.js";
 import type { AgentEngine } from "../../runtime/types.js";
 import { createFsConversationStore } from "../../storage/fs-store.js";
 import type { ConversationStore } from "../../storage/types.js";
-import type { ToolRegistry } from "../../tools/registry.js";
+import { createToolRegistry, type ToolRegistry } from "../../tools/registry.js";
 import type { ActiveEndpointRuntimeConfig, DaemonConfig, RuntimePaths } from "../types.js";
 
 export interface RuntimeComponents {
@@ -45,8 +46,9 @@ export function buildRuntimeComponents(
   const createLogger = dependencies.createLogger ?? createFileLogger;
   const createConversationStore =
     dependencies.createConversationStore ?? createFsConversationStore;
-  const createBuiltInRegistry =
+  const configuredBuiltInRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
+  const createBuiltInRegistry = createRuntimeToolRegistryFactory(config, configuredBuiltInRegistry);
 
   const endpointLogger = createLogger(endpointConfig.paths.logFilePath, config.logging.level);
   const agentLoggers = createAgentLoggers(endpointConfig.paths.dataRoot, config.logging.level, createLogger);
@@ -71,5 +73,23 @@ export function buildRuntimeComponents(
     agentLoggers,
     conversationStore,
     engine,
+  };
+}
+
+function createRuntimeToolRegistryFactory(
+  config: DaemonConfig,
+  createBuiltInRegistry: NonNullable<BuildRuntimeComponentsDependencies["createBuiltInToolRegistry"]>,
+): NonNullable<BuildRuntimeComponentsDependencies["createBuiltInToolRegistry"]> {
+  const commandTools = config.commandTools ?? [];
+  return (workingDirectory, agent) => {
+    const builtInRegistry = createBuiltInRegistry(workingDirectory, agent);
+    if (commandTools.length === 0) {
+      return builtInRegistry;
+    }
+
+    return createToolRegistry([
+      ...builtInRegistry.list(),
+      ...createCommandToolDefinitions(commandTools),
+    ]);
   };
 }

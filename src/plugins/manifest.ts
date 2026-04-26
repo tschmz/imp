@@ -1,8 +1,9 @@
 import { z } from "zod";
-import type { FileIngressConfig, FileResponseRoutingConfig } from "../config/types.js";
+import type { AgentConfig, FileIngressConfig, FileResponseRoutingConfig } from "../config/types.js";
 import { pluginIdentifierSchema, pluginResponseRoutingSchema } from "./protocol.js";
 
 export const PLUGIN_MANIFEST_FILE = "plugin.json";
+export const USER_PLUGIN_MANIFEST_FILE = "imp-plugin.json";
 export const PLUGIN_MANIFEST_SCHEMA_VERSION = 1;
 
 export interface PluginManifest {
@@ -16,6 +17,9 @@ export interface PluginManifest {
   endpoints?: PluginEndpointManifest[];
   services?: PluginServiceManifest[];
   mcpServers?: PluginMcpServerManifest[];
+  skills?: PluginSkillManifest[];
+  agents?: PluginAgentManifest[];
+  tools?: PluginToolManifest[];
   setup?: PluginSetupManifest;
   init?: PluginInitManifest;
 }
@@ -52,6 +56,28 @@ export interface PluginMcpServerManifest {
   env?: Record<string, string>;
 }
 
+export interface PluginSkillManifest {
+  path: string;
+}
+
+export type PluginAgentManifest = AgentConfig;
+
+export interface PluginToolManifest {
+  name: string;
+  description: string;
+  inputSchema?: Record<string, unknown>;
+  runner: PluginCommandToolRunnerManifest;
+}
+
+export interface PluginCommandToolRunnerManifest {
+  type: "command";
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+  timeoutMs?: number;
+}
+
 export interface PluginInitManifest {
   configTemplate?: string;
   postInstallMessage?: string;
@@ -66,6 +92,80 @@ export interface PluginPythonSetupManifest {
   python?: string;
   venv?: string;
 }
+
+
+const promptSourceSchema = z
+  .object({
+    text: z.string().min(1).optional(),
+    file: z.string().min(1).optional(),
+  })
+  .superRefine((source, ctx) => {
+    const hasText = typeof source.text === "string";
+    const hasFile = typeof source.file === "string";
+
+    if (hasText === hasFile) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Specify exactly one of text or file.",
+      });
+    }
+  });
+
+const pluginAgentSchema: z.ZodType<PluginAgentManifest> = z.object({
+  id: pluginIdentifierSchema,
+  name: z.string().min(1).optional(),
+  prompt: z.object({
+    base: promptSourceSchema.optional(),
+    instructions: promptSourceSchema.array().optional(),
+    references: promptSourceSchema.array().optional(),
+  }).optional(),
+  model: z.object({
+    provider: z.string().min(1),
+    modelId: z.string().min(1),
+    api: z.string().min(1).optional(),
+    baseUrl: z.string().url().optional(),
+    reasoning: z.boolean().optional(),
+    input: z.enum(["text", "image"]).array().min(1).optional(),
+    contextWindow: z.number().int().positive().optional(),
+    maxTokens: z.number().int().positive().optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+  }),
+  home: z.string().min(1).optional(),
+  authFile: z.string().min(1).optional(),
+  inference: z.object({
+    maxOutputTokens: z.number().int().positive().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+    request: z.record(z.string(), z.unknown()).optional(),
+  }).optional(),
+  workspace: z.object({
+    cwd: z.string().min(1).optional(),
+    shellPath: z.string().min(1).array().optional(),
+  }).optional(),
+  skills: z.object({
+    paths: z.string().min(1).array(),
+  }).optional(),
+  tools: z.union([
+    z.string().min(1).array(),
+    z.object({
+      builtIn: z.string().min(1).array().optional(),
+      mcp: z.object({ servers: z.string().min(1).array().min(1) }).optional(),
+    }),
+  ]).optional(),
+}).strict();
+
+const pluginToolSchema: z.ZodType<PluginToolManifest> = z.object({
+  name: pluginIdentifierSchema,
+  description: z.string().min(1),
+  inputSchema: z.record(z.string(), z.unknown()).optional(),
+  runner: z.object({
+    type: z.literal("command"),
+    command: z.string().min(1),
+    args: z.string().min(1).array().optional(),
+    cwd: z.string().min(1).optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    timeoutMs: z.number().int().positive().optional(),
+  }),
+}).strict();
 
 export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
   schemaVersion: z.literal(PLUGIN_MANIFEST_SCHEMA_VERSION),
@@ -121,6 +221,9 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
     })
     .array()
     .optional(),
+  skills: z.object({ path: z.string().min(1) }).array().optional(),
+  agents: pluginAgentSchema.array().optional(),
+  tools: pluginToolSchema.array().optional(),
   setup: z
     .object({
       python: z
@@ -165,6 +268,48 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
     }
 
     serviceIds.add(service.id);
+  }
+
+  const skillPaths = new Set<string>();
+  for (const [index, skill] of (manifest.skills ?? []).entries()) {
+    if (skillPaths.has(skill.path)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["skills", index, "path"],
+        message: `Duplicate skill path "${skill.path}". Skill paths must be unique per plugin.`,
+      });
+      continue;
+    }
+
+    skillPaths.add(skill.path);
+  }
+
+  const agentIds = new Set<string>();
+  for (const [index, agent] of (manifest.agents ?? []).entries()) {
+    if (agentIds.has(agent.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["agents", index, "id"],
+        message: `Duplicate agent id "${agent.id}". Agent ids must be unique per plugin.`,
+      });
+      continue;
+    }
+
+    agentIds.add(agent.id);
+  }
+
+  const toolNames = new Set<string>();
+  for (const [index, tool] of (manifest.tools ?? []).entries()) {
+    if (toolNames.has(tool.name)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tools", index, "name"],
+        message: `Duplicate tool name "${tool.name}". Tool names must be unique per plugin.`,
+      });
+      continue;
+    }
+
+    toolNames.add(tool.name);
   }
 
   const mcpServerIds = new Set<string>();

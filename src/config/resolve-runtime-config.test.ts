@@ -454,6 +454,127 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.tools).toEqual(["read", "bash"]);
   });
 
+
+  it("loads enabled user plugins from dataRoot/plugins at runtime", async () => {
+    const root = await createTempDir();
+    const dataRoot = join(root, "state");
+    const pluginRoot = join(dataRoot, "plugins", "notes");
+    await writeRawFile(join(pluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "notes",
+      name: "Notes",
+      version: "0.1.0",
+      skills: [{ path: "./skills" }],
+      tools: [
+        {
+          name: "search",
+          description: "Search notes.",
+          inputSchema: {
+            type: "object",
+            properties: { query: { type: "string" } },
+            required: ["query"],
+            additionalProperties: false,
+          },
+          runner: {
+            type: "command",
+            command: "node",
+            args: ["./search.mjs"],
+          },
+        },
+      ],
+      mcpServers: [
+        {
+          id: "vault",
+          command: "node",
+          args: ["./server.mjs"],
+          cwd: "./mcp",
+        },
+      ],
+      agents: [
+        {
+          id: "assistant",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          prompt: { base: { file: "./prompts/assistant.md" } },
+          tools: {
+            builtIn: ["search"],
+            mcp: { servers: ["vault"] },
+          },
+          skills: { paths: ["./agent-skills"] },
+        },
+      ],
+    }, null, 2));
+
+    const result = await resolveRuntimeConfig(
+      createAppConfig({
+        paths: { dataRoot },
+        plugins: [{ id: "notes", enabled: true }],
+        agents: [
+          {
+            id: "default",
+            model: { provider: "openai", modelId: "gpt-5.4" },
+            prompt: { base: { text: "Default" } },
+            tools: ["notes.search"],
+            skills: { paths: [] },
+          },
+        ],
+        endpoints: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: { allowedUserIds: [] },
+          },
+        ],
+      }),
+      join(root, "config.json"),
+    );
+
+    expect(result.commandTools).toHaveLength(1);
+    expect(result.commandTools?.[0]).toMatchObject({
+      pluginId: "notes",
+      pluginRoot,
+      manifest: { name: "search" },
+    });
+    expect(result.agents.map((agent) => agent.id)).toEqual(["default", "notes.assistant"]);
+    expect(result.agents[0]?.tools).toEqual(["notes.search"]);
+    expect(result.agents[0]?.skills?.paths).toEqual([]);
+    expect(result.agents[0]?.skillCatalog).toBeUndefined();
+    expect(result.agents[1]).toMatchObject({
+      id: "notes.assistant",
+      prompt: { base: { file: join(pluginRoot, "prompts", "assistant.md") } },
+      tools: ["notes.search"],
+      mcp: {
+        servers: [
+          {
+            id: "notes.vault",
+            command: "node",
+            args: ["./server.mjs"],
+            cwd: join(pluginRoot, "mcp"),
+          },
+        ],
+      },
+      skills: { paths: [join(pluginRoot, "agent-skills")] },
+    });
+  });
+
+  it("allows configured agents to reference MCP servers from enabled plugins", () => {
+    const result = appConfigSchema.safeParse(createAppConfig({
+      plugins: [{ id: "notes", enabled: true }],
+      agents: [
+        {
+          id: "default",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          prompt: { base: { text: "Default" } },
+          tools: { mcp: { servers: ["notes.vault"] } },
+        },
+      ],
+      endpoints: [],
+    }));
+
+    expect(result.success).toBe(true);
+  });
+
   it("uses config-directory-resolved paths.dataRoot from loaded config", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config", "imp.json");

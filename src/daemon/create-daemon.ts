@@ -5,11 +5,13 @@ import type { Logger } from "../logging/types.js";
 import { prepareAgentLogFiles } from "../logging/agent-loggers.js";
 import {
   createBuiltInToolRegistry,
+  type WorkingDirectoryState,
   resolveAgentTools,
   resolveWorkingDirectory,
 } from "../runtime/create-pi-agent-engine.js";
+import { createCommandToolDefinitions } from "../runtime/command-tool.js";
 import { validateResolvedToolNames } from "../runtime/validate-resolved-tool-names.js";
-import type { ToolRegistry } from "../tools/registry.js";
+import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { TransportFactory } from "../transports/types.js";
 import {
   bootstrapRuntime,
@@ -46,7 +48,8 @@ export function createDaemon(
 
   return {
     async start() {
-      validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createBuiltInRegistry);
+      const createRuntimeToolRegistry = createRuntimeToolRegistryFactory(createBuiltInRegistry, config.commandTools ?? []);
+      validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createRuntimeToolRegistry);
       await prepareAgentLogFiles(
         config.activeEndpoints.map((endpoint) => endpoint.paths.dataRoot),
         agentRegistry.list().map((agent) => agent.id),
@@ -57,6 +60,7 @@ export function createDaemon(
         for (const endpointConfig of config.activeEndpoints) {
           runtimes.push(await bootstrapRuntime(config, endpointConfig, {
             ...dependencies,
+            createBuiltInToolRegistry: createRuntimeToolRegistry,
             agentRegistry,
           }));
         }
@@ -100,10 +104,28 @@ export function createDaemon(
   };
 }
 
+
+function createRuntimeToolRegistryFactory(
+  createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
+  commandTools: NonNullable<DaemonConfig["commandTools"]>,
+): (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry {
+  return (workingDirectory, agent) => {
+    const builtInRegistry = createBuiltInRegistry(workingDirectory, agent);
+    if (commandTools.length === 0) {
+      return builtInRegistry;
+    }
+
+    return createToolRegistry([
+      ...builtInRegistry.list(),
+      ...createCommandToolDefinitions(commandTools),
+    ]);
+  };
+}
+
 export function validateAgentRegistry(
   agentRegistry: ReturnType<typeof createAgentRegistry>,
   toolRegistry: ToolRegistry | undefined,
-  createBuiltInRegistry: (workingDirectory: string, agent?: AgentDefinition) => ToolRegistry,
+  createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
 ): void {
   for (const agent of agentRegistry.list()) {
     validateAgentPrompt(agent);

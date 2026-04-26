@@ -1,6 +1,7 @@
 export {
   discoverPluginManifests,
   readPluginManifest,
+  readPluginManifestFromDirectory,
   type DiscoveredPluginManifest,
   type PluginDiscoveryIssue,
   type PluginDiscoveryResult,
@@ -8,13 +9,18 @@ export {
 export {
   PLUGIN_MANIFEST_FILE,
   PLUGIN_MANIFEST_SCHEMA_VERSION,
+  USER_PLUGIN_MANIFEST_FILE,
   pluginManifestSchema,
   type PluginCapability,
   type PluginEndpointManifest,
   type PluginInitManifest,
   type PluginManifest,
+  type PluginAgentManifest,
+  type PluginCommandToolRunnerManifest,
   type PluginMcpServerManifest,
   type PluginPythonSetupManifest,
+  type PluginSkillManifest,
+  type PluginToolManifest,
   type PluginServiceManifest,
   type PluginSetupManifest,
 } from "./manifest.js";
