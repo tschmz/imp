@@ -489,6 +489,9 @@ describe("createTelegramTransport", () => {
       message: { message_id: 99, text: "/export" },
     });
 
+    await waitForAsync(
+      () => (bot.api.sendDocument as unknown as { mock: { calls: unknown[] } }).mock.calls.length === 1,
+    );
     expect(bot.reply).toHaveBeenCalledWith("Export created.", { parse_mode: "HTML" });
     expect(bot.api.sendDocument).toHaveBeenCalledTimes(1);
     expect(bot.api.sendDocument).toHaveBeenCalledWith(
@@ -852,6 +855,7 @@ describe("createTelegramTransport", () => {
       },
     });
 
+    await waitForAsync(() => bot.reply.mock.calls.length === 2);
     expect(capturedMessage?.text).toBe("hello from voice");
     expect(capturedMessage?.source).toEqual({
       kind: "telegram-voice-transcript",
@@ -868,6 +872,79 @@ describe("createTelegramTransport", () => {
     expect(bot.reply).toHaveBeenNthCalledWith(2, "agent reply", {
       parse_mode: "HTML",
     });
+  });
+
+  it("does not resend the transcript for progress updates", async () => {
+    const bot = createFakeBot();
+    const voiceTranscriber: VoiceTranscriber = {
+      transcribe: vi.fn(async () => ({ text: "hello from voice" })),
+    };
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+        voice: {
+          enabled: true,
+          transcription: {
+            provider: "openai",
+            model: "gpt-4o-mini-transcribe",
+          },
+        },
+      },
+      bot,
+      undefined,
+      {
+        fetch: vi.fn<typeof fetch>(async () =>
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: {
+              "Content-Type": "audio/ogg",
+            },
+          }),
+        ),
+        voiceTranscriber,
+      },
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        await event.runWithProcessing(async () => {
+          await event.deliverProgress?.({
+            conversation: event.message.conversation,
+            text: "Working on it",
+          });
+          await event.deliver({
+            conversation: event.message.conversation,
+            text: "agent reply",
+          });
+        });
+      }),
+    });
+    await bot.emitVoiceMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: {
+        message_id: 99,
+        voice: {
+          file_id: "voice-file",
+          mime_type: "audio/ogg",
+        },
+      },
+    });
+
+    await waitForAsync(() => bot.reply.mock.calls.length === 3);
+    expect(bot.reply).toHaveBeenNthCalledWith(1, `<b>Transcript</b>\nhello from voice`, {
+      parse_mode: "HTML",
+    });
+    expect(bot.reply).toHaveBeenNthCalledWith(2, "Working on it", {
+      parse_mode: "HTML",
+    });
+    expect(bot.reply).toHaveBeenNthCalledWith(3, "agent reply", {
+      parse_mode: "HTML",
+    });
+    expect(bot.reply).toHaveBeenCalledTimes(3);
   });
 
   it("downloads telegram documents into the resolved conversation session and adds attachment context", async () => {
