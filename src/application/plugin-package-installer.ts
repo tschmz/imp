@@ -99,18 +99,22 @@ async function installNpmPackage(options: {
   env?: NodeJS.ProcessEnv;
 }): Promise<{ packageRoot: string }> {
   await ensurePackageStore(options.storeRoot);
-  const installedBefore = await listInstalledTopLevelPackageNames(options.storeRoot, options.env);
+  const declaredBefore = await readDeclaredTopLevelDependencies(options.storeRoot);
   await execFileAsync("npm", ["install", options.packageSpec, "--omit=dev", "--no-audit", "--no-fund"], {
     cwd: options.storeRoot,
     env: options.env ? { ...process.env, ...options.env } : undefined,
   });
-  const installedAfter = await listInstalledTopLevelPackageNames(options.storeRoot, options.env);
-  const newlyInstalledPackageNames = installedAfter.filter((name) => !installedBefore.includes(name));
+  const declaredAfter = await readDeclaredTopLevelDependencies(options.storeRoot);
 
   return {
     packageRoot: await resolveInstalledPackageRoot({
       ...options,
-      candidatePackageNames: newlyInstalledPackageNames.length > 0 ? newlyInstalledPackageNames : installedAfter,
+      candidatePackageNames: selectCandidatePackageNames({
+        packageSpec: options.packageSpec,
+        packageName: options.packageName,
+        declaredBefore,
+        declaredAfter,
+      }),
     }),
   };
 }
@@ -136,13 +140,47 @@ async function ensurePackageStore(storeRoot: string): Promise<void> {
   }
 }
 
-async function listInstalledTopLevelPackageNames(storeRoot: string, env?: NodeJS.ProcessEnv): Promise<string[]> {
-  const { stdout } = await execFileAsync("npm", ["ls", "--json", "--depth=0"], {
-    cwd: storeRoot,
-    env: env ? { ...process.env, ...env } : undefined,
-  });
-  const report = JSON.parse(stdout) as { dependencies?: Record<string, unknown> };
-  return Object.keys(report.dependencies ?? {});
+async function readDeclaredTopLevelDependencies(storeRoot: string): Promise<Record<string, string>> {
+  const packageJson = JSON.parse(await readFile(join(storeRoot, "package.json"), "utf8")) as {
+    dependencies?: Record<string, unknown>;
+  };
+  const dependencies = packageJson.dependencies ?? {};
+  return Object.fromEntries(
+    Object.entries(dependencies)
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+export function selectCandidatePackageNames(options: {
+  packageSpec: string;
+  packageName?: string;
+  declaredBefore: Record<string, string>;
+  declaredAfter: Record<string, string>;
+}): string[] {
+  if (options.packageName) {
+    return [options.packageName];
+  }
+
+  const declaredAfterNames = Object.keys(options.declaredAfter);
+  const newlyInstalledPackageNames = declaredAfterNames.filter((name) => !(name in options.declaredBefore));
+  if (newlyInstalledPackageNames.length > 0) {
+    return newlyInstalledPackageNames;
+  }
+
+  const packageSpecMatches = declaredAfterNames.filter((name) => options.declaredAfter[name] === options.packageSpec);
+  if (packageSpecMatches.length > 0) {
+    return packageSpecMatches;
+  }
+
+  const changedDependencyNames = declaredAfterNames.filter(
+    (name) => options.declaredBefore[name] !== options.declaredAfter[name],
+  );
+  if (changedDependencyNames.length > 0) {
+    return changedDependencyNames;
+  }
+
+  return declaredAfterNames;
 }
 
 export async function resolveInstalledPackageRoot(options: {

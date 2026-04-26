@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveInstalledPackageRoot } from "./plugin-package-installer.js";
+import { resolveInstalledPackageRoot, selectCandidatePackageNames } from "./plugin-package-installer.js";
 
 const createdDirs: string[] = [];
 
@@ -15,8 +15,42 @@ afterEach(async () => {
   }
 });
 
+describe("selectCandidatePackageNames", () => {
+  it("prefers dependency names whose declared spec matches the requested package", () => {
+    expect(
+      selectCandidatePackageNames({
+        packageSpec: "github:tschmz/imp-voice#main",
+        declaredBefore: {
+          "imp-other": "^1.0.0",
+          "imp-voice": "github:tschmz/imp-voice#old",
+        },
+        declaredAfter: {
+          "imp-other": "^1.0.0",
+          "imp-voice": "github:tschmz/imp-voice#main",
+        },
+      }),
+    ).toEqual(["imp-voice"]);
+  });
+
+  it("falls back to changed dependency names when npm normalizes the stored spec", () => {
+    expect(
+      selectCandidatePackageNames({
+        packageSpec: "github:tschmz/imp-voice#main",
+        declaredBefore: {
+          "imp-other": "^1.0.0",
+          "imp-voice": "github:tschmz/imp-voice#old",
+        },
+        declaredAfter: {
+          "imp-other": "^1.0.0",
+          "imp-voice": "git+ssh://git@github.com/tschmz/imp-voice.git#main",
+        },
+      }),
+    ).toEqual(["imp-voice"]);
+  });
+});
+
 describe("resolveInstalledPackageRoot", () => {
-  it("resolves git/url installs using npm ls candidates", async () => {
+  it("resolves git/url installs using selected package candidates", async () => {
     const storeRoot = await createStoreRoot();
     await writePackage(storeRoot, "@tschmz/imp-voice", true);
 
