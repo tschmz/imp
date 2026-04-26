@@ -1,7 +1,13 @@
 export function getValueAtKeyPath(root: unknown, keyPath: string): unknown {
+  const segments = keyPath.split(".");
+
+  if (segments.includes("*")) {
+    return getValuesAtWildcardKeyPath(root, segments);
+  }
+
   let current: unknown = root;
 
-  for (const segment of keyPath.split(".")) {
+  for (const segment of segments) {
     current = getChildValue(current, segment);
 
     if (current === undefined) {
@@ -10,6 +16,36 @@ export function getValueAtKeyPath(root: unknown, keyPath: string): unknown {
   }
 
   return current;
+}
+
+function getValuesAtWildcardKeyPath(root: unknown, segments: string[]): unknown[] {
+  if (segments.length === 0) {
+    return [root];
+  }
+
+  const [segment, ...remainingSegments] = segments;
+  if (segment === "*") {
+    return getWildcardChildValues(root).flatMap((value) => getValuesAtWildcardKeyPath(value, remainingSegments));
+  }
+
+  const child = getChildValue(root, segment);
+  if (child === undefined) {
+    return [];
+  }
+
+  return getValuesAtWildcardKeyPath(child, remainingSegments);
+}
+
+function getWildcardChildValues(current: unknown): unknown[] {
+  if (typeof current !== "object" || current === null) {
+    return [];
+  }
+
+  if (Array.isArray(current)) {
+    return current;
+  }
+
+  return Object.values(current);
 }
 
 export function setValueAtKeyPath(root: unknown, keyPath: string, value: unknown): void {

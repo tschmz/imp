@@ -11,7 +11,7 @@ export function registerConfigCommands(programOrSubcommand: Command, deps: CliDe
     configCommand
       .command("get")
       .description("Read a value from a discovered or explicit config file")
-      .argument("<keyPath>", "Dot-separated config key path"),
+      .argument("<keyPath>", "Dot-separated config key path; use * to select multiple values"),
   ).action(
     withAsyncAction(async (keyPath: string, options: { config?: string }) => {
       await deps.getConfigValue({

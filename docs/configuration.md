@@ -33,6 +33,13 @@ imp config get agents.default.model
 imp config get endpoints.private-telegram.enabled
 ```
 
+Use `*` to select multiple values from arrays or objects. Wildcard results are printed as JSON arrays:
+
+```sh
+imp config get agents.*.id
+imp config get endpoints.*.enabled
+```
+
 ## Update Values
 
 Set simple values directly:

@@ -50,6 +50,21 @@ describe("createGetConfigValueUseCase", () => {
     expect(writeOutput).toHaveBeenCalledWith('{\n  "allowedUserIds": []\n}');
   });
 
+  it("reads wildcard-selected config values", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+    const writeOutput = vi.fn();
+
+    await writeConfig(configPath);
+
+    await createGetConfigValueUseCase({ writeOutput })({
+      configPath,
+      keyPath: "agents.*.id",
+    });
+
+    expect(writeOutput).toHaveBeenCalledWith('[\n  "default",\n  "ops"\n]');
+  });
+
   it("fails clearly when the config key is missing", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
@@ -95,6 +110,15 @@ function createConfig(dataRoot: string) {
         prompt: {
           base: {
             text: "prompt",
+          },
+        },
+      },
+      {
+        id: "ops",
+        model: { provider: "openai", modelId: "gpt-5.4-mini" },
+        prompt: {
+          base: {
+            text: "ops prompt",
           },
         },
       },
