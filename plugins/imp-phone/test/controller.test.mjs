@@ -371,6 +371,47 @@ describe("imp-phone controller", () => {
     expect(quarantineError.error).toContain("JSON");
   });
 
+  it("waits for in-progress outbox writes instead of quarantining immediately", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
+    tempDirs.push(root);
+    const controller = new PhoneController({
+      inboxDir: join(root, "inbox"),
+      outboxDir: join(root, "outbox"),
+      requestsDir: join(root, "requests"),
+      requestProcessingDir: join(root, "request-processing"),
+      requestProcessedDir: join(root, "request-processed"),
+      requestFailedDir: join(root, "request-failed"),
+      controlDir: join(root, "control"),
+      recordingsDir: join(root, "recordings"),
+      statusFile: join(root, "status.json"),
+      userId: "imp-phone",
+      pollIntervalMs: 5,
+      conversation: {
+        responseTimeoutSeconds: 1,
+        holdMessageAfterSeconds: 3600,
+        holdMessageIntervalSeconds: 3600,
+      },
+    });
+    await controller.ensureDirs();
+
+    const replyPath = join(root, "outbox", "000-reply.json");
+    await writeFile(replyPath, "{\"eventId\":\"event-1\",\"text\":\"partial");
+    setTimeout(async () => {
+      await writeFile(replyPath, "{\"eventId\":\"event-1\",\"correlationId\":\"corr-1\",\"text\":\"Valid reply\"}");
+    }, 10);
+
+    const reply = await controller.waitForOutboxReply(
+      { eventId: "event-1", correlationId: "corr-1", conversationId: "conv-1" },
+      { id: "thomas", name: "Thomas", uri: "sip:thomas@example.com" },
+    );
+
+    expect(reply).toEqual({
+      text: "Valid reply",
+      speech: {},
+    });
+    await expect(readFile(`${replyPath}.failed.error`, "utf8")).rejects.toThrow();
+  });
+
   it("extracts SIP call failure reasons from call output", () => {
     expect(parseCallFailureReason("sip:example: session closed: 488 Not Acceptable Here")).toBe(
       "488 Not Acceptable Here",
