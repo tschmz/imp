@@ -1003,6 +1003,134 @@ describe("createPiAgentEngine", () => {
     });
   });
 
+  it("sets previous_response_id and replays only messages after the latest matching responses turn", async () => {
+    let capturedOnPayload:
+      | ((payload: unknown, model: { api: string }) => unknown | Promise<unknown> | undefined)
+      | undefined;
+    let capturedMessages: AgentMessage[] | undefined;
+
+    const logger = createMockLogger();
+
+    const engine = createPiAgentEngine({
+      logger,
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        capturedOnPayload = options.onPayload as typeof capturedOnPayload;
+        capturedMessages = options.initialState?.messages;
+        return createAgentDouble({ messages: [fauxAssistantMessage("stored response")] });
+      },
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      },
+      conversation: {
+        ...createConversation(),
+        messages: [
+          {
+            id: "1",
+            role: "user",
+            content: "hello",
+            timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
+            createdAt: "2026-04-05T00:00:00.000Z",
+          },
+          {
+            id: "1:assistant:1",
+            role: "assistant",
+            content: [
+              {
+                type: "text",
+                text: "Let me check.",
+              },
+              {
+                type: "toolCall",
+                id: "tool-1|fc_1",
+                name: "read_file",
+                arguments: { path: "README.md" },
+              },
+            ],
+            timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+            createdAt: "2026-04-05T00:00:01.000Z",
+            api: "openai-responses",
+            provider: "openai",
+            model: "gpt-5.4",
+            responseId: "resp_123",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "toolUse",
+          },
+          {
+            id: "1:tool-result:1",
+            role: "toolResult",
+            toolCallId: "tool-1|fc_1",
+            toolName: "read_file",
+            content: [{ type: "text", text: "README contents" }],
+            isError: false,
+            timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
+            createdAt: "2026-04-05T00:00:02.000Z",
+          },
+        ],
+      },
+      message: createIncomingMessage(),
+    });
+
+    expect(capturedMessages).toEqual([
+      {
+        role: "toolResult",
+        toolCallId: "tool-1|fc_1",
+        toolName: "read_file",
+        content: [{ type: "text", text: "README contents" }],
+        isError: false,
+        timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
+      },
+    ]);
+    expect(capturedOnPayload).toBeTypeOf("function");
+    expect(
+      await capturedOnPayload?.(
+        {
+          model: "gpt-5.4",
+          input: [{ role: "user", content: [{ type: "input_text", text: "next turn" }] }],
+          store: false,
+        },
+        { api: "openai-responses" },
+      ),
+    ).toEqual({
+      model: "gpt-5.4",
+      input: [{ role: "user", content: [{ type: "input_text", text: "next turn" }] }],
+      store: false,
+      previous_response_id: "resp_123",
+    });
+    expect(logger.info).toHaveBeenCalledWith("responses request payload", {
+      endpointId: "private-telegram",
+      transport: "telegram",
+      conversationId: "42",
+      messageId: "2",
+      correlationId: "corr-2",
+      agentId: "default",
+      requestModel: "gpt-5.4",
+      requestStore: false,
+      requestPreviousResponseId: "resp_123",
+      requestInputCount: 1,
+    });
+  });
+
   it("passes resolved configured tools into the agent runtime", async () => {
     let capturedTools: unknown[] | undefined;
     let capturedToolExecution: AgentOptions["toolExecution"] | undefined;

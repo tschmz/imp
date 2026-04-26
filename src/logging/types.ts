@@ -71,6 +71,11 @@ export interface LogFields {
   failedMcpServers?: string[];
   resolvedMcpTools?: string[];
   resolvedTools?: string[];
+  requestModel?: string;
+  requestStore?: boolean;
+  requestPreviousResponseId?: string;
+  requestInputCount?: number;
+  requestToolCount?: number;
 }
 
 export interface Logger {

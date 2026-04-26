@@ -33,6 +33,13 @@ export function resolveAgentTools(
 
 export function createOnPayloadOverride(
   agent: AgentDefinition,
+  options: {
+    previousResponseId?: string;
+    onResolvedPayload?: (
+      payload: Record<string, unknown>,
+      model: { api: string },
+    ) => Promise<void> | void;
+  } = {},
 ): StreamOptions["onPayload"] | undefined {
   const maxOutputTokens = agent.inference?.maxOutputTokens;
   const metadata = agent.inference?.metadata;
@@ -40,12 +47,13 @@ export function createOnPayloadOverride(
   if (
     metadata === undefined &&
     request === undefined &&
-    maxOutputTokens === undefined
+    maxOutputTokens === undefined &&
+    options.previousResponseId === undefined
   ) {
     return undefined;
   }
 
-  return (payload, model) => {
+  return async (payload, model) => {
     if (
       model.api !== "openai-responses" &&
       model.api !== "openai-codex-responses" &&
@@ -58,12 +66,19 @@ export function createOnPayloadOverride(
       return undefined;
     }
 
-    return {
+    const nextPayload = {
       ...payload,
+      ...(options.previousResponseId !== undefined
+        ? { previous_response_id: options.previousResponseId }
+        : {}),
       ...(metadata !== undefined ? { metadata } : {}),
       ...(maxOutputTokens !== undefined ? { max_output_tokens: maxOutputTokens } : {}),
       ...(request ?? {}),
     };
+
+    await options.onResolvedPayload?.(nextPayload, model);
+
+    return nextPayload;
   };
 }
 

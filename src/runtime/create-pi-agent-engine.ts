@@ -199,6 +199,8 @@ export function createPiAgentEngine(
       const executionContext = await executeAgentStage(toolContext, {
         createAgent: dependencies.createAgent,
         getApiKey: dependencies.getApiKey,
+        logger,
+        logContext: context,
       });
       await logPipelineEvent(logger, context, { step: "agent-execution", status: "completed" });
 
