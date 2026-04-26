@@ -496,7 +496,7 @@ describe("resolveRuntimeConfig", () => {
           model: { provider: "openai", modelId: "gpt-5.4" },
           prompt: { base: { file: "./prompts/assistant.md" } },
           tools: {
-            builtIn: ["search"],
+            builtIn: ["search", "read"],
             mcp: { servers: ["vault"] },
           },
           skills: { paths: ["./agent-skills"] },
@@ -543,7 +543,7 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[1]).toMatchObject({
       id: "notes.assistant",
       prompt: { base: { file: join(pluginRoot, "prompts", "assistant.md") } },
-      tools: ["notes.search"],
+      tools: ["notes.search", "read"],
       mcp: {
         servers: [
           {

@@ -75,7 +75,7 @@ function resolvePluginAgents(manifest: PluginManifest, pluginRoot: string): Agen
         ? { workspace: { ...agent.workspace, cwd: resolveConfigPath(agent.workspace.cwd, pluginRoot) } }
         : {}),
       ...(agent.skills ? { skills: { paths: agent.skills.paths.map((path) => resolveConfigPath(path, pluginRoot)) } } : {}),
-      ...(agent.tools ? { tools: resolvePluginAgentTools(manifest.id, agent.tools) } : {}),
+      ...(agent.tools ? { tools: resolvePluginAgentTools(manifest, agent.tools) } : {}),
     };
   });
 }
@@ -100,14 +100,21 @@ function resolvePluginPromptSource(source: { text?: string; file?: string }, plu
   return source;
 }
 
-function resolvePluginAgentTools(pluginId: string, tools: NonNullable<AgentConfig["tools"]>): NonNullable<AgentConfig["tools"]> {
+function resolvePluginAgentTools(manifest: PluginManifest, tools: NonNullable<AgentConfig["tools"]>): NonNullable<AgentConfig["tools"]> {
+  const localToolNames = new Set((manifest.tools ?? []).map((tool) => tool.name));
+  const localMcpServerIds = new Set((manifest.mcpServers ?? []).map((server) => server.id));
+
   if (Array.isArray(tools)) {
-    return tools.map((toolName) => namespacePluginReference(pluginId, toolName));
+    return tools.map((toolName) => namespacePluginReference(manifest.id, toolName, localToolNames));
   }
 
   return {
-    ...(tools.builtIn ? { builtIn: tools.builtIn.map((toolName) => namespacePluginReference(pluginId, toolName)) } : {}),
-    ...(tools.mcp ? { mcp: { servers: tools.mcp.servers.map((serverId) => namespacePluginReference(pluginId, serverId)) } } : {}),
+    ...(tools.builtIn
+      ? { builtIn: tools.builtIn.map((toolName) => namespacePluginReference(manifest.id, toolName, localToolNames)) }
+      : {}),
+    ...(tools.mcp
+      ? { mcp: { servers: tools.mcp.servers.map((serverId) => namespacePluginReference(manifest.id, serverId, localMcpServerIds)) } }
+      : {}),
     ...(tools.phone ? { phone: tools.phone } : {}),
     ...(tools.agents ? { agents: tools.agents } : {}),
   };
@@ -129,8 +136,8 @@ function resolvePluginCommandTools(manifest: PluginManifest, pluginRoot: string)
   }));
 }
 
-function namespacePluginReference(pluginId: string, id: string): string {
-  return id.includes(".") ? id : namespacePluginId(pluginId, id);
+function namespacePluginReference(pluginId: string, id: string, localIds: Set<string>): string {
+  return !id.includes(".") && localIds.has(id) ? namespacePluginId(pluginId, id) : id;
 }
 
 function namespacePluginId(pluginId: string, id: string): string {
