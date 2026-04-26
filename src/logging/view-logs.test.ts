@@ -137,6 +137,49 @@ describe("viewDaemonLogs", () => {
     expect(chunks.join("")).toBe("one\ntwo\n");
   });
 
+  it("continues following lines after log truncate", async () => {
+    const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram"]);
+    const stdout = new PassThrough();
+    const chunks: string[] = [];
+    const abortController = new AbortController();
+    let readCount = 0;
+
+    stdout.on("data", (chunk) => {
+      chunks.push(String(chunk));
+    });
+
+    setTimeout(() => {
+      abortController.abort();
+    }, 10);
+
+    await viewDaemonLogs({
+      runtimeConfig,
+      follow: true,
+      stdout,
+      signal: abortController.signal,
+      dependencies: {
+        async readFile() {
+          readCount += 1;
+          if (readCount <= 2) {
+            return "one\ntwo\n";
+          }
+
+          return "three\n";
+        },
+        watch(_path, options) {
+          return (async function* watchEvents() {
+            yield { eventType: "change" };
+            await new Promise((resolve) => {
+              options.signal?.addEventListener("abort", () => resolve(undefined), { once: true });
+            });
+          })();
+        },
+      },
+    });
+
+    expect(chunks.join("")).toBe("one\ntwo\nthree\n");
+  });
+
   it("returns cleanly after abort when a watcher only settles via return()", async () => {
     const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram"]);
     const abortController = new AbortController();

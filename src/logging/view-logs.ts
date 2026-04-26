@@ -156,8 +156,8 @@ async function watchTarget(
 
       const content = await options.readFile(target.logFilePath, "utf8");
       const previousOffset = offsets.get(target.endpointId) ?? 0;
-      const nextChunk = content.slice(previousOffset);
-      offsets.set(target.endpointId, content.length);
+      const effectiveOffset = content.length < previousOffset ? 0 : previousOffset;
+      const nextChunk = content.slice(effectiveOffset);
 
       const newLines = nextChunk
         .split("\n")
@@ -165,6 +165,7 @@ async function watchTarget(
         .filter((line) => line.length > 0);
 
       writeLogLines(options.stdout, target.endpointId, newLines, options.multiEndpoint);
+      offsets.set(target.endpointId, content.length);
     }
   } catch (error) {
     if (isAbortError(error)) {
