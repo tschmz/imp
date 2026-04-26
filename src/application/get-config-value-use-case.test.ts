@@ -65,6 +65,21 @@ describe("createGetConfigValueUseCase", () => {
     expect(writeOutput).toHaveBeenCalledWith('[\n  "default",\n  "ops"\n]');
   });
 
+  it("reads an effective default config value when it is not explicitly set", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+    const writeOutput = vi.fn();
+
+    await writeConfig(configPath);
+
+    await createGetConfigValueUseCase({ writeOutput })({
+      configPath,
+      keyPath: "agents.default.home",
+    });
+
+    expect(writeOutput).toHaveBeenCalledWith(join(root, "state-home", "imp", "agents", "default"));
+  });
+
   it("fails clearly when the config key is missing", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");

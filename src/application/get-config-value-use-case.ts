@@ -1,5 +1,6 @@
 import { discoverConfigPath } from "../config/discover-config-path.js";
 import { loadAppConfig } from "../config/load-app-config.js";
+import { createConfigGetView } from "./config-get-view.js";
 import { getValueAtKeyPath } from "./config-key-path.js";
 
 interface GetConfigValueUseCaseDependencies {
@@ -22,7 +23,7 @@ export function createGetConfigValueUseCase(
       cliConfigPath: configPath,
     });
     const config = await loadAppConfig(resolvedConfigPath);
-    const value = getValueAtKeyPath(config, keyPath);
+    const value = getValueAtKeyPath(createConfigGetView(config), keyPath);
 
     if (value === undefined) {
       throw new Error(`Config key not found: ${keyPath}`);

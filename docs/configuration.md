@@ -26,6 +26,13 @@ Read a config value:
 imp config get defaults.agentId
 ```
 
+`config get` prints the effective value. When a supported setting is not explicitly configured, it returns the value Imp would use at runtime:
+
+```sh
+imp config get logging.level
+imp config get agents.default.home
+```
+
 Agents and endpoints can be addressed by ID:
 
 ```sh
