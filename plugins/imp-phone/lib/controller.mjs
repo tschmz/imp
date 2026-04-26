@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Blob } from "node:buffer";
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rename, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { ensureDirs, sanitizeFileName, writeJsonAtomic } from "./files.mjs";
@@ -17,6 +17,7 @@ export class PhoneController {
     this.stopped = false;
     this.lastCall = undefined;
     this.activeCall = undefined;
+    this.outboxParseFailures = new Map();
   }
 
   async run() {
@@ -354,6 +355,7 @@ export class PhoneController {
 
   async waitForOutboxReply(event, contact, options = {}) {
     const deadline = Date.now() + this.config.conversation.responseTimeoutSeconds * 1000;
+    const parseFailureGraceMs = Math.max(this.config.pollIntervalMs * 4, 100);
     let nextHoldAt = Date.now()
       + (options.initialHoldMessagePlayed
         ? this.config.conversation.holdMessageIntervalSeconds
@@ -374,14 +376,34 @@ export class PhoneController {
       let payload;
       try {
         payload = JSON.parse(await readFile(filePath, "utf8"));
+        this.outboxParseFailures.delete(filePath);
       } catch (error) {
+        const now = Date.now();
+        const fileStats = await stat(filePath).catch(() => undefined);
+        const lastModifiedAt = fileStats?.mtimeMs ?? now;
+        const isLikelyStillWriting = now - lastModifiedAt < parseFailureGraceMs;
+        if (isLikelyStillWriting) {
+          await sleep(this.config.pollIntervalMs);
+          continue;
+        }
+
+        const failure = this.outboxParseFailures.get(filePath) ?? { firstFailedAt: now, attempts: 0 };
+        failure.attempts += 1;
+        this.outboxParseFailures.set(filePath, failure);
+        if (now - failure.firstFailedAt < parseFailureGraceMs) {
+          await sleep(this.config.pollIntervalMs);
+          continue;
+        }
+
         const failedPath = join(dirname(filePath), `${basename(filePath)}.failed`);
         await rename(filePath, failedPath).catch(() => undefined);
         await writeJsonAtomic(`${failedPath}.error`, {
           failedAt: new Date().toISOString(),
           file: basename(filePath),
+          attempts: failure.attempts,
           error: error instanceof Error ? error.message : String(error),
         }).catch(() => undefined);
+        this.outboxParseFailures.delete(filePath);
         this.log(
           `Outbox reply file ${basename(filePath)} could not be parsed and was quarantined: ${
             error instanceof Error ? error.message : String(error)
