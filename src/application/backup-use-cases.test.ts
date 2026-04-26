@@ -590,6 +590,94 @@ describe("backup use cases", () => {
       }),
     ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
   });
+
+  it("fails restore when manifest file archivePath is dot", async () => {
+    const root = await createTempDir();
+    const archivePath = join(root, "backup.tar");
+    const targetDataRoot = join(root, "target-state");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await createBackupArchive(archivePath, [
+      [
+        "manifest.json",
+        `${JSON.stringify(
+          {
+            version: 1,
+            createdAt: "2026-04-07T00:00:00.000Z",
+            scopes: ["conversations"],
+            source: {
+              configPath: "/source/config.json",
+              dataRoot: "/source/state",
+            },
+            conversations: [
+              {
+                archivePath: ".",
+                endpointId: "private-telegram",
+                relativeToDataRoot: "endpoints/private-telegram/conversations",
+              },
+            ],
+          },
+          null,
+          2,
+        )}\n`,
+      ],
+    ]);
+
+    await expect(
+      useCases.restoreBackup({
+        inputPath: archivePath,
+        dataRoot: targetDataRoot,
+        only: "conversations",
+        force: true,
+      }),
+    ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
+  });
+
+  it("fails restore when manifest archivePath contains dot segments", async () => {
+    const root = await createTempDir();
+    const archivePath = join(root, "backup.tar");
+    const targetDataRoot = join(root, "target-state");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await createBackupArchive(archivePath, [
+      [
+        "manifest.json",
+        `${JSON.stringify(
+          {
+            version: 1,
+            createdAt: "2026-04-07T00:00:00.000Z",
+            scopes: ["conversations"],
+            source: {
+              configPath: "/source/config.json",
+              dataRoot: "/source/state",
+            },
+            conversations: [
+              {
+                archivePath: "a/./b",
+                endpointId: "private-telegram",
+                relativeToDataRoot: "endpoints/private-telegram/conversations",
+              },
+            ],
+          },
+          null,
+          2,
+        )}\n`,
+      ],
+    ]);
+
+    await expect(
+      useCases.restoreBackup({
+        inputPath: archivePath,
+        dataRoot: targetDataRoot,
+        only: "conversations",
+        force: true,
+      }),
+    ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
+  });
 });
 
 async function writeConfig(configPath: string, dataRoot: string): Promise<void> {
