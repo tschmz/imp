@@ -6,7 +6,12 @@ import { priorityInboundCommands } from "./commands/priority-inbound-commands.js
 
 export interface MessageProcessorDependencies {
   handler: {
-    handle(message: IncomingMessage): Promise<import("../domain/message.js").OutgoingMessage>;
+    handle(
+      message: IncomingMessage,
+      options?: {
+        deliverProgress?: (message: import("../domain/message.js").OutgoingMessage) => Promise<void> | void;
+      },
+    ): Promise<import("../domain/message.js").OutgoingMessage>;
   };
   logger?: Logger;
   maxParallel?: number;
@@ -105,7 +110,9 @@ async function processEvent(
   for (;;) {
     try {
       await event.runWithProcessing(async () => {
-        const response = await dependencies.handler.handle(event.message);
+        const response = await dependencies.handler.handle(event.message, {
+          deliverProgress: (message) => event.deliver(message),
+        });
         await event.deliver(response);
         if (response.deliveryAction) {
           await dependencies.afterDeliveryAction?.(response.deliveryAction, event);

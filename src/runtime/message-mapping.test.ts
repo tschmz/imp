@@ -1,10 +1,12 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Model } from "@mariozechner/pi-ai";
+import type { AssistantMessage, Model } from "@mariozechner/pi-ai";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ConversationEvent } from "../domain/conversation.js";
 import {
+  getAssistantCommentaryText,
+  getAssistantText,
   renderIncomingMessageForAgent,
   renderIncomingMessageTextForAgent,
   toAgentMessages,
@@ -466,3 +468,66 @@ async function writeTempFile(fileName: string, content: string): Promise<string>
   await writeFile(path, content, "utf8");
   return path;
 }
+
+
+describe("assistant text phase helpers", () => {
+  it("returns only final_answer text for final replies", () => {
+    const message: AssistantMessage = {
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: "I'll inspect the repo first.",
+          textSignature: JSON.stringify({ v: 1, id: "msg_1", phase: "commentary" }),
+        },
+        {
+          type: "text",
+          text: "Root cause: stale cache metadata.",
+          textSignature: JSON.stringify({ v: 1, id: "msg_2", phase: "final_answer" }),
+        },
+      ],
+      api: "openai-responses",
+      provider: "openai",
+      model: "gpt-5-mini",
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "stop",
+      timestamp: Date.now(),
+    };
+
+    expect(getAssistantText(message)).toBe("Root cause: stale cache metadata.");
+    expect(getAssistantCommentaryText(message)).toBe("I'll inspect the repo first.");
+  });
+
+  it("keeps legacy text output when no phase metadata exists", () => {
+    const message: AssistantMessage = {
+      role: "assistant",
+      content: [
+        { type: "text", text: "Plain response" },
+        { type: "text", text: "Still part of the answer" },
+      ],
+      api: "openai-responses",
+      provider: "openai",
+      model: "gpt-5-mini",
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "stop",
+      timestamp: Date.now(),
+    };
+
+    expect(getAssistantText(message)).toBe("Plain response\nStill part of the answer");
+    expect(getAssistantCommentaryText(message)).toBe("");
+  });
+});

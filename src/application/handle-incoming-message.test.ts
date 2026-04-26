@@ -914,6 +914,103 @@ describe("createHandleIncomingMessage", () => {
     ]);
   });
 
+  it("delivers assistant commentary phase messages during the turn", async () => {
+    const agent = createDefaultAgent();
+    const deliverProgress = vi.fn(async () => {});
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message, onConversationEvents }) => {
+        const conversationEvents = [
+          {
+            kind: "message",
+            id: `${message.messageId}:assistant:1`,
+            role: "assistant",
+            createdAt: "2026-04-05T00:00:01.000Z",
+            correlationId: message.correlationId,
+            timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+            api: "openai-responses",
+            provider: "openai",
+            model: "gpt-5-mini",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "toolUse",
+            content: [
+              {
+                type: "text",
+                text: "I'll inspect the repo.",
+                textSignature: JSON.stringify({ v: 1, id: "msg_1", phase: "commentary" }),
+              },
+            ],
+          },
+          {
+            kind: "message",
+            id: `${message.messageId}:assistant:2`,
+            role: "assistant",
+            createdAt: "2026-04-05T00:00:02.000Z",
+            correlationId: message.correlationId,
+            timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
+            api: "openai-responses",
+            provider: "openai",
+            model: "gpt-5-mini",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "stop",
+            content: [
+              {
+                type: "text",
+                text: "Done.",
+                textSignature: JSON.stringify({ v: 1, id: "msg_2", phase: "final_answer" }),
+              },
+            ],
+          },
+        ] satisfies ConversationEvent[];
+
+        await onConversationEvents?.(conversationEvents);
+
+        return {
+          message: {
+            conversation: message.conversation,
+            text: "Done.",
+          },
+          conversationEvents,
+        };
+      }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: createConversationStore(),
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    const response = await service.handle(createIncomingMessage("8a", "inspect it"), {
+      deliverProgress,
+    });
+
+    expect(response.text).toBe("Done.");
+    expect(deliverProgress).toHaveBeenCalledTimes(1);
+    expect(deliverProgress).toHaveBeenCalledWith({
+      conversation: {
+        transport: "telegram",
+        externalId: "42",
+      },
+      text: "I'll inspect the repo.",
+    });
+  });
+
   it("runs inbound message hooks around agent processing", async () => {
     const agent = createDefaultAgent();
     const calls: string[] = [];

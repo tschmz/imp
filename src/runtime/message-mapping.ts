@@ -3,6 +3,7 @@ import type {
   Api as AiApi,
   AssistantMessage,
   ImageContent,
+  TextContent,
   Model,
   ToolResultMessage,
   UserMessage,
@@ -291,9 +292,62 @@ function resolveMessageTimestamp(
   return Number.isNaN(parsed) ? Date.now() : parsed;
 }
 
+export function getAssistantCommentaryText(
+  message: Pick<AssistantMessage, "content"> | Pick<ConversationAssistantMessage, "content">,
+): string {
+  return getAssistantTextByPhase(message, "commentary");
+}
+
 export function getAssistantText(message: AssistantMessage): string {
+  const finalAnswerText = getAssistantTextByPhase(message, "final_answer");
+  if (finalAnswerText) {
+    return finalAnswerText;
+  }
+
   return message.content
-    .filter((content) => content.type === "text")
+    .filter((content): content is TextContent => (
+      content.type === "text" && parseTextSignature(content.textSignature)?.phase !== "commentary"
+    ))
     .map((content) => content.text)
     .join("\n");
+}
+
+function getAssistantTextByPhase(
+  message: Pick<AssistantMessage, "content"> | Pick<ConversationAssistantMessage, "content">,
+  phase: "commentary" | "final_answer",
+): string {
+  return message.content
+    .filter((content): content is TextContent => (
+      content.type === "text" && parseTextSignature(content.textSignature)?.phase === phase
+    ))
+    .map((content) => content.text)
+    .join("\n");
+}
+
+function parseTextSignature(
+  signature: string | undefined,
+): { id: string; phase?: "commentary" | "final_answer" } | undefined {
+  if (!signature) {
+    return undefined;
+  }
+
+  if (!signature.startsWith("{")) {
+    return { id: signature };
+  }
+
+  try {
+    const parsed = JSON.parse(signature) as { v?: unknown; id?: unknown; phase?: unknown };
+    if (parsed.v !== 1 || typeof parsed.id !== "string") {
+      return undefined;
+    }
+
+    return {
+      id: parsed.id,
+      ...(parsed.phase === "commentary" || parsed.phase === "final_answer"
+        ? { phase: parsed.phase }
+        : {}),
+    };
+  } catch {
+    return undefined;
+  }
 }

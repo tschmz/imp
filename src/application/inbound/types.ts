@@ -15,6 +15,7 @@ export interface InboundProcessingContext {
   readRecentLogLines: NonNullable<HandleIncomingMessageDependencies["readRecentLogLines"]>;
   hookRunner: HookRunner<InboundMessageLifecycleHooks>;
   startedAt: number;
+  deliverProgress?: (message: OutgoingMessage) => Promise<void> | void;
   response?: OutgoingMessage;
   conversation?: ConversationContext;
   agent?: AgentDefinition;

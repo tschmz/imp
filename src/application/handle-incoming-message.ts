@@ -16,7 +16,12 @@ import type { InboundProcessingContext } from "./inbound/types.js";
 export type { HandleIncomingMessageDependencies, RuntimeCommandInfo } from "./commands/types.js";
 
 export interface HandleIncomingMessage {
-  handle(message: IncomingMessage): Promise<OutgoingMessage>;
+  handle(
+    message: IncomingMessage,
+    options?: {
+      deliverProgress?: (message: OutgoingMessage) => Promise<void> | void;
+    },
+  ): Promise<OutgoingMessage>;
 }
 
 export function createHandleIncomingMessage(
@@ -35,7 +40,12 @@ export function createHandleIncomingMessage(
   }
 
   return {
-    async handle(message: IncomingMessage): Promise<OutgoingMessage> {
+    async handle(
+      message: IncomingMessage,
+      options: {
+        deliverProgress?: (message: OutgoingMessage) => Promise<void> | void;
+      } = {},
+    ): Promise<OutgoingMessage> {
       const context: InboundProcessingContext = {
         message,
         dependencies,
@@ -45,6 +55,7 @@ export function createHandleIncomingMessage(
         readRecentLogLines: readRecentLogLinesImpl,
         hookRunner,
         startedAt: Date.now(),
+        deliverProgress: options.deliverProgress,
         availableSkills: [],
       };
 

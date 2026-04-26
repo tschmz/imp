@@ -162,10 +162,12 @@ describe("createMessageProcessor", () => {
     expect(handler.handle).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ messageId: "1", text: "prepared-1" }),
+      expect.objectContaining({ deliverProgress: expect.any(Function) }),
     );
     expect(handler.handle).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ messageId: "2", text: "prepared-2" }),
+      expect.objectContaining({ deliverProgress: expect.any(Function) }),
     );
   });
 

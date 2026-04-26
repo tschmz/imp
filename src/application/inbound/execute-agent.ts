@@ -1,3 +1,5 @@
+import type { ConversationEvent } from "../../domain/conversation.js";
+import { getAssistantCommentaryText } from "../../runtime/message-mapping.js";
 import type { InboundProcessingContext } from "./types.js";
 
 export async function executeAgent(context: InboundProcessingContext): Promise<void> {
@@ -39,14 +41,16 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
       agent: context.agent,
       conversation: conversationBeforeRun,
       message: context.message,
-      onConversationEvents: context.dependencies.conversationStore.appendEvents
-        ? async (events) => {
-            persistedConversation = await context.dependencies.conversationStore.appendEvents!(
-              persistedConversation,
-              events,
-            );
-          }
-        : undefined,
+      onConversationEvents: async (events) => {
+        if (context.dependencies.conversationStore.appendEvents) {
+          persistedConversation = await context.dependencies.conversationStore.appendEvents(
+            persistedConversation,
+            events,
+          );
+        }
+
+        await deliverProgressUpdates(context, events, replyChannel);
+      },
       onSystemPromptResolved: context.dependencies.conversationStore.writeSystemPromptSnapshot
         ? async (snapshot) => {
             await context.dependencies.conversationStore.writeSystemPromptSnapshot!(
@@ -125,6 +129,32 @@ function resolveMessageReplyChannel(context: InboundProcessingContext) {
 
 function isResponseNoneOverride(value: unknown): value is { type: "none" } {
   return typeof value === "object" && value !== null && "type" in value && value.type === "none";
+}
+
+async function deliverProgressUpdates(
+  context: InboundProcessingContext,
+  events: ConversationEvent[],
+  replyChannel: ReturnType<typeof resolveMessageReplyChannel>,
+): Promise<void> {
+  if (!context.deliverProgress || replyChannel?.delivery === "none") {
+    return;
+  }
+
+  for (const event of events) {
+    if (event.role !== "assistant") {
+      continue;
+    }
+
+    const text = getAssistantCommentaryText(event);
+    if (!text.trim()) {
+      continue;
+    }
+
+    await context.deliverProgress({
+      conversation: context.message.conversation,
+      text,
+    });
+  }
 }
 
 function toUserConversationMessage(message: InboundProcessingContext["message"]) {
