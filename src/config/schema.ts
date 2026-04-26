@@ -385,7 +385,7 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
   }
 
   validateDefaultAgent(config, knownAgentIds, ctx);
-  validateAgentMcpServerReferences(config, mcpServerIds, enabledPluginIds, ctx);
+  validateAgentMcpServerReferences(config, mcpServerIds, ctx);
   validateAgentDelegationReferences(config, knownAgentIds, ctx);
   validateEndpointDefaultAgents(config, knownAgentIds, ctx);
   validateFileEndpoints(config, endpointIds, enabledEndpointIds, pluginIds, enabledPluginIds, ctx);
@@ -394,7 +394,6 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
 function validateAgentMcpServerReferences(
   config: AppConfig,
   mcpServerIds: Set<string>,
-  enabledPluginIds: Set<string>,
   ctx: RefinementContext<AppConfig>,
 ): void {
   for (const [agentIndex, agent] of config.agents.entries()) {
@@ -403,7 +402,7 @@ function validateAgentMcpServerReferences(
     }
 
     for (const [serverIndex, serverId] of (agent.tools?.mcp?.servers ?? []).entries()) {
-      if (mcpServerIds.has(serverId) || referencesEnabledPlugin(serverId, enabledPluginIds)) {
+      if (mcpServerIds.has(serverId) || isNamespacedReference(serverId)) {
         continue;
       }
 
@@ -514,11 +513,7 @@ function validateFileEndpointPluginReference(
   ctx: RefinementContext<AppConfig>,
 ): void {
   if (!pluginIds.has(endpoint.pluginId)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["endpoints", index, "pluginId"],
-      message: `Unknown plugin id "${endpoint.pluginId}" for endpoint "${endpoint.id}".`,
-    });
+    return;
   }
 
   if (endpoint.enabled && !enabledPluginIds.has(endpoint.pluginId)) {
@@ -581,7 +576,7 @@ export function deriveDelegationToolName(agentId: string): string {
   return `ask_${sanitized || "agent"}`;
 }
 
-function referencesEnabledPlugin(id: string, enabledPluginIds: Set<string>): boolean {
-  const [pluginId, capabilityId] = id.split(".", 2);
-  return Boolean(pluginId && capabilityId && enabledPluginIds.has(pluginId));
+function isNamespacedReference(id: string): boolean {
+  const [namespace, localId] = id.split(".", 2);
+  return Boolean(namespace && localId);
 }

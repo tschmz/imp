@@ -11,7 +11,7 @@ import type {
 import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
 import { getTransport } from "../transports/registry.js";
-import { loadEnabledRuntimePlugins } from "./plugin-runtime.js";
+import { loadRuntimePlugins } from "./plugin-runtime.js";
 import { deriveDelegationToolName } from "./schema.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
 import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig } from "./types.js";
@@ -35,7 +35,7 @@ export async function resolveRuntimeConfig(
     throw new Error("Config must enable at least one daemon endpoint.");
   }
   const configDir = dirname(configPath);
-  const runtimePlugins = await loadEnabledRuntimePlugins(appConfig, configDir);
+  const runtimePlugins = await loadRuntimePlugins(appConfig, configDir);
   const effectiveAgents = mergeConfiguredAgents(appConfig.agents, runtimePlugins.agents);
   const mcpServers = resolveGlobalMcpServers(appConfig, configDir, runtimePlugins.mcpServers);
 

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { AgentMcpServerConfig } from "../domain/agent.js";
-import { readPluginManifestFromDirectory, type PluginManifest } from "../plugins/index.js";
+import { discoverPluginManifests, readPluginManifestFromDirectory, type DiscoveredPluginManifest, type PluginManifest } from "../plugins/index.js";
 import { createCommandToolDefinitions, type CommandToolRuntimeConfig } from "../runtime/command-tool.js";
 import { loadJsPluginToolDefinitions, resolvePluginJsRuntime } from "../runtime/js-plugin.js";
 import type { ToolDefinition } from "../tools/types.js";
@@ -15,7 +15,7 @@ export interface LoadedRuntimePlugins {
   pluginTools: ToolDefinition[];
 }
 
-export async function loadEnabledRuntimePlugins(appConfig: AppConfig, configDir: string): Promise<LoadedRuntimePlugins> {
+export async function loadRuntimePlugins(appConfig: AppConfig, configDir: string): Promise<LoadedRuntimePlugins> {
   const loaded: LoadedRuntimePlugins = {
     skillPaths: [],
     agents: [],
@@ -24,26 +24,11 @@ export async function loadEnabledRuntimePlugins(appConfig: AppConfig, configDir:
     pluginTools: [],
   };
 
-  for (const pluginConfig of appConfig.plugins ?? []) {
-    if (!pluginConfig.enabled) {
-      continue;
-    }
+  const plugins = await discoverRuntimePlugins(appConfig, configDir);
 
-    const pluginRoot = resolvePluginRoot(appConfig, pluginConfig.id, pluginConfig.package?.path, configDir);
-    const discovered = await readPluginManifestFromDirectory(pluginRoot);
-    if ("issue" in discovered) {
-      if (pluginConfig.package?.path && isMissingManifest(discovered.issue.message)) {
-        continue;
-      }
-      throw new Error(`Could not load plugin "${pluginConfig.id}" from ${pluginRoot}: ${discovered.issue.message}`);
-    }
-
-    const manifest = discovered.plugin.manifest;
-    if (manifest.id !== pluginConfig.id) {
-      throw new Error(
-        `Configured plugin "${pluginConfig.id}" loaded manifest for "${manifest.id}" from ${discovered.plugin.manifestPath}.`,
-      );
-    }
+  for (const plugin of plugins) {
+    const manifest = plugin.manifest;
+    const pluginRoot = plugin.rootDir;
 
     const commandTools = resolvePluginCommandTools(manifest, pluginRoot);
     const jsRuntime = resolvePluginJsRuntime(manifest, pluginRoot);
@@ -63,13 +48,79 @@ export async function loadEnabledRuntimePlugins(appConfig: AppConfig, configDir:
   return loaded;
 }
 
-function resolvePluginRoot(appConfig: AppConfig, pluginId: string, packagePath: string | undefined, configDir: string): string {
-  if (packagePath) {
-    return resolveConfigPath(packagePath, configDir);
+interface RuntimePluginCandidate {
+  plugin: DiscoveredPluginManifest;
+  sourceOrder: number;
+}
+
+async function discoverRuntimePlugins(appConfig: AppConfig, configDir: string): Promise<DiscoveredPluginManifest[]> {
+  const disabledPluginIds = new Set(
+    (appConfig.plugins ?? []).filter((plugin) => !plugin.enabled).map((plugin) => plugin.id),
+  );
+  const candidates = new Map<string, RuntimePluginCandidate>();
+  let sourceOrder = 0;
+
+  for (const plugin of await discoverPluginsFromRoots(resolveAutomaticPluginRoots(appConfig, configDir))) {
+    if (disabledPluginIds.has(plugin.manifest.id)) {
+      continue;
+    }
+
+    candidates.set(plugin.manifest.id, { plugin, sourceOrder: sourceOrder++ });
   }
 
-  return join(appConfig.paths.dataRoot, "plugins", pluginId);
+  for (const pluginConfig of appConfig.plugins ?? []) {
+    if (!pluginConfig.enabled || !pluginConfig.package?.path) {
+      continue;
+    }
+
+    const pluginRoot = resolveConfigPath(pluginConfig.package.path, configDir);
+    const discovered = await readPluginManifestFromDirectory(pluginRoot);
+    if ("issue" in discovered) {
+      if (isMissingManifest(discovered.issue.message)) {
+        continue;
+      }
+      throw new Error(`Could not load plugin "${pluginConfig.id}" from ${pluginRoot}: ${discovered.issue.message}`);
+    }
+
+    if (discovered.plugin.manifest.id !== pluginConfig.id) {
+      throw new Error(
+        `Configured plugin "${pluginConfig.id}" loaded manifest for "${discovered.plugin.manifest.id}" from ${discovered.plugin.manifestPath}.`,
+      );
+    }
+
+    candidates.set(discovered.plugin.manifest.id, { plugin: discovered.plugin, sourceOrder: sourceOrder++ });
+  }
+
+  return [...candidates.values()]
+    .sort((left, right) => left.sourceOrder - right.sourceOrder)
+    .map((candidate) => candidate.plugin);
 }
+
+async function discoverPluginsFromRoots(rootDirs: string[]): Promise<DiscoveredPluginManifest[]> {
+  const result = await discoverPluginManifests(rootDirs);
+  const relevantIssues = result.issues.filter((issue) => !isMissingManifest(issue.message));
+  if (relevantIssues.length > 0) {
+    throw new Error(
+      relevantIssues
+        .map((issue) => `Could not load plugins from ${issue.path}: ${issue.message}`)
+        .join("\n"),
+    );
+  }
+
+  return result.plugins;
+}
+
+function resolveAutomaticPluginRoots(appConfig: AppConfig, configDir: string): string[] {
+  return [
+    join(appConfig.paths.dataRoot, "plugins"),
+    ...appConfig.agents.map((agent) => join(resolveAgentHomePath(agent, appConfig.paths.dataRoot, configDir), "plugins")),
+  ];
+}
+
+function resolveAgentHomePath(agent: AgentConfig, dataRoot: string, configDir: string): string {
+  return resolveConfigPath(agent.home ?? join(dataRoot, "agents", agent.id), configDir);
+}
+
 
 function resolvePluginSkillPaths(manifest: PluginManifest, pluginRoot: string): string[] {
   return (manifest.skills ?? []).map((skill) => resolveConfigPath(skill.path, pluginRoot));

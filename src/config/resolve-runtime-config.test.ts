@@ -455,7 +455,7 @@ describe("resolveRuntimeConfig", () => {
   });
 
 
-  it("loads enabled user plugins from dataRoot/plugins at runtime", async () => {
+  it("automatically loads user plugins from dataRoot/plugins at runtime", async () => {
     const root = await createTempDir();
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "notes");
@@ -507,7 +507,6 @@ describe("resolveRuntimeConfig", () => {
     const result = await resolveRuntimeConfig(
       createAppConfig({
         paths: { dataRoot },
-        plugins: [{ id: "notes", enabled: true }],
         agents: [
           {
             id: "default",
@@ -559,6 +558,74 @@ describe("resolveRuntimeConfig", () => {
   });
 
 
+
+
+  it("loads agent home plugins after dataRoot plugins", async () => {
+    const root = await createTempDir();
+    const dataRoot = join(root, "state");
+    const agentHome = join(root, "agents", "default");
+    const dataPluginRoot = join(dataRoot, "plugins", "echo");
+    const homePluginRoot = join(agentHome, "plugins", "echo");
+    await writeRawFile(join(dataPluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "echo",
+      name: "Echo",
+      version: "0.1.0",
+      tools: [
+        {
+          name: "say",
+          description: "Data root echo.",
+          runner: { type: "command", command: "node", args: ["./data-root.mjs"] },
+        },
+      ],
+    }, null, 2));
+    await writeRawFile(join(homePluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "echo",
+      name: "Echo",
+      version: "0.2.0",
+      tools: [
+        {
+          name: "say",
+          description: "Agent home echo.",
+          runner: { type: "command", command: "node", args: ["./agent-home.mjs"] },
+        },
+      ],
+    }, null, 2));
+
+    const result = await resolveRuntimeConfig(
+      createAppConfig({
+        paths: { dataRoot },
+        agents: [
+          {
+            id: "default",
+            home: agentHome,
+            model: { provider: "openai", modelId: "gpt-5.4" },
+            prompt: { base: { text: "Default" } },
+            tools: ["echo.say"],
+          },
+        ],
+        endpoints: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: { allowedUserIds: [] },
+          },
+        ],
+      }),
+      join(root, "config.json"),
+    );
+
+    expect(result.commandTools).toHaveLength(1);
+    expect(result.commandTools?.[0]).toMatchObject({
+      pluginId: "echo",
+      pluginRoot: homePluginRoot,
+      manifest: { description: "Agent home echo." },
+    });
+  });
+
   it("loads JS plugin tools from the runtime module", async () => {
     const root = await createTempDir();
     const dataRoot = join(root, "state");
@@ -605,7 +672,6 @@ describe("resolveRuntimeConfig", () => {
     const result = await resolveRuntimeConfig(
       createAppConfig({
         paths: { dataRoot },
-        plugins: [{ id: "math", enabled: true }],
         endpoints: [
           {
             id: "private-telegram",
@@ -627,9 +693,8 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
-  it("allows configured agents to reference MCP servers from enabled plugins", () => {
+  it("allows configured agents to reference namespaced MCP servers from automatic plugins", () => {
     const result = appConfigSchema.safeParse(createAppConfig({
-      plugins: [{ id: "notes", enabled: true }],
       agents: [
         {
           id: "default",

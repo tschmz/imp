@@ -258,7 +258,7 @@ describe("appConfigSchema", () => {
     );
   });
 
-  it("rejects file endpoints that reference unknown plugins", () => {
+  it("allows file endpoints to reference automatically discovered plugins", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({
         id: "default",
@@ -281,17 +281,7 @@ describe("appConfigSchema", () => {
       ],
     });
 
-    expect(result.success).toBe(false);
-    if (result.success) {
-      throw new Error("Expected schema validation to fail.");
-    }
-
-    expect(result.error.issues).toContainEqual(
-      expect.objectContaining({
-        path: ["endpoints", 0, "pluginId"],
-        message: 'Unknown plugin id "pi-audio" for endpoint "audio-ingress".',
-      }),
-    );
+    expect(result.success).toBe(true);
   });
 
   it("rejects agents without a model", () => {
