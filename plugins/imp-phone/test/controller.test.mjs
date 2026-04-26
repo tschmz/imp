@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -318,6 +318,57 @@ describe("imp-phone controller", () => {
       },
     });
     expect(payload.text).toContain("Finalize the contact notes now");
+  });
+
+  it("skips malformed outbox files and keeps waiting for a valid reply", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-phone-controller-"));
+    tempDirs.push(root);
+    const logMessages = [];
+    const controller = new PhoneController({
+      inboxDir: join(root, "inbox"),
+      outboxDir: join(root, "outbox"),
+      requestsDir: join(root, "requests"),
+      requestProcessingDir: join(root, "request-processing"),
+      requestProcessedDir: join(root, "request-processed"),
+      requestFailedDir: join(root, "request-failed"),
+      controlDir: join(root, "control"),
+      recordingsDir: join(root, "recordings"),
+      statusFile: join(root, "status.json"),
+      userId: "imp-phone",
+      pollIntervalMs: 5,
+      conversation: {
+        responseTimeoutSeconds: 1,
+        holdMessageAfterSeconds: 3600,
+        holdMessageIntervalSeconds: 3600,
+      },
+    }, {
+      log: (message) => logMessages.push(message),
+    });
+    await controller.ensureDirs();
+    await writeFile(join(root, "outbox", "000-bad.json"), "{ invalid-json");
+    await writeJsonAtomic(join(root, "outbox", "001-good.json"), {
+      eventId: "event-1",
+      text: "Valid reply",
+      speech: {
+        model: "gpt-4o-mini-tts",
+      },
+    });
+
+    const reply = await controller.waitForOutboxReply(
+      { eventId: "event-1", correlationId: "corr-1", conversationId: "conv-1" },
+      { id: "thomas", name: "Thomas", uri: "sip:thomas@example.com" },
+    );
+
+    expect(reply).toEqual({
+      text: "Valid reply",
+      speech: {
+        model: "gpt-4o-mini-tts",
+      },
+    });
+    expect(logMessages.some((message) => message.includes("could not be parsed and was quarantined"))).toBe(true);
+    await expect(readFile(join(root, "outbox", "000-bad.json"), "utf8")).rejects.toThrow();
+    const quarantineError = JSON.parse(await readFile(join(root, "outbox", "000-bad.json.failed.error"), "utf8"));
+    expect(quarantineError.error).toContain("JSON");
   });
 
   it("extracts SIP call failure reasons from call output", () => {

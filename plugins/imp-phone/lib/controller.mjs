@@ -371,7 +371,25 @@ export class PhoneController {
         continue;
       }
 
-      const payload = JSON.parse(await readFile(filePath, "utf8"));
+      let payload;
+      try {
+        payload = JSON.parse(await readFile(filePath, "utf8"));
+      } catch (error) {
+        const failedPath = join(dirname(filePath), `${basename(filePath)}.failed`);
+        await rename(filePath, failedPath).catch(() => undefined);
+        await writeJsonAtomic(`${failedPath}.error`, {
+          failedAt: new Date().toISOString(),
+          file: basename(filePath),
+          error: error instanceof Error ? error.message : String(error),
+        }).catch(() => undefined);
+        this.log(
+          `Outbox reply file ${basename(filePath)} could not be parsed and was quarantined: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        await sleep(this.config.pollIntervalMs);
+        continue;
+      }
       if (payload.eventId !== event.eventId && payload.correlationId !== event.correlationId) {
         await sleep(this.config.pollIntervalMs);
         continue;
