@@ -32,8 +32,10 @@ export function createRuntimeEntries(
 ): RuntimeEntry[] {
   const deliveryRouter = dependencies.deliveryRouter ?? createDeliveryRouter();
   const loggedAgentStartup = new Set<string>();
+  const endpointTransportById = new Map(runtimes.map((runtime) => [runtime.endpointConfig.id, runtime.endpointConfig.type]));
   const transportContext: TransportContext = {
     deliveryRouter,
+    endpointTransportById,
   };
 
   return runtimes.map((runtime) => {

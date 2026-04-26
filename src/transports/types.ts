@@ -9,6 +9,7 @@ export type TransportFactory<TConfig = unknown, TLogger = unknown> = (
 
 export interface TransportContext {
   deliveryRouter: DeliveryRouter;
+  endpointTransportById?: ReadonlyMap<string, string>;
 }
 
 export interface TransportInboundEvent {

@@ -152,6 +152,7 @@ describe("createFileTransport", () => {
     });
     const transport = createFileTransport(config, createMockLogger(), {
       deliveryRouter,
+      endpointTransportById: new Map([["private-telegram", "telegram"]]),
     });
     await ensurePluginDirs(config);
 
@@ -182,7 +183,7 @@ describe("createFileTransport", () => {
       },
       message: {
         conversation: {
-          transport: "private-telegram",
+          transport: "telegram",
           externalId: "123456789",
         },
         text: "agent reply",

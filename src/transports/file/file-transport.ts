@@ -303,19 +303,23 @@ async function deliverPluginResponse(
     case "outbox":
       await writePluginOutboxMessage(config as FileOutboxRuntimeConfig, inbound, text);
       return;
-    case "endpoint":
+    case "endpoint": {
+      const responseTransport =
+        context.endpointTransportById?.get(config.response.endpointId) ??
+        "endpoint";
       await context.deliveryRouter.deliver({
         endpointId: config.response.endpointId,
         target: config.response.target,
         message: {
           conversation: {
-            transport: config.response.endpointId,
+            transport: responseTransport,
             externalId: config.response.target.conversationId,
           },
           text,
         },
       });
       return;
+    }
   }
 }
 
