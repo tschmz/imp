@@ -13,6 +13,7 @@ import type { SkillDefinition } from "../skills/types.js";
 import type { OutgoingMessageReplayItem } from "../domain/message.js";
 import type { TransportType } from "../transports/registry.js";
 import type { CommandToolRuntimeConfig } from "../runtime/command-tool.js";
+import type { ToolDefinition } from "../tools/types.js";
 
 interface BaseTransportRuntimeConfig {
   id: string;
@@ -122,6 +123,7 @@ export interface DaemonConfig {
   };
   agents: ConfiguredAgent[];
   commandTools?: CommandToolRuntimeConfig[];
+  pluginTools?: ToolDefinition[];
   activeEndpoints: ActiveEndpointRuntimeConfig[];
 }
 

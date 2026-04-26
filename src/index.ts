@@ -16,8 +16,19 @@ export type {
   PluginEndpointManifest,
   PluginInitManifest,
   PluginManifest,
+  PluginAgentManifest,
+  PluginCommandToolRunnerManifest,
   PluginMcpServerManifest,
   PluginPythonSetupManifest,
   PluginServiceManifest,
   PluginSetupManifest,
 } from "./plugins/manifest.js";
+
+export type {
+  JsPluginInitializer,
+  JsPluginRegistration,
+  JsPluginRuntimeConfig,
+  JsPluginToolDefinition,
+  PluginRuntimeContext,
+} from "./runtime/js-plugin.js";
+export type { ToolDefinition } from "./tools/types.js";

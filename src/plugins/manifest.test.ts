@@ -39,6 +39,9 @@ describe("pluginManifestSchema", () => {
           },
         },
       ],
+      runtime: {
+        module: "./dist/plugin.mjs",
+      },
       mcpServers: [
         {
           id: "voice-tools",

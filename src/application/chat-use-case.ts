@@ -14,6 +14,7 @@ import { ConfigurationError } from "../domain/errors.js";
 import { prepareAgentLogFiles } from "../logging/agent-loggers.js";
 import { createFileOnlyLogger } from "../logging/file-logger.js";
 import { createBuiltInToolRegistry } from "../runtime/create-pi-agent-engine.js";
+import { createToolRegistry } from "../tools/registry.js";
 import type { ConversationStore } from "../storage/types.js";
 import { toVisibleReplayItems } from "./conversation-replay.js";
 import { createRuntimeTransportFactory } from "./runtime-target.js";
@@ -65,7 +66,12 @@ export function createChatUseCase(
     );
     const chatRuntimeConfig = resolveCliChatRuntimeConfig(runtimeConfig);
     const agentRegistry = createAgentRegistry(buildAgents(chatRuntimeConfig.agents));
-    validateAgentRegistry(agentRegistry, undefined, createBuiltInToolRegistry);
+    validateAgentRegistry(agentRegistry, undefined, (workingDirectory, agent) => {
+      const builtInRegistry = createBuiltInToolRegistry(workingDirectory, agent);
+      return chatRuntimeConfig.pluginTools && chatRuntimeConfig.pluginTools.length > 0
+        ? createToolRegistry([...builtInRegistry.list(), ...chatRuntimeConfig.pluginTools])
+        : builtInRegistry;
+    });
     await deps.prepareAgentLogFiles(
       chatRuntimeConfig.activeEndpoints.map((endpoint) => endpoint.paths.dataRoot),
       agentRegistry.list().map((agent) => agent.id),

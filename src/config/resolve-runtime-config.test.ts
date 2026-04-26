@@ -558,6 +558,75 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
+
+  it("loads JS plugin tools from the runtime module", async () => {
+    const root = await createTempDir();
+    const dataRoot = join(root, "state");
+    const pluginRoot = join(dataRoot, "plugins", "math");
+    await writeRawFile(join(pluginRoot, "plugin.mjs"), `export function registerPlugin(context) {
+  return {
+    tools: [
+      {
+        name: "add",
+        label: "add",
+        description: "Add two numbers.",
+        parameters: {
+          type: "object",
+          properties: { a: { type: "number" }, b: { type: "number" } },
+          required: ["a", "b"],
+          additionalProperties: false,
+        },
+        async execute(_toolCallId, params) {
+          return {
+            content: [{ type: "text", text: String(params.a + params.b) }],
+            details: { pluginId: context.plugin.id, sum: params.a + params.b },
+          };
+        },
+      },
+    ],
+  };
+}
+`);
+    await writeRawFile(join(pluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "math",
+      name: "Math",
+      version: "0.1.0",
+      runtime: { module: "./plugin.mjs" },
+      agents: [
+        {
+          id: "assistant",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          tools: ["add"],
+        },
+      ],
+    }, null, 2));
+
+    const result = await resolveRuntimeConfig(
+      createAppConfig({
+        paths: { dataRoot },
+        plugins: [{ id: "math", enabled: true }],
+        endpoints: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: { allowedUserIds: [] },
+          },
+        ],
+      }),
+      join(root, "config.json"),
+    );
+
+    expect(result.agents.find((agent) => agent.id === "math.assistant")?.tools).toEqual(["math.add"]);
+    expect(result.pluginTools?.map((tool) => tool.name)).toEqual(["math.add"]);
+    await expect(result.pluginTools?.[0]?.execute("call-1", { a: 2, b: 3 })).resolves.toEqual({
+      content: [{ type: "text", text: "5" }],
+      details: { pluginId: "math", sum: 5 },
+    });
+  });
+
   it("allows configured agents to reference MCP servers from enabled plugins", () => {
     const result = appConfigSchema.safeParse(createAppConfig({
       plugins: [{ id: "notes", enabled: true }],

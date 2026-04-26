@@ -20,6 +20,7 @@ export interface PluginManifest {
   skills?: PluginSkillManifest[];
   agents?: PluginAgentManifest[];
   tools?: PluginToolManifest[];
+  runtime?: PluginRuntimeManifest;
   setup?: PluginSetupManifest;
   init?: PluginInitManifest;
 }
@@ -76,6 +77,10 @@ export interface PluginCommandToolRunnerManifest {
   cwd?: string;
   env?: Record<string, string>;
   timeoutMs?: number;
+}
+
+export interface PluginRuntimeManifest {
+  module: string;
 }
 
 export interface PluginInitManifest {
@@ -224,6 +229,7 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
   skills: z.object({ path: z.string().min(1) }).array().optional(),
   agents: pluginAgentSchema.array().optional(),
   tools: pluginToolSchema.array().optional(),
+  runtime: z.object({ module: z.string().min(1) }).optional(),
   setup: z
     .object({
       python: z

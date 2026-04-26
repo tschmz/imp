@@ -10,7 +10,6 @@ import {
   createPiAgentEngine,
 } from "../../runtime/create-pi-agent-engine.js";
 import { createOAuthApiKeyResolver } from "../../runtime/create-oauth-api-key-resolver.js";
-import { createCommandToolDefinitions } from "../../runtime/command-tool.js";
 import type { AgentEngine } from "../../runtime/types.js";
 import { createFsConversationStore } from "../../storage/fs-store.js";
 import type { ConversationStore } from "../../storage/types.js";
@@ -80,16 +79,16 @@ function createRuntimeToolRegistryFactory(
   config: DaemonConfig,
   createBuiltInRegistry: NonNullable<BuildRuntimeComponentsDependencies["createBuiltInToolRegistry"]>,
 ): NonNullable<BuildRuntimeComponentsDependencies["createBuiltInToolRegistry"]> {
-  const commandTools = config.commandTools ?? [];
+  const pluginTools = config.pluginTools ?? [];
   return (workingDirectory, agent) => {
     const builtInRegistry = createBuiltInRegistry(workingDirectory, agent);
-    if (commandTools.length === 0) {
+    if (pluginTools.length === 0) {
       return builtInRegistry;
     }
 
     return createToolRegistry([
       ...builtInRegistry.list(),
-      ...createCommandToolDefinitions(commandTools),
+      ...pluginTools,
     ]);
   };
 }

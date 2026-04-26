@@ -1,7 +1,9 @@
 import { join } from "node:path";
 import type { AgentMcpServerConfig } from "../domain/agent.js";
 import { readPluginManifestFromDirectory, type PluginManifest } from "../plugins/index.js";
-import type { CommandToolRuntimeConfig } from "../runtime/command-tool.js";
+import { createCommandToolDefinitions, type CommandToolRuntimeConfig } from "../runtime/command-tool.js";
+import { loadJsPluginToolDefinitions, resolvePluginJsRuntime } from "../runtime/js-plugin.js";
+import type { ToolDefinition } from "../tools/types.js";
 import { resolveConfigPath } from "./secret-value.js";
 import type { AgentConfig, AppConfig } from "./types.js";
 
@@ -10,6 +12,7 @@ export interface LoadedRuntimePlugins {
   agents: AgentConfig[];
   mcpServers: AgentMcpServerConfig[];
   commandTools: CommandToolRuntimeConfig[];
+  pluginTools: ToolDefinition[];
 }
 
 export async function loadEnabledRuntimePlugins(appConfig: AppConfig, configDir: string): Promise<LoadedRuntimePlugins> {
@@ -18,6 +21,7 @@ export async function loadEnabledRuntimePlugins(appConfig: AppConfig, configDir:
     agents: [],
     mcpServers: [],
     commandTools: [],
+    pluginTools: [],
   };
 
   for (const pluginConfig of appConfig.plugins ?? []) {
@@ -41,10 +45,19 @@ export async function loadEnabledRuntimePlugins(appConfig: AppConfig, configDir:
       );
     }
 
+    const commandTools = resolvePluginCommandTools(manifest, pluginRoot);
+    const jsRuntime = resolvePluginJsRuntime(manifest, pluginRoot);
+    const jsTools = jsRuntime ? await loadJsPluginToolDefinitions([jsRuntime]) : [];
+    const localToolNames = new Set([
+      ...(manifest.tools ?? []).map((tool) => tool.name),
+      ...jsTools.map((tool) => stripPluginNamespace(manifest.id, tool.name)),
+    ]);
+
     loaded.skillPaths.push(...resolvePluginSkillPaths(manifest, pluginRoot));
-    loaded.agents.push(...resolvePluginAgents(manifest, pluginRoot));
+    loaded.agents.push(...resolvePluginAgents(manifest, pluginRoot, localToolNames));
     loaded.mcpServers.push(...resolvePluginMcpServers(manifest, pluginRoot));
-    loaded.commandTools.push(...resolvePluginCommandTools(manifest, pluginRoot));
+    loaded.commandTools.push(...commandTools);
+    loaded.pluginTools.push(...createCommandToolDefinitions(commandTools), ...jsTools);
   }
 
   return loaded;
@@ -62,7 +75,7 @@ function resolvePluginSkillPaths(manifest: PluginManifest, pluginRoot: string): 
   return (manifest.skills ?? []).map((skill) => resolveConfigPath(skill.path, pluginRoot));
 }
 
-function resolvePluginAgents(manifest: PluginManifest, pluginRoot: string): AgentConfig[] {
+function resolvePluginAgents(manifest: PluginManifest, pluginRoot: string, localToolNames: Set<string>): AgentConfig[] {
   return (manifest.agents ?? []).map((agent) => {
     const agentId = namespacePluginId(manifest.id, agent.id);
     return {
@@ -75,7 +88,7 @@ function resolvePluginAgents(manifest: PluginManifest, pluginRoot: string): Agen
         ? { workspace: { ...agent.workspace, cwd: resolveConfigPath(agent.workspace.cwd, pluginRoot) } }
         : {}),
       ...(agent.skills ? { skills: { paths: agent.skills.paths.map((path) => resolveConfigPath(path, pluginRoot)) } } : {}),
-      ...(agent.tools ? { tools: resolvePluginAgentTools(manifest, agent.tools) } : {}),
+      ...(agent.tools ? { tools: resolvePluginAgentTools(manifest, agent.tools, localToolNames) } : {}),
     };
   });
 }
@@ -100,8 +113,11 @@ function resolvePluginPromptSource(source: { text?: string; file?: string }, plu
   return source;
 }
 
-function resolvePluginAgentTools(manifest: PluginManifest, tools: NonNullable<AgentConfig["tools"]>): NonNullable<AgentConfig["tools"]> {
-  const localToolNames = new Set((manifest.tools ?? []).map((tool) => tool.name));
+function resolvePluginAgentTools(
+  manifest: PluginManifest,
+  tools: NonNullable<AgentConfig["tools"]>,
+  localToolNames: Set<string>,
+): NonNullable<AgentConfig["tools"]> {
   const localMcpServerIds = new Set((manifest.mcpServers ?? []).map((server) => server.id));
 
   if (Array.isArray(tools)) {
@@ -146,4 +162,9 @@ function namespacePluginId(pluginId: string, id: string): string {
 
 function isMissingManifest(message: string): boolean {
   return message.includes("ENOENT") || message.includes("no such file or directory");
+}
+
+function stripPluginNamespace(pluginId: string, id: string): string {
+  const prefix = `${pluginId}.`;
+  return id.startsWith(prefix) ? id.slice(prefix.length) : id;
 }

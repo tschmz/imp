@@ -69,6 +69,7 @@ export async function resolveRuntimeConfig(
       }),
     ),
     commandTools: runtimePlugins.commandTools,
+    pluginTools: runtimePlugins.pluginTools,
     activeEndpoints: await Promise.all(
       enabledEndpoints.map(async (endpoint) => {
         const transport = getTransport(endpoint.type);

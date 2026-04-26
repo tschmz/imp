@@ -9,7 +9,6 @@ import {
   resolveAgentTools,
   resolveWorkingDirectory,
 } from "../runtime/create-pi-agent-engine.js";
-import { createCommandToolDefinitions } from "../runtime/command-tool.js";
 import { validateResolvedToolNames } from "../runtime/validate-resolved-tool-names.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { TransportFactory } from "../transports/types.js";
@@ -48,7 +47,7 @@ export function createDaemon(
 
   return {
     async start() {
-      const createRuntimeToolRegistry = createRuntimeToolRegistryFactory(createBuiltInRegistry, config.commandTools ?? []);
+      const createRuntimeToolRegistry = createRuntimeToolRegistryFactory(createBuiltInRegistry, config.pluginTools ?? []);
       validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createRuntimeToolRegistry);
       await prepareAgentLogFiles(
         config.activeEndpoints.map((endpoint) => endpoint.paths.dataRoot),
@@ -107,17 +106,17 @@ export function createDaemon(
 
 function createRuntimeToolRegistryFactory(
   createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
-  commandTools: NonNullable<DaemonConfig["commandTools"]>,
+  pluginTools: NonNullable<DaemonConfig["pluginTools"]>,
 ): (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry {
   return (workingDirectory, agent) => {
     const builtInRegistry = createBuiltInRegistry(workingDirectory, agent);
-    if (commandTools.length === 0) {
+    if (pluginTools.length === 0) {
       return builtInRegistry;
     }
 
     return createToolRegistry([
       ...builtInRegistry.list(),
-      ...createCommandToolDefinitions(commandTools),
+      ...pluginTools,
     ]);
   };
 }

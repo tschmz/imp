@@ -19,6 +19,7 @@ export {
   type PluginCommandToolRunnerManifest,
   type PluginMcpServerManifest,
   type PluginPythonSetupManifest,
+  type PluginRuntimeManifest,
   type PluginSkillManifest,
   type PluginToolManifest,
   type PluginServiceManifest,
