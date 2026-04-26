@@ -590,6 +590,78 @@ describe("plugin use cases", () => {
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("resolves required service env from process.env when dependencies env is partial", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    const calls: Array<{ command: string; args: string[] }> = [];
+    await writeManifest(root, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+      services: [
+        {
+          id: "out",
+          command: "node",
+          args: ["bin/speaker-outbox.mjs"],
+          env: {
+            OPENAI_API_KEY: "required",
+            IMP_CUSTOM_FLAG: "required",
+          },
+        },
+      ],
+    });
+    await writeFile(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`, "utf8");
+
+    const originalApiKey = process.env.OPENAI_API_KEY;
+    const originalCustomFlag = process.env.IMP_CUSTOM_FLAG;
+    process.env.OPENAI_API_KEY = "sk-from-process-env";
+    delete process.env.IMP_CUSTOM_FLAG;
+
+    try {
+      const useCases = createPluginUseCases({
+        writeOutput: vi.fn(),
+        env: { IMP_CUSTOM_FLAG: "enabled" },
+        platform: "linux",
+        homeDir: root,
+        installer: {
+          async run(command, args) {
+            calls.push({ command, args });
+          },
+        },
+      });
+
+      await useCases.installPlugin({
+        root,
+        configPath,
+        id: "imp-voice",
+      });
+
+      const serviceName = "imp-voice-out";
+      const outEnvironmentPath = join(root, "plugin-services", `${serviceName}.env`);
+      await expect(readFile(outEnvironmentPath, "utf8")).resolves.toContain(
+        'OPENAI_API_KEY="sk-from-process-env"',
+      );
+      await expect(readFile(outEnvironmentPath, "utf8")).resolves.toContain('IMP_CUSTOM_FLAG="enabled"');
+      expect(calls).toEqual([
+        { command: "systemctl", args: ["--user", "daemon-reload"] },
+        { command: "systemctl", args: ["--user", "enable", "--now", `${serviceName}.service`] },
+        { command: "systemctl", args: ["--user", "restart", `${serviceName}.service`] },
+      ]);
+    } finally {
+      if (originalApiKey === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = originalApiKey;
+      }
+      if (originalCustomFlag === undefined) {
+        delete process.env.IMP_CUSTOM_FLAG;
+      } else {
+        process.env.IMP_CUSTOM_FLAG = originalCustomFlag;
+      }
+    }
+  });
+
   it("skips plugin service installation when requested", async () => {
     const root = await createPluginRoot();
     const configPath = join(root, "config.json");
