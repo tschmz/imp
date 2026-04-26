@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import type { AppConfig } from "../../config/types.js";
 import type { ConversationStore } from "../../storage/types.js";
 import { agentCommandHandler } from "./agent-command.js";
 import {
@@ -6,6 +10,12 @@ import {
   createDependencies,
   createIncomingMessage,
 } from "./test-helpers.js";
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
 
 describe("agentCommandHandler", () => {
   it("switches the chat to the requested agent active session without mutating the prior session", async () => {
@@ -77,4 +87,111 @@ describe("agentCommandHandler", () => {
     expect(await store.getSelectedAgent!(context.message.conversation)).toBe("ops");
     expect((await store.get(context.message.conversation))?.state.conversation.sessionId).toBe("session-2");
   });
+
+  it("lists plugin agents configured on disk even before the daemon reloads", async () => {
+    const { appConfig, configPath, dataRoot } = await createPluginAgentConfig();
+    const context = createCommandContext({
+      message: createIncomingMessage("agent"),
+      dependencies: createDependencies({
+        runtimeInfo: {
+          endpointId: "private-telegram",
+          configPath,
+          dataRoot,
+          logFilePath: join(dirname(configPath), "endpoint.log"),
+          loggingLevel: "info",
+          activeEndpointIds: ["private-telegram"],
+        },
+      }),
+      loadAppConfig: async () => appConfig,
+    });
+
+    const response = await agentCommandHandler.handle(context);
+
+    expect(response?.text).toContain("Available: default, ops, imp-devkit.developer");
+  });
+
+  it("tells the user to reload before switching to a newly configured plugin agent", async () => {
+    const { appConfig, configPath, dataRoot } = await createPluginAgentConfig();
+    const context = createCommandContext({
+      message: createIncomingMessage("agent", "imp-devkit.developer"),
+      dependencies: createDependencies({
+        runtimeInfo: {
+          endpointId: "private-telegram",
+          configPath,
+          dataRoot,
+          logFilePath: join(dirname(configPath), "endpoint.log"),
+          loggingLevel: "info",
+          activeEndpointIds: ["private-telegram"],
+        },
+      }),
+      loadAppConfig: async () => appConfig,
+    });
+
+    const response = await agentCommandHandler.handle(context);
+
+    expect(response?.text).toContain('Agent "imp-devkit.developer" is configured but not loaded in this daemon yet.');
+    expect(response?.text).toContain("Use /reload");
+    expect(response?.text).toContain("Available: default, ops, imp-devkit.developer");
+  });
 });
+
+async function createPluginAgentConfig(): Promise<{ appConfig: AppConfig; configPath: string; dataRoot: string }> {
+  const root = await createTempDir();
+  const dataRoot = join(root, "state");
+  const pluginRoot = join(dataRoot, "plugins", "imp-devkit");
+  await writeRawFile(join(pluginRoot, "imp-plugin.json"), JSON.stringify({
+    schemaVersion: 1,
+    id: "imp-devkit",
+    name: "Imp DevKit",
+    version: "0.1.0",
+    agents: [
+      {
+        id: "developer",
+        model: { provider: "openai", modelId: "gpt-5.1-codex" },
+        prompt: { base: { text: "Imp developer" } },
+      },
+    ],
+  }, null, 2));
+
+  return {
+    appConfig: createAppConfig(dataRoot),
+    configPath: join(root, "config.json"),
+    dataRoot,
+  };
+}
+
+async function createTempDir(): Promise<string> {
+  const path = await mkdtemp(join(tmpdir(), "imp-agent-command-test-"));
+  tempDirs.push(path);
+  return path;
+}
+
+async function writeRawFile(path: string, content: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, "utf8");
+}
+
+function createAppConfig(dataRoot: string): AppConfig {
+  return {
+    instance: { name: "test" },
+    paths: { dataRoot },
+    defaults: { agentId: "default" },
+    agents: [
+      {
+        id: "default",
+        model: { provider: "openai", modelId: "gpt-5.4" },
+        prompt: { base: { text: "Default" } },
+        tools: [],
+      },
+    ],
+    endpoints: [
+      {
+        id: "private-telegram",
+        type: "telegram",
+        enabled: true,
+        token: "telegram-token",
+        access: { allowedUserIds: [] },
+      },
+    ],
+  };
+}
