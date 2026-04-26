@@ -8,9 +8,9 @@ interface PreviousResponseState {
 
 export function resolvePreviousResponseState(
   messages: ConversationEvent[],
-  model: Pick<Model<AiApi>, "api" | "provider">,
+  model: Pick<Model<AiApi>, "api" | "provider" | "baseUrl">,
 ): PreviousResponseState {
-  if (!supportsPreviousResponseId(model.api)) {
+  if (!supportsPreviousResponseId(model)) {
     return { conversationMessages: messages };
   }
 
@@ -34,8 +34,30 @@ export function resolvePreviousResponseState(
   };
 }
 
-export function supportsPreviousResponseId(api: AiApi): boolean {
-  return api === "openai-responses" || api === "azure-openai-responses" || api === "openai-codex-responses";
+export function supportsPreviousResponseId(
+  model: Pick<Model<AiApi>, "api" | "provider" | "baseUrl">,
+): boolean {
+  if (model.api === "azure-openai-responses") {
+    return model.provider === "azure-openai-responses";
+  }
+
+  if (model.api === "openai-codex-responses") {
+    return model.provider === "openai-codex";
+  }
+
+  if (model.api !== "openai-responses" || model.provider !== "openai") {
+    return false;
+  }
+
+  return isOfficialOpenAiBaseUrl(model.baseUrl);
+}
+
+function isOfficialOpenAiBaseUrl(baseUrl: string): boolean {
+  try {
+    return new URL(baseUrl).hostname === "api.openai.com";
+  } catch {
+    return false;
+  }
 }
 
 function findLatestAssistantMessage(

@@ -1018,6 +1018,7 @@ describe("createPiAgentEngine", () => {
           id: "gpt-5.4",
           provider: "openai",
           api: "openai-responses",
+          baseUrl: "https://api.openai.com/v1",
         }) as never,
       readTextFile: async () => "unused context",
       createAgent: (options) => {
