@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.15.0 - 2026-04-26
+
+### Added
+
+- Deliver commentary-phase progress messages during chat sessions.
+
+### Fixed
+
+- Make log following more reliable by preserving followed lines and handling truncation correctly.
+- Merge required plugin-service environment variables with the process environment.
+- Harden conversation and outbox persistence against corrupt or malformed JSON, including safe quarantine handling and continued per-cycle reply processing.
+- Resolve plugin setup and package installation paths more safely across platforms, including virtualenv Python paths, host OS defaults, archive path validation, and package root candidate narrowing.
+- Isolate endpoint message queues and route file endpoint responses through the correct target transport kind.
+- Sanitize retry delay handling.
+- Treat `EPERM` during runtime-state PID checks as an inaccessible process state.
+- Preserve response conversation state for Responses agents while avoiding invalid previous response IDs for failed responses, custom providers, and Codex.
+- Restrict progress delivery to transports that support it and avoid duplicate Telegram transcript updates.
+- Relocate agent files correctly during scoped restores.
+- Preflight service install write permissions before installation.
+
 ## 0.14.0 - 2026-04-26
 
 ### Added
