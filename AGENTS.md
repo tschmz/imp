@@ -1,66 +1,53 @@
 # AGENTS.md
 
+Quick repo map for getting into the code. Prefer `src/` over generated `dist/`.
+
 - Commit messages must follow `type: summary`, for example `feat: add status endpoint`.
 - Do not use Conventional Commit scopes in this repository, for example use `feat: add status endpoint`, not `feat(cli): add status endpoint`.
 - Before a commit that includes changes under `src/`, run `npm run check` and `npm test`, and do not commit unless both pass.
 - The project is early-stage: prefer clear CLI commands over backward-compatibility aliases or shims when the design improves.
 
-## Repo Snapshot
+## First files to inspect
+- `package.json`: npm scripts and CLI bin (`imp -> ./dist/main.js`)
+- `src/main.ts`: executable entry point; wires CLI commands to application use cases
+- `src/cli/create-cli.ts`: top-level CLI definition
+- `src/cli/commands/*.ts`: command group registration for `config`, `skills`, `backup`, `plugin`, and `service`
+- `src/application/runtime-target.ts`: config discovery + runtime/service target resolution
+- `src/daemon/create-daemon.ts`: daemon assembly and runtime validation
+- `src/daemon/bootstrap/*`: runtime bootstrap steps
 
-### Top level
-- `package.json`: npm package metadata, scripts, and the CLI bin mapping `imp -> ./dist/main.js`.
-- `README.md`: user-facing overview, install flow, config/init/start/service usage.
-- `config.example.json`: example runtime configuration.
-- `src/`: TypeScript source.
-- `docs/`: user and developer docs.
-- `dist/`: built output.
+## Runtime flow
+- CLI entry: `src/main.ts` -> `src/cli/*`
+- User-facing operations: `src/application/*`
+- Config loading and normalization: `src/config/*`
+- Daemon/runtime lifecycle: `src/daemon/*`
+- Agent execution, tool resolution, prompts, MCP integration: `src/runtime/*`
+- Endpoint transport creation and normalization: `src/transports/*`
 
-### Runtime and CLI entry points
-- `src/main.ts`: main executable entry point. Wires CLI commands to app logic, starts the daemon, handles `init`, `log`, `config`, and `service` subcommands.
-- `src/cli/create-cli.ts`: defines the full command surface:
-  - `imp start`
-  - `imp log`
-  - `imp init`
-  - `imp config validate|get|set|reload`
-  - `imp service install|uninstall|start|stop|restart|status`
-- `src/index.ts`: library export surface; currently exports `createDaemon` and daemon types.
-- `package.json` scripts:
-  - `npm run build` -> compile to `dist/`
-  - `npm test` -> Vitest
-  - `npm run check` -> typecheck + lint
-  - `npm start` -> `node dist/main.js`
+## Main source areas
+- `src/application/`: use cases for daemon startup, chat, config, backups, plugins, services, and inbound command handling
+- `src/cli/`: Commander-based CLI and command registration
+- `src/config/`: config discovery, init flow, schema, loading, and runtime resolution
+- `src/daemon/`: runtime bootstrap, runner, shutdown, and state handling
+- `src/domain/`: core agent, conversation, message, and error types
+- `src/runtime/`: PI agent engine wiring, model/prompt/tool resolution, built-in tools, MCP runtime
+- `src/transports/`: transport registry plus built-in `cli`, `telegram`, and `file` transports
+- `src/plugins/`: plugin manifest/discovery/protocol support
+- `src/skills/`: skill discovery and catalog merging
+- `src/service/`: install/manage/uninstall background services across platforms
+- `src/storage/`: filesystem-backed persistence
+- `src/logging/`: file loggers and log viewing
+- `src/files/`: file/archive helpers used by backups and managed files
+- `src/extensions/`: extension hooks
+- `src/agents/`: built-in prompt and agent registry
+- `src/tools/`: tool registry types
 
-### Main source areas under `src/`
-- `agents/`: built-in system prompt and agent registry.
-- `application/`: message handling orchestration.
-- `cli/`: Commander-based CLI definition.
-- `config/`: config discovery, prompting, schema validation, defaults, initialization, and runtime resolution.
-- `daemon/`: daemon construction, lifecycle, and runtime state.
-- `domain/`: core domain types for agents, conversations, and messages.
-- `files/`: managed-file helpers.
-- `logging/`: file logger and log viewing.
-- `runtime/`: runtime context, PI agent engine setup, OAuth/API-key resolution.
-- `service/`: service install/manage/uninstall logic and install-plan rendering.
-- `storage/`: filesystem-backed persistence.
-- `tools/`: tool registry types and wiring.
-- `transports/telegram/`: Telegram transport and Telegram message rendering.
-- `transports/types.ts`: transport interfaces.
+## Public/package entry points
+- `src/index.ts`: exports `createDaemon`, daemon types, and plugin discovery/manifest APIs
+- `assets/agents/default-system-prompt.md`: bundled default system prompt
+- `config.example.json`: example app config
+- `plugins/`: bundled installable plugins
 
-### Main integration boundaries
-- `@mariozechner/pi-ai`, `@mariozechner/pi-agent-core`, `@mariozechner/pi-coding-agent`: model/provider and agent runtime integration.
-- `grammy`: Telegram transport integration.
-- Linux/macOS service managers via `src/service/*`.
-
-### Test layout
-- Unit tests live next to modules as `*.test.ts`.
-- Top-level end-to-end coverage is in `src/main.e2e.test.ts`.
-- Service behavior has dedicated tests under `src/service/`.
-- Telegram rendering and transport behavior have dedicated tests under `src/transports/telegram/`.
-
-### First files to inspect for most tasks
-- CLI/runtime flow: `package.json`, `src/main.ts`, `src/cli/create-cli.ts`
-- Config loading and resolution: `src/config/*`
-- Daemon lifecycle: `src/daemon/create-daemon.ts`
-- Agent runtime wiring: `src/runtime/create-pi-agent-engine.ts`
-- Service generation/management: `src/service/install-plan.ts`, `src/service/install-service.ts`, `src/service/manage-service.ts`
-- Telegram behavior: `src/transports/telegram/telegram-transport.ts`, `src/transports/telegram/render-telegram-message.ts`
+## Tests
+- Unit tests live next to source files as `*.test.ts`
+- CLI end-to-end coverage is in `src/main.e2e.test.ts`
