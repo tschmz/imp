@@ -1,7 +1,7 @@
-import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChatRef, ConversationContext } from "../domain/conversation.js";
 import type { RuntimePaths } from "../daemon/types.js";
 import { createFsConversationStore } from "./fs-store.js";
@@ -23,6 +23,100 @@ describe("createFsConversationStore", () => {
     const store = createFsConversationStore(createRuntimePaths(root));
 
     await expect(store.get(createChatRef())).resolves.toBeUndefined();
+  });
+
+  it("returns undefined and quarantines corrupt selected-agent metadata", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const selectedAgentPath = join(
+      root,
+      "conversations",
+      "chats",
+      "telegram",
+      "42",
+      "selected-agent.json",
+    );
+    await mkdir(dirname(selectedAgentPath), { recursive: true });
+    await writeFile(selectedAgentPath, "{not-json", "utf8");
+
+    await expect(store.get(createChatRef())).resolves.toBeUndefined();
+
+    const entries = await readdir(dirname(selectedAgentPath));
+    expect(entries).not.toContain("selected-agent.json");
+    expect(entries.some((entry) => entry.startsWith("selected-agent.json.corrupt-"))).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it("returns undefined and quarantines corrupt active conversation pointer", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const selectedAgentPath = join(
+      root,
+      "conversations",
+      "chats",
+      "telegram",
+      "42",
+      "selected-agent.json",
+    );
+    const activePath = join(root, "conversations", "agents", "default", "active.json");
+    await mkdir(dirname(selectedAgentPath), { recursive: true });
+    await mkdir(dirname(activePath), { recursive: true });
+    await writeFile(selectedAgentPath, `${JSON.stringify({ agentId: "default" })}\n`, "utf8");
+    await writeFile(activePath, "{this-is: broken", "utf8");
+
+    await expect(store.get(createChatRef())).resolves.toBeUndefined();
+
+    const entries = await readdir(dirname(activePath));
+    expect(entries).not.toContain("active.json");
+    expect(entries.some((entry) => entry.startsWith("active.json.corrupt-"))).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it("returns undefined and quarantines corrupt session meta without crashing", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const selectedAgentPath = join(
+      root,
+      "conversations",
+      "chats",
+      "telegram",
+      "42",
+      "selected-agent.json",
+    );
+    const activePath = join(root, "conversations", "agents", "default", "active.json");
+    const sessionDir = join(root, "conversations", "agents", "default", "sessions", "session-1");
+    const metaPath = join(sessionDir, "meta.json");
+    await mkdir(dirname(selectedAgentPath), { recursive: true });
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(selectedAgentPath, `${JSON.stringify({ agentId: "default" })}\n`, "utf8");
+    await writeFile(activePath, `${JSON.stringify({ transport: "telegram", externalId: "42", sessionId: "session-1" })}\n`, "utf8");
+    await writeFile(metaPath, "{ bad", "utf8");
+
+    await expect(store.get(createChatRef())).resolves.toBeUndefined();
+
+    const entries = await readdir(sessionDir);
+    expect(entries).not.toContain("meta.json");
+    expect(entries.some((entry) => entry.startsWith("meta.json.corrupt-"))).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it("keeps throwing non-ENOENT I/O errors for selected-agent reads", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const selectedAgentPath = join(
+      root,
+      "conversations",
+      "chats",
+      "telegram",
+      "42",
+      "selected-agent.json",
+    );
+    await mkdir(selectedAgentPath, { recursive: true });
+
+    await expect(store.get(createChatRef())).rejects.toMatchObject({ code: "EISDIR" });
   });
 
   it("creates and loads an active conversation with a generated session id", async () => {
