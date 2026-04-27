@@ -16,10 +16,6 @@
     {
       "id": "developer",
       "name": "Imp Developer",
-      "model": {
-        "provider": "openai",
-        "modelId": "gpt-5.1-codex"
-      },
       "prompt": {
         "base": {
           "file": "./prompts/imp-developer.md"
