@@ -1,5 +1,7 @@
+import { dirname } from "node:path";
 import { discoverConfigPath } from "../config/discover-config-path.js";
 import { loadAppConfig } from "../config/load-app-config.js";
+import { loadPluginConfigContributions } from "../config/plugin-runtime.js";
 import { createConfigGetView } from "./config-get-view.js";
 import { getValueAtKeyPath } from "./config-key-path.js";
 
@@ -23,7 +25,12 @@ export function createGetConfigValueUseCase(
       cliConfigPath: configPath,
     });
     const config = await loadAppConfig(resolvedConfigPath);
-    const value = getValueAtKeyPath(createConfigGetView(config), keyPath);
+    const pluginConfig = shouldIncludePluginConfig(keyPath)
+      ? await loadPluginConfigContributions(config, dirname(resolvedConfigPath))
+      : undefined;
+    const value = getValueAtKeyPath(createConfigGetView(config, {
+      pluginAgents: pluginConfig?.agents,
+    }), keyPath);
 
     if (value === undefined) {
       throw new Error(`Config key not found: ${keyPath}`);
@@ -31,6 +38,10 @@ export function createGetConfigValueUseCase(
 
     deps.writeOutput(formatConfigValue(value));
   };
+}
+
+function shouldIncludePluginConfig(keyPath: string): boolean {
+  return keyPath === "agents" || keyPath.startsWith("agents.");
 }
 
 function formatConfigValue(value: unknown): string {

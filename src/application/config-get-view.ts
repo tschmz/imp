@@ -13,13 +13,19 @@ const defaultTelegramDocumentMaxDownloadBytes = 20 * 1024 * 1024;
 const defaultFilePollIntervalMs = 1000;
 const defaultFileMaxEventBytes = 256 * 1024;
 
-export function createConfigGetView(config: AppConfig): unknown {
+interface ConfigGetViewOptions {
+  pluginAgents?: AgentConfig[];
+}
+
+export function createConfigGetView(config: AppConfig, options: ConfigGetViewOptions = {}): unknown {
+  const agents = [...config.agents, ...(options.pluginAgents ?? [])];
+
   return {
     ...config,
     logging: {
       level: config.logging?.level ?? "info",
     },
-    agents: config.agents.map((agent) =>
+    agents: agents.map((agent) =>
       materializeAgentDefaults(agent, config.paths.dataRoot, config.defaults.model),
     ),
     endpoints: config.endpoints.map((endpoint) => materializeEndpointDefaults(endpoint, config.defaults.agentId)),

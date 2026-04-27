@@ -16,6 +16,31 @@ export interface LoadedRuntimePlugins {
   toolNameAliases: Record<string, string>;
 }
 
+export interface LoadedPluginConfigContributions {
+  agents: AgentConfig[];
+}
+
+export async function loadPluginConfigContributions(
+  appConfig: AppConfig,
+  configDir: string,
+): Promise<LoadedPluginConfigContributions> {
+  const loaded: LoadedPluginConfigContributions = {
+    agents: [],
+  };
+  const plugins = await discoverRuntimePlugins(appConfig, configDir);
+
+  for (const plugin of plugins) {
+    const manifest = plugin.manifest;
+    const pluginRoot = plugin.rootDir;
+    const localToolNames = new Set((manifest.tools ?? []).map((tool) => tool.name));
+
+    loaded.agents.push(...resolvePluginAgents(manifest, pluginRoot, appConfig.paths.dataRoot, localToolNames));
+  }
+  validatePluginAgentIds(appConfig.agents, loaded.agents);
+
+  return loaded;
+}
+
 export async function loadRuntimePlugins(appConfig: AppConfig, configDir: string): Promise<LoadedRuntimePlugins> {
   const loaded: LoadedRuntimePlugins = {
     skillPaths: [],
@@ -238,6 +263,16 @@ function resolvePluginCommandTools(manifest: PluginManifest, pluginRoot: string)
     pluginRoot,
     manifest: tool,
   }));
+}
+
+function validatePluginAgentIds(configAgents: AppConfig["agents"], pluginAgents: AppConfig["agents"]): void {
+  const agentIds = new Set(configAgents.map((agent) => agent.id));
+  for (const agent of pluginAgents) {
+    if (agentIds.has(agent.id)) {
+      throw new Error(`Plugin agent id "${agent.id}" conflicts with a configured agent id.`);
+    }
+    agentIds.add(agent.id);
+  }
 }
 
 function namespacePluginReference(pluginId: string, id: string, localIds: Set<string>): string {

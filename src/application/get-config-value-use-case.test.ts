@@ -65,6 +65,61 @@ describe("createGetConfigValueUseCase", () => {
     expect(writeOutput).toHaveBeenCalledWith('[\n  "default",\n  "ops"\n]');
   });
 
+  it("includes plugin-provided agents in wildcard-selected config values", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+    const dataRoot = join(root, "state-home", "imp");
+    const pluginRoot = join(dataRoot, "plugins", "imp-agents");
+    const writeOutput = vi.fn();
+
+    await writeConfig(configPath);
+    await writePluginManifest(pluginRoot, {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.0",
+      runtime: {
+        module: "./plugin.mjs",
+      },
+      agents: [
+        {
+          id: "cody",
+          prompt: {
+            base: {
+              file: "./prompts/cody.md",
+            },
+          },
+        },
+      ],
+    });
+    await writeFile(join(pluginRoot, "plugin.mjs"), "throw new Error('must not import plugin runtime');\n", "utf8");
+
+    await createGetConfigValueUseCase({ writeOutput })({
+      configPath,
+      keyPath: "agents.*.id",
+    });
+
+    expect(writeOutput).toHaveBeenCalledWith('[\n  "default",\n  "ops",\n  "imp-agents.cody"\n]');
+  });
+
+  it("does not load plugin config when reading unrelated config values", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+    const dataRoot = join(root, "state-home", "imp");
+    const writeOutput = vi.fn();
+
+    await writeConfig(configPath);
+    await mkdir(join(dataRoot, "plugins", "broken"), { recursive: true });
+    await writeFile(join(dataRoot, "plugins", "broken", "imp-plugin.json"), "{", "utf8");
+
+    await createGetConfigValueUseCase({ writeOutput })({
+      configPath,
+      keyPath: "logging.level",
+    });
+
+    expect(writeOutput).toHaveBeenCalledWith("info");
+  });
+
   it("reads an effective default config value when it is not explicitly set", async () => {
     const root = await createTempDir();
     const configPath = join(root, "custom", "imp.json");
@@ -110,6 +165,11 @@ async function writeConfig(configPath: string): Promise<void> {
     `${JSON.stringify(createConfig(join(dirname(dirname(configPath)), "state-home", "imp")), null, 2)}\n`,
     "utf8",
   );
+}
+
+async function writePluginManifest(pluginRoot: string, manifest: unknown): Promise<void> {
+  await mkdir(pluginRoot, { recursive: true });
+  await writeFile(join(pluginRoot, "imp-plugin.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
 function createConfig(dataRoot: string) {

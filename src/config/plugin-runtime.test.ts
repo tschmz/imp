@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadRuntimePlugins } from "./plugin-runtime.js";
+import { loadPluginConfigContributions, loadRuntimePlugins } from "./plugin-runtime.js";
 import type { AppConfig } from "./types.js";
 
 const tempDirs: string[] = [];
@@ -61,6 +61,43 @@ describe("loadRuntimePlugins", () => {
       id: "imp-agents.cody",
       home: join(pluginRoot, "agents", "cody"),
     });
+  });
+
+  it("rejects plugin config agents that collide with configured agents", async () => {
+    const root = await createTempDir();
+    const dataRoot = join(root, "state");
+    const pluginRoot = join(dataRoot, "plugins", "imp-agents");
+    await writePluginManifest(pluginRoot, {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.0",
+      agents: [
+        {
+          id: "cody",
+          prompt: { base: { text: "Cody" } },
+        },
+      ],
+    });
+
+    await expect(
+      loadPluginConfigContributions(
+        {
+          ...createAppConfig(dataRoot),
+          agents: [
+            {
+              id: "default",
+              prompt: { base: { text: "Default" } },
+            },
+            {
+              id: "imp-agents.cody",
+              prompt: { base: { text: "Configured Cody" } },
+            },
+          ],
+        },
+        join(root, "config"),
+      ),
+    ).rejects.toThrow('Plugin agent id "imp-agents.cody" conflicts with a configured agent id.');
   });
 });
 
