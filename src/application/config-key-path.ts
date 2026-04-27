@@ -5,17 +5,30 @@ export function getValueAtKeyPath(root: unknown, keyPath: string): unknown {
     return getValuesAtWildcardKeyPath(root, segments);
   }
 
-  let current: unknown = root;
+  return getValueAtSegments(root, segments);
+}
 
-  for (const segment of segments) {
-    current = getChildValue(current, segment);
-
-    if (current === undefined) {
-      return undefined;
-    }
+function getValueAtSegments(current: unknown, segments: string[]): unknown {
+  if (segments.length === 0) {
+    return current;
   }
 
-  return current;
+  if (Array.isArray(current)) {
+    const match = getArrayMatch(current, segments);
+    if (!match) {
+      return undefined;
+    }
+
+    return getValueAtSegments(match.value, segments.slice(match.consumed));
+  }
+
+  const [segment, ...remainingSegments] = segments;
+  const child = getObjectChildValue(current, segment);
+  if (child === undefined) {
+    return undefined;
+  }
+
+  return getValueAtSegments(child, remainingSegments);
 }
 
 function getValuesAtWildcardKeyPath(root: unknown, segments: string[]): unknown[] {
@@ -28,7 +41,16 @@ function getValuesAtWildcardKeyPath(root: unknown, segments: string[]): unknown[
     return getWildcardChildValues(root).flatMap((value) => getValuesAtWildcardKeyPath(value, remainingSegments));
   }
 
-  const child = getChildValue(root, segment);
+  if (Array.isArray(root)) {
+    const match = getArrayMatch(root, segments);
+    if (!match) {
+      return [];
+    }
+
+    return getValuesAtWildcardKeyPath(match.value, segments.slice(match.consumed));
+  }
+
+  const child = getObjectChildValue(root, segment);
   if (child === undefined) {
     return [];
   }
@@ -50,61 +72,66 @@ function getWildcardChildValues(current: unknown): unknown[] {
 
 export function setValueAtKeyPath(root: unknown, keyPath: string, value: unknown): void {
   const segments = keyPath.split(".");
-  const lastSegment = segments.pop();
-
-  if (!lastSegment) {
+  if (segments.length === 0 || segments.some((segment) => segment.length === 0)) {
     throw new Error(`Config key not found: ${keyPath}`);
   }
 
-  let current: unknown = root;
+  setValueAtSegments(root, segments, value, keyPath);
+}
 
-  for (const segment of segments) {
-    current = getOrCreateChildValue(current, segment);
-
-    if (current === undefined) {
-      throw new Error(`Config key not found: ${keyPath}`);
-    }
-  }
-
+function setValueAtSegments(current: unknown, segments: string[], value: unknown, keyPath: string): void {
   if (typeof current !== "object" || current === null) {
     throw new Error(`Config key not found: ${keyPath}`);
   }
 
   if (Array.isArray(current)) {
-    const index = getArrayIndex(current, lastSegment);
-
-    if (index === undefined) {
+    const match = getArrayMatch(current, segments);
+    if (!match) {
       throw new Error(`Config key not found: ${keyPath}`);
     }
 
-    current[index] = value;
+    if (match.consumed === segments.length) {
+      current[match.index] = value;
+      return;
+    }
+
+    setValueAtSegments(match.value, segments.slice(match.consumed), value, keyPath);
     return;
   }
 
-  (current as Record<string, unknown>)[lastSegment] = value;
+  const [segment, ...remainingSegments] = segments;
+  if (remainingSegments.length === 0) {
+    (current as Record<string, unknown>)[segment] = value;
+    return;
+  }
+
+  const child = getOrCreateObjectChildValue(current, segment);
+  if (child === undefined) {
+    throw new Error(`Config key not found: ${keyPath}`);
+  }
+
+  setValueAtSegments(child, remainingSegments, value, keyPath);
 }
 
-function getChildValue(current: unknown, segment: string): unknown {
-  if (typeof current !== "object" || current === null) {
+function getObjectChildValue(current: unknown, segment: string | undefined): unknown {
+  if (segment === undefined) {
     return undefined;
   }
 
-  if (Array.isArray(current)) {
-    const index = getArrayIndex(current, segment);
-    return index === undefined ? undefined : current[index];
+  if (typeof current !== "object" || current === null) {
+    return undefined;
   }
 
   return (current as Record<string, unknown>)[segment];
 }
 
-function getOrCreateChildValue(current: unknown, segment: string): unknown {
-  if (typeof current !== "object" || current === null) {
+function getOrCreateObjectChildValue(current: unknown, segment: string | undefined): unknown {
+  if (segment === undefined) {
     return undefined;
   }
 
-  if (Array.isArray(current)) {
-    const index = getArrayIndex(current, segment);
-    return index === undefined ? undefined : current[index];
+  if (typeof current !== "object" || current === null) {
+    return undefined;
   }
 
   const record = current as Record<string, unknown>;
@@ -115,14 +142,31 @@ function getOrCreateChildValue(current: unknown, segment: string): unknown {
   return record[segment];
 }
 
-function getArrayIndex(items: unknown[], segment: string): number | undefined {
-  const numericIndex = Number(segment);
-  if (Number.isInteger(numericIndex) && String(numericIndex) === segment) {
-    return numericIndex >= 0 && numericIndex < items.length ? numericIndex : undefined;
+function getArrayMatch(
+  items: unknown[],
+  segments: string[],
+): { index: number; value: unknown; consumed: number } | undefined {
+  const [segment] = segments;
+  if (segment === undefined) {
+    return undefined;
   }
 
-  const matchedIndex = items.findIndex((item) => hasMatchingId(item, segment));
-  return matchedIndex >= 0 ? matchedIndex : undefined;
+  const numericIndex = Number(segment);
+  if (Number.isInteger(numericIndex) && String(numericIndex) === segment) {
+    return numericIndex >= 0 && numericIndex < items.length
+      ? { index: numericIndex, value: items[numericIndex], consumed: 1 }
+      : undefined;
+  }
+
+  for (let consumed = segments.length; consumed >= 1; consumed -= 1) {
+    const expectedId = segments.slice(0, consumed).join(".");
+    const index = items.findIndex((item) => hasMatchingId(item, expectedId));
+    if (index >= 0) {
+      return { index, value: items[index], consumed };
+    }
+  }
+
+  return undefined;
 }
 
 function hasMatchingId(value: unknown, expectedId: string): boolean {

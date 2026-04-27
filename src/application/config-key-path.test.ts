@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getValueAtKeyPath } from "./config-key-path.js";
+import { getValueAtKeyPath, setValueAtKeyPath } from "./config-key-path.js";
 
 describe("getValueAtKeyPath", () => {
   it("keeps exact key paths unchanged", () => {
@@ -28,6 +28,20 @@ describe("getValueAtKeyPath", () => {
         "agents.*.id",
       ),
     ).toEqual(["default", "ops"]);
+  });
+
+  it("uses dotted ids for array navigation", () => {
+    expect(
+      getValueAtKeyPath(
+        {
+          agents: [
+            { id: "default", name: "Default" },
+            { id: "imp-agents.cody", name: "Cody" },
+          ],
+        },
+        "agents.imp-agents.cody.name",
+      ),
+    ).toBe("Cody");
   });
 
   it("maps wildcard segments over object values", () => {
@@ -60,5 +74,18 @@ describe("getValueAtKeyPath", () => {
         "agents.*.tools.mcp.servers",
       ),
     ).toEqual([["filesystem"]]);
+  });
+
+  it("updates values below array items with dotted ids", () => {
+    const config = {
+      agents: [
+        { id: "default", name: "Default" },
+        { id: "imp-agents.cody", name: "Cody" },
+      ],
+    };
+
+    setValueAtKeyPath(config, "agents.imp-agents.cody.name", "Custom Cody");
+
+    expect(config.agents[1]?.name).toBe("Custom Cody");
   });
 });

@@ -1,9 +1,12 @@
 import { access, readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { parseConfigJson } from "../config/config-json.js";
+import { loadPluginConfigContributions } from "../config/plugin-runtime.js";
 import { appConfigSchema } from "../config/schema.js";
 import { discoverConfigPath } from "../config/discover-config-path.js";
+import { resolveConfigPath } from "../config/secret-value.js";
+import type { AgentConfig, AppConfig } from "../config/types.js";
 import { getValueAtKeyPath, setValueAtKeyPath } from "./config-key-path.js";
 
 interface SetConfigValueUseCaseDependencies {
@@ -30,6 +33,7 @@ export function createSetConfigValueUseCase(
     });
 
     const parsedValue = parseConfigValue(value);
+    await materializePluginAgentOverride(parsed, resolvedConfigPath, keyPath);
 
     try {
       setValueAtKeyPath(parsed, keyPath, parsedValue);
@@ -43,6 +47,104 @@ export function createSetConfigValueUseCase(
     await writeFile(resolvedConfigPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
     deps.writeOutput(`Updated config ${resolvedConfigPath}: ${keyPath}`);
   };
+}
+
+async function materializePluginAgentOverride(
+  config: unknown,
+  configPath: string,
+  keyPath: string,
+): Promise<void> {
+  const keyPathSegments = keyPath.split(".");
+  if (keyPathSegments[0] !== "agents" || keyPathSegments.length < 2) {
+    return;
+  }
+
+  if (!isRecord(config) || !Array.isArray(config.agents)) {
+    return;
+  }
+
+  const agentPathSegments = keyPathSegments.slice(1);
+  if (findTargetAgentId(agentPathSegments, config.agents)) {
+    return;
+  }
+
+  const configDir = dirname(configPath);
+  const appConfig = parseAppConfigForPluginLookup(config, configPath);
+  const pluginConfig = await loadPluginConfigContributions(appConfig, configDir);
+  const pluginAgentId = findTargetAgentId(agentPathSegments, pluginConfig.agents);
+  if (!pluginAgentId) {
+    return;
+  }
+
+  const pluginAgent = pluginConfig.agents.find((agent) => agent.id === pluginAgentId);
+  if (!pluginAgent) {
+    return;
+  }
+
+  config.agents.push(createPluginAgentOverride(pluginAgent, appConfig, agentPathSegments));
+}
+
+function parseAppConfigForPluginLookup(config: unknown, configPath: string): AppConfig {
+  const result = appConfigSchema.safeParse(config);
+  if (!result.success) {
+    throw new Error(
+      formatSchemaError(`Config update cannot resolve plugin agents from invalid config: ${configPath}`, result.error.issues),
+    );
+  }
+
+  const configDir = dirname(configPath);
+  return {
+    ...result.data,
+    paths: {
+      ...result.data.paths,
+      dataRoot: resolveConfigPath(result.data.paths.dataRoot, configDir),
+    },
+  };
+}
+
+function createPluginAgentOverride(
+  pluginAgent: AgentConfig,
+  appConfig: AppConfig,
+  agentPathSegments: string[],
+): AgentConfig {
+  const agent = structuredClone(pluginAgent) as AgentConfig;
+  const remainingSegments = agentPathSegments.slice(pluginAgent.id.split(".").length);
+  if (remainingSegments[0] === "model" && !agent.model && appConfig.defaults.model) {
+    agent.model = structuredClone(appConfig.defaults.model) as NonNullable<AgentConfig["model"]>;
+  }
+
+  return agent;
+}
+
+function findTargetAgentId(agentPathSegments: string[], agents: unknown[]): string | undefined {
+  const [firstSegment] = agentPathSegments;
+  if (firstSegment === undefined || firstSegment === "*") {
+    return undefined;
+  }
+
+  const numericIndex = Number(firstSegment);
+  if (Number.isInteger(numericIndex) && String(numericIndex) === firstSegment) {
+    const agent = agents[numericIndex];
+    return getAgentId(agent);
+  }
+
+  return agents
+    .map((agent) => getAgentId(agent))
+    .filter((id): id is string => id !== undefined)
+    .sort((left, right) => right.split(".").length - left.split(".").length)
+    .find((id) => isPathPrefix(agentPathSegments, id.split(".")));
+}
+
+function isPathPrefix(segments: string[], prefix: string[]): boolean {
+  return prefix.length <= segments.length && prefix.every((segment, index) => segments[index] === segment);
+}
+
+function getAgentId(value: unknown): string | undefined {
+  return isRecord(value) && typeof value.id === "string" ? value.id : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function resolveWritableConfigPath(configPath?: string): Promise<string> {

@@ -36,9 +36,10 @@ export async function loadPluginConfigContributions(
 
     loaded.agents.push(...resolvePluginAgents(manifest, pluginRoot, appConfig.paths.dataRoot, localToolNames));
   }
-  validatePluginAgentIds(appConfig.agents, loaded.agents);
 
-  return loaded;
+  return {
+    agents: filterShadowedPluginAgents(appConfig.agents, loaded.agents),
+  };
 }
 
 export async function loadRuntimePlugins(appConfig: AppConfig, configDir: string): Promise<LoadedRuntimePlugins> {
@@ -265,14 +266,12 @@ function resolvePluginCommandTools(manifest: PluginManifest, pluginRoot: string)
   }));
 }
 
-function validatePluginAgentIds(configAgents: AppConfig["agents"], pluginAgents: AppConfig["agents"]): void {
+export function filterShadowedPluginAgents(
+  configAgents: AppConfig["agents"],
+  pluginAgents: AppConfig["agents"],
+): AppConfig["agents"] {
   const agentIds = new Set(configAgents.map((agent) => agent.id));
-  for (const agent of pluginAgents) {
-    if (agentIds.has(agent.id)) {
-      throw new Error(`Plugin agent id "${agent.id}" conflicts with a configured agent id.`);
-    }
-    agentIds.add(agent.id);
-  }
+  return pluginAgents.filter((agent) => !agentIds.has(agent.id));
 }
 
 function namespacePluginReference(pluginId: string, id: string, localIds: Set<string>): string {

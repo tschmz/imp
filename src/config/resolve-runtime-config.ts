@@ -12,7 +12,7 @@ import type {
 import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
 import { getTransport } from "../transports/registry.js";
-import { loadRuntimePlugins } from "./plugin-runtime.js";
+import { filterShadowedPluginAgents, loadRuntimePlugins } from "./plugin-runtime.js";
 import { deriveDelegationToolName } from "./schema.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
 import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig, ModelConfig } from "./types.js";
@@ -139,26 +139,21 @@ async function resolveModelConfig(
 
 
 function mergeConfiguredAgents(configAgents: AppConfig["agents"], pluginAgents: AppConfig["agents"]): AppConfig["agents"] {
-  const agentIds = new Set(configAgents.map((agent) => agent.id));
-  for (const agent of pluginAgents) {
-    if (agentIds.has(agent.id)) {
-      throw new Error(`Plugin agent id "${agent.id}" conflicts with a configured agent id.`);
-    }
-    agentIds.add(agent.id);
-  }
-
-  return [...configAgents, ...pluginAgents];
+  return [...configAgents, ...filterShadowedPluginAgents(configAgents, pluginAgents)];
 }
 
 function resolvePluginToolNameAliases(agent: AppConfig["agents"][number], aliases: Record<string, string>): AppConfig["agents"][number] {
   if (!agent.tools) {
     return agent;
   }
+  const agentPluginId = getPluginIdFromNamespacedAgentId(agent.id);
+  const resolveToolName = (toolName: string) =>
+    aliases[toolName] ?? (agentPluginId ? aliases[`${agentPluginId}.${toolName}`] : undefined) ?? toolName;
 
   if (Array.isArray(agent.tools)) {
     return {
       ...agent,
-      tools: agent.tools.map((toolName) => aliases[toolName] ?? toolName),
+      tools: agent.tools.map(resolveToolName),
     };
   }
 
@@ -166,9 +161,14 @@ function resolvePluginToolNameAliases(agent: AppConfig["agents"][number], aliase
     ...agent,
     tools: {
       ...agent.tools,
-      ...(agent.tools.builtIn ? { builtIn: agent.tools.builtIn.map((toolName) => aliases[toolName] ?? toolName) } : {}),
+      ...(agent.tools.builtIn ? { builtIn: agent.tools.builtIn.map(resolveToolName) } : {}),
     },
   };
+}
+
+function getPluginIdFromNamespacedAgentId(agentId: string): string | undefined {
+  const separatorIndex = agentId.indexOf(".");
+  return separatorIndex > 0 ? agentId.slice(0, separatorIndex) : undefined;
 }
 
 async function resolveEndpointRuntimeSecrets(

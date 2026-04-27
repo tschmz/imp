@@ -63,7 +63,7 @@ describe("loadRuntimePlugins", () => {
     });
   });
 
-  it("rejects plugin config agents that collide with configured agents", async () => {
+  it("omits plugin config agents that are shadowed by configured agents", async () => {
     const root = await createTempDir();
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "imp-agents");
@@ -80,24 +80,24 @@ describe("loadRuntimePlugins", () => {
       ],
     });
 
-    await expect(
-      loadPluginConfigContributions(
-        {
-          ...createAppConfig(dataRoot),
-          agents: [
-            {
-              id: "default",
-              prompt: { base: { text: "Default" } },
-            },
-            {
-              id: "imp-agents.cody",
-              prompt: { base: { text: "Configured Cody" } },
-            },
-          ],
-        },
-        join(root, "config"),
-      ),
-    ).rejects.toThrow('Plugin agent id "imp-agents.cody" conflicts with a configured agent id.');
+    const result = await loadPluginConfigContributions(
+      {
+        ...createAppConfig(dataRoot),
+        agents: [
+          {
+            id: "default",
+            prompt: { base: { text: "Default" } },
+          },
+          {
+            id: "imp-agents.cody",
+            prompt: { base: { text: "Configured Cody" } },
+          },
+        ],
+      },
+      join(root, "config"),
+    );
+
+    expect(result.agents).toEqual([]);
   });
 });
 

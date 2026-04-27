@@ -702,6 +702,78 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
+  it("lets configured agents shadow plugin-provided agents with the same namespaced id", async () => {
+    const root = await createTempDir();
+    const dataRoot = join(root, "state");
+    const pluginRoot = join(dataRoot, "plugins", "imp-agents");
+    await writeRawFile(join(pluginRoot, "plugin.mjs"), `export function registerPlugin() {
+  return {
+    tools: [
+      {
+        name: "snapshot",
+        description: "Read a snapshot.",
+        async execute() {
+          return { content: [{ type: "text", text: "snapshot" }] };
+        },
+      },
+    ],
+  };
+}
+`);
+    await writeRawFile(join(pluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.0",
+      runtime: { module: "./plugin.mjs" },
+      agents: [
+        {
+          id: "cody",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          prompt: { base: { text: "Plugin Cody" } },
+        },
+      ],
+    }, null, 2));
+
+    const result = await resolveRuntimeConfig(
+      createAppConfig({
+        paths: { dataRoot },
+        agents: [
+          {
+            id: "default",
+            model: { provider: "openai", modelId: "gpt-5.4" },
+            prompt: { base: { text: "Default" } },
+          },
+          {
+            id: "imp-agents.cody",
+            model: { provider: "openai", modelId: "gpt-5.4-mini" },
+            prompt: { base: { text: "Configured Cody" } },
+            tools: {
+              builtIn: ["snapshot", "read"],
+            },
+          },
+        ],
+        endpoints: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: { allowedUserIds: [] },
+          },
+        ],
+      }),
+      join(root, "config.json"),
+    );
+
+    expect(result.agents.map((agent) => agent.id)).toEqual(["default", "imp-agents.cody"]);
+    expect(result.agents.find((agent) => agent.id === "imp-agents.cody")).toMatchObject({
+      model: { modelId: "gpt-5.4-mini" },
+      prompt: { base: { text: "Configured Cody" } },
+      tools: ["imp-agents__snapshot", "read"],
+    });
+  });
+
   it("does not reject a plugin agent skill path that is also exported globally", async () => {
     const root = await createTempDir();
     const dataRoot = join(root, "state");

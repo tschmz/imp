@@ -92,6 +92,105 @@ describe("createSetConfigValueUseCase", () => {
     expect(config.agents[0]?.home).toBe("./agents/default");
   });
 
+  it("materializes a plugin-provided agent before updating it", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+    const dataRoot = join(root, "state-home", "imp");
+    const pluginRoot = join(dataRoot, "plugins", "imp-agents");
+    const writeOutput = vi.fn();
+    const config = createConfig(dataRoot);
+    config.defaults.model = { provider: "openai", modelId: "gpt-5.4" };
+
+    await writeRawFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
+    await writePluginManifest(pluginRoot, {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.0",
+      runtime: {
+        module: "./plugin.mjs",
+      },
+      agents: [
+        {
+          id: "cody",
+          name: "Cody",
+          prompt: {
+            base: {
+              file: "./prompts/cody.md",
+            },
+          },
+          tools: {
+            builtIn: ["read", "bash"],
+          },
+        },
+      ],
+    });
+    await writeRawFile(join(pluginRoot, "plugin.mjs"), "throw new Error('must not import plugin runtime');\n");
+
+    await createSetConfigValueUseCase({ writeOutput })({
+      configPath,
+      keyPath: "agents.imp-agents.cody.name",
+      value: "Custom Cody",
+    });
+
+    const updated = JSON.parse(await readFile(configPath, "utf8")) as {
+      agents: Array<{ id: string; name?: string; home?: string; prompt?: { base?: { file?: string } } }>;
+    };
+    expect(writeOutput).toHaveBeenCalledWith(`Updated config ${configPath}: agents.imp-agents.cody.name`);
+    expect(updated.agents).toHaveLength(2);
+    expect(updated.agents[1]).toMatchObject({
+      id: "imp-agents.cody",
+      name: "Custom Cody",
+      home: join(dataRoot, "agents", "imp-agents.cody"),
+      prompt: {
+        base: {
+          file: join(pluginRoot, "prompts", "cody.md"),
+        },
+      },
+    });
+  });
+
+  it("materializes the default model when updating a plugin agent model leaf", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+    const dataRoot = join(root, "state-home", "imp");
+    const pluginRoot = join(dataRoot, "plugins", "imp-agents");
+    const config = createConfig(dataRoot);
+    config.defaults.model = { provider: "openai", modelId: "gpt-5.4" };
+
+    await writeRawFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
+    await writePluginManifest(pluginRoot, {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.0",
+      agents: [
+        {
+          id: "cody",
+          prompt: {
+            base: {
+              text: "Cody",
+            },
+          },
+        },
+      ],
+    });
+
+    await createSetConfigValueUseCase({ writeOutput: vi.fn() })({
+      configPath,
+      keyPath: "agents.imp-agents.cody.model.modelId",
+      value: "gpt-5.4-mini",
+    });
+
+    const updated = JSON.parse(await readFile(configPath, "utf8")) as {
+      agents: Array<{ id: string; model?: { provider: string; modelId: string } }>;
+    };
+    expect(updated.agents[1]?.model).toEqual({
+      provider: "openai",
+      modelId: "gpt-5.4-mini",
+    });
+  });
+
   it("creates missing optional object branches for agent prompt context", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config-home", "imp", "config.json");
@@ -299,7 +398,28 @@ async function writeRawFile(path: string, content: string): Promise<void> {
   await writeFile(path, content, "utf8");
 }
 
-function createConfig(dataRoot: string) {
+async function writePluginManifest(pluginRoot: string, manifest: unknown): Promise<void> {
+  await writeRawFile(join(pluginRoot, "imp-plugin.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+function createConfig(dataRoot: string): {
+  instance: { name: string };
+  paths: { dataRoot: string };
+  logging: { level: "info" };
+  defaults: { agentId: string; model?: { provider: string; modelId: string } };
+  agents: Array<{
+    id: string;
+    model: { provider: string; modelId: string };
+    prompt: { base: { text: string } };
+  }>;
+  endpoints: Array<{
+    id: string;
+    type: "telegram";
+    enabled: boolean;
+    token: string;
+    access: { allowedUserIds: string[] };
+  }>;
+} {
   return {
     instance: { name: "default" },
     paths: { dataRoot },
