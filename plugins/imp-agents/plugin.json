@@ -21,6 +21,11 @@
           }
         ]
       },
+      "skills": {
+        "paths": [
+          "./skills"
+        ]
+      },
       "tools": {
         "builtIn": [
           "read",
@@ -31,6 +36,7 @@
           "edit",
           "write",
           "update_plan",
+          "load_skill",
           "pwd",
           "cd",
           "workspaceSnapshot"

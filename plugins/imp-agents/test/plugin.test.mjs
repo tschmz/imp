@@ -20,6 +20,22 @@ describe("imp-agents plugin", () => {
     expect(prompt).toContain("agent-home Markdown instructions");
   });
 
+  it("configures Cody with the Imp administration skill", async () => {
+    const manifest = JSON.parse(await readFile(new URL("../plugin.json", import.meta.url), "utf8"));
+    const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+    const skill = await readFile(
+      new URL("../skills/imp-administration/SKILL.md", import.meta.url),
+      "utf8",
+    );
+    const cody = manifest.agents.find((agent) => agent.id === "cody");
+
+    expect(cody.skills.paths).toEqual(["./skills"]);
+    expect(cody.tools.builtIn).toContain("load_skill");
+    expect(packageJson.files).toContain("skills");
+    expect(skill).toContain("name: imp-administration");
+    expect(skill).toContain("Use only `imp ...` commands for Imp administration.");
+  });
+
   it("creates a workspace snapshot for coding-agent orientation", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-agents-test-"));
     tempDirs.push(root);

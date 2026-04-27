@@ -11,9 +11,11 @@ Plugin agents that do not set `home` get the same default home pattern as config
 
 ## Cody
 
-Cody is a pragmatic software engineering agent. It is configured with the standard file, shell, edit, plan, and working-directory tools plus the plugin-provided `workspaceSnapshot` tool.
+Cody is a pragmatic software engineering agent. It is configured with the standard file, shell, edit, plan, skill, and working-directory tools plus the plugin-provided `workspaceSnapshot` tool.
 
 Cody uses `<agentHome>/MEMORY.md` as a small persistent workspace note. When a user says which repository to work in, Cody records it as `Current repo: /absolute/path` and uses that path as the default workspace in later chats because agent-home Markdown files are loaded into each turn.
+
+Cody includes the `imp-administration` skill for safe Imp config, log, plugin, service, backup, and runtime diagnosis workflows.
 
 `workspaceSnapshot` creates a shallow, read-only orientation summary for a workspace:
 

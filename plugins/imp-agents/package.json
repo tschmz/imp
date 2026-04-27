@@ -8,7 +8,8 @@
     "plugin.json",
     "README.md",
     "plugin.mjs",
-    "prompts"
+    "prompts",
+    "skills"
   ],
   "publishConfig": {
     "access": "public"
