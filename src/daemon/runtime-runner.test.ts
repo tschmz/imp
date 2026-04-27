@@ -645,31 +645,32 @@ describe("createRuntimeEntries", () => {
     expect(agentLogger.info).toHaveBeenCalledWith(
       "loaded configured base prompt",
       expect.objectContaining({
-        agentId: "default",
+        event: "agent.config.base_prompt.loaded",
+        component: "runtime-runner",
         basePromptSource: "text",
       }),
     );
     expect(agentLogger.info).toHaveBeenCalledWith(
       "loaded configured agent skills",
       expect.objectContaining({
-        agentId: "default",
-        configuredSkillCount: 1,
+        event: "agent.config.skills.loaded",
+        component: "runtime-runner",
         configuredSkillNames: ["commit"],
       }),
     );
     expect(agentLogger.info).toHaveBeenCalledWith(
       "loaded configured instruction files",
       expect.objectContaining({
-        agentId: "default",
-        configuredInstructionFileCount: 1,
+        event: "agent.config.instructions.loaded",
+        component: "runtime-runner",
         configuredInstructionFiles: ["/agents/default/STYLE.md"],
       }),
     );
     expect(agentLogger.info).toHaveBeenCalledWith(
       "loaded configured reference files",
       expect.objectContaining({
-        agentId: "default",
-        configuredReferenceFileCount: 1,
+        event: "agent.config.references.loaded",
+        component: "runtime-runner",
         configuredReferenceFiles: ["/agents/default/RUNBOOK.md"],
       }),
     );

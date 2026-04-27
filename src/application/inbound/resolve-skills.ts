@@ -47,13 +47,14 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
     }
 
     await context.dependencies.logger?.debug("resolved effective agent skills for turn", {
+      event: "agent.skills.resolved",
+      component: "agent-runtime",
       endpointId: context.message.endpointId,
       transport: context.message.conversation.transport,
       conversationId: context.message.conversation.externalId,
       messageId: context.message.messageId,
       correlationId: context.message.correlationId,
       agentId: context.agent.id,
-      skillCount: resolution.skills.length,
       skillNames: resolution.skills.map((skill) => skill.name),
       ...(resolution.globalSkillsPath ? { globalSkillsPath: resolution.globalSkillsPath } : {}),
       ...(resolution.agentHomeSkillsPath ? { agentHomeSkillsPath: resolution.agentHomeSkillsPath } : {}),

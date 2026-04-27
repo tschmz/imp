@@ -92,6 +92,8 @@ function createResponsesPayloadLogger(
     }
 
     await logger.info("responses request payload", {
+      event: "agent.request.responses.payload",
+      component: "agent-engine",
       ...context,
       ...summarizeResponsesRequestPayload(payload),
     });

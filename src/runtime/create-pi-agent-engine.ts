@@ -268,21 +268,18 @@ async function logSystemPromptSources(
 ): Promise<void> {
   const sources = resolution.sources;
   await logger?.debug("resolved system prompt sources", {
+    event: "agent.prompt.sources.resolved",
+    component: "agent-engine",
     ...context,
     cacheHit: resolution.cacheHit,
     basePromptSource: sources.basePromptSource,
     ...(sources.basePromptFile ? { basePromptFile: sources.basePromptFile } : {}),
     ...(sources.basePromptBuiltIn ? { basePromptBuiltIn: sources.basePromptBuiltIn } : {}),
-    instructionFileCount: sources.instructionFiles.length,
     instructionFiles: sources.instructionFiles,
-    configuredInstructionFileCount: sources.configuredInstructionFiles.length,
     configuredInstructionFiles: sources.configuredInstructionFiles,
-    agentHomeInstructionFileCount: sources.agentHomeInstructionFiles.length,
     agentHomeInstructionFiles: sources.agentHomeInstructionFiles,
     ...(sources.workspaceInstructionFile ? { workspaceInstructionFile: sources.workspaceInstructionFile } : {}),
-    referenceFileCount: sources.referenceFiles.length,
     referenceFiles: sources.referenceFiles,
-    configuredReferenceFileCount: sources.configuredReferenceFiles.length,
     configuredReferenceFiles: sources.configuredReferenceFiles,
   });
 }
@@ -294,6 +291,8 @@ async function logPipelineEvent(
 ): Promise<void> {
   const { error, ...eventFields } = event;
   await logger?.debug("agent-engine.pipeline", {
+    event: `agent.pipeline.${event.step}.${event.status}`,
+    component: "agent-engine",
     ...context,
     ...eventFields,
   });
@@ -302,6 +301,8 @@ async function logPipelineEvent(
     await logger?.error(
       "agent engine run failed",
       {
+        event: "agent.pipeline.failed",
+        component: "agent-engine",
         ...context,
         ...eventFields,
       },

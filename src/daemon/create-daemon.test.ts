@@ -219,7 +219,7 @@ describe("createDaemon", () => {
     });
     expect(runInputs[0]?.agent.prompt.base.text).toBeUndefined();
     await expect(readFile(join(root, "logs", "agents.log"), "utf8")).resolves.toContain(
-      '"message":"loaded configured base prompt","agentId":"default","basePromptSource":"file","basePromptFile":"/workspace/prompts/default.md"',
+      '"event":"agent.config.base_prompt.loaded","message":"loaded configured base prompt","agentId":"default","component":"runtime-runner","basePromptSource":"file","basePromptFile":"/workspace/prompts/default.md"',
     );
   });
 
@@ -529,19 +529,19 @@ describe("createDaemon", () => {
 
     expect(startedBotIds.sort()).toEqual(["ops-telegram", "private-telegram"]);
     await expect(readFile(privateBot.paths.logFilePath, "utf8")).resolves.toContain(
-      '"message":"starting daemon with default agent \\"default\\""',
+      '"event":"runtime.endpoint.starting","message":"starting endpoint runtime","endpointId":"private-telegram","component":"runtime-runner","defaultAgentId":"default"',
     );
     await expect(readFile(privateBot.paths.logFilePath, "utf8")).resolves.not.toContain(
       '"message":"loaded configured agent skills"',
     );
     await expect(readFile(opsBot.paths.logFilePath, "utf8")).resolves.toContain(
-      '"message":"starting daemon with default agent \\"ops\\""',
+      '"event":"runtime.endpoint.starting","message":"starting endpoint runtime","endpointId":"ops-telegram","component":"runtime-runner","defaultAgentId":"ops"',
     );
     await expect(readFile(join(root, "logs", "agents.log"), "utf8")).resolves.toContain(
-      '"message":"loaded configured agent skills","agentId":"default"',
+      '"event":"agent.config.skills.loaded","message":"loaded configured agent skills","agentId":"default"',
     );
     await expect(readFile(join(root, "logs", "agents.log"), "utf8")).resolves.toContain(
-      '"message":"loaded configured agent skills","agentId":"ops"',
+      '"event":"agent.config.skills.loaded","message":"loaded configured agent skills","agentId":"ops"',
     );
   });
 

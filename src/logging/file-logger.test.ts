@@ -24,7 +24,10 @@ describe("createFileLogger", () => {
 
     await logger.debug("visible-debug");
 
-    await expect(readFile(logFilePath, "utf8")).resolves.toContain('"level":"DEBUG"');
+    const content = await readFile(logFilePath, "utf8");
+    expect(content).toContain('"level":"debug"');
+    expect(content).toContain('"schemaVersion":1');
+    expect(content).toContain('"event":"visible.debug"');
     expect(consoleDebug).toHaveBeenCalledWith("visible-debug");
   });
 
@@ -75,8 +78,11 @@ describe("createFileLogger", () => {
     await logger.error("visible-error", undefined, new Error("boom"));
 
     const content = await readFile(logFilePath, "utf8");
+    const lines = content.trim().split("\n");
+    expect(lines).toHaveLength(2);
     expect(content).toContain('"message":"visible-info"');
     expect(content).toContain('"message":"visible-error"');
+    expect(content).toContain('"error":{"type":"Error","message":"boom"');
     expect(content).toContain("Error: boom");
     expect(consoleInfo).not.toHaveBeenCalled();
     expect(consoleError).not.toHaveBeenCalled();

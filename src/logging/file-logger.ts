@@ -1,7 +1,7 @@
 import { appendFile, mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { isMissingFileError } from "../files/node-error.js";
-import type { LogFields, Logger, LogLevel } from "./types.js";
+import type { LogErrorFields, LogFields, Logger, LogLevel } from "./types.js";
 
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
   debug: 10,
@@ -29,7 +29,7 @@ function createFileLoggerWithOptions(
         return;
       }
 
-      await writeLogLine(path, "DEBUG", message, fields);
+      await writeLogLine(path, "debug", message, fields);
       if (options.writeConsole) {
         console.debug(formatConsoleLog(message, fields));
       }
@@ -39,7 +39,7 @@ function createFileLoggerWithOptions(
         return;
       }
 
-      await writeLogLine(path, "INFO", message, fields);
+      await writeLogLine(path, "info", message, fields);
       if (options.writeConsole) {
         console.log(formatConsoleLog(message, fields));
       }
@@ -49,10 +49,7 @@ function createFileLoggerWithOptions(
         return;
       }
 
-      await writeLogLine(path, "ERROR", message, fields);
-      if (error !== undefined) {
-        await writeLogLine(path, "ERROR", formatError(error), fields);
-      }
+      await writeLogLine(path, "error", message, fields, error);
 
       if (options.writeConsole) {
         console.error(formatConsoleLog(message, fields));
@@ -116,26 +113,68 @@ function shouldLog(entryLevel: LogLevel, configuredLevel: LogLevel): boolean {
 
 async function writeLogLine(
   path: string,
-  level: string,
+  level: LogLevel,
   message: string,
   fields?: LogFields,
+  error?: unknown,
 ): Promise<void> {
+  const { event, error: fieldError, ...restFields } = fields ?? {};
   const payload = {
     ts: new Date().toISOString(),
     level,
+    schemaVersion: 1,
+    event: event ?? deriveEventName(message),
     message,
-    ...(fields ?? {}),
+    ...restFields,
+    ...(error !== undefined ? { error: formatStructuredError(error) } : fieldError ? { error: fieldError } : {}),
   };
 
   await appendFile(path, `${JSON.stringify(payload)}\n`, "utf8");
 }
 
-function formatError(error: unknown): string {
+function deriveEventName(message: string): string {
+  const normalized = message
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "");
+
+  return normalized || "log.event";
+}
+
+function formatStructuredError(error: unknown): LogErrorFields {
   if (error instanceof Error) {
-    return error.stack ?? `${error.name}: ${error.message}`;
+    return {
+      type: error.name,
+      message: error.message,
+      ...(error.stack ? { stack: error.stack } : {}),
+      ...formatErrorCause(error),
+    };
   }
 
-  return String(error);
+  return {
+    type: typeof error,
+    message: String(error),
+  };
+}
+
+function formatErrorCause(error: Error): Pick<LogErrorFields, "causeType" | "causeMessage"> {
+  if (!("cause" in error) || error.cause === undefined) {
+    return {};
+  }
+
+  const cause = error.cause;
+  if (cause instanceof Error) {
+    return {
+      causeType: cause.name,
+      causeMessage: cause.message,
+    };
+  }
+
+  return {
+    causeType: typeof cause,
+    causeMessage: String(cause),
+  };
 }
 
 function formatConsoleLog(message: string, fields?: LogFields): string {

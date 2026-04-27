@@ -1,6 +1,16 @@
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+export interface LogErrorFields {
+  type: string;
+  message: string;
+  stack?: string;
+  causeType?: string;
+  causeMessage?: string;
+}
+
 export interface LogFields {
+  event?: string;
+  component?: string;
   endpointId?: string;
   pluginId?: string;
   transport?: string;
@@ -12,6 +22,7 @@ export interface LogFields {
   backupId?: string;
   durationMs?: number;
   cacheHit?: boolean;
+  error?: LogErrorFields;
   errorType?: string;
   errorMessage?: string;
   errorStack?: string;
@@ -38,23 +49,16 @@ export interface LogFields {
   outboxDir?: string;
   hookName?: string;
   hookRegistrationName?: string;
-  skillCount?: number;
   skillNames?: string[];
-  configuredSkillCount?: number;
   configuredSkillNames?: string[];
-  configuredInstructionFileCount?: number;
   configuredInstructionFiles?: string[];
-  configuredReferenceFileCount?: number;
   configuredReferenceFiles?: string[];
   basePromptSource?: "built-in" | "file" | "text" | "unknown";
   basePromptFile?: string;
   basePromptBuiltIn?: string;
-  instructionFileCount?: number;
   instructionFiles?: string[];
-  agentHomeInstructionFileCount?: number;
   agentHomeInstructionFiles?: string[];
   workspaceInstructionFile?: string;
-  referenceFileCount?: number;
   referenceFiles?: string[];
   globalSkillsPath?: string;
   agentHomeSkillsPath?: string;
@@ -65,6 +69,8 @@ export interface LogFields {
   configuredBuiltInTools?: string[];
   resolvedBuiltInTools?: string[];
   interruptedRunCount?: number;
+  defaultAgentId?: string;
+  paths?: Record<string, string>;
   missingBuiltInTools?: string[];
   configuredMcpServers?: string[];
   initializedMcpServers?: string[];

@@ -245,7 +245,8 @@ describe("createHandleIncomingMessage", () => {
     expect(logger.debug).toHaveBeenCalledWith(
       "resolved effective agent skills for turn",
       expect.objectContaining({
-        skillCount: 4,
+        event: "agent.skills.resolved",
+        component: "agent-runtime",
         skillNames: ["git-commit", "git-rebase", "git-review", "git-cleanup"],
       }),
     );

@@ -1119,6 +1119,8 @@ describe("createPiAgentEngine", () => {
       previous_response_id: "resp_123",
     });
     expect(logger.info).toHaveBeenCalledWith("responses request payload", {
+      event: "agent.request.responses.payload",
+      component: "agent-engine",
       endpointId: "private-telegram",
       transport: "telegram",
       conversationId: "42",
@@ -1918,6 +1920,8 @@ describe("createPiAgentEngine", () => {
     });
 
     expect(logger.debug).toHaveBeenCalledWith("agent-engine.pipeline", {
+      event: "agent.pipeline.tool-resolution.completed",
+      component: "agent-engine",
       endpointId: "private-telegram",
       transport: "telegram",
       conversationId: "42",
@@ -1986,6 +1990,8 @@ describe("createPiAgentEngine", () => {
     });
 
     expect(logger.debug).toHaveBeenCalledWith("resolved system prompt sources", {
+      event: "agent.prompt.sources.resolved",
+      component: "agent-engine",
       endpointId: "private-telegram",
       transport: "telegram",
       conversationId: "42",
@@ -1995,16 +2001,11 @@ describe("createPiAgentEngine", () => {
       cacheHit: false,
       basePromptSource: "file",
       basePromptFile,
-      instructionFileCount: 3,
       instructionFiles: [agentHomeInstructionFile, configuredInstructionFile, workspaceInstructionFile],
-      configuredInstructionFileCount: 1,
       configuredInstructionFiles: [configuredInstructionFile],
-      agentHomeInstructionFileCount: 1,
       agentHomeInstructionFiles: [agentHomeInstructionFile],
       workspaceInstructionFile,
-      referenceFileCount: 1,
       referenceFiles: [referenceFile],
-      configuredReferenceFileCount: 1,
       configuredReferenceFiles: [referenceFile],
     });
     expect(JSON.stringify(vi.mocked(logger.debug).mock.calls)).not.toContain("secret content");

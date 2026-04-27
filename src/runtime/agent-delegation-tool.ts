@@ -206,13 +206,14 @@ async function resolveDelegatedAgentSkills(
     }
 
     await logger?.debug("resolved effective agent skills for turn", {
+      event: "agent.skills.resolved",
+      component: "agent-runtime",
       endpointId: message.endpointId,
       transport: message.conversation.transport,
       conversationId: message.conversation.externalId,
       messageId: message.messageId,
       correlationId: message.correlationId,
       agentId: childAgent.id,
-      skillCount: resolution.skills.length,
       skillNames: resolution.skills.map((skill) => skill.name),
       ...(resolution.globalSkillsPath ? { globalSkillsPath: resolution.globalSkillsPath } : {}),
       ...(resolution.agentHomeSkillsPath ? { agentHomeSkillsPath: resolution.agentHomeSkillsPath } : {}),
