@@ -49,6 +49,8 @@ describe("statusCommandHandler", () => {
     expect(statusCommandHandler.canHandle("status")).toBe(true);
     expect(response?.text).toContain("# Status");
     expect(response?.text).toContain("## Session");
+    expect(response?.text).toContain("- **Turns:** 0");
+    expect(response?.text).toContain("- **Events:** 0");
     expect(response?.text).not.toContain("Sessions in history");
   });
 

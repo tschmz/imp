@@ -61,6 +61,10 @@ function formatContextUsage(inputTokens: number, contextWindow: number | undefin
   return `${new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format((inputTokens / contextWindow) * 100)}%`;
 }
 
+function countUserTurns(conversation: ConversationContext): number {
+  return conversation.messages.filter((message) => message.role === "user").length;
+}
+
 function getLastAssistantMessage(
   conversation: ConversationContext,
 ): ConversationAssistantMessage | undefined {
@@ -137,7 +141,8 @@ export function renderStatusMessage(
     "## Session",
     `- **Title:** ${renderMarkdownValue(conversation.state.title)}`,
     `- **Agent:** \`${conversation.state.agentId}\``,
-    `- **Messages:** ${formatCount(conversation.messages.length)}`,
+    `- **Turns:** ${formatCount(countUserTurns(conversation))}`,
+    `- **Events:** ${formatCount(conversation.messages.length)}`,
     `- **Created:** ${formatTimestamp(conversation.state.createdAt)}`,
     `- **Updated:** ${formatTimestamp(conversation.state.updatedAt)}`,
     `- **Working directory:** ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
@@ -161,7 +166,8 @@ export function renderHistoryMessage(
     lines.push(
       `- **Title:** ${renderMarkdownValue(renderHistoryEntryLabel(conversation.state.title))}`,
       `- **Agent:** \`${conversation.state.agentId}\``,
-      `- **Messages:** ${formatCount(conversation.messages.length)}`,
+      `- **Turns:** ${formatCount(countUserTurns(conversation))}`,
+      `- **Events:** ${formatCount(conversation.messages.length)}`,
       `- **Updated:** ${formatTimestamp(conversation.state.updatedAt)}`,
       `- **Working directory:** ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
     );
@@ -178,7 +184,7 @@ export function renderHistoryMessage(
 
   for (const [index, backup] of backups.entries()) {
     lines.push(
-      `${index + 1}. **${renderHistoryEntryLabel(backup.title)}** — \`${backup.agentId}\` — ${formatCount(backup.messageCount)} message${backup.messageCount === 1 ? "" : "s"} — updated ${formatTimestamp(backup.updatedAt)}`,
+      `${index + 1}. **${renderHistoryEntryLabel(backup.title)}** — \`${backup.agentId}\` — ${formatCount(backup.messageCount)} event${backup.messageCount === 1 ? "" : "s"} — updated ${formatTimestamp(backup.updatedAt)}`,
     );
   }
 
