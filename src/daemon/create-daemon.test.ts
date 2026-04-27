@@ -266,6 +266,72 @@ describe("createDaemon", () => {
     expect(startTransport).not.toHaveBeenCalled();
   });
 
+  it("skips a non-default agent that references an unknown tool", async () => {
+    const root = await createTempDir();
+    const endpointConfig = createEndpointConfig(root);
+    const runInputs: AgentRunInput[] = [];
+    const engine: AgentEngine = {
+      run: vi.fn(async (input) => {
+        runInputs.push(input);
+        return createAgentRunResult(input.message, input.agent.id);
+      }),
+    };
+
+    const daemon = createDaemon(
+      {
+        ...createConfig(endpointConfig),
+        agents: [
+          {
+            id: "default",
+            prompt: {
+              base: {
+                text: "You are concise.",
+              },
+            },
+            model: {
+              provider: "test",
+              modelId: "stub",
+            },
+          },
+          {
+            id: "broken",
+            prompt: {
+              base: {
+                text: "You are broken.",
+              },
+            },
+            model: {
+              provider: "test",
+              modelId: "stub",
+            },
+            tools: ["bashh"],
+          },
+        ],
+      },
+      {
+        engine,
+        createBuiltInToolRegistry: () => ({
+          list: () => [],
+          get: () => undefined,
+          pick: () => [],
+        }),
+        createTransport: () => ({
+          async start(handler: TransportHandler) {
+            await handler.handle(createTransportEvent(createIncomingMessage("1", "hello")));
+          },
+        }),
+      },
+    );
+
+    await daemon.start();
+
+    expect(runInputs).toHaveLength(1);
+    expect(runInputs[0]?.agent.id).toBe("default");
+    await expect(readFile(endpointConfig.paths.logFilePath, "utf8")).resolves.toContain(
+      '"message":"skipping invalid agent","endpointId":"private-telegram","agentId":"broken","errorMessage":"Unknown tools for agent \\"broken\\": bashh"',
+    );
+  });
+
   it("fails startup when an agent references an unknown delegated agent", async () => {
     const root = await createTempDir();
     const endpointConfig = createEndpointConfig(root);
@@ -369,34 +435,35 @@ describe("createDaemon", () => {
     expect(startTransport).not.toHaveBeenCalled();
   });
 
-  it("fails fast when an agent does not define a usable base prompt", async () => {
+  it("fails startup when the default agent does not define a usable base prompt", async () => {
     const root = await createTempDir();
     const endpointConfig = createEndpointConfig(root);
-
-    expect(() =>
-      createDaemon(
-        {
-          ...createConfig(endpointConfig),
-          agents: [
-            {
-              id: "default",
-              prompt: {
-                base: {},
-              },
-              model: {
-                provider: "openai",
-                modelId: "gpt-5.4",
-              },
+    const daemon = createDaemon(
+      {
+        ...createConfig(endpointConfig),
+        agents: [
+          {
+            id: "default",
+            prompt: {
+              base: {},
             },
-          ],
-        },
-        {
-          createTransport: () => ({
-            start: vi.fn(),
-          }),
-        },
-      ),
-    ).toThrow('Configured agent "default" must define prompt.base.text, prompt.base.file, or a built-in base prompt.');
+            model: {
+              provider: "openai",
+              modelId: "gpt-5.4",
+            },
+          },
+        ],
+      },
+      {
+        createTransport: () => ({
+          start: vi.fn(),
+        }),
+      },
+    );
+
+    await expect(daemon.start()).rejects.toThrow(
+      'Configured agent "default" must define prompt.base.text, prompt.base.file, or a built-in base prompt.',
+    );
   });
 
   it("starts all enabled endpoints with isolated runtime state", async () => {

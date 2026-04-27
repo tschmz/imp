@@ -37,19 +37,27 @@ interface DaemonDependencies extends RuntimeBootstrapDependencies {
   runtimeProcess?: RuntimeLifecycleProcess;
 }
 
+interface SkippedAgent {
+  agentId: string;
+  error: unknown;
+}
+
 export function createDaemon(
   config: DaemonConfig,
   dependencies: DaemonDependencies,
 ): Daemon {
-  const agentRegistry =
-    dependencies.agentRegistry ?? createAgentRegistry(buildAgents(config.agents));
   const createBuiltInRegistry =
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
 
   return {
     async start() {
       const createRuntimeToolRegistry = createRuntimeToolRegistryFactory(createBuiltInRegistry, config.pluginTools ?? []);
-      validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createRuntimeToolRegistry);
+      const { agentRegistry, skippedAgents } = buildOperationalAgentRegistry(
+        config,
+        dependencies.agentRegistry,
+        dependencies.toolRegistry,
+        createRuntimeToolRegistry,
+      );
       await prepareAgentHomeDirectories(agentRegistry.list());
       await prepareAgentLogFiles(
         config.activeEndpoints.map((endpoint) => endpoint.paths.dataRoot),
@@ -77,6 +85,7 @@ export function createDaemon(
         );
         throw error;
       }
+      await logSkippedAgents(runtimes, skippedAgents);
       const runtimeControl = createDeferredActionController<RuntimeControlAction>();
       const runtimeEntries = createRuntimeEntries(runtimes, {
         agentRegistry,
@@ -105,6 +114,91 @@ export function createDaemon(
   };
 }
 
+function buildOperationalAgentRegistry(
+  config: DaemonConfig,
+  configuredAgentRegistry: ReturnType<typeof createAgentRegistry> | undefined,
+  toolRegistry: ToolRegistry | undefined,
+  createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
+): { agentRegistry: ReturnType<typeof createAgentRegistry>; skippedAgents: SkippedAgent[] } {
+  const requiredAgentIds = new Set(config.activeEndpoints.map((endpoint) => endpoint.defaultAgentId));
+  const skippedAgents: SkippedAgent[] = [];
+  let agents = configuredAgentRegistry?.list() ?? buildOptionalAgents(config.agents, requiredAgentIds, skippedAgents);
+
+  while (true) {
+    const agentRegistry = createAgentRegistry(agents);
+    const invalidAgents = findInvalidAgents(agentRegistry, toolRegistry, createBuiltInRegistry);
+    if (invalidAgents.length === 0) {
+      return { agentRegistry, skippedAgents };
+    }
+
+    const fatalInvalidAgent = invalidAgents.find((issue) => requiredAgentIds.has(issue.agent.id));
+    if (fatalInvalidAgent) {
+      throw fatalInvalidAgent.error;
+    }
+
+    const invalidAgentIds = new Set(invalidAgents.map((issue) => issue.agent.id));
+    skippedAgents.push(...invalidAgents.map((issue) => ({ agentId: issue.agent.id, error: issue.error })));
+    agents = agents.filter((agent) => !invalidAgentIds.has(agent.id));
+  }
+}
+
+function buildOptionalAgents(
+  configuredAgents: DaemonConfig["agents"],
+  requiredAgentIds: Set<string>,
+  skippedAgents: SkippedAgent[],
+): AgentDefinition[] {
+  const agents: AgentDefinition[] = [];
+
+  for (const configuredAgent of configuredAgents) {
+    try {
+      agents.push(buildAgent(configuredAgent));
+    } catch (error) {
+      if (requiredAgentIds.has(configuredAgent.id)) {
+        throw error;
+      }
+      skippedAgents.push({ agentId: configuredAgent.id, error });
+    }
+  }
+
+  return agents;
+}
+
+function findInvalidAgents(
+  agentRegistry: ReturnType<typeof createAgentRegistry>,
+  toolRegistry: ToolRegistry | undefined,
+  createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
+): Array<{ agent: AgentDefinition; error: unknown }> {
+  const invalidAgents: Array<{ agent: AgentDefinition; error: unknown }> = [];
+
+  for (const agent of agentRegistry.list()) {
+    try {
+      validateAgent(agent, agentRegistry, toolRegistry, createBuiltInRegistry);
+    } catch (error) {
+      invalidAgents.push({ agent, error });
+    }
+  }
+
+  return invalidAgents;
+}
+
+async function logSkippedAgents(runtimes: BootstrappedRuntime[], skippedAgents: SkippedAgent[]): Promise<void> {
+  if (skippedAgents.length === 0) {
+    return;
+  }
+
+  await Promise.all(
+    runtimes.flatMap((runtime) =>
+      skippedAgents.map((skipped) =>
+        runtime.logger.error("skipping invalid agent", {
+          endpointId: runtime.endpointConfig.id,
+          agentId: skipped.agentId,
+          errorMessage: formatError(skipped.error),
+        }, skipped.error),
+      ),
+    ),
+  );
+}
+
 
 function createRuntimeToolRegistryFactory(
   createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
@@ -129,42 +223,53 @@ export function validateAgentRegistry(
   createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
 ): void {
   for (const agent of agentRegistry.list()) {
-    validateAgentPrompt(agent);
-    validateAgentDelegations(agent, agentRegistry);
-    const registry = toolRegistry ?? createBuiltInRegistry(resolveWorkingDirectory(agent), agent);
-    const resolvedBuiltInTools = resolveAgentTools(agent, registry).map((tool) => tool.name);
-    validateResolvedToolNames(agent.id, {
-      builtIn: resolvedBuiltInTools,
-      delegation: (agent.delegations ?? []).map((delegation) => delegation.toolName),
-      mcp: [],
-    });
+    validateAgent(agent, agentRegistry, toolRegistry, createBuiltInRegistry);
   }
 }
 
 export function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefinition[] {
-  return configuredAgents.map((configuredAgent) => {
-    validatePromptBase(configuredAgent.id, configuredAgent.prompt.base);
+  return configuredAgents.map(buildAgent);
+}
 
-    if (!configuredAgent.model) {
-      throw new ConfigurationError(`Configured agent "${configuredAgent.id}" must define model.`);
-    }
+function buildAgent(configuredAgent: DaemonConfig["agents"][number]): AgentDefinition {
+  validatePromptBase(configuredAgent.id, configuredAgent.prompt.base);
 
-    return {
-      id: configuredAgent.id,
-      name: configuredAgent.name ?? configuredAgent.id,
-      prompt: configuredAgent.prompt,
-      model: configuredAgent.model,
-      ...(configuredAgent.home ? { home: configuredAgent.home } : {}),
-      ...(configuredAgent.workspace ? { workspace: configuredAgent.workspace } : {}),
-      ...(configuredAgent.skills ? { skills: configuredAgent.skills } : {}),
-      ...(configuredAgent.skillCatalog ? { skillCatalog: configuredAgent.skillCatalog } : {}),
-      ...(configuredAgent.skillIssues ? { skillIssues: configuredAgent.skillIssues } : {}),
-      ...(configuredAgent.delegations ? { delegations: configuredAgent.delegations } : {}),
-      ...(configuredAgent.mcp ? { mcp: configuredAgent.mcp } : {}),
-      ...(configuredAgent.phone ? { phone: configuredAgent.phone } : {}),
-      tools: configuredAgent.tools ?? [],
-      extensions: [],
-    };
+  if (!configuredAgent.model) {
+    throw new ConfigurationError(`Configured agent "${configuredAgent.id}" must define model.`);
+  }
+
+  return {
+    id: configuredAgent.id,
+    name: configuredAgent.name ?? configuredAgent.id,
+    prompt: configuredAgent.prompt,
+    model: configuredAgent.model,
+    ...(configuredAgent.home ? { home: configuredAgent.home } : {}),
+    ...(configuredAgent.workspace ? { workspace: configuredAgent.workspace } : {}),
+    ...(configuredAgent.skills ? { skills: configuredAgent.skills } : {}),
+    ...(configuredAgent.skillCatalog ? { skillCatalog: configuredAgent.skillCatalog } : {}),
+    ...(configuredAgent.skillIssues ? { skillIssues: configuredAgent.skillIssues } : {}),
+    ...(configuredAgent.delegations ? { delegations: configuredAgent.delegations } : {}),
+    ...(configuredAgent.mcp ? { mcp: configuredAgent.mcp } : {}),
+    ...(configuredAgent.phone ? { phone: configuredAgent.phone } : {}),
+    tools: configuredAgent.tools ?? [],
+    extensions: [],
+  };
+}
+
+function validateAgent(
+  agent: AgentDefinition,
+  agentRegistry: ReturnType<typeof createAgentRegistry>,
+  toolRegistry: ToolRegistry | undefined,
+  createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
+): void {
+  validateAgentPrompt(agent);
+  validateAgentDelegations(agent, agentRegistry);
+  const registry = toolRegistry ?? createBuiltInRegistry(resolveWorkingDirectory(agent), agent);
+  const resolvedBuiltInTools = resolveAgentTools(agent, registry).map((tool) => tool.name);
+  validateResolvedToolNames(agent.id, {
+    builtIn: resolvedBuiltInTools,
+    delegation: (agent.delegations ?? []).map((delegation) => delegation.toolName),
+    mcp: [],
   });
 }
 
@@ -206,4 +311,8 @@ function validatePromptBase(
   }
 
   throw new ConfigurationError(`Configured agent "${agentId}" must define prompt.base.text, prompt.base.file, or a built-in base prompt.`);
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
