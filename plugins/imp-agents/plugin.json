@@ -31,7 +31,6 @@
           "edit",
           "write",
           "update_plan",
-          "load_skill",
           "pwd",
           "cd",
           "workspaceSnapshot"
