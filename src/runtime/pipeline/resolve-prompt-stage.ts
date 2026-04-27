@@ -58,5 +58,5 @@ function resolvePromptWorkingDirectory(
   agent: AgentDefinition,
   conversation: ConversationContext,
 ): string | undefined {
-  return conversation.state.workingDirectory ?? agent.workspace?.cwd;
+  return conversation.state.workingDirectory ?? agent.workspace?.cwd ?? agent.home;
 }

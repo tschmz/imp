@@ -4,7 +4,7 @@ import { loadAppConfig } from "../config/load-app-config.js";
 import { resolveRuntimeConfig } from "../config/resolve-runtime-config.js";
 import type { AppConfig, CliEndpointConfig } from "../config/types.js";
 import { buildRuntimeComponents } from "../daemon/bootstrap/build-runtime-components.js";
-import { prepareRuntimeFilesystem } from "../daemon/bootstrap/prepare-runtime-filesystem.js";
+import { prepareAgentHomeDirectories, prepareRuntimeFilesystem } from "../daemon/bootstrap/prepare-runtime-filesystem.js";
 import { buildAgents, validateAgentRegistry } from "../daemon/create-daemon.js";
 import type { BootstrappedRuntime } from "../daemon/runtime-bootstrap.js";
 import { createRuntimeEntries, runRuntimeEntries, stopRuntimeEntries } from "../daemon/runtime-runner.js";
@@ -72,6 +72,7 @@ export function createChatUseCase(
         ? createToolRegistry([...builtInRegistry.list(), ...chatRuntimeConfig.pluginTools])
         : builtInRegistry;
     });
+    await prepareAgentHomeDirectories(agentRegistry.list());
     await deps.prepareAgentLogFiles(
       chatRuntimeConfig.activeEndpoints.map((endpoint) => endpoint.paths.dataRoot),
       agentRegistry.list().map((agent) => agent.id),

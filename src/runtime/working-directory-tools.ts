@@ -10,7 +10,7 @@ export interface WorkingDirectoryState {
 }
 
 export function resolveWorkingDirectory(agent: AgentDefinition): string {
-  return agent.workspace?.cwd ?? process.cwd();
+  return agent.workspace?.cwd ?? agent.home ?? process.cwd();
 }
 
 export function createWorkingDirectoryState(initialWorkingDirectory: string): WorkingDirectoryState {

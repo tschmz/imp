@@ -3,6 +3,7 @@ import type { AgentDefinition } from "../domain/agent.js";
 import { ConfigurationError } from "../domain/errors.js";
 import type { Logger } from "../logging/types.js";
 import { prepareAgentLogFiles } from "../logging/agent-loggers.js";
+import { prepareAgentHomeDirectories } from "./bootstrap/prepare-runtime-filesystem.js";
 import {
   createBuiltInToolRegistry,
   type WorkingDirectoryState,
@@ -49,6 +50,7 @@ export function createDaemon(
     async start() {
       const createRuntimeToolRegistry = createRuntimeToolRegistryFactory(createBuiltInRegistry, config.pluginTools ?? []);
       validateAgentRegistry(agentRegistry, dependencies.toolRegistry, createRuntimeToolRegistry);
+      await prepareAgentHomeDirectories(agentRegistry.list());
       await prepareAgentLogFiles(
         config.activeEndpoints.map((endpoint) => endpoint.paths.dataRoot),
         agentRegistry.list().map((agent) => agent.id),

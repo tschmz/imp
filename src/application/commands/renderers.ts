@@ -24,7 +24,7 @@ function resolveDisplayedWorkingDirectory(
   conversation: ConversationContext | undefined,
   agent: AgentDefinition | undefined,
 ): string {
-  return conversation?.state.workingDirectory ?? agent?.workspace?.cwd ?? "not set";
+  return conversation?.state.workingDirectory ?? agent?.workspace?.cwd ?? agent?.home ?? "not set";
 }
 
 function renderHistoryEntryLabel(title: string | undefined): string {

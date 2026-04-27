@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import type { AgentDefinition } from "../../domain/agent.js";
 import { rotateLogFileOnStartup } from "../../logging/file-logger.js";
 import type { RuntimePaths } from "../types.js";
 
@@ -16,4 +17,14 @@ export async function prepareRuntimeFilesystem(paths: RuntimePaths): Promise<voi
     await mkdir(paths.file.outboxDir, { recursive: true });
   }
   await rotateLogFileOnStartup(paths.logFilePath);
+}
+
+export async function prepareAgentHomeDirectories(agents: AgentDefinition[]): Promise<void> {
+  const homes = new Set(
+    agents
+      .map((agent) => agent.home)
+      .filter((home): home is string => typeof home === "string" && home.length > 0),
+  );
+
+  await Promise.all([...homes].map((home) => mkdir(home, { recursive: true })));
 }

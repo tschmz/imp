@@ -2250,6 +2250,54 @@ describe("createPiAgentEngine", () => {
     expect(capturedTools?.map((tool) => tool.name)).toEqual(["read", "bash"]);
   });
 
+  it("uses agent home as the default runtime path when no workspace cwd is configured", async () => {
+    let capturedWorkingDirectory: string | undefined;
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createBuiltInToolRegistry: (workingDirectory) => {
+        capturedWorkingDirectory =
+          typeof workingDirectory === "string" ? workingDirectory : workingDirectory.get();
+        return {
+          list: () => [],
+          get: () => undefined,
+          pick: (names) =>
+            names.map((name) => ({
+              name,
+              label: name,
+              description: `${name} tool`,
+              parameters: Type.Object({}),
+              async execute() {
+                return {
+                  content: [],
+                  details: {},
+                };
+              },
+            })),
+        };
+      },
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("tool-ready")] }),
+    });
+
+    await engine.run({
+      agent: {
+        ...createAgent(),
+        home: "/agents/default",
+        tools: ["read"],
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(capturedWorkingDirectory).toBe("/agents/default");
+  });
+
   it("adds load_skill for available skills and lists bundled resources", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-load-skill-"));
     tempDirs.push(root);

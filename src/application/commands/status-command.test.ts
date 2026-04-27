@@ -429,4 +429,38 @@ describe("statusCommandHandler", () => {
 
     expect(response?.text).toContain("Working directory: /workspace/project");
   });
+
+  it("falls back to the agent home for the working directory", async () => {
+    const context = createCommandContext({
+      message: createIncomingMessage("status"),
+      dependencies: createDependencies({
+        conversationStore: {
+          get: async () => ({
+            state: baseConversationState,
+            messages: [],
+          }),
+          put: async () => {},
+          listBackups: async () => [],
+          restore: async () => false,
+          ensureActive: async () => {
+            throw new Error("not used");
+          },
+          create: async () => {
+            throw new Error("not used");
+          },
+        },
+        agentRegistry: createAgentRegistry([
+          {
+            ...createDefaultAgent(),
+            home: "/agents/default",
+          },
+          createDefaultAgent("ops"),
+        ]),
+      }),
+    });
+
+    const response = await statusCommandHandler.handle(context);
+
+    expect(response?.text).toContain("Working directory: /agents/default");
+  });
 });

@@ -129,4 +129,47 @@ describe("historyCommandHandler", () => {
     expect(response?.text).toContain("Previous:");
     expect(response?.text).toContain("- none");
   });
+
+  it("falls back to the agent home for the active session working directory", async () => {
+    const context = createCommandContext({
+      message: createIncomingMessage("history"),
+      dependencies: createDependencies({
+        conversationStore: {
+          get: async () => ({
+            state: {
+              conversation: { transport: "telegram", externalId: "42", sessionId: "session-2" },
+              agentId: "default",
+              title: "Current work",
+              createdAt: "2026-04-05T00:00:00.000Z",
+              updatedAt: "2026-04-05T00:05:00.000Z",
+              version: 1,
+            },
+            messages: [{ id: "m1", role: "user", content: "hi", timestamp: Date.parse("2026-04-05T00:04:00.000Z"), createdAt: "2026-04-05T00:04:00.000Z" }],
+          }),
+          put: async () => {},
+          listBackups: async () => [],
+          restore: async () => false,
+          ensureActive: async () => {
+            throw new Error("not used");
+          },
+          create: async () => {
+            throw new Error("not used");
+          },
+        },
+        agentRegistry: createAgentRegistry([
+          {
+            ...createDefaultAgent(),
+            home: "/agents/default",
+          },
+          createDefaultAgent("ops"),
+        ]),
+      }),
+    });
+
+    const response = await historyCommandHandler.handle(context);
+
+    expect(response?.text).toContain("- wd /agents/default");
+    expect(response?.text).toContain("Previous:");
+    expect(response?.text).toContain("- none");
+  });
 });

@@ -85,6 +85,10 @@ When skills are available from `paths.dataRoot/skills`, `agent.home/.skills`, co
 
 The tool loads the selected skill's `SKILL.md` instructions and lists bundled resources. See [Agent Context](./agent-context.md) for skill discovery and context behavior.
 
+## Working Directory
+
+The `pwd` tool returns the current directory used by filesystem and shell tools. New conversations start in `workspace.cwd`, fall back to `agent.home`, and can move with `cd`.
+
 ## Apply Changes
 
 Validate the config after changing tool access:

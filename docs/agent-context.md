@@ -250,7 +250,7 @@ Set a workspace directory and shell search path:
 imp config set agents.default.workspace '{"cwd":"/path/to/project","shellPath":["/usr/local/bin","/usr/bin","/bin"]}'
 ```
 
-If the active working directory contains an `AGENTS.md` file, Imp loads it as an instruction file for the turn. The active working directory starts from `workspace.cwd` and can change during a conversation when tool-supported working-directory changes are available.
+If the active working directory contains an `AGENTS.md` file, Imp loads it as an instruction file for the turn. The active working directory starts from `workspace.cwd`, falls back to `agent.home`, and can change during a conversation when tool-supported working-directory changes are available.
 
 Workspace-local skills can be placed under:
 
