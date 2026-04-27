@@ -59,9 +59,9 @@ function describeManifest(manifest, manifestPath, devkitPluginId) {
   ];
 
   appendList(lines, "agents", manifest.agents, (agent) => `${pluginId}.${agent.id ?? "<missing-id>"}`);
-  appendList(lines, "command tools", manifest.tools, (tool) => `${pluginId}.${tool.name ?? "<missing-name>"}`);
+  appendList(lines, "command tools", manifest.tools, (tool) => `${pluginId}__${tool.name ?? "<missing-name>"}`);
   if (manifest.runtime?.module) {
-    lines.push(`- JS runtime: ${manifest.runtime.module} (tools are registered by the module and namespaced as ${pluginId}.<tool>)`);
+    lines.push(`- JS runtime: ${manifest.runtime.module} (tools are registered by the module and namespaced as ${pluginId}__<tool>)`);
   }
   appendList(lines, "MCP servers", manifest.mcpServers, (server) => `${pluginId}.${server.id ?? "<missing-id>"}`);
   appendList(lines, "skills", manifest.skills, (skill) => skill.path ?? "<missing-path>");

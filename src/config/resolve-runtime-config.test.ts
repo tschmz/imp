@@ -536,13 +536,13 @@ describe("resolveRuntimeConfig", () => {
       manifest: { name: "search" },
     });
     expect(result.agents.map((agent) => agent.id)).toEqual(["default", "notes.assistant"]);
-    expect(result.agents[0]?.tools).toEqual(["notes.search"]);
+    expect(result.agents[0]?.tools).toEqual(["notes__search"]);
     expect(result.agents[0]?.skills?.paths).toEqual([]);
     expect(result.agents[0]?.skillCatalog).toBeUndefined();
     expect(result.agents[1]).toMatchObject({
       id: "notes.assistant",
       prompt: { base: { file: join(pluginRoot, "prompts", "assistant.md") } },
-      tools: ["notes.search", "read"],
+      tools: ["notes__search", "read"],
       mcp: {
         servers: [
           {
@@ -557,8 +557,62 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
+  it("does not reject a plugin agent skill path that is also exported globally", async () => {
+    const root = await createTempDir();
+    const dataRoot = join(root, "state");
+    const pluginRoot = join(dataRoot, "plugins", "notes");
+    await writeRawFile(
+      join(pluginRoot, "skills", "plugin-author", "SKILL.md"),
+      [
+        "---",
+        "name: plugin-author",
+        "description: Author plugin manifests.",
+        "---",
+        "",
+        "Use the plugin manifest reference.",
+      ].join("\n"),
+    );
+    await writeRawFile(join(pluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "notes",
+      name: "Notes",
+      version: "0.1.0",
+      skills: [{ path: "./skills" }],
+      agents: [
+        {
+          id: "assistant",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          prompt: { base: { text: "Assistant" } },
+          tools: {
+            builtIn: ["load_skill"],
+          },
+          skills: { paths: ["./skills"] },
+        },
+      ],
+    }, null, 2));
 
+    const result = await resolveRuntimeConfig(
+      createAppConfig({
+        paths: { dataRoot },
+        endpoints: [
+          {
+            id: "private-telegram",
+            type: "telegram",
+            enabled: true,
+            token: "telegram-token",
+            access: { allowedUserIds: [] },
+          },
+        ],
+      }),
+      join(root, "config.json"),
+    );
 
+    const pluginAgent = result.agents.find((agent) => agent.id === "notes.assistant");
+    expect(pluginAgent?.tools).toEqual(["load_skill"]);
+    expect(pluginAgent?.skills?.paths).toEqual([join(pluginRoot, "skills")]);
+    expect(pluginAgent?.skillCatalog?.map((skill) => skill.name)).toEqual(["plugin-author"]);
+    expect(pluginAgent?.skillIssues ?? []).toEqual([]);
+  });
 
   it("loads agent home plugins after dataRoot plugins", async () => {
     const root = await createTempDir();
@@ -685,8 +739,8 @@ describe("resolveRuntimeConfig", () => {
       join(root, "config.json"),
     );
 
-    expect(result.agents.find((agent) => agent.id === "math.assistant")?.tools).toEqual(["math.add"]);
-    expect(result.pluginTools?.map((tool) => tool.name)).toEqual(["math.add"]);
+    expect(result.agents.find((agent) => agent.id === "math.assistant")?.tools).toEqual(["math__add"]);
+    expect(result.pluginTools?.map((tool) => tool.name)).toEqual(["math__add"]);
     await expect(result.pluginTools?.[0]?.execute("call-1", { a: 2, b: 3 })).resolves.toEqual({
       content: [{ type: "text", text: "5" }],
       details: { pluginId: "math", sum: 5 },

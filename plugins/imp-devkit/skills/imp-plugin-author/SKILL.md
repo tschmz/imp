@@ -13,7 +13,7 @@ Use this skill when authoring an Imp plugin or changing the Imp plugin architect
 2. Use `imp-plugin.json` for user-authored plugins; bundled installable plugins may use `plugin.json`.
 3. Use `schemaVersion: 1`.
 4. Keep plugin ids stable and limited to letters, numbers, hyphens, and underscores.
-5. Capabilities are exposed as `<pluginId>.<localId>`.
+5. Agent and MCP capabilities are exposed as `<pluginId>.<localId>`; tool capabilities are exposed as `<pluginId>__<localToolName>` to satisfy model provider tool-name constraints.
 6. Agent-home plugins are discovered after data-root plugins and can override a global plugin with the same id.
 7. Use `enabled: false` in `config.plugins` only when a plugin should be excluded from auto-loading.
 

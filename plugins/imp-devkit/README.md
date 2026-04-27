@@ -5,7 +5,7 @@ Imp DevKit is a reference plugin for Imp plugin authors and Imp maintainers. It 
 ## What it registers
 
 - Agent: `imp-devkit.developer`
-- Tool: `imp-devkit.describeManifest`
+- Tool: `imp-devkit__describeManifest`
 - Skills:
   - `imp-plugin-author`
   - `imp-architecture-reviewer`

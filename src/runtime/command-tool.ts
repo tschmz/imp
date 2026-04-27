@@ -23,7 +23,7 @@ export function createCommandToolDefinitions(tools: CommandToolRuntimeConfig[]):
 }
 
 function createCommandToolDefinition(tool: CommandToolRuntimeConfig): ToolDefinition {
-  const fullName = `${tool.pluginId}.${tool.manifest.name}`;
+  const fullName = `${tool.pluginId}__${tool.manifest.name}`;
 
   return {
     name: fullName,

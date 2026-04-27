@@ -31,7 +31,7 @@ describe("imp-devkit plugin", () => {
     const result = await tool.execute("call-1", { path: manifestPath });
 
     expect(result.content[0].text).toContain("Plugin: notes");
-    expect(result.content[0].text).toContain("notes.search");
+    expect(result.content[0].text).toContain("notes__search");
     expect(result.content[0].text).toContain("notes.assistant");
     expect(result.content[0].text).toContain("runtime.module runs trusted JS");
     expect(result.details).toMatchObject({

@@ -37,9 +37,9 @@ describe("command plugin tools", () => {
 
     const result = await tool!.execute("call-1", { query: "imp" });
 
-    expect(tool?.name).toBe("notes.search");
+    expect(tool?.name).toBe("notes__search");
     expect(result).toEqual({
-      content: [{ type: "text", text: "notes.search:imp" }],
+      content: [{ type: "text", text: "notes__search:imp" }],
       details: { pluginId: "notes", cwd: root },
     });
   });

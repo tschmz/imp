@@ -135,7 +135,7 @@ function parseJsPluginTool(value: unknown, plugin: JsPluginRuntimeConfig, index:
 }
 
 function namespaceJsPluginTool(plugin: JsPluginRuntimeConfig, tool: JsPluginToolDefinition): ToolDefinition {
-  const fullName = tool.name.includes(".") ? tool.name : `${plugin.pluginId}.${tool.name}`;
+  const fullName = tool.name.includes("__") ? tool.name : `${plugin.pluginId}__${tool.name}`;
 
   return {
     ...tool,

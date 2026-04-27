@@ -36,7 +36,8 @@ export async function resolveRuntimeConfig(
   }
   const configDir = dirname(configPath);
   const runtimePlugins = await loadRuntimePlugins(appConfig, configDir);
-  const effectiveAgents = mergeConfiguredAgents(appConfig.agents, runtimePlugins.agents);
+  const effectiveAgents = mergeConfiguredAgents(appConfig.agents, runtimePlugins.agents)
+    .map((agent) => resolvePluginToolNameAliases(agent, runtimePlugins.toolNameAliases));
   const mcpServers = resolveGlobalMcpServers(appConfig, configDir, runtimePlugins.mcpServers);
 
   return {
@@ -105,6 +106,27 @@ function mergeConfiguredAgents(configAgents: AppConfig["agents"], pluginAgents: 
   }
 
   return [...configAgents, ...pluginAgents];
+}
+
+function resolvePluginToolNameAliases(agent: AppConfig["agents"][number], aliases: Record<string, string>): AppConfig["agents"][number] {
+  if (!agent.tools) {
+    return agent;
+  }
+
+  if (Array.isArray(agent.tools)) {
+    return {
+      ...agent,
+      tools: agent.tools.map((toolName) => aliases[toolName] ?? toolName),
+    };
+  }
+
+  return {
+    ...agent,
+    tools: {
+      ...agent.tools,
+      ...(agent.tools.builtIn ? { builtIn: agent.tools.builtIn.map((toolName) => aliases[toolName] ?? toolName) } : {}),
+    },
+  };
 }
 
 async function resolveEndpointRuntimeSecrets(

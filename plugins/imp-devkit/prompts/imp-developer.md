@@ -36,6 +36,6 @@ When working on plugins:
 1. Decide whether the extension should be declarative, command-based, MCP-based, or JS runtime-based.
 2. Prefer declarative resources, command tools, or MCP for user/untrusted code.
 3. Use JS runtime tools only for trusted plugins that should run inside the Imp process.
-4. Ensure plugin capability names remain namespaced as `<pluginId>.<localId>`.
+4. Ensure plugin capability names remain namespaced. Agents and MCP servers use `<pluginId>.<localId>`; tools use `<pluginId>__<localToolName>` because model providers reject dots in tool names.
 5. Add tests that cover manifest validation, runtime config resolution, and tool registration/execution.
 6. Keep examples minimal and runnable without external services unless the plugin is explicitly an integration plugin.

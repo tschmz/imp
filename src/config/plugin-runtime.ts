@@ -13,6 +13,7 @@ export interface LoadedRuntimePlugins {
   mcpServers: AgentMcpServerConfig[];
   commandTools: CommandToolRuntimeConfig[];
   pluginTools: ToolDefinition[];
+  toolNameAliases: Record<string, string>;
 }
 
 export async function loadRuntimePlugins(appConfig: AppConfig, configDir: string): Promise<LoadedRuntimePlugins> {
@@ -22,6 +23,7 @@ export async function loadRuntimePlugins(appConfig: AppConfig, configDir: string
     mcpServers: [],
     commandTools: [],
     pluginTools: [],
+    toolNameAliases: {},
   };
 
   const plugins = await discoverRuntimePlugins(appConfig, configDir);
@@ -37,6 +39,9 @@ export async function loadRuntimePlugins(appConfig: AppConfig, configDir: string
       ...(manifest.tools ?? []).map((tool) => tool.name),
       ...jsTools.map((tool) => stripPluginNamespace(manifest.id, tool.name)),
     ]);
+    for (const localToolName of localToolNames) {
+      loaded.toolNameAliases[`${manifest.id}.${localToolName}`] = namespacePluginToolId(manifest.id, localToolName);
+    }
 
     loaded.skillPaths.push(...resolvePluginSkillPaths(manifest, pluginRoot));
     loaded.agents.push(...resolvePluginAgents(manifest, pluginRoot, localToolNames));
@@ -180,7 +185,7 @@ function resolvePluginAgentTools(
       ? { builtIn: tools.builtIn.map((toolName) => namespacePluginReference(manifest.id, toolName, localToolNames)) }
       : {}),
     ...(tools.mcp
-      ? { mcp: { servers: tools.mcp.servers.map((serverId) => namespacePluginReference(manifest.id, serverId, localMcpServerIds)) } }
+      ? { mcp: { servers: tools.mcp.servers.map((serverId) => namespacePluginMcpReference(manifest.id, serverId, localMcpServerIds)) } }
       : {}),
     ...(tools.phone ? { phone: tools.phone } : {}),
     ...(tools.agents ? { agents: tools.agents } : {}),
@@ -204,6 +209,14 @@ function resolvePluginCommandTools(manifest: PluginManifest, pluginRoot: string)
 }
 
 function namespacePluginReference(pluginId: string, id: string, localIds: Set<string>): string {
+  return !id.includes(".") && !id.includes("__") && localIds.has(id) ? namespacePluginToolId(pluginId, id) : id;
+}
+
+function namespacePluginToolId(pluginId: string, id: string): string {
+  return `${pluginId}__${id}`;
+}
+
+function namespacePluginMcpReference(pluginId: string, id: string, localIds: Set<string>): string {
   return !id.includes(".") && localIds.has(id) ? namespacePluginId(pluginId, id) : id;
 }
 
@@ -216,6 +229,6 @@ function isMissingManifest(message: string): boolean {
 }
 
 function stripPluginNamespace(pluginId: string, id: string): string {
-  const prefix = `${pluginId}.`;
+  const prefix = `${pluginId}__`;
   return id.startsWith(prefix) ? id.slice(prefix.length) : id;
 }
