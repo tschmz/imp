@@ -55,8 +55,7 @@ export async function discoverSkills(
   const issues: string[] = [];
   const discoveredSkills: SkillDefinition[] = [];
 
-  for (const configuredPath of paths) {
-    const directoryPath = resolve(configuredPath);
+  for (const directoryPath of uniqueResolvedPaths(paths)) {
     let entries: Dirent<string>[];
 
     try {
@@ -94,6 +93,10 @@ export async function discoverSkills(
     skills: rejectDuplicateSkills(discoveredSkills, issues),
     issues,
   };
+}
+
+function uniqueResolvedPaths(paths: string[]): string[] {
+  return [...new Set(paths.map((path) => resolve(path)))];
 }
 
 export function mergeSkillCatalogs(

@@ -44,6 +44,28 @@ describe("discoverSkills", () => {
     });
   });
 
+  it("scans duplicate configured skill paths only once", async () => {
+    const root = await createTempDir();
+    const skillsRoot = join(root, "skills");
+    await writeSkillFile(
+      join(skillsRoot, "commit", "SKILL.md"),
+      [
+        "---",
+        "name: commit",
+        "description: Stage and commit changes.",
+        "---",
+        "",
+        "Use focused commits.",
+      ].join("\n"),
+    );
+
+    const result = await discoverSkills([skillsRoot, skillsRoot]);
+
+    expect(result.issues).toEqual([]);
+    expect(result.skills).toHaveLength(1);
+    expect(result.skills[0]?.name).toBe("commit");
+  });
+
   it("ignores invalid frontmatter", async () => {
     const root = await createTempDir();
     const skillsRoot = join(root, "skills");
