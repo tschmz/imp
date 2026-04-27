@@ -14,12 +14,7 @@
       "prompt": {
         "base": {
           "file": "./prompts/cody.md"
-        },
-        "references": [
-          {
-            "file": "./README.md"
-          }
-        ]
+        }
       },
       "skills": {
         "paths": [
