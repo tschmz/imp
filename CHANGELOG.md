@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.16.0 - 2026-04-27
+
+### Added
+
+- Load installed plugins into the daemon runtime automatically, including plugin-provided skills, agents, MCP servers, command tools, and trusted JS runtime tools.
+- Add plugin agent support in configuration views and updates, including `imp config get` visibility for plugin agents and `imp config set` overrides for plugin-provided agents.
+- Add default model configuration under `defaults.model`, move `authFile`, API key, and inference settings into model config, and let plugin agents inherit the default model when they do not define one.
+- Add default agent home directories for plugin agents and use an agent's home directory as the working-directory fallback.
+- Add an `imp-agents` bundled plugin package with the Cody agent, workspace snapshot tool, Imp administration skill, and release preparation skill.
+- Add the Imp devkit reference plugin and package it for local development installs.
+
+### Changed
+
+- Update local install plugin selection for the bundled plugin packages.
+- Show configured plugin agents in the `/agent` command and report when a selected configured agent requires `/reload` before use.
+- Expose agent names to prompt templates and use Cody's configured name in its prompt.
+
+### Fixed
+
+- Keep core tools available to plugin agents.
+- Use provider-safe names for plugin tools.
+- Deduplicate configured skill paths.
+- Pin PI runtime dependencies to exact `0.70.2` versions.
+- Tighten Cody's agent configuration and skip invalid optional agents instead of failing the daemon when they are not required by an endpoint.
+
 ## 0.15.0 - 2026-04-26
 
 ### Added
