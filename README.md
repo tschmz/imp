@@ -207,10 +207,13 @@ npm install
 Useful development commands:
 
 ```sh
-npm run build      # compile TypeScript to dist/
-npm run check      # run typecheck and ESLint
-npm test           # run Vitest tests
-npm run clean      # remove dist/
+npm run build                    # compile TypeScript to dist/
+npm run check                    # run typecheck and ESLint
+npm test                         # run Vitest tests
+npm run clean                    # remove dist/
+just install                     # package and install only Imp globally
+just install --plugins           # also install and activate all plugin packages
+just install --plugin imp-voice  # also install and activate one plugin package
 ```
 
 After building, run the local CLI with:
