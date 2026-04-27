@@ -44,7 +44,7 @@ export async function loadRuntimePlugins(appConfig: AppConfig, configDir: string
     }
 
     loaded.skillPaths.push(...resolvePluginSkillPaths(manifest, pluginRoot));
-    loaded.agents.push(...resolvePluginAgents(manifest, pluginRoot, localToolNames));
+    loaded.agents.push(...resolvePluginAgents(manifest, pluginRoot, appConfig.paths.dataRoot, localToolNames));
     loaded.mcpServers.push(...resolvePluginMcpServers(manifest, pluginRoot));
     loaded.commandTools.push(...commandTools);
     loaded.pluginTools.push(...createCommandToolDefinitions(commandTools), ...jsTools);
@@ -131,7 +131,12 @@ function resolvePluginSkillPaths(manifest: PluginManifest, pluginRoot: string): 
   return (manifest.skills ?? []).map((skill) => resolveConfigPath(skill.path, pluginRoot));
 }
 
-function resolvePluginAgents(manifest: PluginManifest, pluginRoot: string, localToolNames: Set<string>): AgentConfig[] {
+function resolvePluginAgents(
+  manifest: PluginManifest,
+  pluginRoot: string,
+  dataRoot: string,
+  localToolNames: Set<string>,
+): AgentConfig[] {
   return (manifest.agents ?? []).map((agent) => {
     const agentId = namespacePluginId(manifest.id, agent.id);
     return {
@@ -139,7 +144,9 @@ function resolvePluginAgents(manifest: PluginManifest, pluginRoot: string, local
       id: agentId,
       ...(agent.model ? { model: resolvePluginModel(agent.model, pluginRoot) } : {}),
       ...(agent.prompt ? { prompt: resolvePluginPrompt(agent.prompt, pluginRoot) } : {}),
-      ...(agent.home ? { home: resolveConfigPath(agent.home, pluginRoot) } : {}),
+      home: agent.home
+        ? resolveConfigPath(agent.home, pluginRoot)
+        : join(dataRoot, "agents", agentId),
       ...(agent.workspace?.cwd
         ? { workspace: { ...agent.workspace, cwd: resolveConfigPath(agent.workspace.cwd, pluginRoot) } }
         : {}),

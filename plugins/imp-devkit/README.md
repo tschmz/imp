@@ -10,6 +10,9 @@ Imp DevKit is a reference plugin for Imp plugin authors and Imp maintainers. It 
   - `imp-plugin-author`
   - `imp-architecture-reviewer`
 
+Plugin agents that do not set `home` get the same default home pattern as configured
+agents, using their runtime id: `<dataRoot>/agents/<pluginId>.<agentId>`.
+
 ## Layout
 
 ```text

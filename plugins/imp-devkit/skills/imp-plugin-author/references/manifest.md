@@ -14,7 +14,7 @@ A minimal plugin manifest:
 Common capabilities:
 
 - `skills`: skill roots relative to the plugin directory.
-- `agents`: agent definitions shipped by the plugin. Runtime ids become `<pluginId>.<agentId>`.
+- `agents`: agent definitions shipped by the plugin. Runtime ids become `<pluginId>.<agentId>`. If `home` is omitted, Imp uses `<dataRoot>/agents/<pluginId>.<agentId>`.
 - `tools`: command tools. Runtime names become `<pluginId>__<toolName>` because model provider tool names may not contain dots.
 - `runtime.module`: trusted JS module that can register in-process tools.
 - `mcpServers`: MCP servers. Runtime ids become `<pluginId>.<serverId>`.
