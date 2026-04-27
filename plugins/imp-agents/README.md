@@ -15,7 +15,7 @@ Cody is a pragmatic software engineering agent. It is configured with the standa
 
 Cody uses `<agentHome>/MEMORY.md` as a small persistent workspace note. When a user says which repository to work in, Cody records it as `Current repo: /absolute/path` and uses that path as the default workspace in later chats because agent-home Markdown files are loaded into each turn.
 
-Cody includes the `imp-administration` skill for safe Imp config, log, plugin, service, backup, and runtime diagnosis workflows.
+Cody includes the `imp-administration` skill for safe Imp config, log, plugin, service, backup, and runtime diagnosis workflows. Cody also includes the `release-preparation` skill for repository release notes, versioning, validation, and tagging workflows.
 
 `workspaceSnapshot` creates a shallow, read-only orientation summary for a workspace:
 

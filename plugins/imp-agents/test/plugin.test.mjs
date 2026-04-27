@@ -20,11 +20,15 @@ describe("imp-agents plugin", () => {
     expect(prompt).toContain("agent-home Markdown instructions");
   });
 
-  it("configures Cody with the Imp administration skill", async () => {
+  it("configures Cody with bundled skills", async () => {
     const manifest = JSON.parse(await readFile(new URL("../plugin.json", import.meta.url), "utf8"));
     const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-    const skill = await readFile(
+    const administrationSkill = await readFile(
       new URL("../skills/imp-administration/SKILL.md", import.meta.url),
+      "utf8",
+    );
+    const releaseSkill = await readFile(
+      new URL("../skills/release-preparation/SKILL.md", import.meta.url),
       "utf8",
     );
     const cody = manifest.agents.find((agent) => agent.id === "cody");
@@ -32,8 +36,11 @@ describe("imp-agents plugin", () => {
     expect(cody.skills.paths).toEqual(["./skills"]);
     expect(cody.tools.builtIn).toContain("load_skill");
     expect(packageJson.files).toContain("skills");
-    expect(skill).toContain("name: imp-administration");
-    expect(skill).toContain("Use only `imp ...` commands for Imp administration.");
+    expect(administrationSkill).toContain("name: imp-administration");
+    expect(administrationSkill).toContain("Use only `imp ...` commands for Imp administration.");
+    expect(releaseSkill).toContain("name: release-preparation");
+    expect(releaseSkill).toContain("Find The Existing Release Pattern");
+    expect(releaseSkill).toContain("If there is no prior release pattern");
   });
 
   it("creates a workspace snapshot for coding-agent orientation", async () => {
