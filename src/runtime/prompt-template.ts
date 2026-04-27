@@ -59,6 +59,7 @@ export interface PromptTemplateContext {
   };
   agent: {
     id: string;
+    name: string;
     model: {
       provider: string;
       modelId: string;
@@ -176,6 +177,7 @@ export function createEmptyPromptTemplateContext(): PromptTemplateContext {
     },
     agent: {
       id: "",
+      name: "",
       model: {
         provider: "",
         modelId: "",
@@ -328,6 +330,7 @@ export function createPromptTemplateContext(options: {
     },
     agent: {
       id: options.agent.id,
+      name: options.agent.name,
       model: {
         provider: options.agent.model.provider,
         modelId: options.agent.model.modelId,

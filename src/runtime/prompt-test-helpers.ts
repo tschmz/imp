@@ -125,6 +125,7 @@ export function createPromptTestContext(
     },
     agent: {
       id: "default",
+      name: "Default",
       home: "/var/lib/imp/agents/default",
       model: {
         provider: "faux",

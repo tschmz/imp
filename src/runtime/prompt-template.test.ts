@@ -74,6 +74,25 @@ describe("createPromptTemplateContext", () => {
     expect(rendered).toBe("delegated default ask_helper telegram delegated-tool none");
   });
 
+  it("renders agent identity in prompt templates", () => {
+    const context = createPromptTemplateContext({
+      system: createSystemContext(),
+      agent: createAgent({
+        id: "imp-agents.cody",
+        name: "Cody",
+      }),
+      endpointId: "local-cli",
+      transportKind: "cli",
+    });
+
+    const rendered = renderPromptTemplate("{{agent.id}} {{agent.name}}", {
+      filePath: "/workspace/SYSTEM.md",
+      context,
+    });
+
+    expect(rendered).toBe("imp-agents.cody Cody");
+  });
+
   it("renders explicit reply channel context in prompt templates", () => {
     const context = createPromptTemplateContext({
       system: createSystemContext(),
