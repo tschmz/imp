@@ -82,7 +82,7 @@ describe("agentCommandHandler", () => {
     const response = await agentCommandHandler.handle(context);
 
     expect(agentCommandHandler.canHandle("agent")).toBe(true);
-    expect(response?.text).toContain('Switched this chat to agent "ops".');
+    expect(response?.text).toContain("Switched this chat to agent `ops`.");
     expect(sessions.get("default")?.state.agentId).toBe("default");
     expect(await store.getSelectedAgent!(context.message.conversation)).toBe("ops");
     expect((await store.get(context.message.conversation))?.state.conversation.sessionId).toBe("session-2");
@@ -107,7 +107,7 @@ describe("agentCommandHandler", () => {
 
     const response = await agentCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Available: default, ops, imp-agents.cody");
+    expect(response?.text).toContain("`default`, `ops`, `imp-agents.cody`");
   });
 
   it("tells the user to reload before switching to a newly configured plugin agent", async () => {
@@ -129,9 +129,9 @@ describe("agentCommandHandler", () => {
 
     const response = await agentCommandHandler.handle(context);
 
-    expect(response?.text).toContain('Agent "imp-agents.cody" is configured but not loaded in this daemon yet.');
-    expect(response?.text).toContain("Use /reload");
-    expect(response?.text).toContain("Available: default, ops, imp-agents.cody");
+    expect(response?.text).toContain("Agent `imp-agents.cody` is configured but not loaded in this daemon yet.");
+    expect(response?.text).toContain("Use `/reload`");
+    expect(response?.text).toContain("`default`, `ops`, `imp-agents.cody`");
   });
 });
 

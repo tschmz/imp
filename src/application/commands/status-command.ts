@@ -15,17 +15,13 @@ export const statusCommandHandler: InboundCommandHandler = {
     const agentId =
       await dependencies.conversationStore.getSelectedAgent?.(message.conversation) ??
       dependencies.defaultAgentId;
-    const [conversation, backups] = await Promise.all([
-      dependencies.conversationStore.getActiveForAgent?.(agentId) ??
-        dependencies.conversationStore.get(message.conversation),
-      dependencies.conversationStore.listBackupsForAgent?.(agentId) ??
-        dependencies.conversationStore.listBackups(message.conversation),
-    ]);
+    const conversation = await (dependencies.conversationStore.getActiveForAgent?.(agentId) ??
+      dependencies.conversationStore.get(message.conversation));
     const agent = conversation ? dependencies.agentRegistry.get(conversation.state.agentId) : undefined;
 
     return {
       conversation: message.conversation,
-      text: renderStatusMessage(conversation, backups, agent, dependencies.resolveModel ?? defaultResolveModel),
+      text: renderStatusMessage(conversation, agent, dependencies.resolveModel ?? defaultResolveModel),
     };
   },
 };

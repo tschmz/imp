@@ -148,11 +148,7 @@ describe("createRuntimeEntries", () => {
       externalId: "42",
       endpointId: "private-telegram",
     });
-    expect(runtime.conversationStore.listBackups).toHaveBeenCalledWith({
-      transport: "telegram",
-      externalId: "42",
-      endpointId: "private-telegram",
-    });
+    expect(runtime.conversationStore.listBackups).not.toHaveBeenCalled();
     expect(runtime.engine.run).not.toHaveBeenCalled();
   });
 

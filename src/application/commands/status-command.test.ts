@@ -47,8 +47,9 @@ describe("statusCommandHandler", () => {
     const response = await statusCommandHandler.handle(context);
 
     expect(statusCommandHandler.canHandle("status")).toBe(true);
-    expect(response?.text).toContain("**Active session**");
-    expect(response?.text).toContain("Sessions in history: 1");
+    expect(response?.text).toContain("# Status");
+    expect(response?.text).toContain("## Session");
+    expect(response?.text).not.toContain("Sessions in history");
   });
 
   it("renders aggregated LLM usage across assistant messages", async () => {
@@ -137,32 +138,14 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain(
-      [
-        "**Session usage**",
-        "Total: 198",
-        "Input: 111",
-        "Output: 32",
-        "Cache read: 43",
-        "Cache write: 12",
-      ].join("\n"),
-    );
-    expect(response?.text).toContain(
-      [
-        "**Last LLM turn**",
-        "Model: test/stub",
-        "Total: 23",
-        "Input: 11",
-        "Output: 7",
-        "Cache read: 3",
-        "Cache write: 2",
-        "",
-        "**Model limits**",
-        "Context window: 128,000",
-        "Context usage: 0.0%",
-        "Max tokens: 8,192",
-      ].join("\n"),
-    );
+    expect(response?.text).toContain("## Usage");
+    expect(response?.text).toContain("- **Tokens:** 198 total · 111 input · 32 output");
+    expect(response?.text).toContain("- **Cache:** 43 read · 12 write");
+    expect(response?.text).toContain("## Last LLM turn");
+    expect(response?.text).toContain("- **Model:** `test/stub`");
+    expect(response?.text).toContain("- **Tokens:** 23 total · 11 input · 7 output");
+    expect(response?.text).toContain("- **Context:** 0.0% of 128,000");
+    expect(response?.text).toContain("- **Max tokens:** 8,192");
   });
 
   it("renders last-turn context usage from input tokens only", async () => {
@@ -223,8 +206,8 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Context usage: 8.6%");
-    expect(response?.text).not.toContain("Context usage: 71.1%");
+    expect(response?.text).toContain("- **Context:** 8.6% of 128,000");
+    expect(response?.text).not.toContain("71.1%");
   });
 
   it("renders unknown context usage when the context window is unavailable", async () => {
@@ -273,8 +256,7 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Context window: unknown");
-    expect(response?.text).toContain("Context usage: unknown");
+    expect(response?.text).toContain("- **Context:** unknown of unknown");
   });
 
   it("renders zero LLM usage before assistant usage exists", async () => {
@@ -310,17 +292,8 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain(
-      [
-        "**Session usage**",
-        "Total: 0",
-        "Input: 0",
-        "Output: 0",
-        "Cache read: 0",
-        "Cache write: 0",
-      ].join("\n"),
-    );
-    expect(response?.text).toContain(["**Last LLM turn**", "No LLM turn recorded yet."].join("\n"));
+    expect(response?.text).toContain("- **Tokens:** 0 total · 0 input · 0 output");
+    expect(response?.text).toContain(["## Last LLM turn", "No LLM turn recorded yet."].join("\n"));
   });
 
   it("renders model limits without using the agent max output setting", async () => {
@@ -390,9 +363,8 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Context window: 200,000");
-    expect(response?.text).toContain("Context usage: 0.0%");
-    expect(response?.text).toContain("Max tokens: 100,000");
+    expect(response?.text).toContain("- **Context:** 0.0% of 200,000");
+    expect(response?.text).toContain("- **Max tokens:** 100,000");
     expect(response?.text).not.toContain("123");
   });
 
@@ -427,7 +399,7 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Working directory: /workspace/project");
+    expect(response?.text).toContain("- **Working directory:** `/workspace/project`");
   });
 
   it("falls back to the agent home for the working directory", async () => {
@@ -461,6 +433,6 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Working directory: /agents/default");
+    expect(response?.text).toContain("- **Working directory:** `/agents/default`");
   });
 });

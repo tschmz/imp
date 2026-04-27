@@ -41,17 +41,22 @@ export const agentCommandHandler: InboundCommandHandler = {
     const requestedAgent = dependencies.agentRegistry.get(requestedAgentId);
     if (!requestedAgent) {
       const configuredButNotLoaded = availableAgentIds.includes(requestedAgentId);
+      const availableAgents = availableAgentIds.map((agentId) => `\`${agentId}\``).join(", ");
       return {
         conversation: message.conversation,
         text: configuredButNotLoaded
           ? [
-              `Agent "${requestedAgentId}" is configured but not loaded in this daemon yet.`,
-              "Use /reload so the daemon restarts with the latest plugin agents.",
-              `Available: ${availableAgentIds.join(", ")}`,
+              "# Agent",
+              `Agent \`${requestedAgentId}\` is configured but not loaded in this daemon yet.`,
+              "",
+              "Use `/reload` so the daemon restarts with the latest plugin agents.",
+              `Available agents: ${availableAgents}`,
             ].join("\n")
-          : [`Unknown agent: ${requestedAgentId}`, `Available: ${availableAgentIds.join(", ")}`].join(
-              "\n",
-            ),
+          : [
+              "# Agent",
+              `Unknown agent: \`${requestedAgentId}\``,
+              `Available agents: ${availableAgents}`,
+            ].join("\n"),
       };
     }
 
@@ -72,7 +77,7 @@ export const agentCommandHandler: InboundCommandHandler = {
     return {
       conversation: message.conversation,
       text: [
-        `Switched this chat to agent "${requestedAgent.id}".`,
+        `Switched this chat to agent \`${requestedAgent.id}\`.`,
         "",
         renderAgentMessage(requestedAgent, {
           currentAgentId: requestedAgent.id,

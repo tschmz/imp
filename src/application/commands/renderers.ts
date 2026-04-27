@@ -74,66 +74,77 @@ function getLastAssistantMessage(
   return undefined;
 }
 
+function renderMarkdownValue(value: string | number | undefined): string {
+  return value === undefined || value === "" ? "not set" : String(value);
+}
+
+function renderInlineCode(value: string | undefined): string {
+  const rendered = renderMarkdownValue(value);
+  return rendered === "not set" ? rendered : `\`${rendered}\``;
+}
+
+function renderCsv(values: readonly string[]): string {
+  return values.length > 0 ? values.join(", ") : "none";
+}
+
+function renderCodeCsv(values: readonly string[]): string {
+  return values.length > 0 ? values.map((value) => `\`${value}\``).join(", ") : "none";
+}
+
+function renderPromptSource(source: AgentDefinition["prompt"]["base"]): string {
+  return source.file ?? (source.builtIn ? `built-in:${source.builtIn}` : "inline");
+}
+
 function renderLastLlmTurn(
   conversation: ConversationContext,
   resolveModel: ModelResolver,
 ): string[] {
   const lastAssistantMessage = getLastAssistantMessage(conversation);
   if (!lastAssistantMessage) {
-    return ["**Last LLM turn**", "No LLM turn recorded yet."];
+    return ["## Last LLM turn", "No LLM turn recorded yet."];
   }
 
   const model = resolveModel(lastAssistantMessage.provider, lastAssistantMessage.model);
   return [
-    "**Last LLM turn**",
-    `Model: ${lastAssistantMessage.provider}/${lastAssistantMessage.model}`,
-    `Total: ${formatCount(lastAssistantMessage.usage.totalTokens)}`,
-    `Input: ${formatCount(lastAssistantMessage.usage.input)}`,
-    `Output: ${formatCount(lastAssistantMessage.usage.output)}`,
-    `Cache read: ${formatCount(lastAssistantMessage.usage.cacheRead)}`,
-    `Cache write: ${formatCount(lastAssistantMessage.usage.cacheWrite)}`,
-    "",
-    "**Model limits**",
-    `Context window: ${formatCount(model?.contextWindow)}`,
-    `Context usage: ${formatContextUsage(lastAssistantMessage.usage.input, model?.contextWindow)}`,
-    `Max tokens: ${formatCount(model?.maxTokens)}`,
+    "## Last LLM turn",
+    `- **Model:** \`${lastAssistantMessage.provider}/${lastAssistantMessage.model}\``,
+    `- **Tokens:** ${formatCount(lastAssistantMessage.usage.totalTokens)} total · ${formatCount(lastAssistantMessage.usage.input)} input · ${formatCount(lastAssistantMessage.usage.output)} output`,
+    `- **Cache:** ${formatCount(lastAssistantMessage.usage.cacheRead)} read · ${formatCount(lastAssistantMessage.usage.cacheWrite)} write`,
+    `- **Context:** ${formatContextUsage(lastAssistantMessage.usage.input, model?.contextWindow)} of ${formatCount(model?.contextWindow)}`,
+    `- **Max tokens:** ${formatCount(model?.maxTokens)}`,
   ];
 }
 
 export function renderStatusMessage(
   conversation: ConversationContext | undefined,
-  backups: ConversationBackupSummary[],
   agent: AgentDefinition | undefined,
   resolveModel: ModelResolver,
 ): string {
   if (!conversation) {
     return [
+      "# Status",
       "No active session.",
-      `Sessions in history: ${backups.length}`,
-      backups.length > 0 ? "Use /history to inspect them or /resume <n> to switch to one." : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
+      "",
+      "Use `/new` to start a session or `/history` to inspect previous sessions.",
+    ].join("\n");
   }
 
   const llmUsage = aggregateLlmUsage(conversation);
 
   return [
-    "**Active session**",
-    `Title: ${conversation.state.title ?? "not set"}`,
-    `Agent: ${conversation.state.agentId}`,
-    `Entries: ${formatCount(conversation.messages.length)}`,
-    `Created: ${formatTimestamp(conversation.state.createdAt)}`,
-    `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
-    `Working directory: ${resolveDisplayedWorkingDirectory(conversation, agent)}`,
-    `Sessions in history: ${formatCount(backups.length)}`,
+    "# Status",
     "",
-    "**Session usage**",
-    `Total: ${formatCount(llmUsage.totalTokens)}`,
-    `Input: ${formatCount(llmUsage.input)}`,
-    `Output: ${formatCount(llmUsage.output)}`,
-    `Cache read: ${formatCount(llmUsage.cacheRead)}`,
-    `Cache write: ${formatCount(llmUsage.cacheWrite)}`,
+    "## Session",
+    `- **Title:** ${renderMarkdownValue(conversation.state.title)}`,
+    `- **Agent:** \`${conversation.state.agentId}\``,
+    `- **Messages:** ${formatCount(conversation.messages.length)}`,
+    `- **Created:** ${formatTimestamp(conversation.state.createdAt)}`,
+    `- **Updated:** ${formatTimestamp(conversation.state.updatedAt)}`,
+    `- **Working directory:** ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
+    "",
+    "## Usage",
+    `- **Tokens:** ${formatCount(llmUsage.totalTokens)} total · ${formatCount(llmUsage.input)} input · ${formatCount(llmUsage.output)} output`,
+    `- **Cache:** ${formatCount(llmUsage.cacheRead)} read · ${formatCount(llmUsage.cacheWrite)} write`,
     "",
     ...renderLastLlmTurn(conversation, resolveModel),
   ].join("\n");
@@ -144,35 +155,34 @@ export function renderHistoryMessage(
   backups: ConversationBackupSummary[],
   agent: AgentDefinition | undefined,
 ): string {
-  const lines = ["Session history:", ""];
+  const lines = ["# History", "", "## Current session"];
 
   if (conversation) {
-    lines.push("Current:");
     lines.push(
-      `- ${renderHistoryEntryLabel(conversation.state.title)} · agent ${conversation.state.agentId} · ${conversation.messages.length} entr${conversation.messages.length === 1 ? "y" : "ies"} · updated ${formatTimestamp(conversation.state.updatedAt)}`,
+      `- **Title:** ${renderMarkdownValue(renderHistoryEntryLabel(conversation.state.title))}`,
+      `- **Agent:** \`${conversation.state.agentId}\``,
+      `- **Messages:** ${formatCount(conversation.messages.length)}`,
+      `- **Updated:** ${formatTimestamp(conversation.state.updatedAt)}`,
+      `- **Working directory:** ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
     );
-    lines.push(`- wd ${resolveDisplayedWorkingDirectory(conversation, agent)}`);
   } else {
-    lines.push("Current:");
-    lines.push("- none");
+    lines.push("No active session.");
   }
 
-  lines.push("");
-  lines.push("Previous:");
+  lines.push("", "## Previous sessions");
 
   if (backups.length === 0) {
-    lines.push("- none");
+    lines.push("No previous sessions.");
     return lines.join("\n");
   }
 
   for (const [index, backup] of backups.entries()) {
     lines.push(
-      `${index + 1}. ${renderHistoryEntryLabel(backup.title)} · agent ${backup.agentId} · ${backup.messageCount} entr${backup.messageCount === 1 ? "y" : "ies"} · ${formatTimestamp(backup.updatedAt)}`,
+      `${index + 1}. **${renderHistoryEntryLabel(backup.title)}** — \`${backup.agentId}\` — ${formatCount(backup.messageCount)} message${backup.messageCount === 1 ? "" : "s"} — updated ${formatTimestamp(backup.updatedAt)}`,
     );
   }
 
-  lines.push("");
-  lines.push("Use /resume <n> to switch sessions.");
+  lines.push("", "Use `/resume <n>` to switch sessions.");
   return lines.join("\n");
 }
 
@@ -193,29 +203,32 @@ export function renderAgentMessage(
     availableAgentIds: string[];
   },
 ): string {
-  const basePrompt = agent.prompt.base.file ?? (agent.prompt.base.builtIn ? `built-in:${agent.prompt.base.builtIn}` : "inline");
-  const instructionSources = (agent.prompt.instructions ?? []).map((source) =>
-    "file" in source ? source.file : "inline",
-  );
-  const referenceSources = (agent.prompt.references ?? []).map((source) =>
-    "file" in source ? source.file : "inline",
-  );
+  const basePrompt = renderPromptSource(agent.prompt.base);
+  const instructionSources = (agent.prompt.instructions ?? []).map(renderPromptSource);
+  const referenceSources = (agent.prompt.references ?? []).map(renderPromptSource);
 
   return [
-    "Agent details:",
-    `Current: ${options.currentAgentId}`,
-    `Name: ${agent.name}`,
-    `Provider: ${agent.model.provider}`,
-    `Model: ${agent.model.modelId}`,
-    `Base prompt: ${basePrompt}`,
-    `Home: ${agent.home ?? "not set"}`,
-    `Auth file: ${agent.model.authFile ?? "not set"}`,
-    `API key: ${agent.model.apiKey ? "configured" : "not set"}`,
-    `Instructions: ${instructionSources.length > 0 ? instructionSources.join(", ") : "none"}`,
-    `References: ${referenceSources.length > 0 ? referenceSources.join(", ") : "none"}`,
-    `Workspace: ${agent.workspace?.cwd ?? "not set"}`,
-    `Skills: ${agent.skills?.paths.length ? agent.skills.paths.join(", ") : "none"}`,
-    `Tools: ${agent.tools.length > 0 ? agent.tools.join(", ") : "none"}`,
-    `Available: ${options.availableAgentIds.join(", ")}`,
+    "# Agent",
+    "",
+    "## Selected",
+    `- **ID:** \`${options.currentAgentId}\``,
+    `- **Name:** ${agent.name}`,
+    `- **Model:** \`${agent.model.provider}/${agent.model.modelId}\``,
+    `- **Home:** ${renderInlineCode(agent.home)}`,
+    `- **Workspace:** ${renderInlineCode(agent.workspace?.cwd)}`,
+    `- **Tools:** ${renderCodeCsv(agent.tools)}`,
+    `- **Skills:** ${renderCsv(agent.skills?.paths ?? [])}`,
+    "",
+    "## Prompt",
+    `- **Base:** ${renderInlineCode(basePrompt)}`,
+    `- **Instructions:** ${renderCsv(instructionSources)}`,
+    `- **References:** ${renderCsv(referenceSources)}`,
+    "",
+    "## Credentials",
+    `- **Auth file:** ${renderInlineCode(agent.model.authFile)}`,
+    `- **API key:** ${agent.model.apiKey ? "configured" : "not set"}`,
+    "",
+    "## Available agents",
+    renderCodeCsv(options.availableAgentIds),
   ].join("\n");
 }
