@@ -5,7 +5,6 @@ import type {
   AgentPromptConfig,
   AgentSkillsConfig,
   AgentWorkspaceConfig,
-  InferenceSettings,
   ModelRef,
 } from "../domain/agent.js";
 import type { LogLevel } from "../logging/types.js";
@@ -137,8 +136,6 @@ export interface ConfiguredAgent {
   prompt: AgentPromptConfig;
   model?: ModelRef;
   home?: string;
-  authFile?: string;
-  inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
   skills?: AgentSkillsConfig;
   skillCatalog?: SkillDefinition[];

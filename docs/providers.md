@@ -1,6 +1,8 @@
 # Providers
 
-Each agent uses one model provider and one model ID. The provider decides which credentials Imp needs in the runtime environment.
+Each agent uses one effective model config. An agent can define its own `model`, or inherit
+`defaults.model`. If an agent defines `model`, that model config replaces the default model
+config for that agent.
 
 The examples use `agents.default` to address the agent with the ID `default`.
 
@@ -9,14 +11,14 @@ The examples use `agents.default` to address the agent with the ID `default`.
 Set the provider and model ID:
 
 ```sh
-imp config set agents.default.model.provider openai
-imp config set agents.default.model.modelId gpt-5.4
+imp config set defaults.model.provider openai
+imp config set defaults.model.modelId gpt-5.4
 ```
 
 You can also set the model object at once:
 
 ```sh
-imp config set agents.default.model '{"provider":"openai","modelId":"gpt-5.4"}'
+imp config set defaults.model '{"provider":"openai","modelId":"gpt-5.4"}'
 ```
 
 Validate the config after changing a model:
@@ -53,12 +55,22 @@ Imp uses the provider registry from [`@mariozechner/pi-ai`](https://www.npmjs.co
 - `xai`: `XAI_API_KEY`
 - `zai`: `ZAI_API_KEY`
 
-## OAuth Credentials
-
-Some providers use OAuth credential files instead of API keys. Set `authFile` on the agent when the provider supports it:
+You can pin an API key source directly to a model config:
 
 ```sh
-imp config set agents.default.authFile /path/to/auth.json
+imp config set defaults.model.apiKey '{"env":"OPENAI_API_KEY"}'
+```
+
+`apiKey` accepts the same secret forms as endpoint tokens: inline string, `{"env":"NAME"}`,
+or `{"file":"./secrets/provider.key"}`.
+
+## OAuth Credentials
+
+Some providers use OAuth credential files instead of API keys. Set `authFile` on the model
+config when the provider supports it:
+
+```sh
+imp config set defaults.model.authFile /path/to/auth.json
 ```
 
 For OpenAI Codex credentials, create the auth file with:

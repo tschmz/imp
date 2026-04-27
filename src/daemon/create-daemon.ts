@@ -153,8 +153,6 @@ export function buildAgents(configuredAgents: DaemonConfig["agents"]): AgentDefi
       prompt: configuredAgent.prompt,
       model: configuredAgent.model,
       ...(configuredAgent.home ? { home: configuredAgent.home } : {}),
-      ...(configuredAgent.authFile ? { authFile: configuredAgent.authFile } : {}),
-      ...(configuredAgent.inference ? { inference: configuredAgent.inference } : {}),
       ...(configuredAgent.workspace ? { workspace: configuredAgent.workspace } : {}),
       ...(configuredAgent.skills ? { skills: configuredAgent.skills } : {}),
       ...(configuredAgent.skillCatalog ? { skillCatalog: configuredAgent.skillCatalog } : {}),

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AgentConfig, FileIngressConfig, FileResponseRoutingConfig } from "../config/types.js";
+import { secretValueConfigSchema } from "../config/secret-value.js";
 import { pluginIdentifierSchema, pluginResponseRoutingSchema } from "./protocol.js";
 
 export const PLUGIN_MANIFEST_FILE = "plugin.json";
@@ -134,14 +135,15 @@ const pluginAgentSchema: z.ZodType<PluginAgentManifest> = z.object({
     contextWindow: z.number().int().positive().optional(),
     maxTokens: z.number().int().positive().optional(),
     headers: z.record(z.string(), z.string()).optional(),
-  }),
-  home: z.string().min(1).optional(),
-  authFile: z.string().min(1).optional(),
-  inference: z.object({
-    maxOutputTokens: z.number().int().positive().optional(),
-    metadata: z.record(z.string(), z.unknown()).optional(),
-    request: z.record(z.string(), z.unknown()).optional(),
+    authFile: z.string().min(1).optional(),
+    apiKey: secretValueConfigSchema.optional(),
+    inference: z.object({
+      maxOutputTokens: z.number().int().positive().optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+      request: z.record(z.string(), z.unknown()).optional(),
+    }).optional(),
   }).optional(),
+  home: z.string().min(1).optional(),
   workspace: z.object({
     cwd: z.string().min(1).optional(),
     shellPath: z.string().min(1).array().optional(),

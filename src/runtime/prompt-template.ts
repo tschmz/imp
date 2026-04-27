@@ -62,9 +62,9 @@ export interface PromptTemplateContext {
     model: {
       provider: string;
       modelId: string;
+      authFile?: string;
     };
     home: string;
-    authFile?: string;
     workspace: {
       cwd?: string;
     };
@@ -179,9 +179,9 @@ export function createEmptyPromptTemplateContext(): PromptTemplateContext {
       model: {
         provider: "",
         modelId: "",
+        authFile: "",
       },
       home: "",
-      authFile: "",
       workspace: {
         cwd: "",
       },
@@ -331,9 +331,9 @@ export function createPromptTemplateContext(options: {
       model: {
         provider: options.agent.model.provider,
         modelId: options.agent.model.modelId,
+        authFile: options.agent.model.authFile ?? "",
       },
       home: options.agent.home ?? "",
-      authFile: options.agent.authFile ?? "",
       workspace: {
         cwd: options.agent.workspace?.cwd ?? "",
       },

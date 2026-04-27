@@ -435,8 +435,7 @@ describe("backup use cases", () => {
           agents: [
             {
               id: "default",
-              model: { provider: "openai-codex", modelId: "gpt-5.4" },
-              authFile: "./oauth.json",
+              model: { provider: "openai-codex", modelId: "gpt-5.4", authFile: "./oauth.json" },
               prompt: {
                 base: { file: sourceBasePromptPath },
                 instructions: [{ file: sourceInstructionPath }],
@@ -478,7 +477,9 @@ describe("backup use cases", () => {
     const restoredConfig = JSON.parse(await readFile(targetConfigPath, "utf8")) as {
       paths: { dataRoot: string };
       agents: Array<{
-        authFile?: string;
+        model?: {
+          authFile?: string;
+        };
         prompt: {
           base: { file?: string };
           instructions?: Array<{ file?: string }>;
@@ -487,7 +488,7 @@ describe("backup use cases", () => {
     };
 
     expect(restoredConfig.paths.dataRoot).toBe(targetDataRoot);
-    expect(restoredConfig.agents[0]?.authFile).toBe("./oauth.json");
+    expect(restoredConfig.agents[0]?.model?.authFile).toBe("./oauth.json");
     expect(restoredConfig.agents[0]?.prompt.base.file).toBe(join(targetDataRoot, "agents", "SYSTEM.md"));
     expect(restoredConfig.agents[0]?.prompt.instructions?.[0]?.file).toBe(
       join(targetDataRoot, "agents", "instructions", "STYLE.md"),
@@ -749,8 +750,7 @@ async function writeConfig(configPath: string, dataRoot: string): Promise<void> 
         agents: [
           {
             id: "default",
-            model: { provider: "openai-codex", modelId: "gpt-5.4" },
-            authFile: "./oauth.json",
+            model: { provider: "openai-codex", modelId: "gpt-5.4", authFile: "./oauth.json" },
             prompt: {
               base: {
                 file: "./prompts/SYSTEM.md",

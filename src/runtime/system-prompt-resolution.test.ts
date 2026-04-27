@@ -270,7 +270,6 @@ describe("resolveSystemPrompt", () => {
     const prompt = await buildSystemPrompt(
       {
         ...createAgent(),
-        authFile: undefined,
         workspace: undefined,
         prompt: {
           base: { text: createInlineBasePrompt("You are concise.", { includeReferences: false }) },
@@ -282,7 +281,10 @@ describe("resolveSystemPrompt", () => {
         ...createTemplateContext(),
         agent: {
           ...createTemplateContext().agent,
-          authFile: "",
+          model: {
+            ...createTemplateContext().agent.model,
+            authFile: "",
+          },
           workspace: {
             cwd: "",
           },
@@ -295,7 +297,7 @@ describe("resolveSystemPrompt", () => {
       [],
       async (path) => {
         if (path === "/workspace/AGENTS.md") {
-          return "auth=[{{agent.authFile}}] cwd=[{{agent.workspace.cwd}}] config=[{{imp.configPath}}] data=[{{imp.dataRoot}}]";
+          return "auth=[{{agent.model.authFile}}] cwd=[{{agent.workspace.cwd}}] config=[{{imp.configPath}}] data=[{{imp.dataRoot}}]";
         }
 
         throw new Error(`unexpected path: ${path}`);

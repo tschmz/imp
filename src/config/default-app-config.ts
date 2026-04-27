@@ -55,18 +55,7 @@ export function buildInitialAppConfig(
       model: {
         provider: answers.provider,
         modelId: answers.modelId,
-      },
-    },
-    agents: [
-      {
-        id: defaultAgentId,
-        ...(prompt ? { prompt } : {}),
         ...(usesOAuth ? { authFile: join(answers.dataRoot, "auth.json") } : {}),
-        tools: [...defaultTools],
-        ...(workspace ? { workspace } : {}),
-        skills: {
-          paths: [],
-        },
         inference: {
           metadata: {
             app: "imp",
@@ -74,6 +63,17 @@ export function buildInitialAppConfig(
           request: {
             store: true,
           },
+        },
+      },
+    },
+    agents: [
+      {
+        id: defaultAgentId,
+        ...(prompt ? { prompt } : {}),
+        tools: [...defaultTools],
+        ...(workspace ? { workspace } : {}),
+        skills: {
+          paths: [],
         },
       },
     ],

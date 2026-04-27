@@ -53,8 +53,8 @@ Set simple values directly:
 
 ```sh
 imp config set logging.level debug
-imp config set agents.default.model.provider openai
-imp config set agents.default.model.modelId gpt-5.4
+imp config set defaults.model.provider openai
+imp config set defaults.model.modelId gpt-5.4
 ```
 
 Set arrays or objects as JSON:
@@ -87,7 +87,7 @@ The top-level config is organized around these areas:
 - `instance`: installation metadata
 - `paths`: runtime storage locations
 - `logging`: daemon log level
-- `defaults`: fallback agent routing
+- `defaults`: fallback agent routing and shared model config
 - `agents`: agent definitions
 - `tools`: reusable tool integrations such as MCP servers
 - `plugins`: installed local plugin definitions
@@ -110,6 +110,7 @@ imp config set endpoints.private-telegram.token '{"env":"IMP_TELEGRAM_BOT_TOKEN"
 ```
 
 Secret file paths are resolved relative to the config file directory unless they are absolute.
+Model `apiKey` values use the same secret forms.
 
 ## Relative Paths
 
@@ -120,7 +121,10 @@ This applies to:
 - Prompt files
 - Instruction files
 - Reference files
-- `authFile`
+- `defaults.model.authFile`
+- `agents[].model.authFile`
+- `defaults.model.apiKey.file`
+- `agents[].model.apiKey.file`
 - Secret files
 - `workspace.cwd`
 - Plugin package paths

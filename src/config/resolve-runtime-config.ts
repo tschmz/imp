@@ -6,6 +6,7 @@ import type {
   AgentPhoneCallConfig,
   AgentPromptConfig,
   AgentWorkspaceConfig,
+  ModelRef,
   PromptSource,
 } from "../domain/agent.js";
 import type { DaemonConfig } from "../daemon/types.js";
@@ -14,7 +15,7 @@ import { getTransport } from "../transports/registry.js";
 import { loadRuntimePlugins } from "./plugin-runtime.js";
 import { deriveDelegationToolName } from "./schema.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
-import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig } from "./types.js";
+import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig, ModelConfig } from "./types.js";
 
 interface ResolveRuntimeConfigOptions {
   env?: NodeJS.ProcessEnv;
@@ -52,17 +53,16 @@ export async function resolveRuntimeConfig(
           ...runtimePlugins.skillPaths,
         ];
         const skillCatalog = await discoverSkills(skillPaths);
+        const model = await resolveAgentModel(agent, appConfig.defaults.model, configDir, options);
 
         return {
           id: agent.id,
           ...(agent.name ? { name: agent.name } : {}),
           prompt: resolveAgentPrompt(agent.prompt, configDir),
-          model: agent.model ?? appConfig.defaults.model,
+          ...(model ? { model } : {}),
           home: resolveAgentHome(agent, appConfig.paths.dataRoot, configDir),
-          ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, configDir) } : {}),
           ...(agent.workspace ? { workspace: resolveAgentWorkspace(agent.workspace, configDir) } : {}),
           ...(agent.skills ? { skills: resolveAgentSkills(agent.skills, configDir) } : {}),
-          ...(agent.inference ? { inference: agent.inference } : {}),
           ...(skillCatalog.skills.length > 0 ? { skillCatalog: skillCatalog.skills } : {}),
           ...(skillCatalog.issues.length > 0 ? { skillIssues: skillCatalog.issues } : {}),
           ...resolveAgentTools(agent, mcpServers, configDir),
@@ -92,6 +92,48 @@ export async function resolveRuntimeConfig(
         );
       }),
     ),
+  };
+}
+
+async function resolveAgentModel(
+  agent: AppConfig["agents"][number],
+  defaultModel: ModelConfig | undefined,
+  configDir: string,
+  options: ResolveRuntimeConfigOptions,
+): Promise<ModelRef | undefined> {
+  const model = agent.model ?? defaultModel;
+  if (!model) {
+    return undefined;
+  }
+
+  return resolveModelConfig(model, configDir, options, {
+    apiKeyFieldLabel: agent.model ? `agents.${agent.id}.model.apiKey` : "defaults.model.apiKey",
+  });
+}
+
+async function resolveModelConfig(
+  model: ModelConfig,
+  configDir: string,
+  options: ResolveRuntimeConfigOptions,
+  labels: {
+    apiKeyFieldLabel: string;
+  },
+): Promise<ModelRef> {
+  const { apiKey, authFile, ...modelConfig } = model;
+
+  return {
+    ...modelConfig,
+    ...(authFile ? { authFile: resolveConfigPath(authFile, configDir) } : {}),
+    ...(apiKey
+      ? {
+          apiKey: await resolveSecretValue(apiKey, {
+            configDir,
+            env: options.env,
+            readTextFile: options.readTextFile,
+            fieldLabel: labels.apiKeyFieldLabel,
+          }),
+        }
+      : {}),
   };
 }
 

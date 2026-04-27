@@ -77,7 +77,8 @@ Check these fields:
 - `prompt.base.file`
 - `prompt.instructions[].file`
 - `prompt.references[].file`
-- `authFile`
+- `defaults.model.authFile`
+- `agents[].model.authFile`
 - `workspace.cwd`
 - `endpoints[].token.file`
 

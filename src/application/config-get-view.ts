@@ -19,15 +19,22 @@ export function createConfigGetView(config: AppConfig): unknown {
     logging: {
       level: config.logging?.level ?? "info",
     },
-    agents: config.agents.map((agent) => materializeAgentDefaults(agent, config.paths.dataRoot)),
+    agents: config.agents.map((agent) =>
+      materializeAgentDefaults(agent, config.paths.dataRoot, config.defaults.model),
+    ),
     endpoints: config.endpoints.map((endpoint) => materializeEndpointDefaults(endpoint, config.defaults.agentId)),
   };
 }
 
-function materializeAgentDefaults(agent: AgentConfig, dataRoot: string): Record<string, unknown> {
+function materializeAgentDefaults(
+  agent: AgentConfig,
+  dataRoot: string,
+  defaultModel: AppConfig["defaults"]["model"],
+): Record<string, unknown> {
   return {
     ...agent,
     name: agent.name ?? agent.id,
+    ...(!agent.model && defaultModel ? { model: defaultModel } : {}),
     home: agent.home ?? join(dataRoot, "agents", agent.id),
     prompt: {
       ...(agent.prompt ?? {}),

@@ -33,6 +33,12 @@ describe("initAppConfig", () => {
         model?: {
           provider: string;
           modelId: string;
+          authFile?: string;
+          inference?: {
+            maxOutputTokens?: number;
+            metadata?: Record<string, unknown>;
+            request?: Record<string, unknown>;
+          };
         };
       };
       agents: Array<{
@@ -48,11 +54,6 @@ describe("initAppConfig", () => {
         prompt?: {
           base?: { file?: string; text?: string };
         };
-        inference?: {
-          maxOutputTokens?: number;
-          metadata?: Record<string, unknown>;
-          request?: Record<string, unknown>;
-        };
       }>;
       endpoints: unknown[];
     };
@@ -64,6 +65,14 @@ describe("initAppConfig", () => {
     expect(config.defaults.model).toEqual({
       provider: "openai",
       modelId: "gpt-5.4",
+      inference: {
+        metadata: {
+          app: "imp",
+        },
+        request: {
+          store: true,
+        },
+      },
     });
     expect(config.agents[0]?.model).toBeUndefined();
     expect(config.agents[0]?.tools).toEqual([
@@ -77,14 +86,7 @@ describe("initAppConfig", () => {
       "update_plan",
     ]);
     expect(config.agents[0]?.workspace).toBeUndefined();
-    expect(config.agents[0]?.inference).toEqual({
-      metadata: {
-        app: "imp",
-      },
-      request: {
-        store: true,
-      },
-    });
+    expect(config.agents[0]).not.toHaveProperty("inference");
     expect(config.agents[0]?.prompt).toBeUndefined();
     expect(config.endpoints).toEqual([]);
 
@@ -269,7 +271,9 @@ describe("initAppConfig", () => {
 
     await initAppConfig({ configPath, config });
 
-    await expect(readFile(configPath, "utf8")).resolves.toContain('"authFile"');
+    const rawConfig = await readFile(configPath, "utf8");
+    expect(rawConfig).toContain('"authFile"');
+    expect(rawConfig).toContain('"model"');
     await expect(readFile(configPath, "utf8")).resolves.toContain('"prompt"');
     await expect(
       readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),

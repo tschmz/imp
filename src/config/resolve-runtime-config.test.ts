@@ -34,13 +34,13 @@ describe("resolveRuntimeConfig", () => {
           model: {
             provider: "openai",
             modelId: "gpt-5.4",
-          },
-          inference: {
-            metadata: {
-              app: "imp",
-            },
-            request: {
-              store: true,
+            inference: {
+              metadata: {
+                app: "imp",
+              },
+              request: {
+                store: true,
+              },
             },
           },
           tools: ["read"],
@@ -91,13 +91,13 @@ describe("resolveRuntimeConfig", () => {
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
-        },
-        inference: {
-          metadata: {
-            app: "imp",
-          },
-          request: {
-            store: true,
+          inference: {
+            metadata: {
+              app: "imp",
+            },
+            request: {
+              store: true,
+            },
           },
         },
         tools: ["read"],
@@ -173,13 +173,13 @@ describe("resolveRuntimeConfig", () => {
           model: {
             provider: "openai",
             modelId: "gpt-5.4",
-          },
-          inference: {
-            metadata: {
-              app: "imp",
-            },
-            request: {
-              store: true,
+            inference: {
+              metadata: {
+                app: "imp",
+              },
+              request: {
+                store: true,
+              },
             },
           },
           tools: [],
@@ -343,13 +343,117 @@ describe("resolveRuntimeConfig", () => {
       defaults: {
         agentId: "default",
         model: {
-          provider: "openai",
+          provider: "openai-codex",
           modelId: "gpt-5.4",
+          authFile: "./auth.json",
+          inference: {
+            request: {
+              store: true,
+            },
+          },
         },
       },
       agents: [
         {
           id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.model).toEqual({
+      provider: "openai-codex",
+      modelId: "gpt-5.4",
+      authFile: "/etc/imp/auth.json",
+      inference: {
+        request: {
+          store: true,
+        },
+      },
+    });
+  });
+
+  it("resolves defaults.model apiKey secret references", async () => {
+    const appConfig = createAppConfig({
+      defaults: {
+        agentId: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+          apiKey: {
+            env: "OPENAI_API_KEY",
+          },
+        },
+      },
+      agents: [
+        {
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json", {
+      env: {
+        OPENAI_API_KEY: "sk-test",
+      },
+    });
+
+    expect(result.agents[0]?.model?.apiKey).toBe("sk-test");
+  });
+
+  it("does not merge defaults.model into an explicit agent model", async () => {
+    const appConfig = createAppConfig({
+      defaults: {
+        agentId: "default",
+        model: {
+          provider: "openai-codex",
+          modelId: "gpt-5.4",
+          authFile: "./auth.json",
+          inference: {
+            maxOutputTokens: 1000,
+          },
+        },
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.4",
+          },
           prompt: {
             base: {
               text: "You are concise.",
@@ -1036,8 +1140,8 @@ describe("resolveRuntimeConfig", () => {
           model: {
             provider: "openai",
             modelId: "gpt-5.4",
+            authFile: "./auth.json",
           },
-          authFile: "./auth.json",
           prompt: {
             base: {
               text: "You are concise.",
@@ -1060,7 +1164,7 @@ describe("resolveRuntimeConfig", () => {
 
     const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
-    expect(result.agents[0]?.authFile).toBe("/etc/imp/auth.json");
+    expect(result.agents[0]?.model?.authFile).toBe("/etc/imp/auth.json");
   });
 
   it("fails when no daemon endpoint is enabled", async () => {
@@ -1498,13 +1602,13 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
-        },
-        inference: {
-          metadata: {
-            app: "imp",
-          },
-          request: {
-            store: true,
+          inference: {
+            metadata: {
+              app: "imp",
+            },
+            request: {
+              store: true,
+            },
           },
         },
         tools: [],

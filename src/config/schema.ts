@@ -5,12 +5,21 @@ import type {
   AppConfig,
   EndpointConfig,
   FileEndpointConfig,
+  ModelConfig,
 } from "./types.js";
+import { secretValueConfigSchema } from "./secret-value.js";
 import { getTransport, listTransportTypes } from "../transports/registry.js";
 
 type RefinementContext<T> = z.core.$RefinementCtx<T>;
 
 const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
+
+const inferenceSettingsSchema = z.object({
+  maxOutputTokens: z.number().int().positive().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  request: z.record(z.string(), z.unknown()).optional(),
+});
+
 const modelConfigSchema = z.object({
   provider: z.string().min(1),
   modelId: z.string().min(1),
@@ -21,12 +30,9 @@ const modelConfigSchema = z.object({
   contextWindow: z.number().int().positive().optional(),
   maxTokens: z.number().int().positive().optional(),
   headers: z.record(z.string(), z.string()).optional(),
-});
-
-const inferenceSettingsSchema = z.object({
-  maxOutputTokens: z.number().int().positive().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  request: z.record(z.string(), z.unknown()).optional(),
+  authFile: z.string().min(1).optional(),
+  apiKey: secretValueConfigSchema.optional(),
+  inference: inferenceSettingsSchema.optional(),
 });
 
 const promptSourceSchema = z
@@ -150,12 +156,10 @@ const agentConfigSchema = z.object({
   prompt: agentPromptConfigSchema.optional(),
   model: modelConfigSchema.optional(),
   home: z.string().min(1).optional(),
-  authFile: z.string().min(1).optional(),
-  inference: inferenceSettingsSchema.optional(),
   workspace: agentWorkspaceConfigSchema.optional(),
   skills: agentSkillsConfigSchema.optional(),
   tools: agentToolsConfigSchema.optional(),
-});
+}).strict();
 
 const pluginIdSchema = z
   .string()
@@ -286,6 +290,8 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
   const agentIds = new Set<string>();
   const knownAgentIds = new Set<string>();
 
+  validateModelConfig(config.defaults.model, ["defaults", "model"], ctx);
+
   for (const [index, agent] of config.agents.entries()) {
     if (agentIds.has(agent.id)) {
       ctx.addIssue({
@@ -299,6 +305,8 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
     agentIds.add(agent.id);
     knownAgentIds.add(agent.id);
 
+    validateModelConfig(agent.model, ["agents", index, "model"], ctx);
+
     const effectiveModel = agent.model ?? config.defaults.model;
     if (!effectiveModel) {
       ctx.addIssue({
@@ -306,23 +314,6 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
         path: ["agents", index, "model"],
         message: "Agent model is required when defaults.model is not configured.",
       });
-    }
-
-    if (agent.authFile) {
-      const provider = effectiveModel?.provider;
-      if (!provider) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["agents", index, "authFile"],
-          message: "`authFile` requires `model.provider` or `defaults.model.provider` to be set to an OAuth-capable provider.",
-        });
-      } else if (!getOAuthProvider(provider)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["agents", index, "authFile"],
-          message: `\`authFile\` is not supported for provider \`${provider}\`.`,
-        });
-      }
     }
   }
 
@@ -381,6 +372,24 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
   validateAgentDelegationReferences(config, knownAgentIds, ctx);
   validateEndpointDefaultAgents(config, knownAgentIds, ctx);
   validateFileEndpoints(config, endpointIds, enabledEndpointIds, pluginIds, enabledPluginIds, ctx);
+}
+
+function validateModelConfig(
+  model: ModelConfig | undefined,
+  path: Array<string | number>,
+  ctx: RefinementContext<AppConfig>,
+): void {
+  if (!model?.authFile) {
+    return;
+  }
+
+  if (!getOAuthProvider(model.provider)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [...path, "authFile"],
+      message: `\`authFile\` is not supported for provider \`${model.provider}\`.`,
+    });
+  }
 }
 
 function validateAgentMcpServerReferences(

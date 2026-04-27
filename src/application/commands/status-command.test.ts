@@ -366,7 +366,10 @@ describe("statusCommandHandler", () => {
         agentRegistry: createAgentRegistry([
           {
             ...createDefaultAgent(),
-            inference: { maxOutputTokens: 123 },
+            model: {
+              ...createDefaultAgent().model,
+              inference: { maxOutputTokens: 123 },
+            },
           },
         ]),
         resolveModel: () =>

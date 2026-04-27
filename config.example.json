@@ -12,7 +12,16 @@
     "agentId": "default",
     "model": {
       "provider": "openai-codex",
-      "modelId": "gpt-5.4"
+      "modelId": "gpt-5.4",
+      "authFile": "/var/lib/imp/auth.json",
+      "inference": {
+        "metadata": {
+          "app": "imp"
+        },
+        "request": {
+          "store": true
+        }
+      }
     }
   },
   "tools": {
@@ -38,7 +47,6 @@
   "agents": [
     {
       "id": "default",
-      "authFile": "/var/lib/imp/auth.json",
       "tools": {
         "builtIn": [
           "read",
@@ -88,7 +96,25 @@
       "name": "Operations",
       "model": {
         "provider": "openai",
-        "modelId": "gpt-5.4"
+        "modelId": "gpt-5.4",
+        "apiKey": {
+          "env": "OPENAI_API_KEY"
+        },
+        "inference": {
+          "metadata": {
+            "app": "imp",
+            "role": "ops"
+          },
+          "request": {
+            "store": true,
+            "reasoning": {
+              "effort": "medium"
+            },
+            "text": {
+              "verbosity": "low"
+            }
+          }
+        }
       },
       "tools": [
         "read",
@@ -122,21 +148,6 @@
           "/usr/bin",
           "/bin"
         ]
-      },
-      "inference": {
-        "metadata": {
-          "app": "imp",
-          "role": "ops"
-        },
-        "request": {
-          "store": true,
-          "reasoning": {
-            "effort": "medium"
-          },
-          "text": {
-            "verbosity": "low"
-          }
-        }
       }
     }
   ],

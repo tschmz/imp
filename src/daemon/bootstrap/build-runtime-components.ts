@@ -54,8 +54,13 @@ export function buildRuntimeComponents(
   const logger = createRoutingLogger(endpointLogger, agentLoggers);
   const conversationStore = createConversationStore(endpointConfig.paths);
 
-  const getApiKey = async (provider: string, agent: AgentDefinition) =>
-    createOAuthApiKeyResolver(agent.authFile, logger)(provider);
+  const getApiKey = async (provider: string, agent: AgentDefinition) => {
+    if (provider === agent.model.provider && agent.model.apiKey) {
+      return agent.model.apiKey;
+    }
+
+    return createOAuthApiKeyResolver(agent.model.authFile, logger)(provider);
+  };
   const engine =
     dependencies.engine ??
     createPiAgentEngine({

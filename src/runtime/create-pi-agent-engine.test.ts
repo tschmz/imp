@@ -936,7 +936,7 @@ describe("createPiAgentEngine", () => {
     );
   });
 
-  it("applies inference options and request overrides from agent config", async () => {
+  it("applies inference options and request overrides from model config", async () => {
     let capturedOnPayload:
       | ((payload: unknown, model: { api: string }) => unknown | Promise<unknown> | undefined)
       | undefined;
@@ -961,16 +961,16 @@ describe("createPiAgentEngine", () => {
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
-        },
-        inference: {
-          maxOutputTokens: 2000,
-          metadata: {
-            app: "imp",
-            env: "test",
-          },
-          request: {
-            store: true,
-            service_tier: "priority",
+          inference: {
+            maxOutputTokens: 2000,
+            metadata: {
+              app: "imp",
+              env: "test",
+            },
+            request: {
+              store: true,
+              service_tier: "priority",
+            },
           },
         },
       },
@@ -2071,7 +2071,7 @@ describe("createPiAgentEngine", () => {
 
     const engine = createPiAgentEngine({
       getApiKey: async (provider, agent) =>
-        provider === "openai-codex" && agent.authFile === "/workspace/auth.json"
+        provider === "openai-codex" && agent.model.authFile === "/workspace/auth.json"
           ? "oauth-token"
           : undefined,
       resolveModel: () =>
@@ -2090,10 +2090,10 @@ describe("createPiAgentEngine", () => {
     await engine.run({
       agent: {
         ...createAgent(),
-        authFile: "/workspace/auth.json",
         model: {
           provider: "openai",
           modelId: "gpt-5.4",
+          authFile: "/workspace/auth.json",
         },
       },
       conversation: createConversation(),

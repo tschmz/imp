@@ -84,6 +84,7 @@ imp start
 An agent defines how Imp talks to a model. An agent can configure:
 
 - provider and model ID
+- model credentials and inference settings
 - system prompt, additional instructions, and reference context
 - workspace and shell path
 - enabled built-in tools, MCP servers, skills, and delegated agents

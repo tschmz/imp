@@ -137,9 +137,9 @@ function resolvePluginAgents(manifest: PluginManifest, pluginRoot: string, local
     return {
       ...agent,
       id: agentId,
+      ...(agent.model ? { model: resolvePluginModel(agent.model, pluginRoot) } : {}),
       ...(agent.prompt ? { prompt: resolvePluginPrompt(agent.prompt, pluginRoot) } : {}),
       ...(agent.home ? { home: resolveConfigPath(agent.home, pluginRoot) } : {}),
-      ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, pluginRoot) } : {}),
       ...(agent.workspace?.cwd
         ? { workspace: { ...agent.workspace, cwd: resolveConfigPath(agent.workspace.cwd, pluginRoot) } }
         : {}),
@@ -147,6 +147,31 @@ function resolvePluginAgents(manifest: PluginManifest, pluginRoot: string, local
       ...(agent.tools ? { tools: resolvePluginAgentTools(manifest, agent.tools, localToolNames) } : {}),
     };
   });
+}
+
+function resolvePluginModel(
+  model: NonNullable<AgentConfig["model"]>,
+  pluginRoot: string,
+): NonNullable<AgentConfig["model"]> {
+  return {
+    ...model,
+    ...(model.authFile ? { authFile: resolveConfigPath(model.authFile, pluginRoot) } : {}),
+    ...(model.apiKey ? { apiKey: resolvePluginSecretValue(model.apiKey, pluginRoot) } : {}),
+  };
+}
+
+function resolvePluginSecretValue(
+  value: NonNullable<NonNullable<AgentConfig["model"]>["apiKey"]>,
+  pluginRoot: string,
+): NonNullable<NonNullable<AgentConfig["model"]>["apiKey"]> {
+  if (typeof value === "string" || !("file" in value) || !value.file) {
+    return value;
+  }
+
+  return {
+    ...value,
+    file: resolveConfigPath(value.file, pluginRoot),
+  };
 }
 
 function resolvePluginPrompt(prompt: NonNullable<AgentConfig["prompt"]>, pluginRoot: string): NonNullable<AgentConfig["prompt"]> {

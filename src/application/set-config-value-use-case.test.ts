@@ -217,7 +217,7 @@ describe("createSetConfigValueUseCase", () => {
         keyPath: "agents.default.unknown.value",
         value: "custom",
       }),
-    ).rejects.toThrow("Config update targets an unsupported key path or value: agents.default.unknown.value");
+    ).rejects.toThrow('agents[0]: Unrecognized key: "unknown"');
 
     await expect(readFile(configPath, "utf8")).resolves.toBe(before);
   });

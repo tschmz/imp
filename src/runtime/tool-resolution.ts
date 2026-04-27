@@ -41,9 +41,9 @@ export function createOnPayloadOverride(
     ) => Promise<void> | void;
   } = {},
 ): StreamOptions["onPayload"] | undefined {
-  const maxOutputTokens = agent.inference?.maxOutputTokens;
-  const metadata = agent.inference?.metadata;
-  const request = agent.inference?.request;
+  const maxOutputTokens = agent.model.inference?.maxOutputTokens;
+  const metadata = agent.model.inference?.metadata;
+  const request = agent.model.inference?.request;
   if (
     metadata === undefined &&
     request === undefined &&

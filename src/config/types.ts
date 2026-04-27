@@ -2,7 +2,6 @@ import type {
   AgentMcpServerConfig,
   AgentPhoneCallConfig,
   AgentWorkspaceConfig,
-  InferenceSettings,
   ModelRef,
   PromptSource,
 } from "../domain/agent.js";
@@ -26,7 +25,9 @@ export interface DefaultsConfig {
   model?: ModelConfig;
 }
 
-export type ModelConfig = ModelRef;
+export interface ModelConfig extends Omit<ModelRef, "apiKey"> {
+  apiKey?: SecretValueConfig;
+}
 
 export interface ToolsConfig {
   mcp?: {
@@ -70,8 +71,6 @@ export interface AgentConfig {
   prompt?: AgentPromptConfigInput;
   model?: ModelConfig;
   home?: string;
-  authFile?: string;
-  inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
   tools?: AgentToolsConfig;
   skills?: AgentSkillsConfig;

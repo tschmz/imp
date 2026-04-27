@@ -25,7 +25,7 @@ describe("default app config helpers", () => {
   });
 
 
-  it("stores the initial provider and model in defaults.model", () => {
+  it("stores the initial provider, model, and inference defaults in defaults.model", () => {
     const config = buildInitialAppConfig(process.env, {
       instanceName: "default",
       dataRoot: "/tmp/imp",
@@ -36,8 +36,17 @@ describe("default app config helpers", () => {
     expect(config.defaults.model).toEqual({
       provider: "openai",
       modelId: "gpt-5.4",
+      inference: {
+        metadata: {
+          app: "imp",
+        },
+        request: {
+          store: true,
+        },
+      },
     });
     expect(config.agents[0]?.model).toBeUndefined();
+    expect(config.agents[0]).not.toHaveProperty("inference");
   });
 
   it("creates a telegram endpoint when a token is provided", () => {
@@ -73,7 +82,8 @@ describe("default app config helpers", () => {
       allowedUserIds: [],
     });
 
-    expect(config.agents[0]?.authFile).toBe("/tmp/imp/auth.json");
+    expect(config.defaults.model?.authFile).toBe("/tmp/imp/auth.json");
+    expect(config.agents[0]?.model).toBeUndefined();
   });
 
   it("omits authFile for non-OAuth providers", () => {
@@ -86,7 +96,7 @@ describe("default app config helpers", () => {
       allowedUserIds: [],
     });
 
-    expect(config.agents[0]?.authFile).toBeUndefined();
+    expect(config.defaults.model?.authFile).toBeUndefined();
   });
 
   it("builds workspace and prompt overrides", () => {

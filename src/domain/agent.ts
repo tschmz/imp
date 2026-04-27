@@ -74,6 +74,9 @@ export interface ModelRef {
   contextWindow?: number;
   maxTokens?: number;
   headers?: Record<string, string>;
+  authFile?: string;
+  apiKey?: string;
+  inference?: InferenceSettings;
 }
 
 export interface AgentDefinition {
@@ -82,8 +85,6 @@ export interface AgentDefinition {
   prompt: AgentPromptConfig;
   model: ModelRef;
   home?: string;
-  authFile?: string;
-  inference?: InferenceSettings;
   workspace?: AgentWorkspaceConfig;
   skills?: AgentSkillsConfig;
   skillCatalog?: import("../skills/types.js").SkillDefinition[];

@@ -49,7 +49,12 @@ interface BackupAgentFileEntry {
   sourcePath: string;
   configRelativePath?: string;
   agentId: string;
-  reference: "prompt.base.file" | "prompt.instructions[].file" | "prompt.references[].file" | "authFile";
+  reference:
+    | "prompt.base.file"
+    | "prompt.instructions[].file"
+    | "prompt.references[].file"
+    | "defaults.model.authFile"
+    | "model.authFile";
 }
 
 interface BackupConversationEntry {
@@ -263,6 +268,13 @@ function collectAgentFiles(appConfig: AppConfig, configPath: string): Omit<Backu
   const configDir = dirname(configPath);
   const files = new Map<string, Omit<BackupAgentFileEntry, "archivePath">>();
 
+  addAgentFile(files, {
+    agentId: appConfig.defaults.agentId,
+    reference: "defaults.model.authFile",
+    configDir,
+    configuredPath: appConfig.defaults.model?.authFile,
+  });
+
   for (const agent of appConfig.agents) {
     addAgentFile(files, {
       agentId: agent.id,
@@ -291,9 +303,9 @@ function collectAgentFiles(appConfig: AppConfig, configPath: string): Omit<Backu
 
     addAgentFile(files, {
       agentId: agent.id,
-      reference: "authFile",
+      reference: "model.authFile",
       configDir,
-      configuredPath: agent.authFile,
+      configuredPath: agent.model?.authFile,
     });
   }
 
@@ -526,9 +538,27 @@ function relocateConfigFileReferences(
 
   return {
     ...appConfig,
+    defaults: {
+      ...appConfig.defaults,
+      ...(appConfig.defaults.model
+        ? {
+            model: {
+              ...appConfig.defaults.model,
+              authFile: relocateConfiguredFilePath(appConfig.defaults.model.authFile, sourceConfigDir, relocationMap),
+            },
+          }
+        : {}),
+    },
     agents: appConfig.agents.map((agent) => ({
       ...agent,
-      authFile: relocateConfiguredFilePath(agent.authFile, sourceConfigDir, relocationMap),
+      ...(agent.model
+        ? {
+            model: {
+              ...agent.model,
+              authFile: relocateConfiguredFilePath(agent.model.authFile, sourceConfigDir, relocationMap),
+            },
+          }
+        : {}),
       ...(agent.prompt
         ? {
             prompt: {
