@@ -121,7 +121,7 @@ See [`config.example.json`](./config.example.json) for a complete example.
 | `imp log`                          | Show daemon logs                                    |
 | `imp config get <path>`            | Read an effective config value                      |
 | `imp config set <path> <value>`    | Update a config value                               |
-| `imp config validate`              | Validate the active config                          |
+| `imp config validate [--preflight]` | Validate the active config and optional agent preflight |
 | `imp config reload`                | Ask the installed service to reload                 |
 | `imp backup create`                | Create a backup archive                             |
 | `imp restore <archive>`            | Restore from a backup archive                       |
@@ -140,7 +140,10 @@ Use the CLI for day-to-day config inspection and updates:
 imp config get defaults.agentId
 imp config set logging.level debug
 imp config validate
+imp config validate --preflight
 ```
+
+Use `--preflight` to also resolve runtime agent config, tools, and prompt files before starting a chat or daemon endpoint.
 
 Pass arrays and objects as JSON:
 

@@ -37,9 +37,14 @@ export function registerConfigCommands(programOrSubcommand: Command, deps: CliDe
     }),
   );
 
-  addConfigOption(configCommand.command("validate").description("Validate a discovered or explicit config file")).action(
-    withAsyncAction(async (options: { config?: string }) => {
-      await deps.validateConfig({ configPath: options.config });
+  addConfigOption(
+    configCommand
+      .command("validate")
+      .description("Validate a discovered or explicit config file")
+      .option("--preflight", "Also resolve runtime agent config, tools, and prompt files"),
+  ).action(
+    withAsyncAction(async (options: { config?: string; preflight?: boolean }) => {
+      await deps.validateConfig({ configPath: options.config, preflight: options.preflight });
     }),
   );
 

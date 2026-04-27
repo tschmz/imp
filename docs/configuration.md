@@ -70,13 +70,21 @@ Validate after changes:
 imp config validate
 ```
 
+Run the agent preflight before starting chats or daemon endpoints:
+
+```sh
+imp config validate --preflight
+```
+
+The preflight also resolves runtime agent config, validates configured tools/delegations, and reads configured prompt/instruction/reference files.
+
 Print the JSON Schema for config-shape reference:
 
 ```sh
 imp config schema
 ```
 
-The schema describes field structure and basic value constraints. Use `imp config validate` for cross-reference checks, duplicate-id rules, and secret-reference validation.
+The schema describes field structure and basic value constraints. Use `imp config validate` for cross-reference checks, duplicate-id rules, and secret-reference validation. Add `--preflight` for runtime agent checks that normally happen when a chat or daemon endpoint starts.
 
 Use [Agent Context](./agent-context.md), [Agent Tools](./agent-tools.md), and [Providers](./providers.md) for the most common agent-specific settings.
 
@@ -163,9 +171,11 @@ When config validation fails, check these first:
 - Endpoint IDs are unique
 - `defaults.agentId` points to an existing agent
 - Endpoint routing points to an existing agent
-- Prompt sources use exactly one of `text` or `file`
+- Prompt sources use exactly one of `text`, `file`, or `builtIn`
 - Telegram token secret references resolve
+- With `--preflight`: prompt, instruction, and reference files are readable
+- With `--preflight`: built-in tool names and agent delegations resolve
 
-Provider credentials are used when the agent runs, not during `imp config validate`. If validation passes but a run fails, check the runtime or service environment for the variables required by the configured provider.
+Provider credentials that are read implicitly by the provider SDK are used when the agent runs, not during `imp config validate`. Explicit `model.apiKey` secret references are resolved by `imp config validate --preflight`. If validation passes but a run fails, check the runtime or service environment for the variables required by the configured provider.
 
 See [`config.example.json`](../config.example.json) for a complete example config.

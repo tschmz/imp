@@ -45,6 +45,81 @@ describe("createValidateConfigUseCase", () => {
     expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${configPath}`);
   });
 
+  it("runs agent preflight validation when requested", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+    const promptPath = join(root, "custom", "prompt.md");
+    const writeOutput = vi.fn();
+
+    await mkdir(dirname(promptPath), { recursive: true });
+    await writeFile(promptPath, "prompt from file", "utf8");
+    await writeConfig(configPath, {
+      agents: [
+        {
+          id: "default",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          prompt: {
+            base: {
+              file: "prompt.md",
+            },
+          },
+        },
+      ],
+    });
+
+    await createValidateConfigUseCase({ writeOutput })({ configPath, preflight: true });
+
+    expect(writeOutput).toHaveBeenCalledWith("Agent preflight valid: 1 agent(s)");
+    expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${configPath}`);
+  });
+
+  it("fails preflight when an agent prompt file is missing", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+
+    await writeConfig(configPath, {
+      agents: [
+        {
+          id: "default",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          prompt: {
+            base: {
+              file: "missing.md",
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(createValidateConfigUseCase()({ configPath, preflight: true })).rejects.toThrow(
+      `Failed to read base prompt for agent "default": ${join(root, "custom", "missing.md")}`,
+    );
+  });
+
+  it("fails preflight when an agent references an unknown built-in tool", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+
+    await writeConfig(configPath, {
+      agents: [
+        {
+          id: "default",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          prompt: {
+            base: {
+              text: "prompt",
+            },
+          },
+          tools: ["definitely_missing_tool"],
+        },
+      ],
+    });
+
+    await expect(createValidateConfigUseCase()({ configPath, preflight: true })).rejects.toThrow(
+      'Unknown tools for agent "default": definitely_missing_tool',
+    );
+  });
+
   it("accepts env-backed telegram token references when the env var is set", async () => {
     const root = await createTempDir();
     const configPath = join(root, "custom", "imp.json");

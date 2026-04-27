@@ -2,7 +2,7 @@ export interface CliDependencies {
   startDaemon: (options: { configPath?: string }) => Promise<void>;
   startChat: (options: { configPath?: string; endpointId?: string }) => Promise<void>;
   viewLogs: (options: { configPath?: string; endpointId?: string; follow: boolean; lines: number }) => Promise<void>;
-  validateConfig: (options: { configPath?: string }) => Promise<void>;
+  validateConfig: (options: { configPath?: string; preflight?: boolean }) => Promise<void>;
   showConfigSchema: () => Promise<void>;
   reloadConfig: (options: { configPath?: string }) => Promise<void>;
   getConfigValue: (options: { configPath?: string; keyPath: string }) => Promise<void>;

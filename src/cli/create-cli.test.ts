@@ -38,6 +38,7 @@ describe("createCli", () => {
 
     expect(findCommand(configCommand, "validate").helpInformation()).toContain("Usage: imp config validate");
     expect(findCommand(configCommand, "validate").helpInformation()).toContain("--config <path>");
+    expect(findCommand(configCommand, "validate").helpInformation()).toContain("--preflight");
     expect(findCommand(configCommand, "schema").helpInformation()).toContain("Usage: imp config schema");
 
     const configGetHelp = findCommand(configCommand, "get").helpInformation();
