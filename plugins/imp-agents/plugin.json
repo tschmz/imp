@@ -1,24 +1,19 @@
 {
   "schemaVersion": 1,
-  "id": "imp-devkit",
-  "name": "Imp DevKit",
+  "id": "imp-agents",
+  "name": "Imp Agent Pack",
   "version": "0.1.0",
-  "description": "Specialized development agent, skills, and tools for extending Imp.",
+  "description": "Specialized Imp agents and practical reference tools.",
   "runtime": {
     "module": "./plugin.mjs"
   },
-  "skills": [
-    {
-      "path": "./skills"
-    }
-  ],
   "agents": [
     {
-      "id": "developer",
-      "name": "Imp Developer",
+      "id": "cody",
+      "name": "Cody",
       "prompt": {
         "base": {
-          "file": "./prompts/imp-developer.md"
+          "file": "./prompts/cody.md"
         },
         "references": [
           {
@@ -39,12 +34,7 @@
           "load_skill",
           "pwd",
           "cd",
-          "describeManifest"
-        ]
-      },
-      "skills": {
-        "paths": [
-          "./skills"
+          "workspaceSnapshot"
         ]
       }
     }

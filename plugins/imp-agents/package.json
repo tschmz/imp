@@ -1,15 +1,14 @@
 {
-  "name": "@tschmz/imp-devkit",
+  "name": "@tschmz/imp-agents",
   "version": "0.1.0",
   "private": false,
   "type": "module",
-  "description": "Reference development plugin for extending Imp",
+  "description": "Specialized Imp agents and practical reference tools",
   "files": [
     "plugin.json",
     "README.md",
     "plugin.mjs",
-    "prompts",
-    "skills"
+    "prompts"
   ],
   "publishConfig": {
     "access": "public"

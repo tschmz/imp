@@ -14,10 +14,10 @@ afterEach(async () => {
 describe("prepareAgentHomeDirectories", () => {
   it("creates configured agent home directories", async () => {
     const root = await createTempDir();
-    const agentHome = join(root, "agents", "imp-devkit.developer");
+    const agentHome = join(root, "agents", "imp-agents.cody");
 
     await prepareAgentHomeDirectories([
-      createAgent({ id: "imp-devkit.developer", home: agentHome }),
+      createAgent({ id: "imp-agents.cody", home: agentHome }),
       createAgent({ id: "no-home" }),
     ]);
 

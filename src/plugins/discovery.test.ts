@@ -50,11 +50,10 @@ describe("discoverPluginManifests", () => {
     const result = await discoverPluginManifests([join(process.cwd(), "plugins")]);
 
     expect(result.issues).toEqual([]);
-    expect(result.plugins.map((plugin) => plugin.manifest.id)).toContain("imp-devkit");
-    expect(result.plugins.find((plugin) => plugin.manifest.id === "imp-devkit")?.manifest).toMatchObject({
+    expect(result.plugins.map((plugin) => plugin.manifest.id)).toContain("imp-agents");
+    expect(result.plugins.find((plugin) => plugin.manifest.id === "imp-agents")?.manifest).toMatchObject({
       runtime: { module: "./plugin.mjs" },
-      agents: [expect.objectContaining({ id: "developer" })],
-      skills: [{ path: "./skills" }],
+      agents: [expect.objectContaining({ id: "cody" })],
     });
   });
 

@@ -107,13 +107,13 @@ describe("agentCommandHandler", () => {
 
     const response = await agentCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Available: default, ops, imp-devkit.developer");
+    expect(response?.text).toContain("Available: default, ops, imp-agents.cody");
   });
 
   it("tells the user to reload before switching to a newly configured plugin agent", async () => {
     const { appConfig, configPath, dataRoot } = await createPluginAgentConfig();
     const context = createCommandContext({
-      message: createIncomingMessage("agent", "imp-devkit.developer"),
+      message: createIncomingMessage("agent", "imp-agents.cody"),
       dependencies: createDependencies({
         runtimeInfo: {
           endpointId: "private-telegram",
@@ -129,26 +129,26 @@ describe("agentCommandHandler", () => {
 
     const response = await agentCommandHandler.handle(context);
 
-    expect(response?.text).toContain('Agent "imp-devkit.developer" is configured but not loaded in this daemon yet.');
+    expect(response?.text).toContain('Agent "imp-agents.cody" is configured but not loaded in this daemon yet.');
     expect(response?.text).toContain("Use /reload");
-    expect(response?.text).toContain("Available: default, ops, imp-devkit.developer");
+    expect(response?.text).toContain("Available: default, ops, imp-agents.cody");
   });
 });
 
 async function createPluginAgentConfig(): Promise<{ appConfig: AppConfig; configPath: string; dataRoot: string }> {
   const root = await createTempDir();
   const dataRoot = join(root, "state");
-  const pluginRoot = join(dataRoot, "plugins", "imp-devkit");
+  const pluginRoot = join(dataRoot, "plugins", "imp-agents");
   await writeRawFile(join(pluginRoot, "imp-plugin.json"), JSON.stringify({
     schemaVersion: 1,
-    id: "imp-devkit",
-    name: "Imp DevKit",
+    id: "imp-agents",
+    name: "Imp Agent Pack",
     version: "0.1.0",
     agents: [
       {
-        id: "developer",
-        model: { provider: "openai", modelId: "gpt-5.1-codex" },
-        prompt: { base: { text: "Imp developer" } },
+        id: "cody",
+        model: { provider: "openai", modelId: "gpt-5.4" },
+        prompt: { base: { text: "Cody" } },
       },
     ],
   }, null, 2));

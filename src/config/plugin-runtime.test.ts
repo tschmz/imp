@@ -15,16 +15,16 @@ describe("loadRuntimePlugins", () => {
   it("assigns a default home to plugin agents", async () => {
     const root = await createTempDir();
     const dataRoot = join(root, "state");
-    const pluginRoot = join(dataRoot, "plugins", "imp-devkit");
+    const pluginRoot = join(dataRoot, "plugins", "imp-agents");
     await writePluginManifest(pluginRoot, {
       schemaVersion: 1,
-      id: "imp-devkit",
-      name: "Imp DevKit",
+      id: "imp-agents",
+      name: "Imp Agent Pack",
       version: "0.1.0",
       agents: [
         {
-          id: "developer",
-          prompt: { base: { text: "Developer" } },
+          id: "cody",
+          prompt: { base: { text: "Cody" } },
         },
       ],
     });
@@ -32,25 +32,25 @@ describe("loadRuntimePlugins", () => {
     const result = await loadRuntimePlugins(createAppConfig(dataRoot), join(root, "config"));
 
     expect(result.agents[0]).toMatchObject({
-      id: "imp-devkit.developer",
-      home: join(dataRoot, "agents", "imp-devkit.developer"),
+      id: "imp-agents.cody",
+      home: join(dataRoot, "agents", "imp-agents.cody"),
     });
   });
 
   it("resolves explicit plugin agent home paths relative to the plugin root", async () => {
     const root = await createTempDir();
     const dataRoot = join(root, "state");
-    const pluginRoot = join(dataRoot, "plugins", "imp-devkit");
+    const pluginRoot = join(dataRoot, "plugins", "imp-agents");
     await writePluginManifest(pluginRoot, {
       schemaVersion: 1,
-      id: "imp-devkit",
-      name: "Imp DevKit",
+      id: "imp-agents",
+      name: "Imp Agent Pack",
       version: "0.1.0",
       agents: [
         {
-          id: "developer",
-          home: "./agents/developer",
-          prompt: { base: { text: "Developer" } },
+          id: "cody",
+          home: "./agents/cody",
+          prompt: { base: { text: "Cody" } },
         },
       ],
     });
@@ -58,8 +58,8 @@ describe("loadRuntimePlugins", () => {
     const result = await loadRuntimePlugins(createAppConfig(dataRoot), join(root, "config"));
 
     expect(result.agents[0]).toMatchObject({
-      id: "imp-devkit.developer",
-      home: join(pluginRoot, "agents", "developer"),
+      id: "imp-agents.cody",
+      home: join(pluginRoot, "agents", "cody"),
     });
   });
 });
