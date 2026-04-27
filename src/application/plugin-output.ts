@@ -21,6 +21,38 @@ export function renderPluginDetails(plugin: DiscoveredPluginManifest): string {
     lines.push(`Capabilities: ${plugin.manifest.capabilities.join(", ")}`);
   }
 
+  if (plugin.manifest.runtime) {
+    lines.push("");
+    lines.push("Runtime:");
+    lines.push(`- js: ${plugin.manifest.runtime.module}`);
+  }
+
+  if (plugin.manifest.agents?.length) {
+    lines.push("");
+    lines.push("Agents:");
+    for (const agent of plugin.manifest.agents) {
+      const label = agent.name ? `${agent.id} (${agent.name})` : agent.id;
+      const details = renderAgentDetails(agent);
+      lines.push(`- ${label}${details.length > 0 ? `: ${details.join("; ")}` : ""}`);
+    }
+  }
+
+  if (plugin.manifest.skills?.length) {
+    lines.push("");
+    lines.push("Skills:");
+    for (const skill of plugin.manifest.skills) {
+      lines.push(`- ${skill.path}`);
+    }
+  }
+
+  if (plugin.manifest.tools?.length) {
+    lines.push("");
+    lines.push("Command tools:");
+    for (const tool of plugin.manifest.tools) {
+      lines.push(`- ${tool.name}: ${tool.description}`);
+    }
+  }
+
   if (plugin.manifest.endpoints?.length) {
     lines.push("");
     lines.push("Endpoints:");
@@ -51,6 +83,34 @@ export function renderPluginDetails(plugin: DiscoveredPluginManifest): string {
   }
 
   return lines.join("\n");
+}
+
+function renderAgentDetails(agent: NonNullable<DiscoveredPluginManifest["manifest"]["agents"]>[number]): string[] {
+  const details: string[] = [];
+  const toolNames = renderAgentToolNames(agent.tools);
+  if (toolNames.length > 0) {
+    details.push(`tools=${toolNames.join(", ")}`);
+  }
+  if (agent.skills?.paths.length) {
+    details.push(`skills=${agent.skills.paths.join(", ")}`);
+  }
+  if (agent.prompt?.base?.file) {
+    details.push(`prompt=${agent.prompt.base.file}`);
+  }
+  return details;
+}
+
+function renderAgentToolNames(tools: NonNullable<DiscoveredPluginManifest["manifest"]["agents"]>[number]["tools"]): string[] {
+  if (!tools) {
+    return [];
+  }
+  if (Array.isArray(tools)) {
+    return tools;
+  }
+  return [
+    ...(tools.builtIn ?? []),
+    ...(tools.mcp?.servers.map((server) => `mcp:${server}`) ?? []),
+  ];
 }
 
 export function renderPluginListOutput(options: {

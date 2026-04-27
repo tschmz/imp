@@ -169,7 +169,7 @@ Read more in [Telegram](./docs/telegram.md).
 
 ### Plugins
 
-Plugins are local companion components. Imp does not load plugin code into the daemon process; instead, plugins communicate through configured file endpoints and optional MCP server defaults.
+Plugins are local companion components. They can contribute installable endpoints, services, MCP server defaults, specialized agents, skills, and trusted JS runtime tools.
 
 ```sh
 imp plugin list

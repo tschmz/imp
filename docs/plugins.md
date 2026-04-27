@@ -1,8 +1,8 @@
 # Plugins
 
-Plugins are local companion components that exchange files with Imp. They are not loaded into the daemon process, and Imp does not execute plugin code while handling a message.
+Plugins are local companion components. They can contribute file endpoints, companion services, MCP server defaults, specialized agents, skills, command tools, and trusted JS runtime tools.
 
-A plugin usually provides one or more file endpoints, optional companion services, and optional MCP server defaults. The external component writes event files into an inbox, Imp routes the text to an agent, and the configured response route decides where the reply goes.
+A plugin usually provides one or more file endpoints, optional companion services, and optional MCP server defaults. The external component writes event files into an inbox, Imp routes the text to an agent, and the configured response route decides where the reply goes. Plugins that declare a JS runtime module run inside the Imp process and should only be installed from trusted sources.
 
 ## Inspect Plugins
 
@@ -46,6 +46,7 @@ The install command updates the config by adding:
 - MCP server defaults declared by the plugin manifest
 - Package metadata such as the plugin path, version, and manifest hash
 
+Plugin agents and skills are loaded from the installed plugin package at runtime. Plugin-provided agents use namespaced IDs such as `imp-agents.cody`.
 Plugin MCP servers are not attached to agents automatically. Enable them per agent in [Agent Tools](./agent-tools.md).
 Manifest MCP server `command`, `args`, `cwd`, `inheritEnv`, and `env` values may use `{{config.path}}`, `{{config.dir}}`, `{{paths.dataRoot}}`, `{{plugin.id}}`, and `{{plugin.rootDir}}`. `{{agent.id}}` and `{{agent.name}}` are resolved when an agent enables the server.
 

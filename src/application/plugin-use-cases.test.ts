@@ -9,6 +9,7 @@ import {
   parseNpmPackageName,
   tryParseNpmPackageName,
 } from "./plugin-use-cases.js";
+import { resolveRuntimeConfig } from "../config/resolve-runtime-config.js";
 import type { AppConfig } from "../config/types.js";
 
 describe("plugin use cases", () => {
@@ -84,6 +85,77 @@ describe("plugin use cases", () => {
         "",
         "MCP servers:",
         "- voice-tools: node dist/mcp-server.js",
+      ].join("\n"),
+    );
+  });
+
+  it("inspects plugin agents, skills, command tools, and JS runtime modules", async () => {
+    const root = await createPluginRoot();
+    await writeManifest(root, "imp-agents", {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.0",
+      runtime: {
+        module: "./plugin.mjs",
+      },
+      agents: [
+        {
+          id: "cody",
+          name: "Cody",
+          prompt: {
+            base: {
+              file: "./prompts/cody.md",
+            },
+          },
+          skills: {
+            paths: ["./skills"],
+          },
+          tools: {
+            builtIn: ["read", "load_skill", "workspaceSnapshot"],
+          },
+        },
+      ],
+      skills: [
+        {
+          path: "./skills",
+        },
+      ],
+      tools: [
+        {
+          name: "repo-summary",
+          description: "Summarize a repository.",
+          runner: {
+            type: "command",
+            command: "node",
+            args: ["tools/repo-summary.mjs"],
+          },
+        },
+      ],
+    });
+    const writeOutput = vi.fn();
+    const useCases = createPluginUseCases({ writeOutput });
+
+    await useCases.inspectPlugin({ root, id: "imp-agents" });
+
+    expect(writeOutput).toHaveBeenCalledWith(
+      [
+        "Imp Agent Pack (imp-agents)",
+        "Version: 0.1.0",
+        `Root: ${join(root, "imp-agents")}`,
+        `Manifest: ${join(root, "imp-agents", "plugin.json")}`,
+        "",
+        "Runtime:",
+        "- js: ./plugin.mjs",
+        "",
+        "Agents:",
+        "- cody (Cody): tools=read, load_skill, workspaceSnapshot; skills=./skills; prompt=./prompts/cody.md",
+        "",
+        "Skills:",
+        "- ./skills",
+        "",
+        "Command tools:",
+        "- repo-summary: Summarize a repository.",
       ].join("\n"),
     );
   });
@@ -369,6 +441,70 @@ describe("plugin use cases", () => {
       `Installed plugin package "@tschmz/imp-voice@0.1.0" into ${packageStoreRoot}`,
     );
     expect(writeOutput).toHaveBeenCalledWith(`Installed plugin "imp-voice" into ${configPath}`);
+  });
+
+  it("installs bundled imp-agents and resolves Cody with skills and runtime tools", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    const dataRoot = join(root, "state");
+    const writeOutput = vi.fn();
+    await writeFile(
+      configPath,
+      `${JSON.stringify({
+        ...createConfig(),
+        paths: { dataRoot },
+        defaults: {
+          agentId: "default",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+        },
+        endpoints: [
+          {
+            id: "local",
+            type: "cli",
+            enabled: true,
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    const useCases = createPluginUseCases({ writeOutput });
+
+    await useCases.installPlugin({
+      root: join(process.cwd(), "plugins"),
+      configPath,
+      id: "imp-agents",
+      autoStartServices: false,
+    });
+
+    const updated = JSON.parse(await readConfig(configPath)) as AppConfig;
+    const runtimeConfig = await resolveRuntimeConfig(updated, configPath, { includeCliEndpoints: true });
+    const cody = runtimeConfig.agents.find((agent) => agent.id === "imp-agents.cody");
+
+    expect(updated.plugins).toEqual([
+      {
+        id: "imp-agents",
+        enabled: true,
+        package: {
+          path: join(process.cwd(), "plugins", "imp-agents"),
+          source: {
+            version: "0.1.0",
+            manifestHash: expect.stringMatching(/^sha256:/),
+          },
+        },
+      },
+    ]);
+    expect(cody).toMatchObject({
+      id: "imp-agents.cody",
+      name: "Cody",
+      home: join(dataRoot, "agents", "imp-agents.cody"),
+      tools: expect.arrayContaining(["read", "load_skill", "imp-agents__workspaceSnapshot"]),
+    });
+    expect(cody?.skillCatalog?.map((skill) => skill.name).sort()).toEqual([
+      "imp-administration",
+      "release-preparation",
+    ]);
+    expect((runtimeConfig.pluginTools ?? []).map((tool) => tool.name)).toContain("imp-agents__workspaceSnapshot");
+    expect(writeOutput).toHaveBeenCalledWith(`Installed plugin "imp-agents" into ${configPath}`);
   });
 
   it("installs and starts auto-start plugin services", async () => {

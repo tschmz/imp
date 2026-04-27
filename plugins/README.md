@@ -12,7 +12,7 @@ plugins/
     plugin.json
 ```
 
-Published users should install plugins from npm, for example `imp plugin install @tschmz/imp-voice` or `imp plugin install @tschmz/imp-phone`. `imp-agents` is a local reference plugin for bundled specialized agents and plugin tools.
+Published users should install plugins from npm, for example `imp plugin install @tschmz/imp-voice`, `imp plugin install @tschmz/imp-phone`, or `imp plugin install @tschmz/imp-agents`.
 For local development from this repository, pass the explicit plugin root:
 
 ```bash
@@ -22,4 +22,5 @@ imp plugin install imp-voice --root plugins --config ~/.config/imp/config.json
 imp plugin inspect imp-phone --root plugins
 imp plugin install imp-phone --root plugins --config ~/.config/imp/config.json
 imp plugin inspect imp-agents --root plugins
+imp plugin install imp-agents --root plugins --config ~/.config/imp/config.json
 ```

@@ -5,9 +5,32 @@ Imp Agent Pack is a bundled reference plugin that ships specialized Imp agents a
 ## What it registers
 
 - Agent: `imp-agents.cody`
-- Tool: `imp-agents__workspaceSnapshot`
+- JS runtime tool: `imp-agents__workspaceSnapshot`
 
 Plugin agents that do not set `home` get the same default home pattern as configured agents, using their runtime id: `<dataRoot>/agents/<pluginId>.<agentId>`.
+
+## Installation
+
+Install the published package with Imp's plugin installer:
+
+```sh
+imp plugin install @tschmz/imp-agents
+```
+
+For local development from a checked-out repository, pass the parent plugin root explicitly:
+
+```sh
+imp plugin list --root plugins
+imp plugin inspect imp-agents --root plugins
+imp plugin install imp-agents --root plugins --config ~/.config/imp/config.json
+```
+
+After installation, Cody is visible in the effective config:
+
+```sh
+imp config get agents.*.id
+imp config get agents.imp-agents.cody.name
+```
 
 ## Cody
 
@@ -31,20 +54,15 @@ Cody includes the `imp-administration` skill for safe Imp config, log, plugin, s
 plugins/imp-agents/
   plugin.json
   plugin.mjs
+  README.md
   prompts/
     cody.md
+  skills/
+    imp-administration/
+      SKILL.md
+    release-preparation/
+      SKILL.md
 ```
-
-## Using it as a user plugin
-
-Copy or symlink this directory to one of Imp's automatic plugin roots:
-
-```text
-<dataRoot>/plugins/imp-agents
-<agentHome>/plugins/imp-agents
-```
-
-Imp auto-discovers plugins from `dataRoot/plugins` first and then from each configured agent's `plugins` directory. If the same plugin id exists in both locations, the agent-home plugin wins.
 
 ## JS runtime API demonstrated
 
