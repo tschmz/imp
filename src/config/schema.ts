@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
 import type {
-  AgentConfig,
   AgentToolsConfig,
   AppConfig,
   EndpointConfig,
@@ -145,20 +144,18 @@ const agentToolsConfigSchema = z
   ])
   .superRefine(validateAgentToolsConfig);
 
-const agentConfigSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1).optional(),
-    prompt: agentPromptConfigSchema.optional(),
-    model: modelConfigSchema.optional(),
-    home: z.string().min(1).optional(),
-    authFile: z.string().min(1).optional(),
-    inference: inferenceSettingsSchema.optional(),
-    workspace: agentWorkspaceConfigSchema.optional(),
-    skills: agentSkillsConfigSchema.optional(),
-    tools: agentToolsConfigSchema.optional(),
-  })
-  .superRefine(validateAgentConfig);
+const agentConfigSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).optional(),
+  prompt: agentPromptConfigSchema.optional(),
+  model: modelConfigSchema.optional(),
+  home: z.string().min(1).optional(),
+  authFile: z.string().min(1).optional(),
+  inference: inferenceSettingsSchema.optional(),
+  workspace: agentWorkspaceConfigSchema.optional(),
+  skills: agentSkillsConfigSchema.optional(),
+  tools: agentToolsConfigSchema.optional(),
+});
 
 const pluginIdSchema = z
   .string()
@@ -203,6 +200,7 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
     .optional(),
   defaults: z.object({
     agentId: z.string().min(1),
+    model: modelConfigSchema.optional(),
   }),
   tools: toolsConfigSchema.optional(),
   agents: agentConfigSchema.array().min(1),
@@ -284,38 +282,6 @@ function validateAgentToolsConfig(
   }
 }
 
-function validateAgentConfig(agent: AgentConfig, ctx: RefinementContext<AgentConfig>): void {
-  if (!agent.model) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["model"],
-      message: "Agent model is required.",
-    });
-  }
-
-  if (!agent.authFile) {
-    return;
-  }
-
-  const provider = agent.model?.provider;
-  if (!provider) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["authFile"],
-      message: "`authFile` requires `model.provider` to be set to an OAuth-capable provider.",
-    });
-    return;
-  }
-
-  if (!getOAuthProvider(provider)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["authFile"],
-      message: `\`authFile\` is not supported for provider \`${provider}\`.`,
-    });
-  }
-}
-
 function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>): void {
   const agentIds = new Set<string>();
   const knownAgentIds = new Set<string>();
@@ -332,6 +298,32 @@ function validateAppConfig(config: AppConfig, ctx: RefinementContext<AppConfig>)
 
     agentIds.add(agent.id);
     knownAgentIds.add(agent.id);
+
+    const effectiveModel = agent.model ?? config.defaults.model;
+    if (!effectiveModel) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["agents", index, "model"],
+        message: "Agent model is required when defaults.model is not configured.",
+      });
+    }
+
+    if (agent.authFile) {
+      const provider = effectiveModel?.provider;
+      if (!provider) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["agents", index, "authFile"],
+          message: "`authFile` requires `model.provider` or `defaults.model.provider` to be set to an OAuth-capable provider.",
+        });
+      } else if (!getOAuthProvider(provider)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["agents", index, "authFile"],
+          message: `\`authFile\` is not supported for provider \`${provider}\`.`,
+        });
+      }
+    }
   }
 
   const endpointIds = new Set<string>();

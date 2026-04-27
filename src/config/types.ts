@@ -23,6 +23,7 @@ export interface LoggingConfig {
 
 export interface DefaultsConfig {
   agentId: string;
+  model?: ModelConfig;
 }
 
 export type ModelConfig = ModelRef;

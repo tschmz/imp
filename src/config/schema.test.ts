@@ -53,7 +53,7 @@ describe("appConfigSchema", () => {
     expect(result.error.issues).toContainEqual(
       expect.objectContaining({
         path: ["agents", 0, "authFile"],
-        message: "`authFile` requires `model.provider` to be set to an OAuth-capable provider.",
+        message: "`authFile` requires `model.provider` or `defaults.model.provider` to be set to an OAuth-capable provider.",
       }),
     );
   });
@@ -74,6 +74,25 @@ describe("appConfigSchema", () => {
         authFile: "/tmp/auth.json",
       }),
     );
+
+    expect(result.success).toBe(true);
+  });
+
+
+  it("validates authFile against defaults.model when the agent omits model", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        authFile: "/tmp/auth.json",
+      }),
+      defaults: {
+        agentId: "default",
+        model: {
+          provider: "openai-codex",
+          modelId: "gpt-5.4",
+        },
+      },
+    });
 
     expect(result.success).toBe(true);
   });
@@ -304,9 +323,32 @@ describe("appConfigSchema", () => {
     expect(result.error.issues).toContainEqual(
       expect.objectContaining({
         path: ["agents", 0, "model"],
-        message: "Agent model is required.",
+        message: "Agent model is required when defaults.model is not configured.",
       }),
     );
+  });
+
+
+  it("accepts agents without a model when defaults.model is configured", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+      }),
+      defaults: {
+        agentId: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it("accepts agent shell path entries in workspace", () => {

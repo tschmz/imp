@@ -30,10 +30,14 @@ describe("initAppConfig", () => {
       paths: { dataRoot: string };
       defaults: {
         agentId: string;
+        model?: {
+          provider: string;
+          modelId: string;
+        };
       };
       agents: Array<{
         id: string;
-        model: {
+        model?: {
           provider: string;
           modelId: string;
         };
@@ -57,10 +61,11 @@ describe("initAppConfig", () => {
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
     expect(config.defaults.agentId).toBe("default");
-    expect(config.agents[0]?.model).toEqual({
+    expect(config.defaults.model).toEqual({
       provider: "openai",
       modelId: "gpt-5.4",
     });
+    expect(config.agents[0]?.model).toBeUndefined();
     expect(config.agents[0]?.tools).toEqual([
       "read",
       "bash",

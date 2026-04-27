@@ -24,6 +24,22 @@ describe("default app config helpers", () => {
     expect(config.endpoints).toEqual([]);
   });
 
+
+  it("stores the initial provider and model in defaults.model", () => {
+    const config = buildInitialAppConfig(process.env, {
+      instanceName: "default",
+      dataRoot: "/tmp/imp",
+      provider: "openai",
+      modelId: "gpt-5.4",
+    });
+
+    expect(config.defaults.model).toEqual({
+      provider: "openai",
+      modelId: "gpt-5.4",
+    });
+    expect(config.agents[0]?.model).toBeUndefined();
+  });
+
   it("creates a telegram endpoint when a token is provided", () => {
     const config = buildInitialAppConfig(process.env, {
       instanceName: "default",

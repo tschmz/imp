@@ -52,14 +52,14 @@ export function buildInitialAppConfig(
     },
     defaults: {
       agentId: defaultAgentId,
+      model: {
+        provider: answers.provider,
+        modelId: answers.modelId,
+      },
     },
     agents: [
       {
         id: defaultAgentId,
-        model: {
-          provider: answers.provider,
-          modelId: answers.modelId,
-        },
         ...(prompt ? { prompt } : {}),
         ...(usesOAuth ? { authFile: join(answers.dataRoot, "auth.json") } : {}),
         tools: [...defaultTools],

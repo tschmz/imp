@@ -36,9 +36,7 @@ export async function promptForInitialAppConfig(
   dependencies: PromptDependencies = { confirm, input, select },
 ): Promise<InitialAppSetup> {
   const defaults = createDefaultAppConfig(env);
-  const defaultAgent = defaults.agents[0];
-
-  if (!defaultAgent || !defaultAgent.model) {
+  if (!defaults.defaults.model) {
     throw new Error("Default init config is incomplete.");
   }
 

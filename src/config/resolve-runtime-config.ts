@@ -57,7 +57,7 @@ export async function resolveRuntimeConfig(
           id: agent.id,
           ...(agent.name ? { name: agent.name } : {}),
           prompt: resolveAgentPrompt(agent.prompt, configDir),
-          ...(agent.model ? { model: agent.model } : {}),
+          model: agent.model ?? appConfig.defaults.model,
           home: resolveAgentHome(agent, appConfig.paths.dataRoot, configDir),
           ...(agent.authFile ? { authFile: resolveConfigPath(agent.authFile, configDir) } : {}),
           ...(agent.workspace ? { workspace: resolveAgentWorkspace(agent.workspace, configDir) } : {}),

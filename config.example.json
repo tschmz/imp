@@ -9,7 +9,11 @@
     "level": "info"
   },
   "defaults": {
-    "agentId": "default"
+    "agentId": "default",
+    "model": {
+      "provider": "openai-codex",
+      "modelId": "gpt-5.4"
+    }
   },
   "tools": {
     "mcp": {
@@ -34,10 +38,6 @@
   "agents": [
     {
       "id": "default",
-      "model": {
-        "provider": "openai-codex",
-        "modelId": "gpt-5.4"
-      },
       "authFile": "/var/lib/imp/auth.json",
       "tools": {
         "builtIn": [

@@ -337,6 +337,47 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
+
+  it("applies defaults.model to agents without an explicit model", async () => {
+    const appConfig = createAppConfig({
+      defaults: {
+        agentId: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      },
+      agents: [
+        {
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.model).toEqual({
+      provider: "openai",
+      modelId: "gpt-5.4",
+    });
+  });
+
   it("preserves custom model settings in runtime config", async () => {
     const appConfig = createAppConfig({
       agents: [
