@@ -1,6 +1,6 @@
 import type { AgentRegistry } from "../../agents/registry.js";
 import type { AgentDefinition } from "../../domain/agent.js";
-import { createAgentLoggers, type AgentLoggers } from "../../logging/agent-loggers.js";
+import { createAgentLoggers, createScopedLogger, type AgentLoggers } from "../../logging/agent-loggers.js";
 import { createFileLogger } from "../../logging/file-logger.js";
 import type { LogLevel, Logger } from "../../logging/types.js";
 import { createRoutingLogger } from "../../logging/routing-logger.js";
@@ -49,7 +49,9 @@ export function buildRuntimeComponents(
     dependencies.createBuiltInToolRegistry ?? createBuiltInToolRegistry;
   const createBuiltInRegistry = createRuntimeToolRegistryFactory(config, configuredBuiltInRegistry);
 
-  const endpointLogger = createLogger(endpointConfig.paths.logFilePath, config.logging.level);
+  const endpointLogger = createScopedLogger(createLogger(endpointConfig.paths.logFilePath, config.logging.level), {
+    endpointId: endpointConfig.id,
+  });
   const agentLoggers = createAgentLoggers(endpointConfig.paths.dataRoot, config.logging.level, createLogger);
   const logger = createRoutingLogger(endpointLogger, agentLoggers);
   const conversationStore = createConversationStore(endpointConfig.paths);

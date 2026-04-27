@@ -5,6 +5,7 @@ import { isMissingFileError } from "../files/node-error.js";
 export interface LogTarget {
   endpointId: string;
   logFilePath: string;
+  filterEndpointId?: string;
 }
 
 type ReadLogFile = (path: string, encoding: "utf8") => Promise<string>;
@@ -34,14 +35,12 @@ export async function viewDaemonLogs(options: {
 
   assertPositiveLineCount(lines);
   const targets = resolveLogTargets(options.runtimeConfig, options.endpointId);
-  const multiEndpoint = targets.length > 1;
-
   const initialOffsets = new Map<string, number>();
 
   for (const target of targets) {
-    const snapshot = await readLogSnapshot(target.logFilePath, lines, readFileImpl);
-    initialOffsets.set(target.endpointId, snapshot.offset);
-    writeLogLines(stdout, target.endpointId, snapshot.recentLines, multiEndpoint);
+    const snapshot = await readLogSnapshot(target.logFilePath, lines, readFileImpl, target.filterEndpointId);
+    initialOffsets.set(target.logFilePath, snapshot.offset);
+    writeLogLines(stdout, snapshot.recentLines);
   }
 
   if (!options.follow) {
@@ -52,7 +51,6 @@ export async function viewDaemonLogs(options: {
     targets,
     stdout,
     signal: options.signal,
-    multiEndpoint,
     readFile: readFileImpl,
     watch: watchImpl,
     initialOffsets,
@@ -61,31 +59,38 @@ export async function viewDaemonLogs(options: {
 
 export function resolveLogTargets(runtimeConfig: DaemonConfig, endpointId?: string): LogTarget[] {
   if (endpointId) {
-    const targetBot = runtimeConfig.activeEndpoints.find((endpoint) => endpoint.id === endpointId);
-    if (!targetBot) {
+    const targetEndpoint = runtimeConfig.activeEndpoints.find((endpoint) => endpoint.id === endpointId);
+    if (!targetEndpoint) {
       throw new Error(`Unknown endpoint ID: ${endpointId}`);
     }
 
     return [
       {
-        endpointId: targetBot.id,
-        logFilePath: targetBot.paths.logFilePath,
+        endpointId: targetEndpoint.id,
+        logFilePath: targetEndpoint.paths.logFilePath,
+        filterEndpointId: targetEndpoint.id,
       },
     ];
   }
 
-  return runtimeConfig.activeEndpoints.map((endpoint) => ({
-    endpointId: endpoint.id,
-    logFilePath: endpoint.paths.logFilePath,
-  }));
+  const uniqueTargets = new Map<string, LogTarget>();
+  for (const endpoint of runtimeConfig.activeEndpoints) {
+    uniqueTargets.set(endpoint.paths.logFilePath, {
+      endpointId: endpoint.id,
+      logFilePath: endpoint.paths.logFilePath,
+    });
+  }
+
+  return [...uniqueTargets.values()];
 }
 
 export async function readRecentLogLines(
   logFilePath: string,
   lines: number,
   readFileImpl: ReadLogFile = readFile,
+  filterEndpointId?: string,
 ): Promise<string[]> {
-  const snapshot = await readLogSnapshot(logFilePath, lines, readFileImpl);
+  const snapshot = await readLogSnapshot(logFilePath, lines, readFileImpl, filterEndpointId);
   return snapshot.recentLines;
 }
 
@@ -93,13 +98,14 @@ async function readLogSnapshot(
   logFilePath: string,
   lines: number,
   readFileImpl: ReadLogFile,
+  filterEndpointId?: string,
 ): Promise<{ recentLines: string[]; offset: number }> {
   try {
     const content = await readFileImpl(logFilePath, "utf8");
     const allLines = content
       .split("\n")
       .map((line) => line.trimEnd())
-      .filter((line) => line.length > 0);
+      .filter((line) => shouldIncludeLogLine(line, filterEndpointId));
 
     return {
       recentLines: allLines.slice(-lines),
@@ -118,7 +124,6 @@ async function followLogTargets(options: {
   targets: LogTarget[];
   stdout: NodeJS.WritableStream;
   signal?: AbortSignal;
-  multiEndpoint: boolean;
   readFile: ReadLogFile;
   watch: WatchLogFile;
   initialOffsets: Map<string, number>;
@@ -161,7 +166,6 @@ async function watchTarget(
   target: LogTarget,
   options: {
     stdout: NodeJS.WritableStream;
-    multiEndpoint: boolean;
     readFile: ReadLogFile;
   },
   offsets: Map<string, number>,
@@ -187,33 +191,44 @@ async function writeNewLogLines(
   target: LogTarget,
   options: {
     stdout: NodeJS.WritableStream;
-    multiEndpoint: boolean;
     readFile: ReadLogFile;
   },
   offsets: Map<string, number>,
 ): Promise<void> {
   const content = await options.readFile(target.logFilePath, "utf8");
-  const previousOffset = offsets.get(target.endpointId) ?? 0;
+  const previousOffset = offsets.get(target.logFilePath) ?? 0;
   const effectiveOffset = content.length < previousOffset ? 0 : previousOffset;
   const nextChunk = content.slice(effectiveOffset);
 
   const newLines = nextChunk
     .split("\n")
     .map((line) => line.trimEnd())
-    .filter((line) => line.length > 0);
+    .filter((line) => shouldIncludeLogLine(line, target.filterEndpointId));
 
-  writeLogLines(options.stdout, target.endpointId, newLines, options.multiEndpoint);
-  offsets.set(target.endpointId, content.length);
+  writeLogLines(options.stdout, newLines);
+  offsets.set(target.logFilePath, content.length);
 }
 
-function writeLogLines(
-  stdout: NodeJS.WritableStream,
-  endpointId: string,
-  lines: string[],
-  multiEndpoint: boolean,
-): void {
+function writeLogLines(stdout: NodeJS.WritableStream, lines: string[]): void {
   for (const line of lines) {
-    stdout.write(multiEndpoint ? `[${endpointId}] ${line}\n` : `${line}\n`);
+    stdout.write(`${line}\n`);
+  }
+}
+
+function shouldIncludeLogLine(line: string, filterEndpointId: string | undefined): boolean {
+  if (line.length === 0) {
+    return false;
+  }
+
+  if (!filterEndpointId) {
+    return true;
+  }
+
+  try {
+    const parsed = JSON.parse(line) as { endpointId?: unknown };
+    return parsed.endpointId === filterEndpointId;
+  } catch {
+    return false;
   }
 }
 

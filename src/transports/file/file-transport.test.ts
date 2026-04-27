@@ -377,8 +377,8 @@ function createPluginRuntimeConfig(
     paths: {
       dataRoot: root,
       conversationsDir: join(root, "endpoints", "audio-ingress", "conversations"),
-      logsDir: join(root, "logs", "endpoints"),
-      logFilePath: join(root, "logs", "endpoints", "audio-ingress.log"),
+      logsDir: join(root, "logs"),
+      logFilePath: join(root, "logs", "endpoints.log"),
       runtimeDir: join(root, "runtime", "endpoints"),
       runtimeStatePath: join(root, "runtime", "endpoints", "audio-ingress.json"),
       file: {

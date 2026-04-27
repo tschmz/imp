@@ -14,7 +14,7 @@ describe("logsCommandHandler", () => {
     const response = await logsCommandHandler.handle(context);
 
     expect(logsCommandHandler.canHandle("logs")).toBe(true);
-    expect(readRecentLogLines).toHaveBeenCalledWith("/tmp/private-telegram.log", 5);
+    expect(readRecentLogLines).toHaveBeenCalledWith("/tmp/private-telegram.log", 5, undefined, "private-telegram");
     expect(response?.text).toContain('{"level":"info","message":"ok"}');
   });
 });

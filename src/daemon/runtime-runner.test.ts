@@ -378,8 +378,8 @@ describe("createRuntimeEntries", () => {
         paths: {
           dataRoot: "/tmp",
           conversationsDir: "/tmp/conversations",
-          logsDir: "/tmp/logs/endpoints",
-          logFilePath: "/tmp/logs/endpoints/phone-ingress.log",
+          logsDir: "/tmp/logs",
+          logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/phone-ingress.json",
           file: {
@@ -507,8 +507,8 @@ describe("createRuntimeEntries", () => {
         paths: {
           dataRoot: "/tmp",
           conversationsDir: "/tmp/conversations",
-          logsDir: "/tmp/logs/endpoints",
-          logFilePath: "/tmp/logs/endpoints/imp.grimoire.log",
+          logsDir: "/tmp/logs",
+          logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/imp.grimoire.json",
         },
@@ -765,8 +765,8 @@ describe("createRuntimeEntries", () => {
         paths: {
           dataRoot: "/tmp",
           conversationsDir: "/tmp/endpoints/audio-ingress/conversations",
-          logsDir: "/tmp/logs/endpoints",
-          logFilePath: "/tmp/logs/endpoints/audio-ingress.log",
+          logsDir: "/tmp/logs",
+          logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/audio-ingress.json",
           file: {
@@ -869,8 +869,8 @@ describe("createRuntimeEntries", () => {
         paths: {
           dataRoot: "/tmp",
           conversationsDir: "/tmp/endpoints/audio-ingress/conversations",
-          logsDir: "/tmp/logs/endpoints",
-          logFilePath: "/tmp/logs/endpoints/audio-ingress.log",
+          logsDir: "/tmp/logs",
+          logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/audio-ingress.json",
           file: {
@@ -900,8 +900,8 @@ describe("createRuntimeEntries", () => {
         paths: {
           dataRoot: "/tmp",
           conversationsDir: "/tmp/endpoints/silent-ingress/conversations",
-          logsDir: "/tmp/logs/endpoints",
-          logFilePath: "/tmp/logs/endpoints/silent-ingress.log",
+          logsDir: "/tmp/logs",
+          logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/silent-ingress.json",
           file: {
@@ -1040,8 +1040,8 @@ describe("createRuntimeEntries", () => {
         paths: {
           dataRoot: "/tmp",
           conversationsDir: "/tmp/endpoints/phone-ingress/conversations",
-          logsDir: "/tmp/logs/endpoints",
-          logFilePath: "/tmp/logs/endpoints/phone-ingress.log",
+          logsDir: "/tmp/logs",
+          logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
           runtimeStatePath: "/tmp/runtime/endpoints/phone-ingress.json",
           file: {
@@ -1176,8 +1176,8 @@ function createRuntime(overrides: Partial<BootstrappedRuntime> = {}): Bootstrapp
       paths: {
         dataRoot: "/tmp",
         conversationsDir: "/tmp/endpoints/private-telegram/conversations",
-        logsDir: "/tmp/logs/endpoints",
-        logFilePath: "/tmp/logs/endpoints/private-telegram.log",
+        logsDir: "/tmp/logs",
+        logFilePath: "/tmp/logs/endpoints.log",
         runtimeDir: "/tmp/runtime/endpoints",
         runtimeStatePath: "/tmp/runtime/endpoints/private-telegram.json",
       },

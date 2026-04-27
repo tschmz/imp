@@ -63,7 +63,7 @@ export function normalizeTelegramRuntimeConfig(
     throw new Error(`Telegram endpoint "${endpoint.id}" token must be resolved before runtime normalization.`);
   }
 
-  const logsDir = join(options.dataRoot, "logs", "endpoints");
+  const logsDir = join(options.dataRoot, "logs");
   const runtimeDir = join(options.dataRoot, "runtime", "endpoints");
 
   return {
@@ -80,7 +80,7 @@ export function normalizeTelegramRuntimeConfig(
       dataRoot: options.dataRoot,
       conversationsDir: join(options.dataRoot, "conversations"),
       logsDir,
-      logFilePath: join(logsDir, `${endpoint.id}.log`),
+      logFilePath: join(logsDir, "endpoints.log"),
       runtimeDir,
       runtimeStatePath: join(runtimeDir, `${endpoint.id}.json`),
     },

@@ -392,8 +392,8 @@ function createRuntimePaths(endpointId: string): DaemonConfig["activeEndpoints"]
   return {
     dataRoot: "/var/lib/imp",
     conversationsDir: `/var/lib/imp/endpoints/${endpointId}/conversations`,
-    logsDir: "/var/lib/imp/logs/endpoints",
-    logFilePath: `/var/lib/imp/logs/endpoints/${endpointId}.log`,
+    logsDir: "/var/lib/imp/logs",
+    logFilePath: "/var/lib/imp/logs/endpoints.log",
     runtimeDir: "/var/lib/imp/runtime/endpoints",
     runtimeStatePath: `/var/lib/imp/runtime/endpoints/${endpointId}.json`,
   };

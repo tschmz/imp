@@ -23,7 +23,12 @@ export const logsCommandHandler: InboundCommandHandler = {
 
     const lineCount = requestedLineCount ?? 20;
     try {
-      const lines = await readRecentLogLines(dependencies.runtimeInfo.logFilePath, lineCount);
+      const lines = await readRecentLogLines(
+        dependencies.runtimeInfo.logFilePath,
+        lineCount,
+        undefined,
+        dependencies.runtimeInfo.endpointId,
+      );
       return {
         conversation: message.conversation,
         text:

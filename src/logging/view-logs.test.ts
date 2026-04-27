@@ -39,13 +39,12 @@ describe("viewDaemonLogs", () => {
     expect(chunks.join("")).toBe("two\nthree\n");
   });
 
-  it("prefixes output when multiple endpoints are enabled", async () => {
+  it("reads shared endpoint logs once when multiple endpoints are enabled", async () => {
     const root = await createTempDir();
     const runtimeConfig = createRuntimeConfig(root, ["private-telegram", "ops-telegram"]);
     const stdout = new PassThrough();
 
-    await writeLog(runtimeConfig.activeEndpoints[0]!.paths.logFilePath, ["one", "two"]);
-    await writeLog(runtimeConfig.activeEndpoints[1]!.paths.logFilePath, ["three", "four"]);
+    await writeLog(runtimeConfig.activeEndpoints[0]!.paths.logFilePath, ["one", "two", "three", "four"]);
 
     const chunks: string[] = [];
     stdout.on("data", (chunk) => {
@@ -54,22 +53,49 @@ describe("viewDaemonLogs", () => {
 
     await viewDaemonLogs({
       runtimeConfig,
-      lines: 1,
+      lines: 2,
       stdout,
     });
 
-    expect(chunks.join("")).toBe("[private-telegram] two\n[ops-telegram] four\n");
+    expect(chunks.join("")).toBe("three\nfour\n");
   });
 
-  it("filters to a selected endpoint", () => {
+  it("filters target metadata to a selected endpoint", () => {
     const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram", "ops-telegram"]);
 
     expect(resolveLogTargets(runtimeConfig, "ops-telegram")).toEqual([
       {
         endpointId: "ops-telegram",
-        logFilePath: "/tmp/log-targets/logs/endpoints/ops-telegram.log",
+        logFilePath: "/tmp/log-targets/logs/endpoints.log",
+        filterEndpointId: "ops-telegram",
       },
     ]);
+  });
+
+  it("prints only matching lines for a selected endpoint", async () => {
+    const root = await createTempDir();
+    const runtimeConfig = createRuntimeConfig(root, ["private-telegram", "ops-telegram"]);
+    const stdout = new PassThrough();
+
+    await writeLog(runtimeConfig.activeEndpoints[0]!.paths.logFilePath, [
+      JSON.stringify({ endpointId: "private-telegram", message: "one" }),
+      JSON.stringify({ endpointId: "ops-telegram", message: "two" }),
+      JSON.stringify({ endpointId: "private-telegram", message: "three" }),
+    ]);
+
+    const chunks: string[] = [];
+    stdout.on("data", (chunk) => {
+      chunks.push(String(chunk));
+    });
+
+    await viewDaemonLogs({
+      runtimeConfig,
+      endpointId: "ops-telegram",
+      lines: 5,
+      stdout,
+    });
+
+    expect(chunks.join("")).toBe(`${JSON.stringify({ endpointId: "ops-telegram", message: "two" })}\n`);
   });
 
   it("rejects an unknown endpoint selection", async () => {
@@ -330,8 +356,8 @@ function createRuntimeConfig(root: string, endpointIds: string[]): DaemonConfig 
       paths: {
         dataRoot: root,
         conversationsDir: join(root, "endpoints", endpointId, "conversations"),
-        logsDir: join(root, "logs", "endpoints"),
-        logFilePath: join(root, "logs", "endpoints", `${endpointId}.log`),
+        logsDir: join(root, "logs"),
+        logFilePath: join(root, "logs", "endpoints.log"),
         runtimeDir: join(root, "runtime", "endpoints"),
         runtimeStatePath: join(root, "runtime", "endpoints", `${endpointId}.json`),
       },

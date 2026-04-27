@@ -25,7 +25,7 @@ describe("backup use cases", () => {
     const promptPath = join(root, "config", "prompts", "SYSTEM.md");
     const authPath = join(root, "config", "oauth.json");
     const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
-    const logPath = join(dataRoot, "logs", "endpoints", "private-telegram.log");
+    const logPath = join(dataRoot, "logs", "endpoints.log");
     const backupPath = join(root, "backup.tar");
     const extractDir = join(root, "extract");
 
@@ -63,7 +63,7 @@ describe("backup use cases", () => {
     await expect(
       readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "chats", "telegram", "42", "meta.json"), "utf8"),
     ).resolves.toContain('"id":"1"');
-    await expect(readFile(join(extractDir, "logs", "endpoints", "private-telegram.log"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(extractDir, "logs", "endpoints.log"), "utf8")).rejects.toThrow();
   });
 
   it("creates backups from paths.dataRoot resolved against the config directory", async () => {
@@ -133,7 +133,7 @@ describe("backup use cases", () => {
       "{\"messages\":[{\"id\":\"old\"}]}\n",
     );
     await writeTextFile(
-      join(targetDataRoot, "logs", "endpoints", "private-telegram.log"),
+      join(targetDataRoot, "logs", "endpoints.log"),
       "keep log\n",
     );
     await writeTextFile(
@@ -161,7 +161,7 @@ describe("backup use cases", () => {
         "utf8",
       ),
     ).resolves.toContain('"source"');
-    await expect(readFile(join(targetDataRoot, "logs", "endpoints", "private-telegram.log"), "utf8")).resolves.toBe(
+    await expect(readFile(join(targetDataRoot, "logs", "endpoints.log"), "utf8")).resolves.toBe(
       "keep log\n",
     );
     await expect(
@@ -800,8 +800,8 @@ function createRuntimePaths(dataRoot: string) {
   return {
     dataRoot,
     conversationsDir: join(dataRoot, "conversations"),
-    logsDir: join(dataRoot, "logs", "endpoints"),
-    logFilePath: join(dataRoot, "logs", "endpoints", "private-telegram.log"),
+    logsDir: join(dataRoot, "logs"),
+    logFilePath: join(dataRoot, "logs", "endpoints.log"),
     runtimeDir: join(dataRoot, "runtime", "endpoints"),
     runtimeStatePath: join(dataRoot, "runtime", "endpoints", "private-telegram.json"),
   };

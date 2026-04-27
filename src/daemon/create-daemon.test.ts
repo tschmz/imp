@@ -218,7 +218,7 @@ describe("createDaemon", () => {
       tools: ["read"],
     });
     expect(runInputs[0]?.agent.prompt.base.text).toBeUndefined();
-    await expect(readFile(join(root, "logs", "agents", "default.log"), "utf8")).resolves.toContain(
+    await expect(readFile(join(root, "logs", "agents.log"), "utf8")).resolves.toContain(
       '"message":"loaded configured base prompt","agentId":"default","basePromptSource":"file","basePromptFile":"/workspace/prompts/default.md"',
     );
   });
@@ -537,11 +537,11 @@ describe("createDaemon", () => {
     await expect(readFile(opsBot.paths.logFilePath, "utf8")).resolves.toContain(
       '"message":"starting daemon with default agent \\"ops\\""',
     );
-    await expect(readFile(join(root, "logs", "agents", "default.log"), "utf8")).resolves.toContain(
-      '"message":"loaded configured agent skills"',
+    await expect(readFile(join(root, "logs", "agents.log"), "utf8")).resolves.toContain(
+      '"message":"loaded configured agent skills","agentId":"default"',
     );
-    await expect(readFile(join(root, "logs", "agents", "ops.log"), "utf8")).resolves.toContain(
-      '"message":"loaded configured agent skills"',
+    await expect(readFile(join(root, "logs", "agents.log"), "utf8")).resolves.toContain(
+      '"message":"loaded configured agent skills","agentId":"ops"',
     );
   });
 
@@ -778,8 +778,8 @@ function createRuntimePaths(root: string, endpointId = "private-telegram"): Runt
   return {
     dataRoot: root,
     conversationsDir: join(root, "endpoints", endpointId, "conversations"),
-    logsDir: join(root, "logs", "endpoints"),
-    logFilePath: join(root, "logs", "endpoints", `${endpointId}.log`),
+    logsDir: join(root, "logs"),
+    logFilePath: join(root, "logs", "endpoints.log"),
     runtimeDir: join(root, "runtime", "endpoints"),
     runtimeStatePath: join(root, "runtime", "endpoints", `${endpointId}.json`),
   };

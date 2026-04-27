@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createFileLogger, rotateLogFileOnStartup } from "./file-logger.js";
-import type { Logger, LogLevel } from "./types.js";
+import type { LogFields, Logger, LogLevel } from "./types.js";
 
 export interface AgentLoggers {
   forAgent(agentId: string): Logger;
@@ -14,6 +14,7 @@ export function createAgentLoggers(
   level: LogLevel,
   createLogger: LoggerFactory = createFileLogger,
 ): AgentLoggers {
+  const baseLogger = createLogger(getAgentLogFilePath(dataRoot), level);
   const loggers = new Map<string, Logger>();
 
   return {
@@ -23,7 +24,7 @@ export function createAgentLoggers(
         return existing;
       }
 
-      const logger = createLogger(getAgentLogFilePath(dataRoot, agentId), level);
+      const logger = createScopedLogger(baseLogger, { agentId });
       loggers.set(agentId, logger);
       return logger;
     },
@@ -31,27 +32,42 @@ export function createAgentLoggers(
 }
 
 export async function prepareAgentLogFiles(dataRoots: Iterable<string>, agentIds: Iterable<string>): Promise<void> {
+  void agentIds;
   const uniqueDataRoots = [...new Set(dataRoots)];
-  const uniqueAgentIds = [...new Set(agentIds)];
 
   await Promise.all(
-    uniqueDataRoots.flatMap((dataRoot) =>
-      uniqueAgentIds.map(async (agentId) => {
-        await mkdir(getAgentLogsDir(dataRoot), { recursive: true });
-        await rotateLogFileOnStartup(getAgentLogFilePath(dataRoot, agentId));
-      }),
-    ),
+    uniqueDataRoots.map(async (dataRoot) => {
+      await mkdir(getLogsDir(dataRoot), { recursive: true });
+      await rotateLogFileOnStartup(getAgentLogFilePath(dataRoot));
+    }),
   );
 }
 
-export function getAgentLogFilePath(dataRoot: string, agentId: string): string {
-  return join(getAgentLogsDir(dataRoot), `${sanitizeAgentLogFileName(agentId)}.log`);
+export function getAgentLogFilePath(dataRoot: string): string {
+  return join(getLogsDir(dataRoot), "agents.log");
 }
 
-function getAgentLogsDir(dataRoot: string): string {
-  return join(dataRoot, "logs", "agents");
+export function createScopedLogger(logger: Logger, defaults: LogFields): Logger {
+  return {
+    async debug(message, fields) {
+      await logger.debug(message, mergeLogFields(defaults, fields));
+    },
+    async info(message, fields) {
+      await logger.info(message, mergeLogFields(defaults, fields));
+    },
+    async error(message, fields, error) {
+      await logger.error(message, mergeLogFields(defaults, fields), error);
+    },
+  };
 }
 
-function sanitizeAgentLogFileName(agentId: string): string {
-  return agentId.replace(/[^A-Za-z0-9._-]/g, "_") || "unknown";
+function mergeLogFields(defaults: LogFields, fields: LogFields | undefined): LogFields {
+  return {
+    ...defaults,
+    ...(fields ?? {}),
+  };
+}
+
+function getLogsDir(dataRoot: string): string {
+  return join(dataRoot, "logs");
 }

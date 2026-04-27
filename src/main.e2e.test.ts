@@ -306,10 +306,10 @@ describe("imp CLI e2e", () => {
       );
     });
 
-    const logFilePath = join(dataRoot, "logs", "endpoints", "private-telegram.log");
+    const logFilePath = join(dataRoot, "logs", "endpoints.log");
     const runtimeStatePath = join(dataRoot, "runtime", "endpoints", "private-telegram.json");
 
-    await expect(stat(join(dataRoot, "logs", "endpoints"))).resolves.toBeDefined();
+    await expect(stat(join(dataRoot, "logs"))).resolves.toBeDefined();
     await expect(stat(join(dataRoot, "runtime", "endpoints"))).resolves.toBeDefined();
     await expect(stat(join(dataRoot, "endpoints"))).rejects.toMatchObject({
       code: "ENOENT",
@@ -326,7 +326,7 @@ describe("imp CLI e2e", () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
-    const logFilePath = join(root, "state-home", "imp", "logs", "endpoints", "private-telegram.log");
+    const logFilePath = join(root, "state-home", "imp", "logs", "endpoints.log");
 
     await writeDefaultConfig(root);
     await overwriteConfig(configPath, {

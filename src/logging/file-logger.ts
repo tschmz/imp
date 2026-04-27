@@ -69,10 +69,32 @@ export async function rotateLogFileOnStartup(path: string): Promise<void> {
 
   const hasContent = await hasExistingLogContent(path);
   if (hasContent) {
-    await rename(path, `${path}.1`);
+    await rename(path, await resolveNextRotatedLogFilePath(path));
   }
 
   await writeFile(path, "", { encoding: "utf8", flag: "w" });
+}
+
+async function resolveNextRotatedLogFilePath(path: string): Promise<string> {
+  let index = 1;
+  while (await pathExists(`${path}.${index}`)) {
+    index += 1;
+  }
+
+  return `${path}.${index}`;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 async function hasExistingLogContent(path: string): Promise<boolean> {

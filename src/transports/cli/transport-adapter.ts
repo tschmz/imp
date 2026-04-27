@@ -32,7 +32,7 @@ export function normalizeCliRuntimeConfig(
     defaultAgentId: string;
   },
 ): ActiveEndpointRuntimeConfig {
-  const logsDir = join(options.dataRoot, "logs", "endpoints");
+  const logsDir = join(options.dataRoot, "logs");
   const runtimeDir = join(options.dataRoot, "runtime", "endpoints");
 
   return {
@@ -44,7 +44,7 @@ export function normalizeCliRuntimeConfig(
       dataRoot: options.dataRoot,
       conversationsDir: join(options.dataRoot, "conversations"),
       logsDir,
-      logFilePath: join(logsDir, `${endpoint.id}.log`),
+      logFilePath: join(logsDir, "endpoints.log"),
       runtimeDir,
       runtimeStatePath: join(runtimeDir, `${endpoint.id}.json`),
     },

@@ -90,7 +90,7 @@ export function normalizeFileRuntimeConfig(
     defaultAgentId: string;
   },
 ): ActiveEndpointRuntimeConfig {
-  const logsDir = join(options.dataRoot, "logs", "endpoints");
+  const logsDir = join(options.dataRoot, "logs");
   const runtimeDir = join(options.dataRoot, "runtime", "endpoints");
   const pluginRoot = join(options.dataRoot, "runtime", "plugins", endpoint.pluginId, "endpoints", endpoint.id);
 
@@ -108,7 +108,7 @@ export function normalizeFileRuntimeConfig(
       dataRoot: options.dataRoot,
       conversationsDir: join(options.dataRoot, "conversations"),
       logsDir,
-      logFilePath: join(logsDir, `${endpoint.id}.log`),
+      logFilePath: join(logsDir, "endpoints.log"),
       runtimeDir,
       runtimeStatePath: join(runtimeDir, `${endpoint.id}.json`),
       file: {

@@ -129,8 +129,8 @@ describe("resolveRuntimeConfig", () => {
         paths: {
           dataRoot: "/var/lib/imp",
           conversationsDir: "/var/lib/imp/conversations",
-          logsDir: "/var/lib/imp/logs/endpoints",
-          logFilePath: "/var/lib/imp/logs/endpoints/private-telegram.log",
+          logsDir: "/var/lib/imp/logs",
+          logFilePath: "/var/lib/imp/logs/endpoints.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",
           runtimeStatePath: "/var/lib/imp/runtime/endpoints/private-telegram.json",
         },
@@ -1014,7 +1014,7 @@ describe("resolveRuntimeConfig", () => {
     expect(result.activeEndpoints[0]?.paths).toMatchObject({
       dataRoot,
       conversationsDir: join(dataRoot, "conversations"),
-      logsDir: join(dataRoot, "logs", "endpoints"),
+      logsDir: join(dataRoot, "logs"),
       runtimeDir: join(dataRoot, "runtime", "endpoints"),
     });
   });
@@ -1346,8 +1346,8 @@ describe("resolveRuntimeConfig", () => {
         paths: {
           dataRoot: "/var/lib/imp",
           conversationsDir: "/var/lib/imp/conversations",
-          logsDir: "/var/lib/imp/logs/endpoints",
-          logFilePath: "/var/lib/imp/logs/endpoints/audio-ingress.log",
+          logsDir: "/var/lib/imp/logs",
+          logFilePath: "/var/lib/imp/logs/endpoints.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",
           runtimeStatePath: "/var/lib/imp/runtime/endpoints/audio-ingress.json",
           file: {
@@ -1494,8 +1494,8 @@ describe("resolveRuntimeConfig", () => {
         paths: {
           dataRoot: typedContext.dataRoot,
           conversationsDir: "/var/lib/imp/conversations",
-          logsDir: "/var/lib/imp/logs/endpoints",
-          logFilePath: "/var/lib/imp/logs/endpoints/no-token.log",
+          logsDir: "/var/lib/imp/logs",
+          logFilePath: "/var/lib/imp/logs/endpoints.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",
           runtimeStatePath: "/var/lib/imp/runtime/endpoints/no-token.json",
         },

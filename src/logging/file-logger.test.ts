@@ -82,7 +82,7 @@ describe("createFileLogger", () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it("rotates a non-empty daemon log to daemon.log.1 on startup", async () => {
+  it("rotates a non-empty daemon log without overwriting existing rotated logs", async () => {
     const logFilePath = await createLogFilePath();
     await writeFile(logFilePath, "older run\n", "utf8");
     await writeFile(`${logFilePath}.1`, "stale previous run\n", "utf8");
@@ -90,7 +90,8 @@ describe("createFileLogger", () => {
     await rotateLogFileOnStartup(logFilePath);
 
     await expect(readFile(logFilePath, "utf8")).resolves.toBe("");
-    await expect(readFile(`${logFilePath}.1`, "utf8")).resolves.toBe("older run\n");
+    await expect(readFile(`${logFilePath}.1`, "utf8")).resolves.toBe("stale previous run\n");
+    await expect(readFile(`${logFilePath}.2`, "utf8")).resolves.toBe("older run\n");
   });
 
   it("creates an empty daemon log without rotation when the current file is missing", async () => {
