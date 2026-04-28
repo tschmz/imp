@@ -8,6 +8,7 @@ describe("createConfigGetView", () => {
     const view = createConfigGetView(createConfig());
 
     expect(getValueAtKeyPath(view, "logging.level")).toBe("info");
+    expect(getValueAtKeyPath(view, "logging.rotationSize")).toBe("5M");
     expect(getValueAtKeyPath(view, "agents.jarvis.name")).toBe("jarvis");
     expect(getValueAtKeyPath(view, "agents.jarvis.model")).toEqual({
       provider: "openai",

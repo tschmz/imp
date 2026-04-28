@@ -12,6 +12,9 @@ export function createRoutingLogger(endpointLogger: Logger, agentLoggers: AgentL
     async error(message, fields, error) {
       await selectLogger(endpointLogger, agentLoggers, message, fields).error(message, fields, error);
     },
+    async close() {
+      await Promise.all([endpointLogger.close?.(), agentLoggers.close?.()]);
+    },
   };
 }
 

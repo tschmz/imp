@@ -1,20 +1,22 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { createFileLogger, rotateLogFileOnStartup } from "./file-logger.js";
+import { createFileLogger, type FileLoggerOptions, prepareLogFile } from "./file-logger.js";
 import type { LogFields, Logger, LogLevel } from "./types.js";
 
 export interface AgentLoggers {
   forAgent(agentId: string): Logger;
+  close?(): Promise<void>;
 }
 
-export type LoggerFactory = (path: string, level: LogLevel) => Logger;
+export type LoggerFactory = (path: string, level: LogLevel, options?: FileLoggerOptions) => Logger;
 
 export function createAgentLoggers(
   dataRoot: string,
   level: LogLevel,
   createLogger: LoggerFactory = createFileLogger,
+  loggerOptions: FileLoggerOptions = {},
 ): AgentLoggers {
-  const baseLogger = createLogger(getAgentLogFilePath(dataRoot), level);
+  const baseLogger = createLogger(getAgentLogFilePath(dataRoot), level, loggerOptions);
   const loggers = new Map<string, Logger>();
 
   return {
@@ -28,6 +30,9 @@ export function createAgentLoggers(
       loggers.set(agentId, logger);
       return logger;
     },
+    async close(): Promise<void> {
+      await baseLogger.close?.();
+    },
   };
 }
 
@@ -38,7 +43,7 @@ export async function prepareAgentLogFiles(dataRoots: Iterable<string>, agentIds
   await Promise.all(
     uniqueDataRoots.map(async (dataRoot) => {
       await mkdir(getLogsDir(dataRoot), { recursive: true });
-      await rotateLogFileOnStartup(getAgentLogFilePath(dataRoot));
+      await prepareLogFile(getAgentLogFilePath(dataRoot));
     }),
   );
 }
@@ -57,6 +62,9 @@ export function createScopedLogger(logger: Logger, defaults: LogFields): Logger 
     },
     async error(message, fields, error) {
       await logger.error(message, mergeLogFields(defaults, fields), error);
+    },
+    async close() {
+      await logger.close?.();
     },
   };
 }

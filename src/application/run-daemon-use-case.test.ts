@@ -57,6 +57,7 @@ function createRuntimeConfig(): DaemonConfig {
     configPath: "/tmp/config.json",
     logging: {
       level: "info",
+      rotationSize: "5M",
     },
     agents: [
       {

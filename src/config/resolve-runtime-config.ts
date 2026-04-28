@@ -12,6 +12,7 @@ import type {
 import type { DaemonConfig } from "../daemon/types.js";
 import { discoverSkills } from "../skills/discovery.js";
 import { getTransport } from "../transports/registry.js";
+import { DEFAULT_LOG_ROTATION_SIZE } from "../logging/file-logger.js";
 import { filterShadowedPluginAgents, loadRuntimePlugins } from "./plugin-runtime.js";
 import { deriveDelegationToolName } from "./schema.js";
 import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
@@ -45,6 +46,7 @@ export async function resolveRuntimeConfig(
     configPath,
     logging: {
       level: appConfig.logging?.level ?? "info",
+      rotationSize: appConfig.logging?.rotationSize ?? DEFAULT_LOG_ROTATION_SIZE,
     },
     agents: await Promise.all(
       effectiveAgents.map(async (agent) => {

@@ -2,12 +2,15 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFileLogger, createFileOnlyLogger, rotateLogFileOnStartup } from "./file-logger.js";
+import { createFileLogger, createFileOnlyLogger, prepareLogFile } from "./file-logger.js";
+import type { Logger } from "./types.js";
 
 const tempDirs: string[] = [];
+const openLoggers: Logger[] = [];
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  await Promise.all(openLoggers.splice(0).map((logger) => logger.close?.()));
   await Promise.all(
     tempDirs.splice(0).map(async (path) => {
       const { rm } = await import("node:fs/promises");
@@ -20,7 +23,7 @@ describe("createFileLogger", () => {
   it("writes debug logs when level is set to debug", async () => {
     const logFilePath = await createLogFilePath();
     const consoleDebug = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const logger = createFileLogger(logFilePath, "debug");
+    const logger = trackLogger(createFileLogger(logFilePath, "debug"));
 
     await logger.debug("visible-debug");
 
@@ -34,7 +37,7 @@ describe("createFileLogger", () => {
   it("suppresses debug logs when level is set to info", async () => {
     const logFilePath = await createLogFilePath();
     const consoleDebug = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const logger = createFileLogger(logFilePath, "info");
+    const logger = trackLogger(createFileLogger(logFilePath, "info"));
 
     await logger.debug("hidden-debug");
 
@@ -47,7 +50,7 @@ describe("createFileLogger", () => {
   it("suppresses info logs when level is set to warn", async () => {
     const logFilePath = await createLogFilePath();
     const consoleInfo = vi.spyOn(console, "log").mockImplementation(() => {});
-    const logger = createFileLogger(logFilePath, "warn");
+    const logger = trackLogger(createFileLogger(logFilePath, "warn"));
 
     await logger.info("hidden");
 
@@ -60,7 +63,7 @@ describe("createFileLogger", () => {
   it("keeps error logs when level is set to warn", async () => {
     const logFilePath = await createLogFilePath();
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const logger = createFileLogger(logFilePath, "warn");
+    const logger = trackLogger(createFileLogger(logFilePath, "warn"));
 
     await logger.error("visible");
 
@@ -72,7 +75,7 @@ describe("createFileLogger", () => {
     const logFilePath = await createLogFilePath();
     const consoleInfo = vi.spyOn(console, "log").mockImplementation(() => {});
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const logger = createFileOnlyLogger(logFilePath, "debug");
+    const logger = trackLogger(createFileOnlyLogger(logFilePath, "debug"));
 
     await logger.info("visible-info");
     await logger.error("visible-error", undefined, new Error("boom"));
@@ -88,22 +91,22 @@ describe("createFileLogger", () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it("rotates a non-empty daemon log without overwriting existing rotated logs", async () => {
+  it("prepares an existing daemon log without rotating or truncating it", async () => {
     const logFilePath = await createLogFilePath();
     await writeFile(logFilePath, "older run\n", "utf8");
-    await writeFile(`${logFilePath}.1`, "stale previous run\n", "utf8");
 
-    await rotateLogFileOnStartup(logFilePath);
+    await prepareLogFile(logFilePath);
 
-    await expect(readFile(logFilePath, "utf8")).resolves.toBe("");
-    await expect(readFile(`${logFilePath}.1`, "utf8")).resolves.toBe("stale previous run\n");
-    await expect(readFile(`${logFilePath}.2`, "utf8")).resolves.toBe("older run\n");
+    await expect(readFile(logFilePath, "utf8")).resolves.toBe("older run\n");
+    await expect(readFile(`${logFilePath}.1`, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("creates an empty daemon log without rotation when the current file is missing", async () => {
     const logFilePath = await createLogFilePath();
 
-    await rotateLogFileOnStartup(logFilePath);
+    await prepareLogFile(logFilePath);
 
     await expect(readFile(logFilePath, "utf8")).resolves.toBe("");
     await expect(readFile(`${logFilePath}.1`, "utf8")).rejects.toMatchObject({
@@ -111,16 +114,21 @@ describe("createFileLogger", () => {
     });
   });
 
-  it("creates an empty daemon log without rotation when the current file is empty", async () => {
+  it("rotates logs only after the configured size is reached", async () => {
     const logFilePath = await createLogFilePath();
-    await writeFile(logFilePath, "", "utf8");
+    const logger = trackLogger(createFileOnlyLogger(logFilePath, "info", { rotationSize: "1K" }));
 
-    await rotateLogFileOnStartup(logFilePath);
-
-    await expect(readFile(logFilePath, "utf8")).resolves.toBe("");
+    await logger.info("first");
     await expect(readFile(`${logFilePath}.1`, "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
+
+    for (let index = 0; index < 30; index += 1) {
+      await logger.info("large log line", { component: `component-${index}-${"x".repeat(100)}` });
+    }
+
+    await expect(readFile(`${logFilePath}.1`, "utf8")).resolves.toContain('"message":"large log line"');
+    await expect(readFile(logFilePath, "utf8")).resolves.toContain('"message":"large log line"');
   });
 });
 
@@ -128,4 +136,9 @@ async function createLogFilePath(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "imp-logger-test-"));
   tempDirs.push(root);
   return join(root, "daemon.log");
+}
+
+function trackLogger<T extends Logger>(logger: T): T {
+  openLoggers.push(logger);
+  return logger;
 }

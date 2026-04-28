@@ -194,6 +194,7 @@ export function createRuntimeEntries(
           await transport?.stop?.();
         } finally {
           await runtime.engine.close?.();
+          await runtime.logger.close?.();
         }
       },
     };

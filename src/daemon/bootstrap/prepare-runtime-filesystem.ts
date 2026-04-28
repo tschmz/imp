@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import type { AgentDefinition } from "../../domain/agent.js";
-import { rotateLogFileOnStartup } from "../../logging/file-logger.js";
+import { prepareLogFile } from "../../logging/file-logger.js";
 import type { RuntimePaths } from "../types.js";
 
 export async function prepareRuntimeFilesystem(paths: RuntimePaths): Promise<void> {
@@ -16,7 +16,7 @@ export async function prepareRuntimeFilesystem(paths: RuntimePaths): Promise<voi
     await mkdir(paths.file.failedDir, { recursive: true });
     await mkdir(paths.file.outboxDir, { recursive: true });
   }
-  await rotateLogFileOnStartup(paths.logFilePath);
+  await prepareLogFile(paths.logFilePath);
 }
 
 export async function prepareAgentHomeDirectories(agents: AgentDefinition[]): Promise<void> {

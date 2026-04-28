@@ -2,6 +2,52 @@ import { describe, expect, it } from "vitest";
 import { appConfigSchema } from "./schema.js";
 
 describe("appConfigSchema", () => {
+
+  it("accepts a configured log rotation size", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      logging: {
+        level: "info",
+        rotationSize: "5M",
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid log rotation sizes", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      }),
+      logging: {
+        level: "info",
+        rotationSize: "5mb",
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["logging", "rotationSize"],
+        message: "Log rotation size must be a positive integer followed by B, K, M, or G, for example 5M.",
+      }),
+    );
+  });
   it("rejects authFile for non-OAuth providers", () => {
     const result = appConfigSchema.safeParse(
       createConfig({

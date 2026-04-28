@@ -1,4 +1,5 @@
 export type LogLevel = "debug" | "info" | "warn" | "error";
+export type LogRotationSize = `${number}${"B" | "K" | "M" | "G"}`;
 
 export interface LogErrorFields {
   type: string;
@@ -88,4 +89,5 @@ export interface Logger {
   debug(message: string, fields?: LogFields): Promise<void>;
   info(message: string, fields?: LogFields): Promise<void>;
   error(message: string, fields?: LogFields, error?: unknown): Promise<void>;
+  close?(): Promise<void>;
 }

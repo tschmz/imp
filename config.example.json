@@ -6,7 +6,8 @@
     "dataRoot": "/var/lib/imp"
   },
   "logging": {
-    "level": "info"
+    "level": "info",
+    "rotationSize": "5M"
   },
   "defaults": {
     "agentId": "default",

@@ -5,7 +5,7 @@ import type {
   ModelRef,
   PromptSource,
 } from "../domain/agent.js";
-import type { LogLevel } from "../logging/types.js";
+import type { LogLevel, LogRotationSize } from "../logging/types.js";
 import type { SecretValueConfig } from "./secret-value.js";
 
 export interface InstanceConfig {
@@ -18,6 +18,7 @@ export interface PathsConfig {
 
 export interface LoggingConfig {
   level: LogLevel;
+  rotationSize?: LogRotationSize;
 }
 
 export interface DefaultsConfig {

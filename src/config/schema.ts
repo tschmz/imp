@@ -13,6 +13,10 @@ import { getTransport, listTransportTypes } from "../transports/registry.js";
 type RefinementContext<T> = z.core.$RefinementCtx<T>;
 
 const loggingLevelSchema = z.enum(["debug", "info", "warn", "error"]);
+const logRotationSizeSchema = z.custom<`${number}${"B" | "K" | "M" | "G"}`>(
+  (value) => typeof value === "string" && /^[1-9][0-9]*[BKMG]$/.test(value),
+  "Log rotation size must be a positive integer followed by B, K, M, or G, for example 5M.",
+);
 
 const inferenceSettingsSchema = z.object({
   maxOutputTokens: z.number().int().positive().optional(),
@@ -200,6 +204,7 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   logging: z
     .object({
       level: loggingLevelSchema,
+      rotationSize: logRotationSizeSchema.optional(),
     })
     .optional(),
   defaults: z.object({

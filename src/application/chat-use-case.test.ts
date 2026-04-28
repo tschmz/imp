@@ -230,6 +230,7 @@ function createDependencies(
         configPath,
         logging: {
           level: "info",
+          rotationSize: "5M",
         },
         agents: [],
         activeEndpoints: [
@@ -287,6 +288,7 @@ function createAppConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     },
     logging: {
       level: "info",
+      rotationSize: "5M",
     },
     defaults: {
       agentId: "default",

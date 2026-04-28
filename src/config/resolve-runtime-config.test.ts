@@ -83,6 +83,7 @@ describe("resolveRuntimeConfig", () => {
     expect(result.configPath).toBe("/etc/imp/config.json");
     expect(result.logging).toEqual({
       level: "info",
+      rotationSize: "5M",
     });
     expect(result.agents).toEqual([
       {
@@ -1363,7 +1364,7 @@ describe("resolveRuntimeConfig", () => {
     ]);
   });
 
-  it("defaults logging level to info when logging config is omitted", async () => {
+  it("defaults logging settings when logging config is omitted", async () => {
     const appConfig = createAppConfig({
       logging: undefined,
       endpoints: [
@@ -1381,7 +1382,37 @@ describe("resolveRuntimeConfig", () => {
 
     const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
 
-    expect(result.logging.level).toBe("info");
+    expect(result.logging).toEqual({
+      level: "info",
+      rotationSize: "5M",
+    });
+  });
+
+  it("resolves configured log rotation size", async () => {
+    const appConfig = createAppConfig({
+      logging: {
+        level: "debug",
+        rotationSize: "20M",
+      },
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.logging).toEqual({
+      level: "debug",
+      rotationSize: "20M",
+    });
   });
 
   it("resolves telegram token env references", async () => {
@@ -1663,6 +1694,7 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
     },
     logging: {
       level: "info",
+      ...overrides.logging,
     },
     defaults: {
       agentId: "default",

@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { DEFAULT_LOG_ROTATION_SIZE } from "../logging/file-logger.js";
 import type {
   AgentConfig,
   AgentToolsConfig,
@@ -24,6 +25,7 @@ export function createConfigGetView(config: AppConfig, options: ConfigGetViewOpt
     ...config,
     logging: {
       level: config.logging?.level ?? "info",
+      rotationSize: config.logging?.rotationSize ?? DEFAULT_LOG_ROTATION_SIZE,
     },
     agents: agents.map((agent) =>
       materializeAgentDefaults(agent, config.paths.dataRoot, config.defaults.model),

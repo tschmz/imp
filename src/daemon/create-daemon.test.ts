@@ -480,6 +480,7 @@ describe("createDaemon", () => {
         configPath: join(root, "config.json"),
         logging: {
           level: "info",
+          rotationSize: "5M",
         },
         agents: [
           {
@@ -634,6 +635,7 @@ describe("createDaemon", () => {
         configPath: join(root, "config.json"),
         logging: {
           level: "info",
+          rotationSize: "5M",
         },
         agents: [
           {
@@ -710,6 +712,7 @@ describe("createDaemon", () => {
         configPath: join(root, "config.json"),
         logging: {
           level: "info",
+          rotationSize: "5M",
         },
         agents: [
           {
@@ -808,6 +811,7 @@ function createConfig(endpointConfig: DaemonConfig["activeEndpoints"][number]): 
     configPath: join(endpointConfig.paths.dataRoot, "config.json"),
     logging: {
       level: "info",
+      rotationSize: "5M",
     },
     activeEndpoints: [endpointConfig],
     agents: [

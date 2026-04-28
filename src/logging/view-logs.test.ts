@@ -345,6 +345,7 @@ function createRuntimeConfig(root: string, endpointIds: string[]): DaemonConfig 
     configPath: join(root, "config.json"),
     logging: {
       level: "info",
+      rotationSize: "5M",
     },
     agents: [],
     activeEndpoints: endpointIds.map((endpointId) => ({

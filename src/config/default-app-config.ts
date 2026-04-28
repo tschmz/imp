@@ -1,5 +1,6 @@
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
 import { join } from "node:path";
+import { DEFAULT_LOG_ROTATION_SIZE } from "../logging/file-logger.js";
 import { getDefaultUserDataRoot } from "./discover-config-path.js";
 import type { AppConfig } from "./types.js";
 
@@ -49,6 +50,7 @@ export function buildInitialAppConfig(
     },
     logging: {
       level: "info",
+      rotationSize: DEFAULT_LOG_ROTATION_SIZE,
     },
     defaults: {
       agentId: defaultAgentId,

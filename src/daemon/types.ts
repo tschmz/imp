@@ -7,7 +7,7 @@ import type {
   AgentWorkspaceConfig,
   ModelRef,
 } from "../domain/agent.js";
-import type { LogLevel } from "../logging/types.js";
+import type { LogLevel, LogRotationSize } from "../logging/types.js";
 import type { SkillDefinition } from "../skills/types.js";
 import type { OutgoingMessageReplayItem } from "../domain/message.js";
 import type { TransportType } from "../transports/registry.js";
@@ -119,6 +119,7 @@ export interface DaemonConfig {
   configPath: string;
   logging: {
     level: LogLevel;
+    rotationSize: LogRotationSize;
   };
   agents: ConfiguredAgent[];
   commandTools?: CommandToolRuntimeConfig[];
