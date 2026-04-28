@@ -380,6 +380,11 @@ function resolveRuntimeSkillCatalogs(
     });
   }
 
+  catalogs.push({
+    label: "user shared catalog",
+    path: join(homedir(), ".agents", "skills"),
+  });
+
   if (agent.home) {
     catalogs.push({
       label: `agent-home catalog for ${agent.id}`,
@@ -394,23 +399,40 @@ function resolveRuntimeSkillCatalogs(
     });
   }
 
-  const workspaceSkillsPath = resolveRuntimeWorkspaceSkillsPath(agent, conversation);
-  if (workspaceSkillsPath) {
-    catalogs.push({
-      label: `workspace catalog for ${agent.id}`,
-      path: workspaceSkillsPath,
-    });
+  const workspaceDirectory = resolveRuntimeWorkspaceDirectory(agent, conversation);
+  if (workspaceDirectory) {
+    catalogs.push(
+      {
+        label: `legacy workspace catalog for ${agent.id}`,
+        path: join(workspaceDirectory, ".skills"),
+      },
+      {
+        label: `workspace agent catalog for ${agent.id}`,
+        path: join(workspaceDirectory, ".agents", "skills"),
+      },
+      {
+        label: `workspace catalog for ${agent.id}`,
+        path: join(workspaceDirectory, "skills"),
+      },
+    );
   }
 
   return catalogs;
+}
+
+function resolveRuntimeWorkspaceDirectory(
+  agent: AgentDefinition,
+  conversation: ConversationContext | undefined,
+): string {
+  return conversation?.state.workingDirectory ?? agent.workspace?.cwd ?? "";
 }
 
 function resolveRuntimeWorkspaceSkillsPath(
   agent: AgentDefinition,
   conversation: ConversationContext | undefined,
 ): string {
-  const workingDirectory = conversation?.state.workingDirectory ?? agent.workspace?.cwd;
-  return workingDirectory ? join(workingDirectory, ".skills") : "";
+  const workspaceDirectory = resolveRuntimeWorkspaceDirectory(agent, conversation);
+  return workspaceDirectory ? join(workspaceDirectory, "skills") : "";
 }
 
 function createPromptTemplateRuntimeContext(

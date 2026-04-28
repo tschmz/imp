@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AgentDefinition } from "../domain/agent.js";
 import {
@@ -223,12 +225,15 @@ describe("createPromptTemplateContext", () => {
 
     expect(context.imp.skillCatalogs).toEqual([
       { label: "global shared catalog", path: "/var/lib/imp/skills" },
+      { label: "user shared catalog", path: join(homedir(), ".agents", "skills") },
       { label: "agent-home catalog for default", path: "/agents/default/.skills" },
       { label: "configured shared catalog for default", path: "/shared/skills-a" },
       { label: "configured shared catalog for default", path: "/shared/skills-b" },
-      { label: "workspace catalog for default", path: "/workspace/project/.skills" },
+      { label: "legacy workspace catalog for default", path: "/workspace/project/.skills" },
+      { label: "workspace agent catalog for default", path: "/workspace/project/.agents/skills" },
+      { label: "workspace catalog for default", path: "/workspace/project/skills" },
     ]);
-    expect(context.imp.dynamicWorkspaceSkillsPath).toBe("/workspace/project/.skills");
+    expect(context.imp.dynamicWorkspaceSkillsPath).toBe("/workspace/project/skills");
   });
 
   it("renders included prompt sections through the shared helper", () => {

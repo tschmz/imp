@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createDefaultAppConfig } from "./default-app-config.js";
 import { getDefaultUserConfigPath } from "./discover-config-path.js";
@@ -119,7 +120,7 @@ function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
       configPath,
       dataRoot,
       skillCatalogs: resolveSkillCatalogs(config, configPath),
-      dynamicWorkspaceSkillsPath: "<working-directory>/.skills",
+      dynamicWorkspaceSkillsPath: "<working-directory>/skills",
     },
   };
 
@@ -139,6 +140,11 @@ function resolveSkillCatalogs(config: AppConfig, configPath: string): PromptTemp
     },
   ];
 
+  catalogs.push({
+    label: "user shared catalog",
+    path: join(homedir(), ".agents", "skills"),
+  });
+
   for (const agent of config.agents) {
     if (agent.home) {
       catalogs.push({
@@ -155,10 +161,21 @@ function resolveSkillCatalogs(config: AppConfig, configPath: string): PromptTemp
     }
 
     if (agent.workspace?.cwd) {
-      catalogs.push({
-        label: `workspace catalog for ${agent.id}`,
-        path: join(resolvePathRelativeToConfig(agent.workspace.cwd, configDir), ".skills"),
-      });
+      const workspaceDirectory = resolvePathRelativeToConfig(agent.workspace.cwd, configDir);
+      catalogs.push(
+        {
+          label: `legacy workspace catalog for ${agent.id}`,
+          path: join(workspaceDirectory, ".skills"),
+        },
+        {
+          label: `workspace agent catalog for ${agent.id}`,
+          path: join(workspaceDirectory, ".agents", "skills"),
+        },
+        {
+          label: `workspace catalog for ${agent.id}`,
+          path: join(workspaceDirectory, "skills"),
+        },
+      );
     }
   }
 

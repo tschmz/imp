@@ -313,7 +313,8 @@ describe("createHandleIncomingMessage", () => {
       expect.objectContaining({
         globalSkillsPath: "/tmp/data/skills",
         workspaceDirectory: workspaceRoot,
-        workspaceSkillsPath: join(workspaceRoot, ".skills"),
+        legacyWorkspaceSkillsPath: join(workspaceRoot, ".skills"),
+        workspaceSkillsPath: join(workspaceRoot, "skills"),
         overriddenSkillNames: ["git-commit"],
       }),
     );
@@ -389,6 +390,28 @@ describe("createHandleIncomingMessage", () => {
         "Use the workspace release flow.",
       ].join("\n"),
     );
+    await writeSkillFile(
+      join(workspaceRoot, ".agents", "skills", "git-review", "SKILL.md"),
+      [
+        "---",
+        "name: git-review",
+        "description: Workspace agent review flow.",
+        "---",
+        "",
+        "Use the workspace agent review flow.",
+      ].join("\n"),
+    );
+    await writeSkillFile(
+      join(workspaceRoot, "skills", "release", "SKILL.md"),
+      [
+        "---",
+        "name: release",
+        "description: Workspace project release flow.",
+        "---",
+        "",
+        "Use the workspace project release flow.",
+      ].join("\n"),
+    );
 
     const agent: AgentDefinition = {
       ...createDefaultAgent(),
@@ -432,7 +455,7 @@ describe("createHandleIncomingMessage", () => {
         }),
         expect.objectContaining({
           name: "git-review",
-          filePath: join(dataRoot, "skills", "git-review", "SKILL.md"),
+          filePath: join(workspaceRoot, ".agents", "skills", "git-review", "SKILL.md"),
         }),
         expect.objectContaining({
           name: "lint",
@@ -440,7 +463,7 @@ describe("createHandleIncomingMessage", () => {
         }),
         expect.objectContaining({
           name: "release",
-          filePath: join(workspaceRoot, ".skills", "release", "SKILL.md"),
+          filePath: join(workspaceRoot, "skills", "release", "SKILL.md"),
         }),
       ]),
     );
@@ -449,8 +472,9 @@ describe("createHandleIncomingMessage", () => {
       expect.objectContaining({
         globalSkillsPath: join(dataRoot, "skills"),
         agentHomeSkillsPath: join(agentHome, ".skills"),
-        workspaceSkillsPath: join(workspaceRoot, ".skills"),
-        overriddenSkillNames: ["git-commit", "lint", "release"],
+        legacyWorkspaceSkillsPath: join(workspaceRoot, ".skills"),
+        workspaceSkillsPath: join(workspaceRoot, "skills"),
+        overriddenSkillNames: ["git-commit", "git-review", "lint", "release"],
       }),
     );
   });

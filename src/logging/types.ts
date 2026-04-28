@@ -62,8 +62,11 @@ export interface LogFields {
   workspaceInstructionFile?: string;
   referenceFiles?: string[];
   globalSkillsPath?: string;
+  userSharedSkillsPath?: string;
   agentHomeSkillsPath?: string;
   workspaceDirectory?: string;
+  legacyWorkspaceSkillsPath?: string;
+  workspaceAgentSkillsPath?: string;
   workspaceSkillsPath?: string;
   overriddenSkillNames?: string[];
   initialWorkingDirectory?: string;

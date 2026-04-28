@@ -40,7 +40,10 @@ function isAgentScopedLog(message: string, fields: LogFields): boolean {
     message === "resolved effective agent skills for turn" ||
     message === "failed to resolve effective agent skills for turn; continuing without skills" ||
     fields.globalSkillsPath !== undefined ||
+    fields.userSharedSkillsPath !== undefined ||
     fields.agentHomeSkillsPath !== undefined ||
+    fields.legacyWorkspaceSkillsPath !== undefined ||
+    fields.workspaceAgentSkillsPath !== undefined ||
     fields.workspaceSkillsPath !== undefined
   );
 }

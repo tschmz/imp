@@ -280,7 +280,7 @@ describe("initAppConfig", () => {
     ).resolves.toContain(`- global shared catalog: \`${join(root, "custom-state", "skills")}\``);
     await expect(
       readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain(`- workspace catalog for default: \`${join(root, "workspace", ".skills")}\``);
+    ).resolves.toContain(`- workspace catalog for default: \`${join(root, "workspace", "skills")}\``);
   });
 
   it("syncs the managed imp skill from the installed asset", async () => {

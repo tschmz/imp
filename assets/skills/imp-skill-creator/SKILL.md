@@ -24,7 +24,7 @@ Skills provide lightweight, task-focused features for `Imp` agents through short
 
 - Check that the skill is a direct child of the catalog root.
 - Check that `name` matches `^[a-z0-9]+(?:-[a-z0-9]+)*$` and stays under 64 characters.
-- Check that the YAML frontmatter contains only `name` and `description` unless the codebase proves imp accepts more.
+- Check that the YAML frontmatter contains at least `name` and `description`; additional metadata may be present but should not be required for basic skill loading.
 - Check that `SKILL.md` starts with valid YAML frontmatter. Prefer a concrete example over placeholders:
 
 ```markdown
