@@ -50,7 +50,6 @@ export class SystemPromptCache {
   readonly #getContextFileFingerprint: (path: string) => Promise<string>;
   readonly #readTextFile: (path: string) => Promise<string>;
   readonly #strategy: CacheStrategy<string>;
-  readonly #latestCacheKeyByAgentId = new Map<string, string>();
   readonly #runtimeUsageByStableCacheKey = new Map<string, PromptTemplateRuntimeUsage>();
 
   constructor(dependencies: SystemPromptCacheDependencies) {
@@ -111,15 +110,8 @@ export class SystemPromptCache {
     return this.#strategy.get(cacheKey);
   }
 
-  set(agentId: string, cacheKey: string, systemPrompt: string): void {
+  set(_agentId: string, cacheKey: string, systemPrompt: string): void {
     this.#strategy.set(cacheKey, systemPrompt);
-
-    const previousCacheKey = this.#latestCacheKeyByAgentId.get(agentId);
-    if (previousCacheKey !== undefined && previousCacheKey !== cacheKey) {
-      this.#strategy.delete(previousCacheKey);
-    }
-
-    this.#latestCacheKeyByAgentId.set(agentId, cacheKey);
   }
 }
 

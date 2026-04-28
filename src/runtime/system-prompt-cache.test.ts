@@ -78,7 +78,7 @@ describe("SystemPromptCache", () => {
     expect(key).toContain('"runtime":{"timezone":"Europe/Berlin"}');
   });
 
-  it("evicts prior key per agent on set", () => {
+  it("keeps distinct cache entries for the same agent", () => {
     const strategy = new InMemoryCacheStrategy<string>();
     const cache = new SystemPromptCache({
       getContextFileFingerprint: async () => "fp",
@@ -89,7 +89,7 @@ describe("SystemPromptCache", () => {
     cache.set("default", "key-1", "prompt-1");
     cache.set("default", "key-2", "prompt-2");
 
-    expect(cache.get("key-1")).toBeUndefined();
+    expect(cache.get("key-1")).toBe("prompt-1");
     expect(cache.get("key-2")).toBe("prompt-2");
   });
 });
