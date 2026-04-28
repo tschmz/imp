@@ -1,10 +1,10 @@
 # Plugins
 
-Plugins are local companion components. They can contribute file endpoints, companion services, MCP server defaults, specialized agents, skills, command tools, and trusted JS runtime tools.
+Plugins add local companion integrations to Imp. A plugin can add file endpoints, background services, MCP server defaults, specialized agents, skills, command tools, or trusted in-process tools.
 
-A plugin usually provides one or more file endpoints, optional companion services, and optional MCP server defaults. The external component writes event files into an inbox, Imp routes the text to an agent, and the configured response route decides where the reply goes. Plugins that declare a JS runtime module run inside the Imp process and should only be installed from trusted sources.
+Use plugins when you want Imp to talk to something local, such as a voice pipeline, phone controller, or packaged agent pack.
 
-## Inspect Plugins
+## Find and Inspect Plugins
 
 List installable plugins:
 
@@ -12,65 +12,72 @@ List installable plugins:
 imp plugin list
 ```
 
-Inspect one plugin:
+Inspect one plugin before installing it:
 
 ```sh
-imp plugin inspect my-plugin
+imp plugin inspect imp-voice
 ```
 
-Local development plugin roots are scanned only when you pass `--root` or set `IMP_PLUGIN_PATH`:
+For a custom plugin directory:
 
 ```sh
-imp plugin list --root /opt/imp/plugins
-imp plugin inspect my-plugin --root /opt/imp/plugins
+imp plugin list --root /path/to/plugins
+imp plugin inspect my-plugin --root /path/to/plugins
 ```
 
 ## Install a Plugin
 
-Install from an npm package spec:
+Install from npm:
 
 ```sh
-imp plugin install @tschmz/imp-voice@latest --config ~/.config/imp/config.json
+imp plugin install @tschmz/imp-voice@latest
 ```
 
 Install from a local package archive:
 
 ```sh
-imp plugin install ./my-plugin-0.1.0.tgz --config ~/.config/imp/config.json
+imp plugin install /path/to/my-plugin-0.1.0.tgz
 ```
 
-The install command updates the config by adding:
+Install into a specific config:
 
-- A top-level `plugins[]` entry
-- File endpoints declared by the plugin manifest
-- MCP server defaults declared by the plugin manifest
-- Package metadata such as the plugin path, version, and manifest hash
+```sh
+imp plugin install @tschmz/imp-voice@latest --config /path/to/config.json
+```
 
-Plugin agents and skills are loaded from the installed plugin package at runtime. Plugin-provided agents use namespaced IDs such as `imp-agents.cody`.
+The install command can update the config with:
+
+- A top-level plugin entry
+- File endpoints declared by the plugin
+- MCP server defaults declared by the plugin
+- Package path, version, and manifest metadata
+- Plugin services, when the plugin declares managed services
+
+Plugin agents and skills are loaded from the installed package at runtime. Plugin-provided agents use namespaced IDs such as `imp-agents.cody`.
+
 Plugin MCP servers are not attached to agents automatically. Enable them per agent in [Agent Tools](./agent-tools.md).
-Manifest MCP server `command`, `args`, `cwd`, `inheritEnv`, and `env` values may use `{{config.path}}`, `{{config.dir}}`, `{{paths.dataRoot}}`, `{{plugin.id}}`, and `{{plugin.rootDir}}`. `{{agent.id}}` and `{{agent.name}}` are resolved when an agent enables the server.
 
 ## Check a Plugin
 
 Check a configured plugin installation:
 
 ```sh
-imp plugin doctor my-plugin --config ~/.config/imp/config.json
+imp plugin doctor imp-voice
 ```
 
-Print a short health line for scripts:
+Print a short status line:
 
 ```sh
-imp plugin status my-plugin --config ~/.config/imp/config.json
+imp plugin status imp-voice
 ```
 
 These commands inspect the configured plugin entry, package path, manifest, file endpoints, and expected runtime directories.
 
 ## File Endpoint Flow
 
-A file endpoint connects one configured plugin to one inbox/outbox directory tree under `paths.dataRoot`.
+Many plugins use a file endpoint. The plugin writes an event JSON file into an inbox. Imp moves it through processing directories, sends the text to an agent, and writes or routes the reply.
 
-For plugin `pi-audio` and endpoint `audio-ingress`, runtime files live at:
+For plugin `pi-audio` and endpoint `audio-ingress`, runtime files live under:
 
 ```text
 <paths.dataRoot>/runtime/plugins/pi-audio/endpoints/audio-ingress/
@@ -81,13 +88,13 @@ For plugin `pi-audio` and endpoint `audio-ingress`, runtime files live at:
   outbox/
 ```
 
-The directories mean:
+Directory meanings:
 
-- `inbox`: the plugin writes event files here
-- `processing`: Imp moves a claimed event here while it is being processed
-- `processed`: successfully handled event files end up here
-- `failed`: invalid or failed event files end up here with a sibling `.error.json`
-- `outbox`: Imp writes reply files here when the endpoint uses `response.type: "outbox"`
+- `inbox`: plugin writes event files here
+- `processing`: Imp places a claimed event here while handling it
+- `processed`: successful event files end here
+- `failed`: invalid or failed event files end here with an `.error.json` file
+- `outbox`: Imp writes replies here when the endpoint uses `response.type: "outbox"`
 
 Imp creates these directories during daemon startup.
 
@@ -95,49 +102,34 @@ Imp creates these directories during daemon startup.
 
 Plugin events are UTF-8 JSON files with a `.json` suffix. The only required field is `text`.
 
-Example event:
-
 ```json
 {
   "schemaVersion": 1,
-  "id": "wake-2026-04-17T00-15-30Z",
+  "id": "smoke-1",
   "conversationId": "kitchen",
-  "userId": "raspberry-pi",
+  "userId": "local-device",
   "text": "turn on the kitchen lights",
   "metadata": {
-    "confidence": 0.94,
-    "wakeWord": "computer"
+    "source": "manual-smoke-test"
   }
 }
 ```
 
-Optional fields include:
+Optional fields include `id`, `correlationId`, `conversationId`, `userId`, `receivedAt`, `metadata`, `session`, and `response`.
 
-- `schemaVersion`: use `1`; omitted means version `1`
-- `id`: event identifier
-- `correlationId`: correlation identifier for logs and conversation records
-- `conversationId`: plugin conversation identifier
-- `userId`: plugin user or device identifier
-- `receivedAt`: ISO timestamp
-- `metadata`: JSON object stored as source metadata
-- `session`: detached session details for plugin-managed conversations
-- `response`: per-event response override; currently only `{"type":"none"}`
-
-Write event files atomically from the plugin side: write a temporary file outside `inbox`, then rename it into `inbox` with a `.json` suffix.
+Write event files atomically: write a temporary file outside `inbox`, then rename it into `inbox` with a `.json` suffix.
 
 ## Response Routing
 
-File endpoints choose one response route.
+A file endpoint chooses one response route.
 
-Use `none` when the agent reply should be discarded:
+Discard replies:
 
 ```json
-{
-  "type": "none"
-}
+{ "type": "none" }
 ```
 
-Use `endpoint` when the reply should be sent through another enabled endpoint, such as Telegram:
+Send replies through another endpoint, such as Telegram:
 
 ```json
 {
@@ -149,7 +141,7 @@ Use `endpoint` when the reply should be sent through another enabled endpoint, s
 }
 ```
 
-Use `outbox` when a local component should consume the reply from the file endpoint outbox:
+Write replies to the endpoint outbox:
 
 ```json
 {
@@ -162,45 +154,11 @@ Use `outbox` when a local component should consume the reply from the file endpo
 }
 ```
 
-`replyChannel.kind` is exposed to prompt templates as `reply.channel.kind`. Use it in the system prompt when an agent should answer differently for a spoken reply, a chat reply, or an internal event.
-
-## Outbox Messages
-
-Outbox reply files include:
-
-- `schemaVersion`
-- `id`
-- `eventId`
-- `correlationId`
-- `conversationId`
-- `userId`
-- `replyChannel`
-- `priority`
-- `ttlMs`, when configured
-- `speech`, when configured
-- `text`
-- `createdAt`
-
-`speech` fields are advisory hints for local speech consumers. Imp writes them to the outbox message but does not perform text-to-speech itself.
-
-## Failure Records
-
-When an event file is invalid or processing fails, Imp moves the event to `failed/` and writes `<event-file>.error.json` next to it.
-
-The error record includes:
-
-- Original file name
-- Endpoint ID
-- Plugin ID
-- Failure timestamp
-- Error type
-- Error message
-
-The endpoint log also records the failed path and error record path.
+`replyChannel.kind` is available to prompt templates as `reply.channel.kind`.
 
 ## Smoke Test
 
-With a running daemon and an enabled file endpoint, write one event into the endpoint inbox:
+With the daemon running and a file endpoint enabled, write one event into the endpoint inbox:
 
 ```sh
 cat > <paths.dataRoot>/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox/smoke.json <<'JSON'
@@ -209,18 +167,14 @@ cat > <paths.dataRoot>/runtime/plugins/pi-audio/endpoints/audio-ingress/inbox/sm
   "id": "smoke-1",
   "conversationId": "smoke",
   "userId": "smoke",
-  "text": "Say a short smoke-test reply.",
-  "receivedAt": "2026-04-18T00:00:00Z",
-  "metadata": {
-    "source": "manual-smoke-test"
-  }
+  "text": "Say a short smoke-test reply."
 }
 JSON
 ```
 
 Expected result:
 
-- The event file moves from `inbox/` to `processing/` and then `processed/`
-- Invalid files move to `failed/` with a sibling `.error.json`
-- When `response.type` is `outbox`, a reply appears in `outbox/`
-- When `response.type` is `endpoint`, the configured endpoint receives the reply
+- The event moves from `inbox/` to `processing/` and then `processed/`
+- Invalid files move to `failed/` with an `.error.json` file
+- If response type is `outbox`, a reply appears in `outbox/`
+- If response type is `endpoint`, the configured endpoint receives the reply

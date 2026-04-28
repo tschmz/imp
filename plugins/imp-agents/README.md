@@ -1,79 +1,62 @@
 # Imp Agent Pack
 
-Imp Agent Pack is a bundled reference plugin that ships specialized Imp agents and practical plugin tools. It is meant to be useful in normal local development while still demonstrating how a plugin can provide agent definitions and trusted JS runtime tools.
+Imp Agent Pack provides ready-made agents and trusted helper tools for Imp. It is useful when you want a packaged software-assistant agent without writing an agent config from scratch.
 
-## What it registers
+## What It Adds
 
 - Agent: `imp-agents.cody`
-- JS runtime tool: `imp-agents__workspaceSnapshot`
+- Tool: `imp-agents__workspaceSnapshot`
+- Skills for Imp administration and release preparation
 
-Plugin agents that do not set `home` get the same default home pattern as configured agents, using their runtime id: `<dataRoot>/agents/<pluginId>.<agentId>`.
+Plugin agents that do not set `home` get a default home under the active data root:
 
-## Installation
+```text
+<paths.dataRoot>/agents/<pluginId>.<agentId>
+```
 
-Install the published package with Imp's plugin installer:
+## Install
+
+Install the published package:
 
 ```sh
 imp plugin install @tschmz/imp-agents
 ```
 
-For local development from a checked-out repository, pass the parent plugin root explicitly:
+For a checked-out repository:
 
 ```sh
-imp plugin list --root plugins
-imp plugin inspect imp-agents --root plugins
-imp plugin install imp-agents --root plugins --config ~/.config/imp/config.json
+imp plugin install imp-agents --root plugins --config /path/to/config.json
 ```
 
-After installation, Cody is visible in the effective config:
+Validate and reload:
+
+```sh
+imp config validate --preflight
+imp config reload
+```
+
+List agents:
 
 ```sh
 imp config get agents.*.id
-imp config get agents.imp-agents.cody.name
 ```
 
 ## Cody
 
-Cody is a pragmatic software engineering agent. It is configured with the standard file, shell, edit, plan, skill, and working-directory tools plus the plugin-provided `workspaceSnapshot` tool.
+`imp-agents.cody` is a pragmatic software-engineering agent. It is configured with file, shell, edit, plan, skill, and working-directory tools plus the plugin-provided workspace snapshot tool.
 
-Cody uses `<agentHome>/MEMORY.md` as a small persistent workspace note. When a user says which repository to work in, Cody records it as `Current repo: /absolute/path` and uses that path as the default workspace in later chats because agent-home Markdown files are loaded into each turn.
+Cody can keep a small workspace note in its agent home. When you tell Cody which repository to work in, it can use that path as the default workspace in later chats.
 
-Cody includes the `imp-administration` skill for safe Imp config, log, plugin, service, backup, and runtime diagnosis workflows. Cody also includes the `release-preparation` skill for repository release notes, versioning, validation, and tagging workflows.
+## Workspace Snapshot Tool
 
-`workspaceSnapshot` creates a shallow, read-only orientation summary for a workspace:
+`imp-agents__workspaceSnapshot` creates a shallow, read-only summary of a workspace, including:
 
-- project root and Git branch/status
-- `package.json` metadata and scripts
-- top-level entries
+- project root and Git status
+- package metadata and scripts
+- top-level files and directories
 - nearby `AGENTS.md` instructions
 - plugin manifests below the project root
 
-## Layout
+## Trust Note
 
-```text
-plugins/imp-agents/
-  plugin.json
-  plugin.mjs
-  README.md
-  prompts/
-    cody.md
-  skills/
-    imp-administration/
-      SKILL.md
-    release-preparation/
-      SKILL.md
-```
-
-## JS runtime API demonstrated
-
-The manifest declares:
-
-```json
-{
-  "runtime": {
-    "module": "./plugin.mjs"
-  }
-}
-```
-
-The module exports `registerPlugin(context)` and returns tool definitions. These tools run inside the Imp process, so use this style only for trusted plugin code. Prefer command tools or MCP servers for untrusted or independently deployable integrations.
+This plugin includes a trusted JavaScript runtime module. Install it only from a source you trust, because trusted plugin tools run inside the Imp process.

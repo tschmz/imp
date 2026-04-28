@@ -1,25 +1,24 @@
 # Imp Documentation
 
-Imp is a local service for running personal AI agents. It is designed for users who want AI assistants they can reach from familiar places, such as Telegram or a local terminal, while keeping the runtime under their own control.
+Imp runs personal AI agents on your own machine. You choose the model provider, define one or more agents, and reach them from the terminal, Telegram, or local plugin integrations.
 
-With Imp, you can configure multiple agents for different roles, each with its own model, instructions, workspace, and tools. A single Imp instance can route conversations to the right agent, let you switch agents when needed, and preserve separate session histories so earlier work remains available.
-
-Imp also includes practical day-to-day controls for starting new chats, resuming previous sessions, exporting conversations, viewing logs, validating configuration, managing backups, and running the service in the background.
+This documentation is written for people using Imp, not for people extending its source code.
 
 ## Start Here
 
-- [Getting Started](./getting-started.md): install Imp, run the initial setup, and start a local chat.
-- [Configuration](./configuration.md): inspect and update the active config with the CLI.
+1. [Getting Started](./getting-started.md): install Imp, create the first config, and start a local chat.
+2. [Providers](./providers.md): choose a model provider and set credentials.
+3. [Configuration](./configuration.md): inspect and safely update your active config.
 
-## Customize Agents
+## Everyday Use
 
-- [Agent Context](./agent-context.md): customize the system prompt, instructions, reference files, workspace context, and skills.
-- [Agent Tools](./agent-tools.md): decide which built-in tools, MCP servers, and delegated agents an agent may use.
-- [Providers](./providers.md): choose a model provider and provide the required credentials.
+- [Telegram](./telegram.md): chat with an agent from a private Telegram bot.
+- [Agent Context](./agent-context.md): give an agent instructions, reference files, workspace context, and skills.
+- [Agent Tools](./agent-tools.md): choose what an agent may do, from read-only file access to shell commands and MCP tools.
+- [Backups](./backups.md): create and restore backup archives.
+- [Troubleshooting](./troubleshooting.md): diagnose common config, service, credential, and endpoint problems.
 
-## Connect and Operate
+## Optional Integrations
 
-- [Telegram](./telegram.md): connect Imp to a private Telegram chat and use the built-in chat commands.
-- [Plugins](./plugins.md): connect local companion components through file endpoints and optional MCP servers.
-- [Backups](./backups.md): create and restore archives for config, agent files, and conversations.
-- [Troubleshooting](./troubleshooting.md): diagnose common setup, config, endpoint, and service problems.
+- [Plugins](./plugins.md): install local companion integrations such as voice, phone, or bundled agent packs.
+- [Bundled plugin packages](../plugins/README.md): quick overview of plugins maintained in this repository.

@@ -1,6 +1,6 @@
 # Backups
 
-Imp can create and restore backup archives for the active installation. Backups are useful before changing config, moving an installation, or replacing a machine.
+Imp can create and restore backup archives for an installation. Use backups before major config changes, moving an installation, or replacing a machine.
 
 ## Create a Backup
 
@@ -13,7 +13,7 @@ imp backup create
 Write the archive to a specific path:
 
 ```sh
-imp backup create --output /tmp/imp-backup.tar
+imp backup create --output /path/to/imp-backup.tar
 ```
 
 Overwrite an existing archive:
@@ -28,9 +28,9 @@ By default, a backup includes:
 
 - The active config file
 - Prompt and auth files referenced by the config
-- Conversations under `paths.dataRoot/conversations`
+- Conversations under the configured data root
 
-Limit the backup to selected scopes when needed:
+Limit a backup to selected scopes:
 
 ```sh
 imp backup create --only conversations
@@ -39,7 +39,7 @@ imp backup create --only config,agents
 
 Available scopes are `config`, `agents`, and `conversations`.
 
-Telegram token secret files referenced through `endpoints[].token.file` are not included in the archive. Back them up separately if you use file-based token references. Environment-variable token references also do not embed the secret value into the archive.
+Telegram token files referenced through `endpoints[].token.file` are not included. Back them up separately if you use file-based token references. Environment-variable token references also do not embed secret values into the archive.
 
 If a referenced prompt or auth file is missing, backup creation fails instead of producing a partial archive.
 
@@ -68,6 +68,16 @@ imp restore /path/to/imp-backup.tar --only conversations --force
 
 ## Restore Behavior
 
-Conversation restores replace the shared conversation store. Other runtime data under `paths.dataRoot` is left untouched.
+Conversation restores replace the conversation store. Other runtime data under `paths.dataRoot` is left untouched.
 
 `--only agents` requires either a restored config or an already existing target config, because agent files need a defined installation layout.
+
+## After Restore
+
+Run:
+
+```sh
+imp config validate --preflight
+```
+
+Then reload or restart your running installation.

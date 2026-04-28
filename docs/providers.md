@@ -1,27 +1,25 @@
 # Providers
 
-Each agent uses one effective model config. An agent can define its own `model`, or inherit
-`defaults.model`. If an agent defines `model`, that model config replaces the default model
-config for that agent.
+Each agent uses one model configuration. An agent can define its own model, or inherit `defaults.model`.
 
-The examples use `agents.default` to address the agent with the ID `default`.
+The examples use `defaults.model` so every agent without its own model uses the same provider.
 
 ## Choose a Model
 
-Set the provider and model ID:
+Set provider and model ID:
 
 ```sh
 imp config set defaults.model.provider openai
 imp config set defaults.model.modelId gpt-5.4
 ```
 
-You can also set the model object at once:
+Or set both at once:
 
 ```sh
 imp config set defaults.model '{"provider":"openai","modelId":"gpt-5.4"}'
 ```
 
-Validate the config after changing a model:
+Validate after changing a model:
 
 ```sh
 imp config validate
@@ -29,62 +27,61 @@ imp config validate
 
 ## Credentials
 
-Imp uses the provider registry from [`@mariozechner/pi-ai`](https://www.npmjs.com/package/@mariozechner/pi-ai). The current installation supports these built-in providers:
+Provider credentials must be available to the process that runs Imp. For an interactive chat, this is your shell. For a service, this is the service environment.
 
-- `amazon-bedrock`: AWS credentials through the normal AWS environment, profile, container, web identity, or Bedrock bearer-token mechanisms. Region comes from `AWS_REGION`, `AWS_DEFAULT_REGION`, or the AWS profile configuration.
-- `anthropic`: `ANTHROPIC_API_KEY` or `ANTHROPIC_OAUTH_TOKEN`
-- `azure-openai-responses`: `AZURE_OPENAI_API_KEY` plus `AZURE_OPENAI_BASE_URL` or `AZURE_OPENAI_RESOURCE_NAME`
-- `cerebras`: `CEREBRAS_API_KEY`
-- `github-copilot`: `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, or GitHub Copilot OAuth credentials
-- `google`: `GEMINI_API_KEY`
-- `google-antigravity`: Google OAuth credentials
-- `google-gemini-cli`: Google OAuth credentials, and for some accounts `GOOGLE_CLOUD_PROJECT` or `GOOGLE_CLOUD_PROJECT_ID`
-- `google-vertex`: `GOOGLE_CLOUD_API_KEY`, or Google Cloud ADC plus `GOOGLE_CLOUD_PROJECT` or `GCLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`
-- `groq`: `GROQ_API_KEY`
-- `huggingface`: `HF_TOKEN`
-- `kimi-coding`: `KIMI_API_KEY`
-- `minimax`: `MINIMAX_API_KEY`
-- `minimax-cn`: `MINIMAX_CN_API_KEY`
-- `mistral`: `MISTRAL_API_KEY`
-- `openai`: `OPENAI_API_KEY`
-- `openai-codex`: OpenAI Codex OAuth credentials
-- `opencode`: `OPENCODE_API_KEY`
-- `opencode-go`: `OPENCODE_API_KEY`
-- `openrouter`: `OPENROUTER_API_KEY`
-- `vercel-ai-gateway`: `AI_GATEWAY_API_KEY`
-- `xai`: `XAI_API_KEY`
-- `zai`: `ZAI_API_KEY`
+Common built-in providers and credential variables include:
 
-You can pin an API key source directly to a model config:
+| Provider | Common credential |
+| --- | --- |
+| `openai` | `OPENAI_API_KEY` |
+| `anthropic` | `ANTHROPIC_API_KEY` or `ANTHROPIC_OAUTH_TOKEN` |
+| `google` | `GEMINI_API_KEY` |
+| `google-vertex` | Google Cloud ADC or `GOOGLE_CLOUD_API_KEY` plus project/location variables |
+| `azure-openai-responses` | `AZURE_OPENAI_API_KEY` plus Azure endpoint settings |
+| `openrouter` | `OPENROUTER_API_KEY` |
+| `groq` | `GROQ_API_KEY` |
+| `mistral` | `MISTRAL_API_KEY` |
+| `xai` | `XAI_API_KEY` |
+| `amazon-bedrock` | AWS credentials and region settings |
+| `github-copilot` | GitHub/Copilot token or OAuth credentials |
+
+Other provider IDs supported by the installed provider library include `cerebras`, `google-antigravity`, `google-gemini-cli`, `huggingface`, `kimi-coding`, `minimax`, `minimax-cn`, `openai-codex`, `opencode`, `opencode-go`, `vercel-ai-gateway`, and `zai`.
+
+## Pin a Credential Source
+
+You can point a model directly at an environment variable:
 
 ```sh
 imp config set defaults.model.apiKey '{"env":"OPENAI_API_KEY"}'
 ```
 
-`apiKey` accepts the same secret forms as endpoint tokens: inline string, `{"env":"NAME"}`,
-or `{"file":"./secrets/provider.key"}`.
+`apiKey` accepts inline strings, environment variable references, and secret file references:
 
-## OAuth Credentials
+```sh
+imp config set defaults.model.apiKey '{"file":"./secrets/provider.key"}'
+```
 
-Some providers use OAuth credential files instead of API keys. Set `authFile` on the model
-config when the provider supports it:
+Prefer environment variables or secret files over inline API keys.
+
+## OAuth Credential Files
+
+Some providers use OAuth credential files. Set `authFile` when the provider supports it:
 
 ```sh
 imp config set defaults.model.authFile /path/to/auth.json
 ```
 
-For OpenAI Codex credentials, create the auth file with:
+For OpenAI Codex OAuth credentials, use:
 
 ```sh
 npx @mariozechner/pi-ai login openai-codex
 ```
 
-## Service Credentials
+## Services
 
-Provider credentials must be available to the process that runs Imp. If Imp runs as a service, make sure the service environment contains the required variables.
-
-On Linux, reinstall the service after changing service environment values:
+When Imp runs as a service, make sure the service process receives provider credentials. After changing service environment values, refresh the managed service definition if needed:
 
 ```sh
 imp service install --force
+imp service restart
 ```

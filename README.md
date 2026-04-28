@@ -14,8 +14,8 @@ The project is designed for users who want useful AI assistants in familiar plac
 - [CLI Overview](#cli-overview)
 - [Configuration](#configuration)
 - [Telegram, Plugins, and Services](#telegram-plugins-and-services)
-- [Development](#development)
 - [Documentation](#documentation)
+- [For Contributors](#for-contributors)
 - [License](#license)
 
 ## What Imp Does
@@ -25,7 +25,7 @@ The project is designed for users who want useful AI assistants in familiar plac
 - **Persistent sessions**: Resume, rename, export, or reset conversations without losing local history.
 - **Controlled tool access**: Enable built-in tools, MCP servers, and delegated agents per agent.
 - **Local runtime state**: Keep configuration, agent files, logs, and conversations in local paths you control.
-- **Operational commands**: Validate config, reload services, inspect logs, create backups, restore archives, and manage background services from the CLI.
+- **Operational commands**: Validate config, inspect logs, create backups, restore archives, and manage background services from the CLI.
 
 ## Requirements
 
@@ -122,7 +122,7 @@ See [`config.example.json`](./config.example.json) for a complete example.
 | `imp config get <path>`            | Read an effective config value                      |
 | `imp config set <path> <value>`    | Update a config value                               |
 | `imp config validate [--preflight]` | Validate the active config and optional agent preflight |
-| `imp config reload`                | Ask the installed service to reload                 |
+| `imp config reload`                | Reload config by restarting the installed service |
 | `imp backup create`                | Create a backup archive                             |
 | `imp restore <archive>`            | Restore from a backup archive                       |
 | `imp plugin list`                  | List installable plugins                            |
@@ -197,34 +197,6 @@ imp service stop
 
 Make sure provider credentials and other required environment variables are available to the service process, not only to your interactive shell.
 
-## Development
-
-Clone the repository and install dependencies:
-
-```sh
-git clone <repo-url>
-cd imp
-npm install
-```
-
-Useful development commands:
-
-```sh
-npm run build                    # compile TypeScript to dist/
-npm run check                    # run typecheck and ESLint
-npm test                         # run Vitest tests
-npm run clean                    # remove dist/
-just install                     # package and install only Imp globally
-just install --plugins           # also install and activate all plugin packages
-just install --plugin imp-voice  # also install and activate one plugin package
-```
-
-After building, run the local CLI with:
-
-```sh
-node dist/main.js --help
-```
-
 ## Documentation
 
 - [Getting Started](./docs/getting-started.md)
@@ -236,6 +208,23 @@ node dist/main.js --help
 - [Plugins](./docs/plugins.md)
 - [Backups](./docs/backups.md)
 - [Troubleshooting](./docs/troubleshooting.md)
+
+## For Contributors
+
+This README is focused on end users. If you are working on Imp itself, use the standard project commands:
+
+```sh
+npm install
+npm run check
+npm test
+```
+
+Build the local CLI with:
+
+```sh
+npm run build
+node dist/main.js --help
+```
 
 ## License
 

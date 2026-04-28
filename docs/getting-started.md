@@ -1,40 +1,38 @@
 # Getting Started
 
-This guide takes you from installing Imp to your first local conversation. The fastest first step is the terminal chat, because it does not require Telegram or a background service.
+This guide gets you from a fresh machine to your first local chat. The local terminal chat is the easiest first step because it does not require Telegram or a background service.
 
-## What You Will Set Up
+## 1. Check Requirements
 
-You will install the `imp` command, run the interactive setup, and start a local chat session.
-
-## Requirements
-
-Before you start, make sure you have:
+You need:
 
 - Node.js 20.6 or newer
 - npm
-- Access credentials for the model provider you want to use
+- Credentials for at least one model provider
 
-For example, if you choose OpenAI during setup, make sure `OPENAI_API_KEY` is available in your shell:
+For example, for OpenAI:
 
 ```sh
 export OPENAI_API_KEY="your-api-key"
 ```
 
-## Install Imp
+See [Providers](./providers.md) for other provider names and required variables.
 
-Install Imp globally with npm:
+## 2. Install Imp
+
+Install the `imp` command globally:
 
 ```sh
 npm install -g @tschmz/imp
 ```
 
-Check that the command is available:
+Check that it is available:
 
 ```sh
 imp --version
 ```
 
-## Run Initial Setup
+## 3. Create the First Config
 
 Run the interactive setup:
 
@@ -42,9 +40,9 @@ Run the interactive setup:
 imp init
 ```
 
-Imp will ask a few questions about your first agent, model provider, and optional integrations.
+The setup asks for a first agent, model provider, and optional endpoint settings. It writes a config file for the current user unless you pass `--config`.
 
-## Start a Local Chat
+## 4. Start a Local Chat
 
 Start an interactive terminal chat:
 
@@ -52,15 +50,32 @@ Start an interactive terminal chat:
 imp chat
 ```
 
-Send a first message. When the agent replies, your local Imp setup is working.
+Send a message. When the agent replies, Imp is working.
 
-Enter `/help` in the chat to view available commands.
+Inside chat, use:
 
-## Next Steps
+```text
+/help
+```
 
-After your first local chat works, you can:
+to see available commands such as `/status`, `/history`, `/new`, `/agent`, and `/export`.
 
-- Configure a dedicated agent for a specific role
-- Connect Telegram
-- Install Imp as a background service
-- Learn how sessions, logs, and backups work
+## 5. Add Telegram or a Service Later
+
+After the local chat works, you can:
+
+- [Connect Telegram](./telegram.md)
+- [Install a background service](./configuration.md#apply-config-changes)
+- [Customize agent instructions](./agent-context.md)
+- [Enable tools carefully](./agent-tools.md)
+- [Create a backup](./backups.md)
+
+## Common First Checks
+
+If the first chat fails:
+
+```sh
+imp config validate --preflight
+```
+
+Then check [Troubleshooting](./troubleshooting.md).

@@ -1,6 +1,6 @@
 # Configuration
 
-Imp is configured with one JSON file, but day-to-day changes should usually go through the config CLI. The CLI updates the active config, validates the result, and lets you address agents and endpoints by ID.
+Imp uses one JSON config file per installation. For normal use, prefer `imp config` commands over editing the file by hand: the CLI targets the active config, validates updates, and lets you address agents and endpoints by ID.
 
 ## Find the Active Config
 
@@ -12,7 +12,7 @@ Imp resolves the config file in this order:
 4. `~/.config/imp/config.json`, when `XDG_CONFIG_HOME` is not set
 5. `/etc/imp/config.json`
 
-Pass `--config` when you want a command to target a specific installation:
+Use `--config` when a command should target a specific installation:
 
 ```sh
 imp config validate --config /path/to/config.json
@@ -20,17 +20,11 @@ imp config validate --config /path/to/config.json
 
 ## Inspect Values
 
-Read a config value:
+Read a value:
 
 ```sh
 imp config get defaults.agentId
-```
-
-`config get` prints the effective value. When a supported setting is not explicitly configured, it returns the value Imp would use at runtime:
-
-```sh
 imp config get logging.level
-imp config get agents.default.home
 ```
 
 Agents and endpoints can be addressed by ID:
@@ -40,7 +34,7 @@ imp config get agents.default.model
 imp config get endpoints.private-telegram.enabled
 ```
 
-Use `*` to select multiple values from arrays or objects. Wildcard results are printed as JSON arrays:
+Use `*` to list values from multiple entries:
 
 ```sh
 imp config get agents.*.id
@@ -70,102 +64,87 @@ Validate after changes:
 imp config validate
 ```
 
-Run the agent preflight before starting chats or daemon endpoints:
+Run a deeper check before starting the daemon or a chat:
 
 ```sh
 imp config validate --preflight
 ```
 
-The preflight also resolves runtime agent config, validates configured tools/delegations, and reads configured prompt/instruction/reference files.
-
-Print the JSON Schema for config-shape reference:
-
-```sh
-imp config schema
-```
-
-The schema describes field structure and basic value constraints. Use `imp config validate` for cross-reference checks, duplicate-id rules, and secret-reference validation. Add `--preflight` for runtime agent checks that normally happen when a chat or daemon endpoint starts.
-
-Use [Agent Context](./agent-context.md), [Agent Tools](./agent-tools.md), and [Providers](./providers.md) for the most common agent-specific settings.
+`--preflight` also resolves runtime agent config, tools, prompt files, instruction files, reference files, and explicit secret-file references.
 
 ## Main Config Areas
 
-The top-level config is organized around these areas:
+| Area | What it controls |
+| --- | --- |
+| `instance` | Human-readable installation metadata |
+| `paths` | Runtime storage locations |
+| `logging` | Daemon log level |
+| `defaults` | Default agent and shared model config |
+| `agents` | Agent prompts, models, workspaces, skills, and tools |
+| `tools` | Shared integrations such as MCP servers |
+| `plugins` | Installed plugin packages |
+| `endpoints` | Telegram, file, and named CLI endpoints |
 
-- `instance`: installation metadata
-- `paths`: runtime storage locations
-- `logging`: daemon log level
-- `defaults`: fallback agent routing and shared model config
-- `agents`: agent definitions
-- `tools`: reusable tool integrations such as MCP servers
-- `plugins`: installed local plugin definitions
-- `endpoints`: Telegram, file, and named CLI endpoints
-
-`imp chat` always has a local CLI endpoint available. Non-CLI endpoints are started by `imp start` or by the installed service.
+See [`config.example.json`](../config.example.json) for a complete example.
 
 ## Secrets
 
-Telegram endpoint tokens can be stored in three forms:
+Telegram tokens and model API keys can be stored as:
 
-- Inline string
-- Environment variable reference, such as `{"env":"IMP_TELEGRAM_BOT_TOKEN"}`
-- Secret file reference, such as `{"file":"./secrets/telegram.token"}`
+- Inline strings
+- Environment variable references, such as `{"env":"IMP_TELEGRAM_BOT_TOKEN"}`
+- Secret file references, such as `{"file":"./secrets/telegram.token"}`
 
-Prefer environment variables or secret files over inline tokens:
+Prefer environment variables or secret files over inline secrets:
 
 ```sh
 imp config set endpoints.private-telegram.token '{"env":"IMP_TELEGRAM_BOT_TOKEN"}'
+imp config set defaults.model.apiKey '{"env":"OPENAI_API_KEY"}'
 ```
 
 Secret file paths are resolved relative to the config file directory unless they are absolute.
-Model `apiKey` values use the same secret forms.
 
 ## Relative Paths
 
 Relative paths in the config are resolved from the config file directory, not from the shell directory where you run `imp`.
 
-This applies to:
-
-- Prompt files
-- Instruction files
-- Reference files
-- `defaults.model.authFile`
-- `agents[].model.authFile`
-- `defaults.model.apiKey.file`
-- `agents[].model.apiKey.file`
-- Secret files
-- `workspace.cwd`
-- Plugin package paths
+This applies to prompt files, instruction files, reference files, auth files, secret files, workspaces, and plugin package paths.
 
 Use absolute paths when the same config is managed from different working directories.
 
 ## Service Environment
 
-When Imp runs interactively, it uses the current shell environment. When Imp runs as a service, provider credentials and other environment variables must be available to the service process.
+When Imp runs interactively, it uses your current shell environment. When Imp runs as a service, provider credentials and token variables must be available to the service process.
 
-On Linux, reinstall the managed service after changing service environment values:
+After changing service environment values, reinstall or refresh the service definition if needed:
 
 ```sh
 imp service install --force
 ```
 
-On macOS, make the required variables available to the launchd job.
+Then restart or reload the service according to your platform.
 
 ## Apply Config Changes
 
-Changes to config values require the affected endpoint to reload or restart:
+After changing config values, reload the installed service:
 
 ```sh
 imp config reload
 ```
 
-If Imp is running under a service manager, `/reload` or `/restart` from Telegram can also trigger the daemon to exit so the supervisor starts it again.
+If needed, restart the service directly:
 
-Edits to prompt, reference, and skill files are picked up on the next user turn, as long as the config already points to those files.
+```sh
+imp service restart
+```
+
+From Telegram, `/reload` asks the daemon to exit after replying so a supervisor can start it again with fresh config. `/restart` uses the same supervisor restart path.
+
+Prompt, reference, and skill file edits are picked up on the next user turn when the config already points to those files.
 
 ## Validation Checklist
 
-When config validation fails, check these first:
+When validation fails, check:
 
 - Agent IDs are unique
 - Endpoint IDs are unique
@@ -173,9 +152,7 @@ When config validation fails, check these first:
 - Endpoint routing points to an existing agent
 - Prompt sources use exactly one of `text`, `file`, or `builtIn`
 - Telegram token secret references resolve
-- With `--preflight`: prompt, instruction, and reference files are readable
-- With `--preflight`: built-in tool names and agent delegations resolve
+- With `--preflight`: prompt, instruction, reference, and auth files are readable
+- With `--preflight`: built-in tool names, MCP servers, and delegated agents resolve
 
-Provider credentials that are read implicitly by the provider SDK are used when the agent runs, not during `imp config validate`. Explicit `model.apiKey` secret references are resolved by `imp config validate --preflight`. If validation passes but a run fails, check the runtime or service environment for the variables required by the configured provider.
-
-See [`config.example.json`](../config.example.json) for a complete example config.
+Provider credentials that are only read by a provider SDK may not be checked until the agent runs. If validation passes but a run fails, check the runtime or service environment.
