@@ -8,6 +8,7 @@ import type { ConversationEvent } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { AgentEngine } from "../runtime/types.js";
 import type { ConversationStore } from "../storage/types.js";
+import type { InboundCommandHandler } from "./commands/types.js";
 import { createHandleIncomingMessage } from "./handle-incoming-message.js";
 
 const tempDirs: string[] = [];
@@ -73,6 +74,42 @@ describe("createHandleIncomingMessage", () => {
     const response = await service.handle(createIncomingMessage("1", "/help", "help"));
 
     expect(response.text).toContain("Available commands:");
+    expect(engine.run).not.toHaveBeenCalled();
+  });
+
+  it("routes command-looking text even when transport command metadata is missing", async () => {
+    const agent = createDefaultAgent();
+    const conversationStore = createConversationStore();
+    const engine: AgentEngine = {
+      run: vi.fn(async () => {
+        throw new Error("engine should not run for /export");
+      }),
+    };
+    const exportHandler: InboundCommandHandler = {
+      metadata: {
+        name: "export",
+        description: "Export transcript",
+      },
+      canHandle: (command) => command === "export",
+      handle: vi.fn(async ({ message }) => ({
+        conversation: message.conversation,
+        text: `export:${message.commandArgs ?? ""}`,
+      })),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore,
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+      availableCommands: [exportHandler],
+    });
+
+    const response = await service.handle(createIncomingMessage("1b", "/export full"));
+
+    expect(response.text).toBe("export:full");
+    expect(exportHandler.handle).toHaveBeenCalledOnce();
     expect(engine.run).not.toHaveBeenCalled();
   });
 
