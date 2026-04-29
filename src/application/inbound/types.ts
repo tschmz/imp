@@ -5,6 +5,7 @@ import type { HookRunner } from "../../extensions/hook-runner.js";
 import type { InboundMessageLifecycleHooks } from "../../extensions/types.js";
 import type { SkillDefinition } from "../../skills/types.js";
 import type { HandleIncomingMessageDependencies, InboundCommandHandler } from "../commands/types.js";
+import type { MidRunMessageSource } from "../../runtime/context.js";
 
 export interface InboundProcessingContext {
   message: IncomingMessage;
@@ -16,6 +17,7 @@ export interface InboundProcessingContext {
   hookRunner: HookRunner<InboundMessageLifecycleHooks>;
   startedAt: number;
   deliverProgress?: (message: OutgoingMessage) => Promise<void> | void;
+  midRunMessages?: MidRunMessageSource;
   response?: OutgoingMessage;
   conversation?: ConversationContext;
   agent?: AgentDefinition;

@@ -40,6 +40,10 @@ export interface ReplyChannelContext {
   endpointId?: string;
 }
 
+export interface MidRunMessageSource {
+  subscribe(consumer: (message: IncomingMessage) => Promise<void> | void): () => void;
+}
+
 export interface AgentRunInput {
   agent: AgentDefinition;
   conversation: ConversationContext;
@@ -48,7 +52,10 @@ export interface AgentRunInput {
   onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
   onSystemPromptResolved?: (snapshot: ConversationSystemPromptSnapshot) => Promise<void> | void;
   continueFromContext?: boolean;
+  midRunMessages?: MidRunMessageSource;
+  onMidRunMessageInjected?: (message: IncomingMessage) => Promise<void> | void;
 }
+
 
 export interface AgentRunResult {
   message: OutgoingMessage;

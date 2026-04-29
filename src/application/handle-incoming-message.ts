@@ -1,6 +1,7 @@
 import { loadAppConfig } from "../config/load-app-config.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { readRecentLogLines } from "../logging/view-logs.js";
+import type { MidRunMessageSource } from "../runtime/context.js";
 import { createHookRunner } from "../extensions/hook-runner.js";
 import { inboundCommandHandlers } from "./commands/registry.js";
 import type { HandleIncomingMessageDependencies } from "./commands/types.js";
@@ -20,6 +21,7 @@ export interface HandleIncomingMessage {
     message: IncomingMessage,
     options?: {
       deliverProgress?: (message: OutgoingMessage) => Promise<void> | void;
+      midRunMessages?: MidRunMessageSource;
     },
   ): Promise<OutgoingMessage>;
 }
@@ -44,6 +46,7 @@ export function createHandleIncomingMessage(
       message: IncomingMessage,
       options: {
         deliverProgress?: (message: OutgoingMessage) => Promise<void> | void;
+        midRunMessages?: MidRunMessageSource;
       } = {},
     ): Promise<OutgoingMessage> {
       const context: InboundProcessingContext = {
@@ -56,6 +59,7 @@ export function createHandleIncomingMessage(
         hookRunner,
         startedAt: Date.now(),
         deliverProgress: options.deliverProgress,
+        midRunMessages: options.midRunMessages,
         availableSkills: [],
       };
 

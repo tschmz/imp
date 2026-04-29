@@ -52,6 +52,57 @@ describe("createMessageProcessor", () => {
     await Promise.all([first, second]);
   });
 
+
+  it("routes later messages into the active run after mid-run ingestion is subscribed", async () => {
+    const ingested: string[] = [];
+    const delivered: string[] = [];
+    let releaseFirst: (() => void) | undefined;
+    const handler = {
+      handle: vi.fn(
+        async (
+          message: IncomingMessage,
+          options?: {
+            midRunMessages?: {
+              subscribe: (consumer: (message: IncomingMessage) => void | Promise<void>) => () => void;
+            };
+          },
+        ): Promise<OutgoingMessage> => {
+          const unsubscribe = options?.midRunMessages?.subscribe(async (midRunMessage) => {
+            ingested.push(midRunMessage.messageId);
+          });
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+          unsubscribe?.();
+          return {
+            conversation: message.conversation,
+            text: `reply:${message.messageId}`,
+          };
+        },
+      ),
+    };
+
+    const processor = createMessageProcessor({ handler });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "42"), {
+      deliver: async (message) => {
+        delivered.push(message.text);
+      },
+    }));
+    await tick();
+
+    const secondDeliver = vi.fn(async () => {});
+    await processor.handle(createEvent(createIncomingMessage("2", "42"), { deliver: secondDeliver }));
+
+    expect(ingested).toEqual(["2"]);
+    expect(handler.handle).toHaveBeenCalledTimes(1);
+    expect(secondDeliver).not.toHaveBeenCalled();
+
+    releaseFirst?.();
+    await first;
+    expect(delivered).toEqual(["reply:1"]);
+  });
+
   it("keeps endpoint queues isolated for the same transport/external conversation id", async () => {
     const starts: string[] = [];
     const releases = new Map<string, () => void>();
@@ -198,7 +249,7 @@ describe("createMessageProcessor", () => {
     expect(handler.handle).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ messageId: "2" }),
-      undefined,
+      expect.not.objectContaining({ deliverProgress: expect.any(Function) }),
     );
   });
 

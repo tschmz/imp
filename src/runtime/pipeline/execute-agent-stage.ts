@@ -56,6 +56,8 @@ export async function executeAgentStage(
     replyChannel: context.input.runtime?.replyChannel,
     onConversationEvents: context.input.onConversationEvents,
     continueFromContext: context.input.continueFromContext,
+    midRunMessages: context.input.midRunMessages,
+    onMidRunMessageInjected: context.input.onMidRunMessageInjected,
   });
 
   return {

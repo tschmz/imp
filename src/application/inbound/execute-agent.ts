@@ -10,6 +10,7 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
   const conversationBeforeRun = context.conversation;
   const userConversationMessage = toUserConversationMessage(context.message);
   let persistedConversation = context.conversation;
+  const midRunUserMessages: ConversationEvent[] = [];
   const startedAt = new Date().toISOString();
   if (context.dependencies.conversationStore.updateState) {
     persistedConversation = await context.dependencies.conversationStore.updateState(
@@ -50,6 +51,17 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
         }
 
         await deliverProgressUpdates(context, events, replyChannel);
+      },
+      midRunMessages: context.midRunMessages,
+      onMidRunMessageInjected: async (message) => {
+        const event = toUserConversationMessage(message);
+        if (context.dependencies.conversationStore.appendEvents) {
+          persistedConversation = await context.dependencies.conversationStore.appendEvents(
+            persistedConversation,
+            [event],
+          );
+        }
+        midRunUserMessages.push(event);
       },
       onSystemPromptResolved: context.dependencies.conversationStore.writeSystemPromptSnapshot
         ? async (snapshot) => {
@@ -110,6 +122,7 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
     messages: [
       ...conversationBeforeRun.messages,
       userConversationMessage,
+      ...midRunUserMessages,
       ...result.conversationEvents,
     ],
   };

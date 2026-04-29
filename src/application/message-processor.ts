@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "../domain/message.js";
+import type { MidRunMessageSource } from "../runtime/context.js";
 import type { OutgoingMessageDeliveryAction } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
 import type { TransportHandler, TransportInboundEvent } from "../transports/types.js";
@@ -10,6 +11,7 @@ export interface MessageProcessorDependencies {
       message: IncomingMessage,
       options?: {
         deliverProgress?: (message: import("../domain/message.js").OutgoingMessage) => Promise<void> | void;
+        midRunMessages?: MidRunMessageSource;
       },
     ): Promise<import("../domain/message.js").OutgoingMessage>;
   };
@@ -33,10 +35,19 @@ export function createMessageProcessor(
 ): MessageProcessor {
   const semaphore = createSemaphore(Math.max(1, dependencies.maxParallel ?? 4));
   const conversationQueues = new Map<string, Promise<void>>();
+  const activeMidRunSinks = new Map<string, MidRunMessageSink>();
 
   return {
     async handle(event: TransportInboundEvent): Promise<void> {
       const preparedEvent = await dependencies.prepareEvent?.(event) ?? event;
+      const conversationKey = getConversationQueueKey(preparedEvent.message);
+      const activeSink = activeMidRunSinks.get(conversationKey);
+      if (activeSink && !shouldBypassConversationQueue(preparedEvent.message)) {
+        const readyEvent = await prepareTransportMessage(preparedEvent);
+        await activeSink.ingest(readyEvent.message);
+        return;
+      }
+
       if (shouldBypassConversationQueue(preparedEvent.message)) {
         await semaphore.withPermit(async () => {
           const readyEvent = await prepareTransportMessage(preparedEvent);
@@ -45,10 +56,18 @@ export function createMessageProcessor(
         return;
       }
 
-      await enqueueByConversation(preparedEvent, async () => {
+      await enqueueByConversation(preparedEvent, conversationKey, async () => {
         await semaphore.withPermit(async () => {
           const readyEvent = await prepareTransportMessage(preparedEvent);
-          await processEvent(readyEvent, dependencies);
+          const midRunMessages = createMidRunMessageSink({
+            onSubscribed: (sink) => activeMidRunSinks.set(conversationKey, sink),
+            onUnsubscribed: (sink) => {
+              if (activeMidRunSinks.get(conversationKey) === sink) {
+                activeMidRunSinks.delete(conversationKey);
+              }
+            },
+          });
+          await processEvent(readyEvent, dependencies, { midRunMessages });
         });
       });
     },
@@ -56,13 +75,9 @@ export function createMessageProcessor(
 
   async function enqueueByConversation(
     event: TransportInboundEvent,
+    key: string,
     operation: () => Promise<void>,
   ): Promise<void> {
-    const endpointKey = event.message.endpointId;
-    const key =
-      "sessionId" in event.message.conversation && event.message.conversation.sessionId
-        ? `session/${endpointKey}/${event.message.conversation.sessionId}`
-        : `${endpointKey}/${event.message.conversation.transport}/${event.message.conversation.externalId}`;
     const previous = conversationQueues.get(key) ?? Promise.resolve();
     let release: (() => void) | undefined;
     const current = new Promise<void>((resolve) => {
@@ -96,6 +111,61 @@ async function prepareTransportMessage(event: TransportInboundEvent): Promise<Tr
   };
 }
 
+function getConversationQueueKey(message: IncomingMessage): string {
+  const endpointKey = message.endpointId;
+  return "sessionId" in message.conversation && message.conversation.sessionId
+    ? `session/${endpointKey}/${message.conversation.sessionId}`
+    : `${endpointKey}/${message.conversation.transport}/${message.conversation.externalId}`;
+}
+
+interface MidRunMessageSink extends MidRunMessageSource {
+  ingest(message: IncomingMessage): Promise<void>;
+}
+
+function createMidRunMessageSink(hooks: {
+  onSubscribed?: (sink: MidRunMessageSink) => void;
+  onUnsubscribed?: (sink: MidRunMessageSink) => void;
+} = {}): MidRunMessageSink {
+  let consumer: ((message: IncomingMessage) => Promise<void> | void) | undefined;
+  const buffered: IncomingMessage[] = [];
+  let chain = Promise.resolve();
+
+  async function deliver(message: IncomingMessage): Promise<void> {
+    if (!consumer) {
+      buffered.push(message);
+      return;
+    }
+    await consumer(message);
+  }
+
+  const sink: MidRunMessageSink = {
+    subscribe(nextConsumer) {
+      consumer = nextConsumer;
+      hooks.onSubscribed?.(sink);
+      chain = chain.then(async () => {
+        while (buffered.length > 0) {
+          const message = buffered.shift();
+          if (message) {
+            await deliver(message);
+          }
+        }
+      });
+      return () => {
+        if (consumer === nextConsumer) {
+          consumer = undefined;
+          hooks.onUnsubscribed?.(sink);
+        }
+      };
+    },
+    async ingest(message) {
+      chain = chain.then(() => deliver(message));
+      await chain;
+    },
+  };
+
+  return sink;
+}
+
 function shouldBypassConversationQueue(message: IncomingMessage): boolean {
   return Boolean(message.command && priorityInboundCommands.has(message.command));
 }
@@ -103,6 +173,7 @@ function shouldBypassConversationQueue(message: IncomingMessage): boolean {
 async function processEvent(
   event: TransportInboundEvent,
   dependencies: MessageProcessorDependencies,
+  options: { midRunMessages?: MidRunMessageSource } = {},
 ): Promise<void> {
   const maxRetryDelayMs = 30_000;
   let attempt = 1;
@@ -112,9 +183,12 @@ async function processEvent(
       await event.runWithProcessing(async () => {
         const response = await dependencies.handler.handle(
           event.message,
-          event.deliverProgress
+          event.deliverProgress || options.midRunMessages
             ? {
-                deliverProgress: (message) => event.deliverProgress!(message),
+                ...(event.deliverProgress
+                  ? { deliverProgress: (message) => event.deliverProgress!(message) }
+                  : {}),
+                ...(options.midRunMessages ? { midRunMessages: options.midRunMessages } : {}),
               }
             : undefined,
         );

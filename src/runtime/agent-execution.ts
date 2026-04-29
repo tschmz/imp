@@ -13,7 +13,7 @@ import {
   type ModelProviderFailureKind,
 } from "../domain/processing-error.js";
 import type { ToolDefinition } from "../tools/types.js";
-import type { ReplyChannelContext } from "./context.js";
+import type { MidRunMessageSource, ReplyChannelContext } from "./context.js";
 import {
   getAssistantText,
   renderIncomingMessageForAgent,
@@ -27,7 +27,7 @@ export type AgentHandle =
   & {
     state: Pick<Agent["state"], "messages">;
   }
-  & Partial<Pick<Agent, "continue" | "subscribe">>;
+  & Partial<Pick<Agent, "continue" | "subscribe" | "steer">>;
 
 type ConversationMessageEvent = Extract<AgentEvent, { type: "message_end" }>;
 
@@ -56,6 +56,8 @@ export interface ExecuteAgentOptions {
   onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
   continueFromContext?: boolean;
   readBinaryFile?: (path: string) => Promise<Uint8Array>;
+  midRunMessages?: MidRunMessageSource;
+  onMidRunMessageInjected?: (message: IncomingMessage) => Promise<void> | void;
 }
 
 export interface ExecuteAgentResult {
@@ -129,12 +131,35 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
     ...(options.onPayload ? { onPayload: options.onPayload } : {}),
   });
 
+  const pendingMidRunMessages: IncomingMessage[] = [];
   const eventMessages = collectConversationEventMessages(agent, {
     parentMessageId: options.parentMessageId,
     correlationId: options.correlationId,
     initialAssistantIndex: initialTurnIndexes.assistant,
     initialToolResultIndex: initialTurnIndexes.toolResult,
     onConversationEvents: options.onConversationEvents,
+    onUserMessageEnd: async () => {
+      const message = pendingMidRunMessages.shift();
+      if (message) {
+        await options.onMidRunMessageInjected?.(message);
+      }
+    },
+  });
+  const unsubscribeMidRunMessages = options.midRunMessages?.subscribe(async (message) => {
+    if (!agent.steer) {
+      return;
+    }
+    const rendered = await renderIncomingMessageForAgent(message, options.model, {
+      readBinaryFile: options.readBinaryFile,
+    });
+    pendingMidRunMessages.push(message);
+    agent.steer({
+      role: "user",
+      content: rendered.images && rendered.images.length > 0
+        ? [{ type: "text", text: rendered.text }, ...rendered.images]
+        : rendered.text,
+      timestamp: Date.parse(message.receivedAt),
+    });
   });
 
   try {
@@ -147,6 +172,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       await agent.prompt(currentTurn.text, currentTurn.images);
     }
   } finally {
+    unsubscribeMidRunMessages?.();
     eventMessages.unsubscribe?.();
   }
 
@@ -225,6 +251,7 @@ function collectConversationEventMessages(
     initialAssistantIndex: number;
     initialToolResultIndex: number;
     onConversationEvents?: (events: ConversationEvent[]) => Promise<void> | void;
+    onUserMessageEnd?: () => Promise<void> | void;
   },
 ): {
   messages: AgentMessage[];
@@ -236,6 +263,11 @@ function collectConversationEventMessages(
   const seen = new Set<string>();
 
   const recordMessage = async (message: AgentMessage) => {
+    if (message.role === "user") {
+      await options.onUserMessageEnd?.();
+      return;
+    }
+
     if (message.role !== "assistant" && message.role !== "toolResult") {
       return;
     }
