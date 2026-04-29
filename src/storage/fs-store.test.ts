@@ -228,6 +228,34 @@ describe("createFsConversationStore", () => {
       promptWorkingDirectory: "/workspace",
     });
     expect(metadata.content).toBeUndefined();
+
+    await store.writeSystemPromptSnapshot!(created, {
+      messageId: "msg-2",
+      correlationId: "corr-2",
+      agentId: "default",
+      createdAt: "2026-04-05T00:00:02.000Z",
+      content: "Updated prompt",
+      cacheHit: false,
+      sources: {
+        basePromptSource: "text",
+        instructionFiles: [],
+        configuredInstructionFiles: [],
+        agentHomeInstructionFiles: [],
+        referenceFiles: [],
+        configuredReferenceFiles: [],
+      },
+    });
+
+    await expect(store.listSystemPromptSnapshots!(created)).resolves.toMatchObject([
+      {
+        messageId: "msg/1",
+        content: "Base prompt\n\n<INSTRUCTIONS from=\"AGENTS.md\">\n\nUse facts.\n</INSTRUCTIONS>",
+      },
+      {
+        messageId: "msg-2",
+        content: "Updated prompt",
+      },
+    ]);
   });
 
   it("persists and reloads telegram document attachment metadata", async () => {

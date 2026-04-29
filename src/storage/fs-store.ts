@@ -138,6 +138,9 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
         ),
       );
     },
+    async listSystemPromptSnapshots(context) {
+      return readSystemPromptSnapshots(paths.conversationsDir, context);
+    },
     async markInterruptedRuns(now) {
       return markInterruptedAgentRuns(paths.conversationsDir, now);
     },
@@ -579,6 +582,64 @@ async function updateConversationState(
 
   await writeSessionMeta(conversationsDir, next);
   return next;
+}
+
+interface StoredSystemPromptSnapshotMetadata extends Omit<ConversationSystemPromptSnapshot, "content"> {
+  conversation?: ConversationRef;
+  contentFile?: string;
+}
+
+async function readSystemPromptSnapshots(
+  conversationsDir: string,
+  context: ConversationContext,
+): Promise<ConversationSystemPromptSnapshot[]> {
+  const promptsDir = getSystemPromptsDir(conversationsDir, context.state.conversation, context.state.agentId);
+  let entries;
+
+  try {
+    entries = await readdir(promptsDir, { withFileTypes: true });
+  } catch (error: unknown) {
+    if (isMissingFileError(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  const snapshots: ConversationSystemPromptSnapshot[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) {
+      continue;
+    }
+
+    const metadataPath = join(promptsDir, entry.name);
+    const metadata = await readJsonFile<StoredSystemPromptSnapshotMetadata>(metadataPath);
+    if (!metadata?.contentFile) {
+      continue;
+    }
+
+    let content;
+    try {
+      content = await readFile(join(promptsDir, metadata.contentFile), "utf8");
+    } catch (error: unknown) {
+      if (isMissingFileError(error)) {
+        continue;
+      }
+      throw error;
+    }
+
+    snapshots.push({
+      messageId: metadata.messageId,
+      correlationId: metadata.correlationId,
+      agentId: metadata.agentId,
+      createdAt: metadata.createdAt,
+      cacheHit: metadata.cacheHit,
+      sources: metadata.sources,
+      ...(metadata.promptWorkingDirectory ? { promptWorkingDirectory: metadata.promptWorkingDirectory } : {}),
+      content,
+    });
+  }
+
+  return snapshots.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
 async function writeSystemPromptSnapshot(

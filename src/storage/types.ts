@@ -26,6 +26,7 @@ export interface ConversationStore {
   appendEvents?(context: ConversationContext, events: ConversationEvent[]): Promise<ConversationContext>;
   updateState?(context: ConversationContext, patch: Partial<ConversationState>): Promise<ConversationContext>;
   writeSystemPromptSnapshot?(context: ConversationContext, snapshot: ConversationSystemPromptSnapshot): Promise<void>;
+  listSystemPromptSnapshots?(context: ConversationContext): Promise<ConversationSystemPromptSnapshot[]>;
   markInterruptedRuns?(now: string): Promise<number>;
   listInterruptedRuns?(): Promise<ConversationContext[]>;
   listBackups(ref: ChatRef): Promise<ConversationBackupSummary[]>;

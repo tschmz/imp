@@ -42,12 +42,17 @@ describe("exportCommandHandler", () => {
     expect(html).not.toContain('"workingDirectory"');
   });
 
-  it("creates a full HTML export with tool details", async () => {
+  it("creates a full HTML export with tool details and the latest system prompt", async () => {
     const dataRoot = await mkdtemp(join(tmpdir(), "imp-export-test-"));
+    const conversationStore = createMutableConversationStore(createConversation());
+    conversationStore.listSystemPromptSnapshots = async () => [
+      createSystemPromptSnapshot("msg-1", "Earlier system prompt."),
+      createSystemPromptSnapshot("msg-2", "Full system prompt with <sensitive markup> escaped."),
+    ];
     const context = createCommandContext({
       message: createIncomingMessage("export", "full"),
       dependencies: createDependencies({
-        conversationStore: createMutableConversationStore(createConversation()),
+        conversationStore,
         runtimeInfo: createRuntimeInfo(dataRoot),
       }),
     });
@@ -62,6 +67,11 @@ describe("exportCommandHandler", () => {
     expect(html).toContain("&quot;workingDirectory&quot;: &quot;/workspace&quot;");
     expect(html).toContain("all tests passed");
     expect(html).toContain("Internal thinking: present, content omitted.");
+    expect(html).toContain("<h2>System prompt snapshots</h2>");
+    expect(html).toContain("Earlier system prompt.");
+    expect(html).toContain("Full system prompt with &lt;sensitive markup&gt; escaped.");
+    expect(html).toContain("/workspace/AGENTS.md");
+    expect(html).toContain('<details class="system-prompt-snapshot" open>');
     expect(html).toContain("<details><summary>Tool result: shell (ok)</summary>");
     expect(html).not.toContain("<details open><summary>Tool result: shell (ok)</summary>");
   });
@@ -152,6 +162,27 @@ function createConversation(): ConversationContext {
         createdAt: "2026-04-05T00:00:30.000Z",
       },
     ],
+  };
+}
+
+function createSystemPromptSnapshot(messageId: string, content: string) {
+  return {
+    messageId,
+    correlationId: `corr-${messageId}`,
+    agentId: "default",
+    createdAt: messageId === "msg-1" ? "2026-04-05T00:00:05.000Z" : "2026-04-05T00:00:15.000Z",
+    content,
+    cacheHit: false,
+    sources: {
+      basePromptSource: "text" as const,
+      instructionFiles: ["/workspace/AGENTS.md"],
+      configuredInstructionFiles: [],
+      agentHomeInstructionFiles: [],
+      workspaceInstructionFile: "/workspace/AGENTS.md",
+      referenceFiles: [],
+      configuredReferenceFiles: [],
+    },
+    promptWorkingDirectory: "/workspace",
   };
 }
 

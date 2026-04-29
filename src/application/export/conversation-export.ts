@@ -6,6 +6,7 @@ import type {
   ConversationAssistantMessage,
   ConversationContext,
   ConversationEvent,
+  ConversationSystemPromptSnapshot,
   ConversationToolResultMessage,
   ConversationUserMessage,
 } from "../../domain/conversation.js";
@@ -19,6 +20,7 @@ export interface ConversationExportOptions {
   mode: ConversationExportMode;
   format?: ConversationExportFormat;
   now?: string;
+  systemPromptSnapshots?: ConversationSystemPromptSnapshot[];
 }
 
 export interface ConversationExportResult {
@@ -78,6 +80,7 @@ export async function createConversationExport(
   const html = renderConversationExportHtml(options.conversation, {
     mode: options.mode,
     createdAt: options.now ?? new Date().toISOString(),
+    systemPromptSnapshots: options.systemPromptSnapshots ?? [],
   });
 
   await mkdir(dirname(outputPath), { recursive: true });
@@ -94,11 +97,16 @@ export async function createConversationExport(
 
 export function renderConversationExportHtml(
   conversation: ConversationContext,
-  options: { mode: ConversationExportMode; createdAt: string },
+  options: {
+    mode: ConversationExportMode;
+    createdAt: string;
+    systemPromptSnapshots?: ConversationSystemPromptSnapshot[];
+  },
 ): string {
   const title = conversation.state.title ?? "untitled";
   const body = [
     renderHeader(conversation, title, options),
+    renderSystemPromptSection(options.mode, options.systemPromptSnapshots ?? []),
     conversation.messages.length === 0
       ? '<section class="empty">No messages.</section>'
       : `<main class="messages">\n${conversation.messages.map((message) => renderMessage(message, options.mode)).join("\n")}\n</main>`,
@@ -144,6 +152,51 @@ function renderHeader(
     ...rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`),
     "</dl>",
     "</header>",
+  ].join("\n");
+}
+
+function renderSystemPromptSection(
+  mode: ConversationExportMode,
+  snapshots: ConversationSystemPromptSnapshot[],
+): string {
+  if (mode !== "full" || snapshots.length === 0) {
+    return "";
+  }
+
+  return [
+    '<section class="system-prompt">',
+    snapshots.length === 1 ? "<h2>System prompt</h2>" : "<h2>System prompt snapshots</h2>",
+    ...snapshots.map((snapshot, index) => renderSystemPromptSnapshot(snapshot, index === snapshots.length - 1)),
+    "</section>",
+  ].join("\n");
+}
+
+function renderSystemPromptSnapshot(snapshot: ConversationSystemPromptSnapshot, open: boolean): string {
+  const content = [
+    renderMetadataList([
+      ["Message ID", snapshot.messageId],
+      ["Agent", snapshot.agentId],
+      ["Created", snapshot.createdAt],
+      ["Cache hit", snapshot.cacheHit ? "yes" : "no"],
+      ...(snapshot.promptWorkingDirectory ? [["Prompt working directory", snapshot.promptWorkingDirectory] as [string, string]] : []),
+      ["Base prompt source", snapshot.sources.basePromptSource],
+      ...(snapshot.sources.basePromptFile ? [["Base prompt file", snapshot.sources.basePromptFile] as [string, string]] : []),
+      ...(snapshot.sources.basePromptBuiltIn ? [["Built-in base prompt", snapshot.sources.basePromptBuiltIn] as [string, string]] : []),
+      ...(snapshot.sources.instructionFiles.length > 0
+        ? [["Instruction files", snapshot.sources.instructionFiles.join("\n")] as [string, string]]
+        : []),
+      ...(snapshot.sources.referenceFiles.length > 0
+        ? [["Reference files", snapshot.sources.referenceFiles.join("\n")] as [string, string]]
+        : []),
+    ]),
+    renderTextBlock(snapshot.content),
+  ].join("\n");
+
+  return [
+    `<details class="system-prompt-snapshot"${open ? " open" : ""}>`,
+    `<summary>${escapeHtml(`System prompt for message ${snapshot.messageId}`)}</summary>`,
+    content,
+    "</details>",
   ].join("\n");
 }
 
@@ -368,7 +421,7 @@ function renderCss(): string {
       margin: 0;
       padding: 32px;
     }
-    header, .message {
+    header, .message, .system-prompt {
       max-width: 960px;
       margin: 0 auto 18px;
       background: #ffffff;
@@ -437,6 +490,9 @@ function renderCss(): string {
       cursor: pointer;
       font-weight: 700;
     }
+    .system-prompt {
+      border-left: 4px solid #7a3fd1;
+    }
     .assistant {
       border-left: 4px solid #2f6fed;
     }
@@ -455,7 +511,7 @@ function renderCss(): string {
         background: #ffffff;
         padding: 0;
       }
-      header, .message {
+      header, .message, .system-prompt {
         break-inside: avoid;
         border-color: #c9cdd4;
       }

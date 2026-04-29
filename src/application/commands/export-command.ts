@@ -37,12 +37,17 @@ export const exportCommandHandler: InboundCommandHandler = {
       };
     }
 
+    const systemPromptSnapshots = options.mode === "full"
+      ? await dependencies.conversationStore.listSystemPromptSnapshots?.(conversation) ?? []
+      : [];
+
     const result = await createConversationExport({
       conversation,
       dataRoot: dependencies.runtimeInfo.dataRoot,
       mode: options.mode,
       format: options.format,
       now: message.receivedAt,
+      systemPromptSnapshots,
     });
 
     return {
