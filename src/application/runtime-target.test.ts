@@ -22,40 +22,29 @@ vi.mock("../transports/registry.js", async (importOriginal) => {
 });
 
 describe("resolveServiceConfigPath", () => {
-  it("prefers --config over IMP_CONFIG_PATH", () => {
-    const resolved = resolveServiceConfigPath({
+  it("resolves service config path by precedence", () => {
+    expect(resolveServiceConfigPath({
       cliConfigPath: "/tmp/from-cli.json",
       env: {
         IMP_CONFIG_PATH: "/tmp/from-env.json",
       },
-    });
+    })).toBe("/tmp/from-cli.json");
 
-    expect(resolved).toBe("/tmp/from-cli.json");
-  });
-
-  it("uses IMP_CONFIG_PATH when --config is omitted", () => {
-    const resolved = resolveServiceConfigPath({
+    expect(resolveServiceConfigPath({
       env: {
         IMP_CONFIG_PATH: "/tmp/from-env.json",
       },
-    });
+    })).toBe("/tmp/from-env.json");
 
-    expect(resolved).toBe("/tmp/from-env.json");
-  });
-
-  it("falls back to the default user config path", () => {
     const env = {
       XDG_CONFIG_HOME: "/tmp/custom-config-home",
     };
-
-    const resolved = resolveServiceConfigPath({ env });
-
-    expect(resolved).toBe(getDefaultUserConfigPath(env));
+    expect(resolveServiceConfigPath({ env })).toBe(getDefaultUserConfigPath(env));
   });
 });
 
 describe("resolveServiceTarget", () => {
-  it("builds a service target from --config", () => {
+  it("builds service targets from resolved config paths", () => {
     const configPath = "/tmp/from-cli.json";
 
     const target = resolveServiceTarget({
@@ -77,16 +66,11 @@ describe("resolveServiceTarget", () => {
         serviceLabel: plan.serviceLabel,
       }),
     );
-  });
 
-  it("builds a service target from IMP_CONFIG_PATH when --config is omitted", () => {
     const env = {
       IMP_CONFIG_PATH: "/tmp/from-env.json",
     };
-
-    const target = resolveServiceTarget({ env });
-
-    expect(target.configPath).toBe(env.IMP_CONFIG_PATH);
+    expect(resolveServiceTarget({ env }).configPath).toBe(env.IMP_CONFIG_PATH);
   });
 });
 

@@ -20,54 +20,39 @@ afterEach(async () => {
 });
 
 describe("createFileLogger", () => {
-  it("writes debug logs when level is set to debug", async () => {
-    const logFilePath = await createLogFilePath();
+  it("applies log-level filtering to file and console output", async () => {
     const consoleDebug = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const logger = trackLogger(createFileLogger(logFilePath, "debug"));
-
-    await logger.debug("visible-debug");
-
-    const content = await readFile(logFilePath, "utf8");
-    expect(content).toContain('"level":"debug"');
-    expect(content).toContain('"schemaVersion":1');
-    expect(content).toContain('"event":"visible.debug"');
-    expect(consoleDebug).toHaveBeenCalledWith("visible-debug");
-  });
-
-  it("suppresses debug logs when level is set to info", async () => {
-    const logFilePath = await createLogFilePath();
-    const consoleDebug = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const logger = trackLogger(createFileLogger(logFilePath, "info"));
-
-    await logger.debug("hidden-debug");
-
-    await expect(readFile(logFilePath, "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-    expect(consoleDebug).not.toHaveBeenCalled();
-  });
-
-  it("suppresses info logs when level is set to warn", async () => {
-    const logFilePath = await createLogFilePath();
     const consoleInfo = vi.spyOn(console, "log").mockImplementation(() => {});
-    const logger = trackLogger(createFileLogger(logFilePath, "warn"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await logger.info("hidden");
+    const debugLogFilePath = await createLogFilePath();
+    const debugLogger = trackLogger(createFileLogger(debugLogFilePath, "debug"));
+    await debugLogger.debug("visible-debug");
 
-    await expect(readFile(logFilePath, "utf8")).rejects.toMatchObject({
+    const debugContent = await readFile(debugLogFilePath, "utf8");
+    expect(debugContent).toContain('"level":"debug"');
+    expect(debugContent).toContain('"schemaVersion":1');
+    expect(debugContent).toContain('"event":"visible.debug"');
+    expect(consoleDebug).toHaveBeenCalledWith("visible-debug");
+
+    const infoLogFilePath = await createLogFilePath();
+    const infoLogger = trackLogger(createFileLogger(infoLogFilePath, "info"));
+    await infoLogger.debug("hidden-debug");
+
+    await expect(readFile(infoLogFilePath, "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
+    expect(consoleDebug).not.toHaveBeenCalledWith("hidden-debug");
+
+    const warnLogFilePath = await createLogFilePath();
+    const warnLogger = trackLogger(createFileLogger(warnLogFilePath, "warn"));
+    await warnLogger.info("hidden");
+    await warnLogger.error("visible");
+
+    const warnContent = await readFile(warnLogFilePath, "utf8");
+    expect(warnContent).toContain('"message":"visible"');
+    expect(warnContent).not.toContain('"message":"hidden"');
     expect(consoleInfo).not.toHaveBeenCalled();
-  });
-
-  it("keeps error logs when level is set to warn", async () => {
-    const logFilePath = await createLogFilePath();
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const logger = trackLogger(createFileLogger(logFilePath, "warn"));
-
-    await logger.error("visible");
-
-    await expect(readFile(logFilePath, "utf8")).resolves.toContain('"message":"visible"');
     expect(consoleError).toHaveBeenCalledWith("visible");
   });
 

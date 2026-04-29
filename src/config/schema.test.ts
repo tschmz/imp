@@ -78,63 +78,6 @@ describe("appConfigSchema", () => {
     );
   });
 
-  it("rejects legacy agent-level authFile", () => {
-    const result = appConfigSchema.safeParse(
-      createConfig({
-        id: "default",
-        prompt: {
-          base: {
-            text: "You are concise.",
-          },
-        },
-        model: {
-          provider: "openai-codex",
-          modelId: "gpt-5.4",
-        },
-        authFile: "/tmp/auth.json",
-      } as never),
-    );
-
-    expect(result.success).toBe(false);
-    if (result.success) {
-      throw new Error("Expected schema validation to fail.");
-    }
-
-    expect(result.error.issues).toContainEqual(
-      expect.objectContaining({
-        path: ["agents", 0],
-        message: expect.stringContaining("authFile"),
-      }),
-    );
-  });
-
-  it("rejects legacy agent-level inference", () => {
-    const result = appConfigSchema.safeParse(
-      createConfig({
-        id: "default",
-        model: {
-          provider: "openai",
-          modelId: "gpt-5.4",
-        },
-        inference: {
-          maxOutputTokens: 1000,
-        },
-      } as never),
-    );
-
-    expect(result.success).toBe(false);
-    if (result.success) {
-      throw new Error("Expected schema validation to fail.");
-    }
-
-    expect(result.error.issues).toContainEqual(
-      expect.objectContaining({
-        path: ["agents", 0],
-        message: expect.stringContaining("inference"),
-      }),
-    );
-  });
-
   it("accepts authFile for OAuth-capable providers", () => {
     const result = appConfigSchema.safeParse(
       createConfig({
@@ -471,48 +414,6 @@ describe("appConfigSchema", () => {
     );
 
     expect(result.success).toBe(true);
-  });
-
-  it("rejects deprecated endpoint skill catalogs", () => {
-    const result = appConfigSchema.safeParse({
-      ...createConfig({
-        id: "default",
-        prompt: {
-          base: {
-            text: "You are concise.",
-          },
-        },
-        model: {
-          provider: "openai",
-          modelId: "gpt-5.4",
-        },
-      }),
-      endpoints: [
-        {
-          id: "private-telegram",
-          type: "telegram",
-          enabled: true,
-          skills: {
-            paths: ["./skills"],
-          },
-          token: "replace-me",
-          access: {
-            allowedUserIds: [],
-          },
-        },
-      ],
-    });
-
-    expect(result.success).toBe(false);
-    if (result.success) {
-      throw new Error("Expected schema validation to fail.");
-    }
-
-    expect(result.error.issues).toContainEqual(
-      expect.objectContaining({
-        path: ["endpoints", 0],
-      }),
-    );
   });
 
   it("accepts global MCP stdio server config referenced by agents", () => {

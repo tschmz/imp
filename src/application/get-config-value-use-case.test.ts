@@ -18,35 +18,27 @@ afterEach(async () => {
 });
 
 describe("createGetConfigValueUseCase", () => {
-  it("reads a primitive config value from the discovered config", async () => {
+  it("reads primitive and structured values from discovered and explicit config paths", async () => {
     const root = await createTempDir();
-    const configPath = join(root, "config-home", "imp", "config.json");
+    const discoveredConfigPath = join(root, "config-home", "imp", "config.json");
+    const explicitConfigPath = join(root, "custom", "imp.json");
     const writeOutput = vi.fn();
     vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
     vi.stubEnv("IMP_CONFIG_PATH", "");
 
-    await writeConfig(configPath);
+    await writeConfig(discoveredConfigPath);
+    await writeConfig(explicitConfigPath);
 
     await createGetConfigValueUseCase({ writeOutput })({
       keyPath: "endpoints.private-telegram.enabled",
     });
-
-    expect(writeOutput).toHaveBeenCalledWith("true");
-  });
-
-  it("reads a structured config value from an explicit path", async () => {
-    const root = await createTempDir();
-    const configPath = join(root, "custom", "imp.json");
-    const writeOutput = vi.fn();
-
-    await writeConfig(configPath);
-
     await createGetConfigValueUseCase({ writeOutput })({
-      configPath,
+      configPath: explicitConfigPath,
       keyPath: "endpoints.private-telegram.access",
     });
 
+    expect(writeOutput).toHaveBeenCalledWith("true");
     expect(writeOutput).toHaveBeenCalledWith('{\n  "allowedUserIds": []\n}');
   });
 

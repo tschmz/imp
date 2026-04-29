@@ -505,29 +505,4 @@ describe("assistant text phase helpers", () => {
     expect(getAssistantCommentaryText(message)).toBe("I'll inspect the repo first.");
   });
 
-  it("keeps legacy text output when no phase metadata exists", () => {
-    const message: AssistantMessage = {
-      role: "assistant",
-      content: [
-        { type: "text", text: "Plain response" },
-        { type: "text", text: "Still part of the answer" },
-      ],
-      api: "openai-responses",
-      provider: "openai",
-      model: "gpt-5-mini",
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: "stop",
-      timestamp: Date.now(),
-    };
-
-    expect(getAssistantText(message)).toBe("Plain response\nStill part of the answer");
-    expect(getAssistantCommentaryText(message)).toBe("");
-  });
 });

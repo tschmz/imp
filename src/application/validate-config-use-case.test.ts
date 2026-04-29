@@ -18,31 +18,23 @@ afterEach(async () => {
 });
 
 describe("createValidateConfigUseCase", () => {
-  it("validates the discovered config", async () => {
+  it("validates discovered and explicit config paths", async () => {
     const root = await createTempDir();
-    const configPath = join(root, "config-home", "imp", "config.json");
+    const discoveredConfigPath = join(root, "config-home", "imp", "config.json");
+    const explicitConfigPath = join(root, "custom", "imp.json");
     const writeOutput = vi.fn();
     vi.stubEnv("HOME", root);
     vi.stubEnv("XDG_CONFIG_HOME", join(root, "config-home"));
     vi.stubEnv("IMP_CONFIG_PATH", "");
 
-    await writeConfig(configPath);
+    await writeConfig(discoveredConfigPath);
+    await writeConfig(explicitConfigPath);
 
     await createValidateConfigUseCase({ writeOutput })({});
+    await createValidateConfigUseCase({ writeOutput })({ configPath: explicitConfigPath });
 
-    expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${configPath}`);
-  });
-
-  it("validates an explicit config path", async () => {
-    const root = await createTempDir();
-    const configPath = join(root, "custom", "imp.json");
-    const writeOutput = vi.fn();
-
-    await writeConfig(configPath);
-
-    await createValidateConfigUseCase({ writeOutput })({ configPath });
-
-    expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${configPath}`);
+    expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${discoveredConfigPath}`);
+    expect(writeOutput).toHaveBeenCalledWith(`Config valid: ${explicitConfigPath}`);
   });
 
   it("runs agent preflight validation when requested", async () => {

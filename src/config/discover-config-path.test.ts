@@ -16,37 +16,33 @@ afterEach(async () => {
 });
 
 describe("discoverConfigPath", () => {
-  it("prefers the explicit cli config path", async () => {
+  it("resolves config path by CLI, env, then default-path precedence", async () => {
     const root = await createTempDir();
     const cliConfigPath = join(root, "cli-config.json");
-    await writeFile(cliConfigPath, "{}\n", "utf8");
-
-    const result = await discoverConfigPath({
-      cliConfigPath,
-      env: {
-        IMP_CONFIG_PATH: join(root, "env-config.json"),
-        XDG_CONFIG_HOME: join(root, "xdg-config"),
-      },
-    });
-
-    expect(result.configPath).toBe(cliConfigPath);
-    expect(result.checkedPaths[0]).toBe(cliConfigPath);
-  });
-
-  it("uses IMP_CONFIG_PATH before XDG and system paths", async () => {
-    const root = await createTempDir();
     const envConfigPath = join(root, "env-config.json");
+    await writeFile(cliConfigPath, "{}\n", "utf8");
     await writeFile(envConfigPath, "{}\n", "utf8");
 
-    const result = await discoverConfigPath({
+    const cliResult = await discoverConfigPath({
+      cliConfigPath,
       env: {
         IMP_CONFIG_PATH: envConfigPath,
         XDG_CONFIG_HOME: join(root, "xdg-config"),
       },
     });
 
-    expect(result.configPath).toBe(envConfigPath);
-    expect(result.checkedPaths[0]).toBe(envConfigPath);
+    expect(cliResult.configPath).toBe(cliConfigPath);
+    expect(cliResult.checkedPaths[0]).toBe(cliConfigPath);
+
+    const envResult = await discoverConfigPath({
+      env: {
+        IMP_CONFIG_PATH: envConfigPath,
+        XDG_CONFIG_HOME: join(root, "xdg-config"),
+      },
+    });
+
+    expect(envResult.configPath).toBe(envConfigPath);
+    expect(envResult.checkedPaths[0]).toBe(envConfigPath);
   });
 
   it("reports the checked paths when no config exists", async () => {
