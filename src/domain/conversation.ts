@@ -55,7 +55,7 @@ export type ConversationEvent =
   | ConversationToolResultMessage;
 
 export interface ConversationMessageSource {
-  kind: "text" | "telegram-voice-transcript" | "telegram-document" | "telegram-image" | "plugin-event";
+  kind: "text" | "telegram-voice-transcript" | "telegram-document" | "telegram-image" | "plugin-event" | "scheduled";
   transcript?: {
     provider: string;
     model: string;
@@ -63,6 +63,12 @@ export interface ConversationMessageSource {
   document?: ConversationDocumentAttachment;
   image?: ConversationImageAttachment;
   plugin?: ConversationPluginSource;
+  scheduled?: ConversationScheduledSource;
+}
+
+export interface ConversationScheduledSource {
+  jobId: string;
+  sourceFile: string;
 }
 
 export interface ConversationPluginSource {

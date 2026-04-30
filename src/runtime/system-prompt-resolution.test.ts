@@ -582,6 +582,37 @@ describe("resolveSystemPrompt", () => {
   });
 });
 
+  it("does not auto-load agent-home cron.md as prompt instructions", async () => {
+    const prompt = await buildSystemPrompt(
+      {
+        ...createAgent(),
+        home: "/agents/default",
+        prompt: {
+          base: { text: "{{#each prompt.instructions}}{{source}} {{content}}{{/each}}" },
+          instructions: [],
+          references: [],
+        },
+      },
+      undefined,
+      createTemplateContext(),
+      [],
+      async (path) => {
+        if (path === "/agents/default/AGENT.md") {
+          return "Agent home instructions.";
+        }
+        if (path === "/agents/default/cron.md") {
+          return "Secret schedule instruction.";
+        }
+        throw new Error(`Unexpected read ${path}`);
+      },
+      ["/agents/default/AGENT.md", "/agents/default/cron.md"],
+    );
+
+    expect(prompt).toContain("Agent home instructions.");
+    expect(prompt).not.toContain("Secret schedule instruction.");
+    expect(prompt).not.toContain("cron.md");
+  });
+
 function expectRenderedTemplate(prompt: string): void {
   expect(prompt.trim().length).toBeGreaterThan(0);
   expect(prompt).not.toMatch(/\{\{[^}]+}}/);

@@ -152,6 +152,43 @@ For the default base prompt, Imp assembles context in this order:
 6. Workspace `AGENTS.md`
 7. Configured `prompt.references`
 
+## Agent Cron Jobs
+
+Agents can maintain scheduled jobs in `cron.md` in their agent home. Imp watches this file at runtime and reloads changes without a daemon restart. `cron.md` is intentionally excluded from automatic agent-home Markdown prompt loading, so scheduled instructions are only passed to the agent when the job fires.
+
+Each job is a Markdown section with a JSON fence tagged `json imp-cron`; the Markdown body after the fence is the instruction sent to the agent.
+
+````md
+# Imp Cron
+
+## wohnungssuche
+
+```json imp-cron
+{
+  "id": "wohnungssuche",
+  "enabled": true,
+  "schedule": "0 8 * * *",
+  "timezone": "Europe/Berlin",
+  "reply": {
+    "type": "endpoint",
+    "endpointId": "private-telegram",
+    "target": {
+      "conversationId": "123456789"
+    }
+  },
+  "session": {
+    "mode": "detached",
+    "id": "wohnungssuche",
+    "title": "Wohnungssuche"
+  }
+}
+```
+
+Suche nach neuen Wohnungen und fasse relevante Änderungen zusammen.
+````
+
+Set `reply.type` to `none` to run a scheduled job without response delivery. Schedules use five-field cron syntax: `minute hour day-of-month month day-of-week`.
+
 ## Complete Example
 
 ```sh

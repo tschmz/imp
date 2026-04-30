@@ -20,6 +20,8 @@ export interface LogFields {
   agentId?: string;
   correlationId?: string;
   command?: string;
+  jobId?: string;
+  sourceFile?: string;
   backupId?: string;
   durationMs?: number;
   cacheHit?: boolean;

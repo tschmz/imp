@@ -1,5 +1,5 @@
 import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { DEFAULT_AGENT_SYSTEM_PROMPT } from "../agents/default-system-prompt.js";
 import type { AgentDefinition, PromptSource } from "../domain/agent.js";
 import type { SkillDefinition } from "../skills/types.js";
@@ -357,7 +357,9 @@ export function resolveInstructionSources(
 function resolveAgentHomeInstructionSources(
   agentHomeMarkdownFiles: string[],
 ): Array<{ source: PromptSource; optional: boolean }> {
-  return agentHomeMarkdownFiles.map((file) => ({ source: { file }, optional: false }));
+  return agentHomeMarkdownFiles
+    .filter((file) => basename(file) !== "cron.md")
+    .map((file) => ({ source: { file }, optional: false }));
 }
 
 function resolveConfiguredInstructionSources(
@@ -415,7 +417,7 @@ async function resolveAgentHomeMarkdownFiles(
   }
 
   try {
-    return await listAgentHomeMarkdownFiles(agent.home);
+    return (await listAgentHomeMarkdownFiles(agent.home)).filter((file) => basename(file) !== "cron.md");
   } catch (error) {
     if (isFileNotFoundError(error) || isNotDirectoryError(error)) {
       return [];
@@ -429,7 +431,7 @@ async function resolveAgentHomeMarkdownFiles(
 async function defaultListAgentHomeMarkdownFiles(path: string): Promise<string[]> {
   const entries = await readdir(path, { withFileTypes: true });
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && entry.name !== "cron.md")
     .map((entry) => join(path, entry.name))
     .sort((left, right) => left.localeCompare(right));
 }

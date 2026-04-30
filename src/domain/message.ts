@@ -33,7 +33,7 @@ export interface IncomingMessage {
 }
 
 export interface IncomingMessageSource {
-  kind: "text" | "telegram-voice-transcript" | "telegram-document" | "telegram-image" | "plugin-event";
+  kind: "text" | "telegram-voice-transcript" | "telegram-document" | "telegram-image" | "plugin-event" | "scheduled";
   transcript?: {
     provider: string;
     model: string;
@@ -41,6 +41,12 @@ export interface IncomingMessageSource {
   document?: IncomingMessageDocumentAttachment;
   image?: IncomingMessageImageAttachment;
   plugin?: IncomingMessagePluginSource;
+  scheduled?: IncomingMessageScheduledSource;
+}
+
+export interface IncomingMessageScheduledSource {
+  jobId: string;
+  sourceFile: string;
 }
 
 export interface IncomingMessagePluginSource {

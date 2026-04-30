@@ -93,6 +93,7 @@ export function createDaemon(
         requestControlAction: (action) => {
           runtimeControl.request(action);
         },
+        enableCronScheduler: true,
       });
       const shutdown = createRuntimeShutdown(
         runtimeEntries,

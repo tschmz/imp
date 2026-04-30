@@ -13,6 +13,7 @@ import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
 import type { RuntimeControlAction } from "./runtime-shutdown.js";
 import type { ActiveEndpointRuntimeConfig } from "./types.js";
 import type { ChatRef } from "../domain/conversation.js";
+import { createCronSchedulerEntry } from "./cron-scheduler.js";
 
 export interface RuntimeEntry {
   start(): Promise<void>;
@@ -24,6 +25,7 @@ interface RuntimeRunnerDependencies {
   createTransport: TransportFactory<ActiveEndpointRuntimeConfig, BootstrappedRuntime["logger"]>;
   deliveryRouter?: DeliveryRouter;
   requestControlAction?: (action: RuntimeControlAction) => Promise<void> | void;
+  enableCronScheduler?: boolean;
 }
 
 export function createRuntimeEntries(
@@ -38,7 +40,7 @@ export function createRuntimeEntries(
     endpointTransportById,
   };
 
-  return runtimes.map((runtime) => {
+  const endpointEntries = runtimes.map((runtime) => {
     const replyChannel = resolveReplyChannel(runtime.endpointConfig, runtimes);
     const handleIncomingMessage = createHandleIncomingMessage({
       agentRegistry: dependencies.agentRegistry,
@@ -200,6 +202,20 @@ export function createRuntimeEntries(
       },
     };
   });
+
+  if (!dependencies.enableCronScheduler) {
+    return endpointEntries;
+  }
+
+  return [
+    ...endpointEntries,
+    createCronSchedulerEntry({
+      agentRegistry: dependencies.agentRegistry,
+      runtimes,
+      deliveryRouter,
+      logger: runtimes[0]?.logger,
+    }),
+  ];
 }
 
 async function ensureActiveConversation(
