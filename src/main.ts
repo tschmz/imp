@@ -57,6 +57,7 @@ async function main(): Promise<void> {
     doctorPlugin: pluginUseCases.doctorPlugin,
     statusPlugin: pluginUseCases.statusPlugin,
     installPlugin: pluginUseCases.installPlugin,
+    updatePlugin: pluginUseCases.updatePlugin,
     installService: serviceUseCases.installService,
     uninstallService: serviceUseCases.uninstallService,
     startService: serviceUseCases.startService,

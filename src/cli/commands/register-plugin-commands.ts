@@ -3,31 +3,34 @@ import type { CliDependencies } from "../cli-dependencies.js";
 import { addConfigOption, booleanWithDefault, withAsyncAction } from "../command-helpers.js";
 
 export function registerPluginCommands(programOrSubcommand: Command, deps: CliDependencies): void {
-  const pluginCommand = programOrSubcommand.command("plugin").description("Inspect installable imp plugins");
+  const pluginCommand = programOrSubcommand.command("plugin").description("Inspect configured and installable imp plugins");
 
-  pluginCommand
-    .command("list")
-    .description("List installable plugins")
-    .option("--root <path>", "Plugin root directory to scan")
-    .action(
-      withAsyncAction(async (options: { root?: string }) => {
-        await deps.listPlugins({ root: options.root });
-      }),
-    );
+  addConfigOption(
+    pluginCommand
+      .command("list")
+      .description("List configured and installable plugins")
+      .option("--root <path>", "Plugin root directory to scan"),
+  ).action(
+    withAsyncAction(async (options: { config?: string; root?: string }) => {
+      await deps.listPlugins({ configPath: options.config, root: options.root });
+    }),
+  );
 
-  pluginCommand
-    .command("inspect")
-    .description("Show an installable plugin manifest")
-    .argument("<id>", "Plugin ID")
-    .option("--root <path>", "Plugin root directory to scan")
-    .action(
-      withAsyncAction(async (id: string, options: { root?: string }) => {
-        await deps.inspectPlugin({
-          root: options.root,
-          id,
-        });
-      }),
-    );
+  addConfigOption(
+    pluginCommand
+      .command("inspect")
+      .description("Show a configured or installable plugin manifest")
+      .argument("<id>", "Plugin ID")
+      .option("--root <path>", "Plugin root directory to scan"),
+  ).action(
+    withAsyncAction(async (id: string, options: { config?: string; root?: string }) => {
+      await deps.inspectPlugin({
+        configPath: options.config,
+        root: options.root,
+        id,
+      });
+    }),
+  );
 
   addConfigOption(
     pluginCommand
@@ -82,5 +85,25 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
         });
       },
     ),
+  );
+
+  addConfigOption(
+    pluginCommand
+      .command("update")
+      .description("Update a configured plugin package and config contributions")
+      .argument("<id>", "Plugin ID or npm package spec")
+      .option("--root <path>", "Plugin root directory to scan")
+      .option("--no-services", "Do not install or start plugin services")
+      .option("-f, --force", "Overwrite existing plugin service definitions"),
+  ).action(
+    withAsyncAction(async (id: string, options: { config?: string; root?: string; services?: boolean; force?: boolean }) => {
+      await deps.updatePlugin({
+        configPath: options.config,
+        root: options.root,
+        id,
+        autoStartServices: booleanWithDefault(options.services, true),
+        force: booleanWithDefault(options.force, false),
+      });
+    }),
   );
 }

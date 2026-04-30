@@ -1,4 +1,5 @@
 import type { DiscoveredPluginManifest } from "../plugins/discovery.js";
+import type { PluginConfigUpdateChanges } from "./plugin-config-installer.js";
 
 export function renderPluginListEntry(plugin: DiscoveredPluginManifest): string {
   const description = plugin.manifest.description ? ` - ${plugin.manifest.description}` : "";
@@ -145,4 +146,33 @@ export function renderPluginInstallSummary(options: {
     lines.push(`Added MCP servers: ${options.mcpServerIds.join(", ")}`);
   }
   return lines;
+}
+
+export function renderPluginUpdateSummary(options: {
+  pluginId: string;
+  configPath: string;
+  changes: PluginConfigUpdateChanges;
+}): string[] {
+  const lines = [`Updated plugin "${options.pluginId}" in ${options.configPath}`];
+  if (options.changes.previousVersion && options.changes.previousVersion !== options.changes.nextVersion) {
+    lines.push(`Version: ${options.changes.previousVersion} -> ${options.changes.nextVersion}`);
+  } else {
+    lines.push(`Version: ${options.changes.nextVersion}`);
+  }
+
+  appendChangedIds(lines, "Added endpoints", options.changes.addedEndpointIds);
+  appendChangedIds(lines, "Updated endpoints", options.changes.updatedEndpointIds);
+  appendChangedIds(lines, "Removed endpoints", options.changes.removedEndpointIds);
+  appendChangedIds(lines, "Preserved modified endpoints", options.changes.preservedEndpointIds);
+  appendChangedIds(lines, "Added MCP servers", options.changes.addedMcpServerIds);
+  appendChangedIds(lines, "Updated MCP servers", options.changes.updatedMcpServerIds);
+  appendChangedIds(lines, "Removed MCP servers", options.changes.removedMcpServerIds);
+  appendChangedIds(lines, "Preserved modified MCP servers", options.changes.preservedMcpServerIds);
+  return lines;
+}
+
+function appendChangedIds(lines: string[], label: string, ids: string[]): void {
+  if (ids.length > 0) {
+    lines.push(`${label}: ${ids.join(", ")}`);
+  }
 }

@@ -12,6 +12,7 @@ export interface PluginUseCaseOptions {
 
 export interface InspectPluginOptions extends PluginUseCaseOptions {
   id: string;
+  configPath?: string;
 }
 
 export interface PluginDiscoveryServiceDependencies {
@@ -23,6 +24,10 @@ export function createPluginDiscoveryService(dependencies: PluginDiscoveryServic
   const discover = dependencies.discoverPluginManifests ?? discoverPluginManifests;
 
   return {
+    async discoverPlugins(options: PluginUseCaseOptions = {}): Promise<PluginDiscoveryResult> {
+      return discover(getPluginSearchRoots(options, dependencies.env));
+    },
+
     async listPlugins(options: PluginUseCaseOptions = {}): Promise<string> {
       const result = await discover(getPluginSearchRoots(options, dependencies.env));
       return renderPluginListOutput({ plugins: result.plugins, issues: result.issues });

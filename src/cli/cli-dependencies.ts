@@ -25,8 +25,8 @@ export interface CliDependencies {
     only?: string;
     force: boolean;
   }) => Promise<void>;
-  listPlugins: (options: { root?: string }) => Promise<void>;
-  inspectPlugin: (options: { root?: string; id: string }) => Promise<void>;
+  listPlugins: (options: { configPath?: string; root?: string }) => Promise<void>;
+  inspectPlugin: (options: { configPath?: string; root?: string; id: string }) => Promise<void>;
   doctorPlugin: (options: { configPath?: string; id: string }) => Promise<void>;
   statusPlugin: (options: { configPath?: string; id: string }) => Promise<void>;
   installPlugin: (options: {
@@ -35,6 +35,13 @@ export interface CliDependencies {
     id: string;
     autoStartServices?: boolean;
     servicesOnly?: boolean;
+    force?: boolean;
+  }) => Promise<void>;
+  updatePlugin: (options: {
+    configPath?: string;
+    root?: string;
+    id: string;
+    autoStartServices?: boolean;
     force?: boolean;
   }) => Promise<void>;
   installService: (options: { configPath?: string; dryRun: boolean; force: boolean }) => Promise<void>;

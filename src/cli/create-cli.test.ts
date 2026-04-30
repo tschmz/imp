@@ -61,9 +61,11 @@ describe("createCli", () => {
 
     expect(findCommand(pluginCommand, "list").helpInformation()).toContain("Usage: imp plugin list");
     expect(findCommand(pluginCommand, "list").helpInformation()).toContain("--root <path>");
+    expect(findCommand(pluginCommand, "list").helpInformation()).toContain("--config <path>");
     expect(findCommand(pluginCommand, "inspect").helpInformation()).toContain("Usage: imp plugin inspect");
     expect(findCommand(pluginCommand, "inspect").helpInformation()).toContain("<id>");
     expect(findCommand(pluginCommand, "inspect").helpInformation()).toContain("--root <path>");
+    expect(findCommand(pluginCommand, "inspect").helpInformation()).toContain("--config <path>");
     expect(findCommand(pluginCommand, "doctor").helpInformation()).toContain("Usage: imp plugin doctor");
     expect(findCommand(pluginCommand, "doctor").helpInformation()).toContain("--config <path>");
     expect(findCommand(pluginCommand, "status").helpInformation()).toContain("Usage: imp plugin status");
@@ -75,6 +77,12 @@ describe("createCli", () => {
     expect(findCommand(pluginCommand, "install").helpInformation()).toContain("--no-services");
     expect(findCommand(pluginCommand, "install").helpInformation()).toContain("--services-only");
     expect(findCommand(pluginCommand, "install").helpInformation()).toContain("--force");
+    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("Usage: imp plugin update");
+    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("<id>");
+    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("--config <path>");
+    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("--root <path>");
+    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("--no-services");
+    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("--force");
 
     const restoreHelp = findCommand(cli, "restore").helpInformation();
     expect(restoreHelp).toContain("Usage: imp restore");
@@ -106,8 +114,8 @@ describe("createCli", () => {
     await cli.parseAsync(["node", "imp", "config", "set", "--config", "/tmp/imp.json", "endpoints.0.enabled", "false"]);
     await cli.parseAsync(["node", "imp", "chat", "--endpoint", "local-cli", "--config", "/tmp/imp.json"]);
     await cli.parseAsync(["node", "imp", "restore", "/tmp/backup.tar", "--config", "/tmp/imp.json", "--data-root", "/tmp/state", "--only", "agents", "--force"]);
-    await cli.parseAsync(["node", "imp", "plugin", "list", "--root", "/tmp/plugins"]);
-    await cli.parseAsync(["node", "imp", "plugin", "inspect", "imp-voice", "--root", "/tmp/plugins"]);
+    await cli.parseAsync(["node", "imp", "plugin", "list", "--config", "/tmp/imp.json", "--root", "/tmp/plugins"]);
+    await cli.parseAsync(["node", "imp", "plugin", "inspect", "imp-voice", "--config", "/tmp/imp.json", "--root", "/tmp/plugins"]);
     await cli.parseAsync(["node", "imp", "plugin", "doctor", "imp-voice", "--config", "/tmp/imp.json"]);
     await cli.parseAsync(["node", "imp", "plugin", "status", "imp-voice", "--config", "/tmp/imp.json"]);
     await cli.parseAsync(["node", "imp", "plugin", "install", "imp-voice", "--config", "/tmp/imp.json", "--root", "/tmp/plugins"]);
@@ -123,6 +131,19 @@ describe("createCli", () => {
       "/tmp/plugins",
       "--no-services",
       "--services-only",
+      "--force",
+    ]);
+    await cli.parseAsync([
+      "node",
+      "imp",
+      "plugin",
+      "update",
+      "imp-voice",
+      "--config",
+      "/tmp/imp.json",
+      "--root",
+      "/tmp/plugins",
+      "--no-services",
       "--force",
     ]);
     await cli.parseAsync(["node", "imp", "service", "install", "--config", "/tmp/imp.json", "--dry-run"]);
@@ -153,9 +174,11 @@ describe("createCli", () => {
       only: "agents",
     });
     expect(dependencies.listPlugins).toHaveBeenCalledWith({
+      configPath: "/tmp/imp.json",
       root: "/tmp/plugins",
     });
     expect(dependencies.inspectPlugin).toHaveBeenCalledWith({
+      configPath: "/tmp/imp.json",
       root: "/tmp/plugins",
       id: "imp-voice",
     });
@@ -181,6 +204,13 @@ describe("createCli", () => {
       id: "imp-voice",
       autoStartServices: false,
       servicesOnly: true,
+      force: true,
+    });
+    expect(dependencies.updatePlugin).toHaveBeenCalledWith({
+      configPath: "/tmp/imp.json",
+      root: "/tmp/plugins",
+      id: "imp-voice",
+      autoStartServices: false,
       force: true,
     });
     expect(dependencies.installService).toHaveBeenCalledWith({
@@ -273,6 +303,7 @@ function createDependencies(): CliDependencies {
     doctorPlugin: vi.fn(async () => undefined),
     statusPlugin: vi.fn(async () => undefined),
     installPlugin: vi.fn(async () => undefined),
+    updatePlugin: vi.fn(async () => undefined),
     installService: vi.fn(async () => undefined),
     uninstallService: vi.fn(async () => undefined),
     startService: vi.fn(async () => undefined),

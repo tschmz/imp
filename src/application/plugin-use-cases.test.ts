@@ -30,6 +30,43 @@ describe("plugin use cases", () => {
     expect(writeOutput).toHaveBeenCalledWith("imp-voice\timp Voice 0.1.0 - Local voice frontend.");
   });
 
+  it("lists configured plugins from the config when no root is provided", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    await writeManifest(root, "imp-agents", {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.1",
+    });
+    await writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          ...createConfig(),
+          plugins: [
+            {
+              id: "imp-agents",
+              enabled: true,
+              package: {
+                path: join(root, "imp-agents"),
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const writeOutput = vi.fn();
+    const useCases = createPluginUseCases({ writeOutput });
+
+    await useCases.listPlugins({ configPath });
+
+    expect(writeOutput).toHaveBeenCalledWith("imp-agents\tImp Agent Pack 0.1.1");
+  });
+
   it("inspects file endpoint and service defaults", async () => {
     const root = await createPluginRoot();
     await writeManifest(root, "imp-voice", {
@@ -156,6 +193,50 @@ describe("plugin use cases", () => {
         "",
         "Command tools:",
         "- repo-summary: Summarize a repository.",
+      ].join("\n"),
+    );
+  });
+
+  it("inspects configured plugins when no root is provided", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    await writeManifest(root, "imp-agents", {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.1",
+    });
+    await writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          ...createConfig(),
+          plugins: [
+            {
+              id: "imp-agents",
+              enabled: true,
+              package: {
+                path: join(root, "imp-agents"),
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const writeOutput = vi.fn();
+    const useCases = createPluginUseCases({ writeOutput });
+
+    await useCases.inspectPlugin({ configPath, id: "imp-agents" });
+
+    expect(writeOutput).toHaveBeenCalledWith(
+      [
+        "Imp Agent Pack (imp-agents)",
+        "Version: 0.1.1",
+        `Root: ${join(root, "imp-agents")}`,
+        `Manifest: ${join(root, "imp-agents", "plugin.json")}`,
       ].join("\n"),
     );
   });
@@ -441,6 +522,215 @@ describe("plugin use cases", () => {
       `Installed plugin package "@tschmz/imp-voice@0.1.0" into ${packageStoreRoot}`,
     );
     expect(writeOutput).toHaveBeenCalledWith(`Installed plugin "imp-voice" into ${configPath}`);
+  });
+
+  it("updates an already configured npm plugin from an explicit package spec", async () => {
+    const root = await createPluginRoot();
+    const configDir = join(root, "config");
+    const configPath = join(configDir, "config.json");
+    const packageStoreRoot = join(configDir, "state", "plugins", "npm");
+    const packageRoot = join(packageStoreRoot, "node_modules", "@tschmz", "imp-agents");
+    await mkdir(packageRoot, { recursive: true });
+    await writeFile(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({ name: "@tschmz/imp-agents", version: "0.1.0" }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(packageRoot, "plugin.json"),
+      `${JSON.stringify(
+        {
+          schemaVersion: 1,
+          id: "imp-agents",
+          name: "Imp Agent Pack",
+          version: "0.1.0",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          ...createConfig(),
+          paths: { dataRoot: "state" },
+          plugins: [
+            {
+              id: "imp-agents",
+              enabled: true,
+              package: {
+                path: packageRoot,
+                source: {
+                  version: "0.1.0",
+                  manifestHash: "sha256:old",
+                },
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const packageInstalls: Array<{ packageSpec: string; packageName: string; storeRoot: string }> = [];
+    const writeOutput = vi.fn();
+    const useCases = createPluginUseCases({
+      writeOutput,
+      async installPackage({ packageSpec, packageName, storeRoot }) {
+        if (!packageName) {
+          throw new Error("Expected package name.");
+        }
+        packageInstalls.push({ packageSpec, packageName, storeRoot });
+        await mkdir(packageRoot, { recursive: true });
+        await writeFile(
+          join(packageRoot, "package.json"),
+          `${JSON.stringify({ name: packageName, version: "0.1.1" }, null, 2)}\n`,
+          "utf8",
+        );
+        await writeFile(
+          join(packageRoot, "plugin.json"),
+          `${JSON.stringify(
+            {
+              schemaVersion: 1,
+              id: "imp-agents",
+              name: "Imp Agent Pack",
+              version: "0.1.1",
+            },
+            null,
+            2,
+          )}\n`,
+          "utf8",
+        );
+        return { packageRoot };
+      },
+    });
+
+    await useCases.updatePlugin({
+      configPath,
+      id: "@tschmz/imp-agents@0.1.1",
+      autoStartServices: false,
+    });
+
+    const updated = JSON.parse(await readConfig(configPath)) as AppConfig;
+    expect(packageInstalls).toEqual([
+      {
+        packageSpec: "@tschmz/imp-agents@0.1.1",
+        packageName: "@tschmz/imp-agents",
+        storeRoot: packageStoreRoot,
+      },
+    ]);
+    expect(updated.plugins?.find((plugin) => plugin.id === "imp-agents")?.package).toEqual({
+      path: packageRoot,
+      source: {
+        version: "0.1.1",
+        manifestHash: expect.stringMatching(/^sha256:/),
+      },
+    });
+    expect(writeOutput).toHaveBeenCalledWith(
+      `Installed plugin package "@tschmz/imp-agents@0.1.1" into ${packageStoreRoot}`,
+    );
+    expect(writeOutput).toHaveBeenCalledWith(`Updated plugin "imp-agents" in ${configPath}`);
+    expect(writeOutput).toHaveBeenCalledWith("Version: 0.1.0 -> 0.1.1");
+  });
+
+  it("updates npm-backed configured plugins by plugin id using the package name", async () => {
+    const root = await createPluginRoot();
+    const configDir = join(root, "config");
+    const configPath = join(configDir, "config.json");
+    const packageStoreRoot = join(configDir, "state", "plugins", "npm");
+    const packageRoot = join(packageStoreRoot, "node_modules", "@tschmz", "imp-agents");
+    await mkdir(packageRoot, { recursive: true });
+    await writeFile(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({ name: "@tschmz/imp-agents", version: "0.1.0" }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(packageRoot, "plugin.json"),
+      `${JSON.stringify(
+        {
+          schemaVersion: 1,
+          id: "imp-agents",
+          name: "Imp Agent Pack",
+          version: "0.1.0",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          ...createConfig(),
+          paths: { dataRoot: "state" },
+          plugins: [
+            {
+              id: "imp-agents",
+              enabled: true,
+              package: {
+                path: packageRoot,
+                source: {
+                  version: "0.1.0",
+                },
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const packageInstalls: Array<{ packageSpec: string; packageName: string }> = [];
+    const useCases = createPluginUseCases({
+      writeOutput: vi.fn(),
+      async installPackage({ packageSpec, packageName }) {
+        if (!packageName) {
+          throw new Error("Expected package name.");
+        }
+        packageInstalls.push({ packageSpec, packageName });
+        await writeFile(
+          join(packageRoot, "package.json"),
+          `${JSON.stringify({ name: packageName, version: "0.1.1" }, null, 2)}\n`,
+          "utf8",
+        );
+        await writeFile(
+          join(packageRoot, "plugin.json"),
+          `${JSON.stringify(
+            {
+              schemaVersion: 1,
+              id: "imp-agents",
+              name: "Imp Agent Pack",
+              version: "0.1.1",
+            },
+            null,
+            2,
+          )}\n`,
+          "utf8",
+        );
+        return { packageRoot };
+      },
+    });
+
+    await useCases.updatePlugin({
+      configPath,
+      id: "imp-agents",
+      autoStartServices: false,
+    });
+
+    expect(packageInstalls).toEqual([
+      {
+        packageSpec: "@tschmz/imp-agents",
+        packageName: "@tschmz/imp-agents",
+      },
+    ]);
   });
 
   it("installs bundled imp-agents and resolves Cody with skills and runtime tools", async () => {
@@ -958,6 +1248,314 @@ describe("plugin use cases", () => {
     });
 
     expect(calls).toEqual([]);
+  });
+
+  it("does not enter service installation for service-less plugins by default", async () => {
+    const root = await createPluginRoot();
+    const configPath = join(root, "config.json");
+    await writeManifest(root, "imp-agents", {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.0",
+    });
+    await writeFile(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`, "utf8");
+    const useCases = createPluginUseCases({
+      writeOutput: vi.fn(),
+      platform: "linux",
+      homeDir: root,
+      installer: {
+        async run() {
+          throw new Error("service installer should not run");
+        },
+      },
+      setupRunner: {
+        async run() {
+          throw new Error("setup runner should not run");
+        },
+      },
+    });
+
+    await useCases.installPlugin({
+      root,
+      configPath,
+      id: "imp-agents",
+    });
+  });
+
+  it("does not enter service installation when updating service-less plugins by default", async () => {
+    const oldRoot = await createPluginRoot();
+    const newRoot = await createPluginRoot();
+    const configPath = join(oldRoot, "config.json");
+    await writeManifest(oldRoot, "imp-agents", {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.0",
+    });
+    await writeManifest(newRoot, "imp-agents", {
+      schemaVersion: 1,
+      id: "imp-agents",
+      name: "Imp Agent Pack",
+      version: "0.1.1",
+    });
+    await writeFile(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`, "utf8");
+    const useCases = createPluginUseCases({
+      writeOutput: vi.fn(),
+      platform: "linux",
+      homeDir: oldRoot,
+      installer: {
+        async run() {
+          throw new Error("service installer should not run");
+        },
+      },
+      setupRunner: {
+        async run() {
+          throw new Error("setup runner should not run");
+        },
+      },
+    });
+    await useCases.installPlugin({
+      root: oldRoot,
+      configPath,
+      id: "imp-agents",
+    });
+
+    await useCases.updatePlugin({
+      root: newRoot,
+      configPath,
+      id: "imp-agents",
+    });
+  });
+
+  it("updates configured plugin endpoints and MCP servers from a newer manifest", async () => {
+    const oldRoot = await createPluginRoot();
+    const newRoot = await createPluginRoot();
+    const configPath = join(oldRoot, "config.json");
+    await writeManifest(oldRoot, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+      endpoints: [
+        {
+          id: "audio-ingress",
+          ingress: {
+            pollIntervalMs: 500,
+          },
+          response: {
+            type: "none",
+          },
+        },
+      ],
+      mcpServers: [
+        {
+          id: "voice-tools",
+          command: "node",
+          args: ["old-server.mjs"],
+        },
+      ],
+    });
+    await writeManifest(newRoot, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.2.0",
+      endpoints: [
+        {
+          id: "audio-ingress",
+          ingress: {
+            pollIntervalMs: 1000,
+          },
+          response: {
+            type: "none",
+          },
+        },
+        {
+          id: "text-ingress",
+          response: {
+            type: "none",
+          },
+        },
+      ],
+      mcpServers: [
+        {
+          id: "voice-tools",
+          command: "node",
+          args: ["new-server.mjs"],
+        },
+        {
+          id: "transcript-tools",
+          command: "node",
+          args: ["transcript-server.mjs"],
+        },
+      ],
+    });
+    await writeFile(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`, "utf8");
+    const writeOutput = vi.fn();
+    const useCases = createPluginUseCases({ writeOutput });
+    await useCases.installPlugin({
+      root: oldRoot,
+      configPath,
+      id: "imp-voice",
+      autoStartServices: false,
+    });
+    writeOutput.mockClear();
+
+    await useCases.updatePlugin({
+      root: newRoot,
+      configPath,
+      id: "imp-voice",
+      autoStartServices: false,
+    });
+
+    const updated = JSON.parse(await readConfig(configPath)) as AppConfig;
+    expect(updated.plugins?.find((plugin) => plugin.id === "imp-voice")?.package).toEqual({
+      path: join(newRoot, "imp-voice"),
+      source: {
+        version: "0.2.0",
+        manifestHash: expect.stringMatching(/^sha256:/),
+      },
+    });
+    expect(updated.endpoints).toEqual([
+      {
+        id: "audio-ingress",
+        type: "file",
+        enabled: true,
+        pluginId: "imp-voice",
+        ingress: {
+          pollIntervalMs: 1000,
+        },
+        response: {
+          type: "none",
+        },
+      },
+      {
+        id: "text-ingress",
+        type: "file",
+        enabled: true,
+        pluginId: "imp-voice",
+        response: {
+          type: "none",
+        },
+      },
+    ]);
+    expect(updated.tools?.mcp?.servers).toEqual([
+      {
+        id: "voice-tools",
+        command: process.execPath,
+        args: ["new-server.mjs"],
+      },
+      {
+        id: "transcript-tools",
+        command: process.execPath,
+        args: ["transcript-server.mjs"],
+      },
+    ]);
+    expect(writeOutput).toHaveBeenCalledWith(`Updated plugin "imp-voice" in ${configPath}`);
+    expect(writeOutput).toHaveBeenCalledWith("Version: 0.1.0 -> 0.2.0");
+    expect(writeOutput).toHaveBeenCalledWith("Added endpoints: text-ingress");
+    expect(writeOutput).toHaveBeenCalledWith("Updated endpoints: audio-ingress");
+    expect(writeOutput).toHaveBeenCalledWith("Added MCP servers: transcript-tools");
+    expect(writeOutput).toHaveBeenCalledWith("Updated MCP servers: voice-tools");
+  });
+
+  it("preserves locally modified plugin config contributions during update", async () => {
+    const oldRoot = await createPluginRoot();
+    const newRoot = await createPluginRoot();
+    const configPath = join(oldRoot, "config.json");
+    await writeManifest(oldRoot, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.1.0",
+      endpoints: [
+        {
+          id: "audio-ingress",
+          response: {
+            type: "none",
+          },
+        },
+      ],
+      mcpServers: [
+        {
+          id: "voice-tools",
+          command: "node",
+          args: ["old-server.mjs"],
+        },
+      ],
+    });
+    await writeManifest(newRoot, "imp-voice", {
+      schemaVersion: 1,
+      id: "imp-voice",
+      name: "imp Voice",
+      version: "0.2.0",
+      endpoints: [
+        {
+          id: "audio-ingress",
+          response: {
+            type: "outbox",
+            replyChannel: {
+              kind: "audio",
+            },
+          },
+        },
+      ],
+      mcpServers: [
+        {
+          id: "voice-tools",
+          command: "node",
+          args: ["new-server.mjs"],
+        },
+      ],
+    });
+    await writeFile(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`, "utf8");
+    const writeOutput = vi.fn();
+    const useCases = createPluginUseCases({ writeOutput });
+    await useCases.installPlugin({
+      root: oldRoot,
+      configPath,
+      id: "imp-voice",
+      autoStartServices: false,
+    });
+    const installed = JSON.parse(await readConfig(configPath)) as AppConfig;
+    installed.endpoints = installed.endpoints.map((endpoint) =>
+      endpoint.id === "audio-ingress" ? { ...endpoint, enabled: false } : endpoint,
+    );
+    installed.tools!.mcp!.servers = installed.tools!.mcp!.servers.map((server) =>
+      server.id === "voice-tools" ? { ...server, args: ["custom-server.mjs"] } : server,
+    );
+    await writeFile(configPath, `${JSON.stringify(installed, null, 2)}\n`, "utf8");
+    writeOutput.mockClear();
+
+    await useCases.updatePlugin({
+      root: newRoot,
+      configPath,
+      id: "imp-voice",
+      autoStartServices: false,
+    });
+
+    const updated = JSON.parse(await readConfig(configPath)) as AppConfig;
+    expect(updated.endpoints).toEqual([
+      {
+        id: "audio-ingress",
+        type: "file",
+        enabled: false,
+        pluginId: "imp-voice",
+        response: {
+          type: "none",
+        },
+      },
+    ]);
+    expect(updated.tools?.mcp?.servers).toEqual([
+      {
+        id: "voice-tools",
+        command: process.execPath,
+        args: ["custom-server.mjs"],
+      },
+    ]);
+    expect(writeOutput).toHaveBeenCalledWith("Preserved modified endpoints: audio-ingress");
+    expect(writeOutput).toHaveBeenCalledWith("Preserved modified MCP servers: voice-tools");
   });
 
   it("reinstalls services for already configured plugins", async () => {
