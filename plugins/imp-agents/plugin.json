@@ -30,6 +30,7 @@
           "bash",
           "edit",
           "write",
+          "apply_patch",
           "update_plan",
           "load_skill",
           "pwd",

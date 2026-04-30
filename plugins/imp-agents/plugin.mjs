@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { createApplyPatchTool } from "./lib/apply-patch.mjs";
 
 const DEFAULT_MAX_ENTRIES = 80;
 const MAX_MAX_ENTRIES = 200;
@@ -22,6 +23,7 @@ const SKIPPED_DIRECTORIES = new Set([
 export function registerPlugin() {
   return {
     tools: [
+      createApplyPatchTool(),
       {
         name: "workspaceSnapshot",
         label: "workspaceSnapshot",

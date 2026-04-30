@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { URL } from "node:url";
@@ -41,6 +41,8 @@ describe("imp-agents plugin", () => {
 
     expect(cody.skills.paths).toEqual(["./skills"]);
     expect(cody.tools.builtIn).toContain("load_skill");
+    expect(cody.tools.builtIn).toContain("apply_patch");
+    expect(packageJson.files).toContain("lib");
     expect(packageJson.files).toContain("skills");
     expect(administrationSkill).toContain("name: imp-administration");
     expect(administrationSkill).toContain("Use only `imp ...` commands for Imp administration.");
@@ -94,6 +96,56 @@ describe("imp-agents plugin", () => {
         expect.objectContaining({ path: "AGENTS.md" }),
       ],
       pluginManifests: ["plugins/notes/plugin.json"],
+    });
+  });
+
+  it("applies Codex apply_patch hunks", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-agents-apply-patch-test-"));
+    tempDirs.push(root);
+    const updatePath = join(root, "notes.txt");
+    const deletePath = join(root, "obsolete.txt");
+    const movePath = join(root, "draft.txt");
+    const movedPath = join(root, "published.txt");
+    const addPath = join(root, "nested", "created.txt");
+    await writeFile(updatePath, "one\ntwo\nthree\n", "utf8");
+    await writeFile(deletePath, "remove me\n", "utf8");
+    await writeFile(movePath, "status: draft\n", "utf8");
+
+    const registration = registerPlugin({ plugin: { id: "imp-agents", rootDir: process.cwd() } });
+    const tool = registration.tools.find((candidate) => candidate.name === "apply_patch");
+    const result = await tool.execute("call-1", {
+      patch: [
+        "*** Begin Patch",
+        `*** Update File: ${updatePath}`,
+        "@@",
+        " one",
+        "-two",
+        "+TWO",
+        " three",
+        `*** Add File: ${addPath}`,
+        "+created",
+        "+content",
+        `*** Delete File: ${deletePath}`,
+        `*** Update File: ${movePath}`,
+        `*** Move to: ${movedPath}`,
+        "@@",
+        "-status: draft",
+        "+status: published",
+        "*** End Patch",
+      ].join("\n"),
+    });
+
+    await expect(stat(deletePath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(stat(movePath)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await readFile(updatePath, "utf8")).toBe("one\nTWO\nthree\n");
+    expect(await readFile(addPath, "utf8")).toBe("created\ncontent\n");
+    expect(await readFile(movedPath, "utf8")).toBe("status: published\n");
+    expect(result.content[0].text).toContain("Applied patch: 1 added, 1 updated, 1 deleted, 1 moved.");
+    expect(result.details.counts).toEqual({
+      added: 1,
+      updated: 1,
+      deleted: 1,
+      moved: 1,
     });
   });
 });

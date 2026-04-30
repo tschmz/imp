@@ -787,13 +787,15 @@ describe("plugin use cases", () => {
       id: "imp-agents.cody",
       name: "Cody",
       home: join(dataRoot, "agents", "imp-agents.cody"),
-      tools: expect.arrayContaining(["read", "load_skill", "imp-agents__workspaceSnapshot"]),
+      tools: expect.arrayContaining(["read", "load_skill", "imp-agents__workspaceSnapshot", "imp-agents__apply_patch"]),
     });
     expect(cody?.skillCatalog?.map((skill) => skill.name).sort()).toEqual([
       "imp-administration",
       "release-preparation",
     ]);
-    expect((runtimeConfig.pluginTools ?? []).map((tool) => tool.name)).toContain("imp-agents__workspaceSnapshot");
+    expect((runtimeConfig.pluginTools ?? []).map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(["imp-agents__workspaceSnapshot", "imp-agents__apply_patch"]),
+    );
     expect(writeOutput).toHaveBeenCalledWith(`Installed plugin "imp-agents" into ${configPath}`);
   });
 

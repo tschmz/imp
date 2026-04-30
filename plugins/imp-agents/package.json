@@ -18,6 +18,7 @@
     "plugin.json",
     "README.md",
     "plugin.mjs",
+    "lib",
     "prompts",
     "skills"
   ],
