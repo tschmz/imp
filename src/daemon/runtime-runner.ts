@@ -61,40 +61,41 @@ export function createRuntimeEntries(
       logger: runtime.logger,
       prepareEvent: async (event) => {
         const scopedEvent = withEndpointScopedConversation(event);
-        if (scopedEvent.message.command && priorityInboundCommands.has(scopedEvent.message.command)) {
-          return scopedEvent;
-        }
-
-        if (!scopedEvent.message.command) {
-          const command = parseInboundCommand(scopedEvent.message.text, {
-            allowedCommands: priorityInboundCommands,
-          });
-          if (command) {
-            return {
+        const command = scopedEvent.message.command
+          ? {
+              command: scopedEvent.message.command,
+              ...(scopedEvent.message.commandArgs ? { commandArgs: scopedEvent.message.commandArgs } : {}),
+            }
+          : parseInboundCommand(scopedEvent.message.text);
+        const commandEvent = command
+          ? {
               ...scopedEvent,
               message: {
                 ...scopedEvent.message,
                 ...command,
               },
-            };
-          }
+            }
+          : scopedEvent;
+
+        if (command && priorityInboundCommands.has(command.command)) {
+          return commandEvent;
         }
 
         const selectedAgentId =
-          await runtime.conversationStore.getSelectedAgent?.(scopedEvent.message.conversation) ??
+          await runtime.conversationStore.getSelectedAgent?.(commandEvent.message.conversation) ??
           runtime.endpointConfig.defaultAgentId;
-        const detachedSession = getDetachedSessionRequest(scopedEvent.message);
+        const detachedSession = getDetachedSessionRequest(commandEvent.message);
         const resolvedAgentId = resolveDetachedAgentId(detachedSession, dependencies.agentRegistry) ?? selectedAgentId;
-        const conversation = detachedSession && scopedEvent.message.conversation.sessionId
-          ? await ensureDetachedConversation(runtime, scopedEvent.message, resolvedAgentId, detachedSession)
-          : await ensureActiveConversation(runtime, scopedEvent.message, resolvedAgentId);
+        const conversation = detachedSession && commandEvent.message.conversation.sessionId
+          ? await ensureDetachedConversation(runtime, commandEvent.message, resolvedAgentId, detachedSession)
+          : await ensureActiveConversation(runtime, commandEvent.message, resolvedAgentId);
 
         return {
-          ...scopedEvent,
+          ...commandEvent,
           message: {
-            ...scopedEvent.message,
+            ...commandEvent.message,
             conversation: {
-              ...scopedEvent.message.conversation,
+              ...commandEvent.message.conversation,
               sessionId: conversation.state.conversation.sessionId,
               agentId: resolvedAgentId,
             },

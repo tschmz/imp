@@ -42,7 +42,7 @@ export function createMessageProcessor(
       const preparedEvent = await dependencies.prepareEvent?.(event) ?? event;
       const conversationKey = getConversationQueueKey(preparedEvent.message);
       const activeSink = activeMidRunSinks.get(conversationKey);
-      if (activeSink && !shouldBypassConversationQueue(preparedEvent.message)) {
+      if (activeSink && !preparedEvent.message.command) {
         const readyEvent = await prepareTransportMessage(preparedEvent);
         await activeSink.ingest(readyEvent.message);
         return;

@@ -152,6 +152,50 @@ describe("createRuntimeEntries", () => {
     expect(runtime.engine.run).not.toHaveBeenCalled();
   });
 
+
+  it("parses non-priority command text before agent execution", async () => {
+    const runtime = createRuntime();
+    const transport = createCapturingTransport();
+    const event = createEvent({
+      endpointId: "private-telegram",
+      conversation: {
+        transport: "telegram",
+        externalId: "42",
+      },
+      messageId: "101",
+      correlationId: "corr-101",
+      userId: "7",
+      text: "/export nope",
+      receivedAt: "2026-04-07T12:00:00.000Z",
+    });
+    const entries = createRuntimeEntries([runtime], {
+      agentRegistry: createAgentRegistry([createTestAgent("default")]),
+      createTransport: vi.fn(() => transport),
+    });
+
+    await entries[0]?.start();
+    await transport.handler.handle(event);
+
+    expect(runtime.conversationStore.ensureActive).toHaveBeenCalledWith(
+      {
+        transport: "telegram",
+        externalId: "42",
+        endpointId: "private-telegram",
+      },
+      expect.objectContaining({ agentId: "default" }),
+    );
+    expect(runtime.engine.run).not.toHaveBeenCalled();
+    expect(event.deliver).toHaveBeenCalledWith({
+      conversation: expect.objectContaining({
+        transport: "telegram",
+        externalId: "42",
+        sessionId: "session-1",
+        agentId: "default",
+      }),
+      text: "Usage: /export [readable|full] [html]",
+    });
+  });
+
   it("treats /rename text as a priority command before session resolution", async () => {
     const runtime = createRuntime();
     const transport = createCapturingTransport();

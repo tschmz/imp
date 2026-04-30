@@ -103,6 +103,76 @@ describe("createMessageProcessor", () => {
     expect(delivered).toEqual(["reply:1"]);
   });
 
+
+  it("does not inject command messages into an active mid-run conversation", async () => {
+    const ingested: string[] = [];
+    const starts: string[] = [];
+    let releaseFirst: (() => void) | undefined;
+    const handler = {
+      handle: vi.fn(
+        async (
+          message: IncomingMessage,
+          options?: {
+            midRunMessages?: {
+              subscribe: (consumer: (message: IncomingMessage) => void | Promise<void>) => () => void;
+            };
+          },
+        ): Promise<OutgoingMessage> => {
+          starts.push(`${message.messageId}:${message.command ?? "message"}`);
+          const unsubscribe = options?.midRunMessages?.subscribe(async (midRunMessage) => {
+            ingested.push(midRunMessage.messageId);
+          });
+          if (message.messageId === "1") {
+            await new Promise<void>((resolve) => {
+              releaseFirst = resolve;
+            });
+          }
+          unsubscribe?.();
+          return {
+            conversation: message.conversation,
+            text: `reply:${message.messageId}`,
+          };
+        },
+      ),
+    };
+
+    const processor = createMessageProcessor({
+      handler,
+      prepareEvent: (event) => ({
+        ...event,
+        message: {
+          ...event.message,
+          conversation: {
+            ...event.message.conversation,
+            sessionId: "session-1",
+          },
+        },
+      }),
+    });
+
+    const first = processor.handle(createEvent(createIncomingMessage("1", "42")));
+    await tick();
+
+    const command = processor.handle(
+      createEvent({
+        ...createIncomingMessage("2", "42"),
+        text: "/export full",
+        command: "export",
+        commandArgs: "full",
+      }),
+    );
+
+    await tick();
+
+    expect(ingested).toEqual([]);
+    expect(starts).toEqual(["1:message"]);
+
+    releaseFirst?.();
+    await Promise.all([first, command]);
+
+    expect(starts).toEqual(["1:message", "2:export"]);
+  });
+
   it("keeps endpoint queues isolated for the same transport/external conversation id", async () => {
     const starts: string[] = [];
     const releases = new Map<string, () => void>();
