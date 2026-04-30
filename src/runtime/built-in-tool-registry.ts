@@ -1,4 +1,5 @@
 import { createFindTool, createGrepTool, createLsTool, createCodingTools } from "@mariozechner/pi-coding-agent";
+import { createBashTool } from "./bash-tool.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
@@ -62,7 +63,8 @@ function createDynamicBuiltInTools(
 function createBaseBuiltInTools(workingDirectory: string, agent?: AgentDefinition): ToolDefinition[] {
   const toolOptions = resolveBuiltInToolOptions(agent);
   return [
-    ...createCodingTools(workingDirectory, toolOptions),
+    ...createCodingTools(workingDirectory).filter((tool) => tool.name !== "bash"),
+    createBashTool(workingDirectory, toolOptions?.bash),
     createGrepTool(workingDirectory),
     createFindTool(workingDirectory),
     createLsTool(workingDirectory),
