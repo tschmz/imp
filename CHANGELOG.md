@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.18.0 - 2026-05-01
+
+### Added
+
+- Add `imp plugin update` to update managed plugin packages and refresh plugin services.
+- Add an `apply_patch` tool to the bundled `imp-agents` Cody agent pack.
+
+### Changed
+
+- Refine Telegram output guidance in Cody's prompt.
+- Bump the bundled `imp-agents` plugin package to `0.1.2` and include its patch tool library in the published package.
+
+### Fixed
+
+- Parse cron markdown job boundaries more reliably.
+
 ## 0.17.0 - 2026-04-30
 
 ### Added
