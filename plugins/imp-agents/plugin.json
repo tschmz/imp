@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "imp-agents",
   "name": "Imp Agent Pack",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Specialized Imp agents and practical reference tools.",
   "runtime": {
     "module": "./plugin.mjs"
