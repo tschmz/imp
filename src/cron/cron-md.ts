@@ -183,7 +183,8 @@ function findCronBlocks(content: string, issues: string[]): CronBlock[] {
   return matches.flatMap((match, index): CronBlock[] => {
     const configStart = match.index ?? 0;
     const fenceEnd = configStart + match[0].length;
-    const nextBlockStart = index + 1 < matches.length ? matches[index + 1]!.index! : content.length;
+    const nextMatch = index + 1 < matches.length ? matches[index + 1] : undefined;
+    const nextBlockStart = nextMatch ? findCronBlockStart(content, nextMatch.index!) : content.length;
     try {
       const parsed = JSON.parse(match[3] ?? "");
       const config = cronConfigSchema.parse(parsed);
@@ -193,6 +194,12 @@ function findCronBlocks(content: string, issues: string[]): CronBlock[] {
       return [];
     }
   });
+}
+
+function findCronBlockStart(content: string, configStart: number): number {
+  const beforeFence = content.slice(0, configStart);
+  const headingMatch = /(^|\n)##[^\n]*\n(?:[ \t]*\n)*$/.exec(beforeFence);
+  return headingMatch ? headingMatch.index + (headingMatch[1] === "\n" ? 1 : 0) : configStart;
 }
 
 function isCronFence(info: string): boolean {

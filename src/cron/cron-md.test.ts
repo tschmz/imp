@@ -43,6 +43,37 @@ describe("parseCronMarkdown", () => {
     ]);
   });
 
+
+  it("does not include the next job heading in the previous markdown instruction", () => {
+    const result = parseCronMarkdown(`${example}
+## zweite-suche
+
+\`\`\`json imp-cron
+{
+  "id": "zweite-suche",
+  "enabled": true,
+  "schedule": "30 8 * * *",
+  "timezone": "Europe/Berlin",
+  "reply": {
+    "type": "none"
+  },
+  "session": {
+    "mode": "detached",
+    "id": "zweite-suche",
+    "title": "Zweite Suche"
+  }
+}
+\`\`\`
+
+Suche später nochmal.
+`);
+
+    expect(result.issues).toEqual([]);
+    expect(result.jobs).toHaveLength(2);
+    expect(result.jobs[0]?.instruction).toBe("Suche täglich nach Wohnungen.");
+    expect(result.jobs[1]?.instruction).toBe("Suche später nochmal.");
+  });
+
   it("renders jobs back as json config in markdown", () => {
     const parsed = parseCronMarkdown(example);
     const rendered = renderCronMarkdown(parsed.jobs);
