@@ -20,6 +20,15 @@ describe("imp-agents plugin", () => {
     expect(prompt).toContain("agent-home Markdown instructions");
   });
 
+  it("includes Telegram-specific output guidance in Cody's prompt", async () => {
+    const prompt = await readFile(new URL("../prompts/cody.md", import.meta.url), "utf8");
+
+    expect(prompt).toContain('{{#if (eq output.reply.channel.kind "telegram")}}');
+    expect(prompt).toContain("This reply will be delivered through Telegram");
+    expect(prompt).toContain("Format final responses for plain, reliable delivery");
+    expect(prompt).toContain("Avoid complex or unusual formatting such as tables");
+  });
+
   it("configures Cody with bundled skills", async () => {
     const manifest = JSON.parse(await readFile(new URL("../plugin.json", import.meta.url), "utf8"));
     const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
