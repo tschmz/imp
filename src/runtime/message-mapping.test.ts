@@ -62,6 +62,7 @@ describe("toAgentMessages", () => {
               mimeType: "text/plain",
               sizeBytes: 13,
               savedPath: "/var/lib/imp/report.txt",
+              relativePath: "attachments/report.txt",
             },
           },
         },
@@ -74,6 +75,8 @@ describe("toAgentMessages", () => {
       content: expect.stringContaining("Telegram document uploaded"),
     });
     expect(String(messages[0]?.content)).toContain("Saved path: /var/lib/imp/report.txt");
+    expect(String(messages[0]?.content)).not.toContain("Relative path:");
+    expect(String(messages[0]?.content)).not.toContain("attachments/report.txt");
     expect(String(messages[0]?.content)).toContain("Please inspect this report");
   });
 
@@ -95,6 +98,7 @@ describe("toAgentMessages", () => {
               fileName: "history-image.png",
               mimeType: "image/png",
               savedPath: imagePath,
+              relativePath: "attachments/history-image.png",
               telegramType: "document",
             },
           },
@@ -118,6 +122,8 @@ describe("toAgentMessages", () => {
       ],
       timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
     });
+    expect(JSON.stringify(messages[0]?.content)).not.toContain("Relative path:");
+    expect(JSON.stringify(messages[0]?.content)).not.toContain("attachments/history-image.png");
   });
 
   it("replays persisted telegram images as text only for non-vision models", async () => {
@@ -138,6 +144,7 @@ describe("toAgentMessages", () => {
               fileName: "history-image.png",
               mimeType: "image/png",
               savedPath: imagePath,
+              relativePath: "attachments/history-image.png",
               telegramType: "photo",
             },
           },
@@ -150,6 +157,8 @@ describe("toAgentMessages", () => {
       role: "user",
       content: expect.stringContaining("Telegram image uploaded"),
     });
+    expect(String(messages[0]?.content)).not.toContain("Relative path:");
+    expect(String(messages[0]?.content)).not.toContain("attachments/history-image.png");
     expect(String(messages[0]?.content)).toContain("What is shown here?");
   });
 
@@ -409,12 +418,15 @@ describe("renderIncomingMessageTextForAgent", () => {
           mimeType: "text/plain",
           sizeBytes: 13,
           savedPath: "/var/lib/imp/report.txt",
+          relativePath: "attachments/report.txt",
         },
       },
     });
 
     expect(text).toContain("Telegram document uploaded");
     expect(text).toContain("Saved path: /var/lib/imp/report.txt");
+    expect(text).not.toContain("Relative path:");
+    expect(text).not.toContain("attachments/report.txt");
     expect(text).toContain("File name: report.txt");
     expect(text).toContain("Please inspect this report");
   });
@@ -443,6 +455,7 @@ describe("renderIncomingMessageForAgent", () => {
             fileName: "current-image.png",
             mimeType: "image/png",
             savedPath: imagePath,
+            relativePath: "attachments/current-image.png",
             telegramType: "photo",
           },
         },
@@ -451,6 +464,9 @@ describe("renderIncomingMessageForAgent", () => {
     );
 
     expect(rendered.text).toContain("Telegram image uploaded");
+    expect(rendered.text).toContain(`Saved path: ${imagePath}`);
+    expect(rendered.text).not.toContain("Relative path:");
+    expect(rendered.text).not.toContain("attachments/current-image.png");
     expect(rendered.images).toEqual([
       {
         type: "image",

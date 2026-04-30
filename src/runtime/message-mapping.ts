@@ -210,7 +210,6 @@ function renderSourceContext(source: IncomingMessageSource): string {
     const lines = [
       TELEGRAM_DOCUMENT_CONTEXT,
       ...(source.document.savedPath ? [`Saved path: ${source.document.savedPath}`] : []),
-      ...(source.document.relativePath ? [`Relative path: ${source.document.relativePath}`] : []),
       ...(source.document.fileName ? [`File name: ${source.document.fileName}`] : []),
       ...(source.document.mimeType ? [`MIME type: ${source.document.mimeType}`] : []),
       ...(typeof source.document.sizeBytes === "number"
@@ -227,7 +226,6 @@ function renderSourceContext(source: IncomingMessageSource): string {
     const lines = [
       TELEGRAM_IMAGE_CONTEXT,
       ...(source.image.savedPath ? [`Saved path: ${source.image.savedPath}`] : []),
-      ...(source.image.relativePath ? [`Relative path: ${source.image.relativePath}`] : []),
       ...(source.image.fileName ? [`File name: ${source.image.fileName}`] : []),
       ...(source.image.mimeType ? [`MIME type: ${source.image.mimeType}`] : []),
       ...(typeof source.image.sizeBytes === "number"
