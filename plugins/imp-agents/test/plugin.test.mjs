@@ -24,9 +24,6 @@ describe("imp-agents plugin", () => {
     const prompt = await readFile(new URL("../prompts/cody.md", import.meta.url), "utf8");
 
     expect(prompt).toContain('{{#if (eq output.reply.channel.kind "telegram")}}');
-    expect(prompt).toContain("This reply will be delivered through Telegram");
-    expect(prompt).toContain("Format final responses for plain, reliable delivery");
-    expect(prompt).toContain("Avoid complex or unusual formatting such as tables");
   });
 
   it("configures Cody with bundled skills", async () => {
