@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.17.0 - 2026-04-30
+
+### Added
+
+- Add agent configuration preflight validation to catch invalid agent setup before runtime use.
+- Consolidate runtime logging into structured, size-rotated log files and standardize command output rendering.
+- Add compatible skill catalog resolution and include system prompt snapshots in full conversation exports.
+- Ingest chat messages that arrive while an agent run is already in progress.
+- Add a native `bash` tool for agents.
+- Add agent cron jobs and scheduling support.
+
+### Changed
+
+- Clarify session counts in user-facing command output.
+- Improve user documentation across README, configuration, plugin, provider, Telegram, backup, and troubleshooting guides.
+- Add Cody commit guidance and bump the bundled `imp-agents` plugin package to `0.1.1`.
+
+### Fixed
+
+- Retain distinct system prompt cache variants.
+- Update the vulnerable XML parser dependency.
+- Parse inbound command text centrally and keep commands out of mid-run chat turns.
+- Hide relative attachment paths from user-facing output.
+- Add Telegram-specific output formatting guidance to Cody's prompt.
+
 ## 0.16.0 - 2026-04-27
 
 ### Added
