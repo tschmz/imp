@@ -487,7 +487,7 @@ describe("plugin use cases", () => {
         package: {
           path: join(process.cwd(), "plugins", "imp-agents"),
           source: {
-            version: "0.1.0",
+            version: "0.1.1",
             manifestHash: expect.stringMatching(/^sha256:/),
           },
         },
