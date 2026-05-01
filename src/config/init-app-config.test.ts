@@ -95,9 +95,9 @@ describe("initAppConfig", () => {
     await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
-    await expect(readFile(skillPath, "utf8")).resolves.toContain(
-      `- global shared catalog: \`${join(root, "state-home", "imp", "skills")}\``,
-    );
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("{{#each imp.skillCatalogs}}");
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("{{path}}");
+    await expect(readFile(skillPath, "utf8")).resolves.not.toContain(join(root, "state-home", "imp", "skills"));
     await expect(readFile(skillPath, "utf8")).resolves.not.toContain("/home/thomas/.imp");
     expect((await stat(skillPath)).mode & 0o777).toBe(0o644);
   });
@@ -277,10 +277,10 @@ describe("initAppConfig", () => {
     await expect(readFile(configPath, "utf8")).resolves.toContain('"prompt"');
     await expect(
       readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain(`- global shared catalog: \`${join(root, "custom-state", "skills")}\``);
+    ).resolves.toContain("{{#each imp.skillCatalogs}}");
     await expect(
       readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain(`- workspace agent catalog for default: \`${join(root, "workspace", ".agents", "skills")}\``);
+    ).resolves.not.toContain(join(root, "workspace", ".agents", "skills"));
   });
 
   it("syncs the managed imp skill from the installed asset", async () => {
