@@ -10,6 +10,7 @@ type SummaryContent = ConversationUserMessage["content"] | ConversationToolResul
 
 export const DEFAULT_COMPACTION_RESERVE_TOKENS = 8_000;
 export const DEFAULT_COMPACTION_KEEP_RECENT_TOKENS = 12_000;
+const MAX_TURN_START_RECENT_TOKEN_MULTIPLIER = 2;
 
 export interface ConversationCompactionPlan {
   firstKeptMessageId: string;
@@ -157,15 +158,34 @@ function findFirstKeptIndex(
       continue;
     }
 
-    const turnStart = findTurnStartAtOrBefore(messages, index, startIndex);
-    return turnStart !== undefined && turnStart > startIndex ? turnStart : undefined;
+    const suffixStart = findSafeSuffixStartAtOrBefore(messages, index, startIndex);
+    if (suffixStart === undefined || suffixStart <= startIndex) {
+      return undefined;
+    }
+
+    const turnStart = findTurnStartAtOrBefore(messages, suffixStart, startIndex);
+    if (
+      turnStart !== undefined &&
+      turnStart > startIndex &&
+      estimateConversationTokens(messages.slice(turnStart)) <=
+        options.keepRecentTokens * MAX_TURN_START_RECENT_TOKEN_MULTIPLIER
+    ) {
+      return turnStart;
+    }
+
+    return suffixStart;
   }
 
   if (!options.force) {
     return undefined;
   }
 
-  return findLastTurnStartAfter(messages, startIndex);
+  const turnStart = findLastTurnStartAfter(messages, startIndex);
+  if (turnStart !== undefined && turnStart > startIndex) {
+    return turnStart;
+  }
+
+  return findSafeSuffixStartAtOrBefore(messages, messages.length - 1, startIndex);
 }
 
 function findTurnStartAtOrBefore(
@@ -189,6 +209,21 @@ function findLastTurnStartAfter(
   for (let index = messages.length - 1; index > startIndex; index -= 1) {
     if (messages[index]?.role === "user") {
       return index;
+    }
+  }
+
+  return undefined;
+}
+
+function findSafeSuffixStartAtOrBefore(
+  messages: ConversationEvent[],
+  index: number,
+  startIndex: number,
+): number | undefined {
+  for (let cursor = index; cursor > startIndex; cursor -= 1) {
+    const message = messages[cursor];
+    if (message && message.role !== "toolResult") {
+      return cursor;
     }
   }
 

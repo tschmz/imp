@@ -58,6 +58,11 @@ export async function compactConversation(
     plan,
     previousSummary: options.conversation.state.compaction?.summary,
   });
+  const tokensAfter = plan.tokensAfter + estimateSummaryTokens(summary);
+  if (tokensAfter >= plan.tokensBefore) {
+    return undefined;
+  }
+
   const now = options.message.receivedAt;
   const previousSequence = options.conversation.state.compaction?.sequence ?? 0;
   const compaction: ConversationCompactionState = {
@@ -70,7 +75,7 @@ export async function compactConversation(
     messageCountKept: plan.recentMessages.length,
     sequence: previousSequence + 1,
     tokensBefore: plan.tokensBefore,
-    tokensAfter: plan.tokensAfter + Math.ceil(summary.length / 4),
+    tokensAfter,
     ...(options.model
       ? {
           model: {
@@ -96,6 +101,10 @@ export async function compactConversation(
     compaction,
     plan,
   };
+}
+
+function estimateSummaryTokens(summary: string): number {
+  return Math.ceil(summary.length / 4);
 }
 
 async function generateCompactionSummary(

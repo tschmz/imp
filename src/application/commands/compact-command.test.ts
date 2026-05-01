@@ -25,8 +25,8 @@ describe("compactCommandHandler", () => {
         version: 1,
       },
       messages: [
-        createUserMessage("u1", "Plan the release", "2026-04-05T00:00:00.000Z"),
-        createAssistantMessage("a1", "We need checks.", "2026-04-05T00:01:00.000Z"),
+        createUserMessage("u1", "Plan the release. ".repeat(500), "2026-04-05T00:00:00.000Z"),
+        createAssistantMessage("a1", "We need checks. ".repeat(500), "2026-04-05T00:01:00.000Z"),
         createUserMessage("u2", "Continue", "2026-04-05T00:02:00.000Z"),
         createAssistantMessage("a2", "Next run tests.", "2026-04-05T00:03:00.000Z"),
       ],
@@ -76,6 +76,49 @@ describe("compactCommandHandler", () => {
     expect(response?.text).toBe("There is no active session to compact.");
   });
 
+  it("does not store compaction metadata when the summary would increase context", async () => {
+    const conversationStore = createMutableConversationStore({
+      state: {
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+          sessionId: "session-1",
+        },
+        agentId: "default",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:03:00.000Z",
+        version: 1,
+      },
+      messages: [
+        createUserMessage("u1", "Plan", "2026-04-05T00:00:00.000Z"),
+        createAssistantMessage("a1", "Ok.", "2026-04-05T00:01:00.000Z"),
+        createUserMessage("u2", "Continue", "2026-04-05T00:02:00.000Z"),
+        createAssistantMessage("a2", "Done.", "2026-04-05T00:03:00.000Z"),
+      ],
+    });
+    const run = vi.fn<AgentEngine["run"]>(async () => ({
+      message: {
+        conversation: createIncomingMessage("compact").conversation,
+        text: "Oversized summary. ".repeat(300),
+      },
+      conversationEvents: [],
+    }));
+    const context = createCommandContext({
+      message: createIncomingMessage("compact"),
+      dependencies: createDependencies({
+        conversationStore,
+        engine: { run },
+      }),
+    });
+
+    const response = await compactCommandHandler.handle(context);
+    const updated = await conversationStore.get(context.message.conversation);
+
+    expect(response?.text).toBe("There is not enough previous context to compact yet.");
+    expect(run).toHaveBeenCalledOnce();
+    expect(updated?.state.compaction).toBeUndefined();
+  });
+
   it("compacts an explicitly addressed session instead of the active agent session", async () => {
     const activeSession = createConversation("active-session", [
       createUserMessage("active-u1", "Active session plan", "2026-04-05T00:00:00.000Z"),
@@ -84,8 +127,8 @@ describe("compactCommandHandler", () => {
       createAssistantMessage("active-a2", "Active follow-up", "2026-04-05T00:03:00.000Z"),
     ]);
     const targetSession = createConversation("target-session", [
-      createUserMessage("target-u1", "Target session plan", "2026-04-05T00:00:00.000Z"),
-      createAssistantMessage("target-a1", "Target response", "2026-04-05T00:01:00.000Z"),
+      createUserMessage("target-u1", "Target session plan. ".repeat(500), "2026-04-05T00:00:00.000Z"),
+      createAssistantMessage("target-a1", "Target response. ".repeat(500), "2026-04-05T00:01:00.000Z"),
       createUserMessage("target-u2", "Target next", "2026-04-05T00:02:00.000Z"),
       createAssistantMessage("target-a2", "Target follow-up", "2026-04-05T00:03:00.000Z"),
     ]);
