@@ -192,6 +192,7 @@ describe("createChatUseCase", () => {
           endpointConfig: expect.objectContaining({
             id: "local-cli",
             type: "cli",
+            initialAgentId: "ops",
             initialReplay: [
               { role: "user", text: "old question", createdAt: "2026-04-05T00:00:10.000Z" },
               { role: "assistant", text: "old answer", createdAt: "2026-04-05T00:00:20.000Z" },

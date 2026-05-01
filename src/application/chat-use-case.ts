@@ -184,7 +184,9 @@ async function withInitialCliReplay(
   }
 
   const initialReplay = toVisibleReplayItems(conversation);
-  return initialReplay.length > 0
-    ? { ...endpointConfig, initialReplay }
-    : endpointConfig;
+  return {
+    ...endpointConfig,
+    initialAgentId: selectedAgentId,
+    ...(initialReplay.length > 0 ? { initialReplay } : {}),
+  };
 }

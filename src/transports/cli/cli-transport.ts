@@ -19,11 +19,17 @@ import {
 import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import { renderUserFacingError } from "../../application/render-user-facing-error.js";
-import type { CliEndpointRuntimeConfig } from "../../daemon/types.js";
+import type { ActiveEndpointRuntimeConfig, CliEndpointRuntimeConfig } from "../../daemon/types.js";
 import type { IncomingMessageCommand } from "../../domain/message.js";
 import type { OutgoingMessageReplayItem } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
+import {
+  createCliPromptHistoryStore,
+  type CliPromptHistoryStore,
+} from "./prompt-history.js";
+
+type CliTransportRuntimeConfig = CliEndpointRuntimeConfig & Pick<ActiveEndpointRuntimeConfig, "defaultAgentId" | "paths">;
 
 const identity = (text: string) => text;
 const sgr = (code: number) => (text: string) => `\x1b[${code}m${text}\x1b[0m`;
@@ -62,7 +68,7 @@ const markdownTheme: MarkdownTheme = {
 };
 
 export function createCliTransport(
-  config: CliEndpointRuntimeConfig,
+  config: CliTransportRuntimeConfig,
   logger?: Logger,
 ): Transport {
   let ui: TUI | undefined;
@@ -93,15 +99,18 @@ export function createCliTransport(
       stopped = false;
       const terminalUi = new TUI(new ProcessTerminal(), true);
       ui = terminalUi;
+      let activeAgentId = config.initialAgentId ?? config.defaultAgentId;
 
       const chatContainer = new Container();
       const statusContainer = new Container();
       const processingStatus = createCliProcessingStatus(statusContainer, terminalUi);
+      const promptHistory = createCliPromptHistoryStore(config.paths.dataRoot);
       const editor = new Editor(terminalUi, editorTheme, {
         paddingX: 1,
         autocompleteMaxVisible: 8,
       });
       editor.setAutocompleteProvider(createCliAutocompleteProvider());
+      await loadCliPromptHistoryIntoEditor(editor, promptHistory, activeAgentId, logger);
 
       terminalUi.addChild(new TruncatedText(bold(`imp chat: ${config.id}`), 0, 0));
       terminalUi.addChild(
@@ -133,6 +142,11 @@ export function createCliTransport(
           editor,
           chatContainer,
           processingStatus,
+          promptHistory,
+          getActiveAgentId: () => activeAgentId,
+          setActiveAgentId: (agentId) => {
+            activeAgentId = agentId;
+          },
           ui: terminalUi,
           handler,
           logger,
@@ -158,6 +172,9 @@ async function submitInput(
     editor: Editor;
     chatContainer: Container;
     processingStatus: CliProcessingStatus;
+    promptHistory: CliPromptHistoryStore;
+    getActiveAgentId: () => string;
+    setActiveAgentId: (agentId: string) => void;
     ui: TUI;
     handler: TransportHandler;
     logger?: Logger;
@@ -176,6 +193,7 @@ async function submitInput(
   }
 
   options.editor.addToHistory(text);
+  persistCliPromptHistory(options.promptHistory, options.getActiveAgentId(), text, options.logger);
   options.editor.setText("");
   options.chatContainer.addChild(new Text(green("You"), 0, 0));
   options.chatContainer.addChild(new Text(text, 1, 0));
@@ -185,6 +203,7 @@ async function submitInput(
   const event = createCliInboundEvent(options.config, text, {
     chatContainer: options.chatContainer,
     processingStatus: options.processingStatus,
+    onAgentResolved: options.setActiveAgentId,
     ui: options.ui,
     logger: options.logger,
   });
@@ -204,6 +223,7 @@ function createCliInboundEvent(
   options: {
     chatContainer: Container;
     processingStatus: CliProcessingStatus;
+    onAgentResolved: (agentId: string) => void;
     ui: TUI;
     logger?: Logger;
   },
@@ -241,6 +261,9 @@ function createCliInboundEvent(
       }
     },
     async deliver(message): Promise<void> {
+      if (message.conversation.agentId) {
+        options.onAgentResolved(message.conversation.agentId);
+      }
       options.chatContainer.addChild(new Text(cyan("imp"), 0, 0));
       options.chatContainer.addChild(new Markdown(message.text, 1, 0, markdownTheme));
       options.chatContainer.addChild(new Spacer(1));
@@ -268,6 +291,42 @@ function createCliInboundEvent(
       options.ui.requestRender();
     },
   };
+}
+
+async function loadCliPromptHistoryIntoEditor(
+  editor: Editor,
+  promptHistory: CliPromptHistoryStore,
+  agentId: string,
+  logger: Logger | undefined,
+): Promise<void> {
+  try {
+    const entries = await promptHistory.read(agentId);
+
+    for (const entry of [...entries].reverse()) {
+      editor.addToHistory(entry);
+    }
+  } catch (error) {
+    await logger?.debug("failed to load cli prompt history", {
+      agentId,
+      errorType: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function persistCliPromptHistory(
+  promptHistory: CliPromptHistoryStore,
+  agentId: string,
+  text: string,
+  logger: Logger | undefined,
+): void {
+  void promptHistory.add(agentId, text).catch((error: unknown) => {
+    void logger?.debug("failed to persist cli prompt history", {
+      agentId,
+      errorType: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+  });
 }
 
 interface CliProcessingStatus {

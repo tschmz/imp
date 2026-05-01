@@ -30,6 +30,7 @@ export interface TelegramEndpointRuntimeConfig extends BaseTransportRuntimeConfi
 export interface CliEndpointRuntimeConfig extends BaseTransportRuntimeConfig {
   type: "cli";
   userId: string;
+  initialAgentId?: string;
   initialReplay?: OutgoingMessageReplayItem[];
 }
 

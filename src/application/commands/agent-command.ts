@@ -30,7 +30,10 @@ export const agentCommandHandler: InboundCommandHandler = {
         dependencies.agentRegistry.get(dependencies.defaultAgentId)!;
 
       return {
-        conversation: message.conversation,
+        conversation: {
+          ...message.conversation,
+          agentId: activeAgent.id,
+        },
         text: renderAgentMessage(activeAgent, {
           currentAgentId: activeAgent.id,
           availableAgentIds,
@@ -75,7 +78,10 @@ export const agentCommandHandler: InboundCommandHandler = {
     });
 
     return {
-      conversation: message.conversation,
+      conversation: {
+        ...message.conversation,
+        agentId: requestedAgent.id,
+      },
       text: [
         `Switched this chat to agent \`${requestedAgent.id}\`.`,
         "",

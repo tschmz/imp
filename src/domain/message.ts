@@ -1,4 +1,4 @@
-import type { ChatRef, ConversationRef } from "./conversation.js";
+import type { ConversationRef } from "./conversation.js";
 
 export type IncomingMessageCommand =
   | "new"
@@ -81,7 +81,7 @@ export interface IncomingMessageImageAttachment {
 }
 
 export interface OutgoingMessage {
-  conversation: ChatRef;
+  conversation: ConversationRef;
   text: string;
   attachments?: OutgoingMessageAttachment[];
   replay?: OutgoingMessageReplayItem[];

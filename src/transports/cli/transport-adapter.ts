@@ -59,5 +59,8 @@ export function createCliTransportFromRuntimeConfig(
     throw new Error(`Expected CLI endpoint runtime config, got "${config.type}".`);
   }
 
-  return createCliTransport(config as CliEndpointRuntimeConfig, logger);
+  return createCliTransport(
+    config as CliEndpointRuntimeConfig & Pick<ActiveEndpointRuntimeConfig, "defaultAgentId" | "paths">,
+    logger,
+  );
 }
