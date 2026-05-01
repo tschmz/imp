@@ -106,7 +106,7 @@ function resolveServiceCommandLine(options: {
   }
 
   const resolvedEntrypoint = resolve(entrypoint);
-  const args = ["start", "--config", options.configPath];
+  const args = ["daemon", "run", "--config", options.configPath];
   if (shouldInvokeViaNode(execPath, resolvedEntrypoint)) {
     return {
       command: execPath,

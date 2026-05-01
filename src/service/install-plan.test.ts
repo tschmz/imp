@@ -21,7 +21,7 @@ describe("service install plan", () => {
     });
 
     expect(plan.command).toBe("/usr/bin/node");
-    expect(plan.args).toEqual(["/app/dist/main.js", "start", "--config", "/tmp/imp/config.json"]);
+    expect(plan.args).toEqual(["/app/dist/main.js", "daemon", "run", "--config", "/tmp/imp/config.json"]);
   });
 
   it("renders a systemd user unit", () => {

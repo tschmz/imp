@@ -16,7 +16,7 @@ describe("createServiceUseCases", () => {
       configPath: "/tmp/config.json",
       workingDirectory: "/tmp",
       command: "/usr/bin/node",
-      args: ["/app/dist/main.js", "start", "--config", "/tmp/config.json"],
+      args: ["/app/dist/main.js", "daemon", "run", "--config", "/tmp/config.json"],
       environmentPath: "/tmp/service.env",
     }));
     const resolveServiceDefinitionPath = vi.fn(() => "/tmp/imp.service");
