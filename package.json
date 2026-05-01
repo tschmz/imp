@@ -1,6 +1,6 @@
 {
   "name": "@tschmz/imp",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "private": false,
   "description": "A lightweight local daemon for modular agent endpoints",
   "type": "module",

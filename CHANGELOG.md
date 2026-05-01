@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.19.0 - 2026-05-01
+
+### Added
+
+- Add `imp backup inspect` to inspect backup contents without restoring them.
+- Add conversation compaction plus automatic compaction triggers for active conversations.
+- Include agent home directories in backups.
+- Auto-load plugin tools from an agent's home directory and align skill and plugin discovery paths across runtime resolution.
+
+### Changed
+
+- Refresh bundled plugin operations guidance plus the packaged `imp-agents` skills and bump the bundled `imp-agents` plugin package to `0.1.3`.
+
+### Fixed
+
+- Avoid stale managed plugin package specs during plugin operations.
+- Make OAuth auth file updates atomic.
+- Correct status context rendering and harden conversation compaction boundaries and triggers.
+
 ## 0.18.0 - 2026-05-01
 
 ### Added
