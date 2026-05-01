@@ -61,7 +61,7 @@ describe("imp CLI e2e", () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
-    const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
+    const skillPath = join(root, "state-home", "imp", "skills", "skill-creator", "SKILL.md");
 
     await writeDefaultConfig(root);
     await writeTextFile(skillPath, "stale skill\n");
@@ -69,7 +69,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["skills", "sync-managed", "--config", configPath], env);
 
     expect(stdout).toContain(`Updated managed skill at ${skillPath}`);
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Imp Skill Creator");
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Skill Creator");
   }, cliE2eTimeoutMs);
 
   it("creates and restores a backup with config, agent files, and conversations", async () => {

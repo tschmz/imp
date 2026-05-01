@@ -28,7 +28,7 @@ describe("createSyncManagedSkillsUseCase", () => {
 
     await initAppConfig({ configPath, env });
 
-    const skillPath = join(dataRoot, "skills", "imp-skill-creator", "SKILL.md");
+    const skillPath = join(dataRoot, "skills", "skill-creator", "SKILL.md");
     await writeFile(skillPath, "stale skill\n", "utf8");
 
     const syncManagedSkillsUseCase = createSyncManagedSkillsUseCase({
@@ -36,7 +36,10 @@ describe("createSyncManagedSkillsUseCase", () => {
     });
     await syncManagedSkillsUseCase({ configPath });
 
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Imp Skill Creator");
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Skill Creator");
+    expect(writeOutput).toHaveBeenCalledWith(
+      `Updated managed skill at ${join(dataRoot, "skills", "plugin-creator", "SKILL.md")}`,
+    );
     expect(writeOutput).toHaveBeenCalledWith(`Updated managed skill at ${skillPath}`);
   });
 });

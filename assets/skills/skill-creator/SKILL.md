@@ -1,28 +1,57 @@
 ---
-name: imp-skill-creator
-description: Use this skill when creating or updating skills for `Imp`.
+name: skill-creator
+description: Use this skill to create a skill for yourself.
 ---
 
-# Imp Skill Creator
+# Skill Creator
 
-Skills provide lightweight, task-focused features for `Imp` agents through short instructions plus optional bundled scripts and references.
+Use this skill to add new skills for yourself.
 
-## Drafting Workflow
+{{#if agent.home}}
+Create these skills under `{{agent.home}}/.skills/<skill-name>`.
+{{else}}
+Your home path is not available in this turn. Ask the user for the target directory before creating a skill.
+{{/if}}
 
-1. Identify the target catalog root from the user's intent:
-{{#each imp.skillCatalogs}}
-  - {{label}}: `{{path}}`
-{{/each}}
-2. Create `<catalog-root>/<skill-name>/SKILL.md`.
-3. Write a concise `description` that includes the action and the user requests that should trigger the skill.
-4. Keep the body procedural and short. Put only instructions another agent needs at use time.
-5. Add `references/` only for optional longer guidance that should be read on demand.
-6. Add `scripts/` only when the workflow needs repeatable executable helpers.
-7. Avoid `README.md`, changelogs, install notes, and placeholder files inside the skill.
+## Hard Rules
+
+- Create skills under `{{agent.home}}/.skills/<skill-name>`.
+- Put the main instructions in `SKILL.md`.
+- Keep skill names lowercase with hyphens: `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
+- Write the `description` as a direct statement of what the skill helps you do. Avoid phrasing it as "when the user asks".
+- Keep the body procedural and short. Put only instructions needed at use time.
+- Add `references/` only for optional longer guidance that should be read on demand.
+- Add `scripts/` only when the workflow needs repeatable executable helpers.
+- Avoid `README.md`, changelogs, install notes, and placeholder files inside the skill.
+
+## Location And Discovery
+
+Use this skill directory:
+
+```text
+{{agent.home}}/.skills/<skill-name>
+```
+
+Directory shape:
+
+```text
+{{agent.home}}/
+  .skills/
+    hello-world/
+      SKILL.md
+      scripts/
+        say-hello.sh
+      references/
+        hello-world.md
+```
+
+The runtime scans one directory level below `.skills`. Each child directory with a `SKILL.md` file is one skill.
+
+A newly created or changed skill is available on your next turn. The current turn's skill list was already resolved before the skill was written.
 
 ## Validation
 
-- Check that the skill is a direct child of the catalog root.
+- Check that the skill is a direct child of `{{agent.home}}/.skills`.
 - Check that `name` matches `^[a-z0-9]+(?:-[a-z0-9]+)*$` and stays under 64 characters.
 - Check that the YAML frontmatter contains at least `name` and `description`; additional metadata may be present but should not be required for basic skill loading.
 - Check that `SKILL.md` starts with valid YAML frontmatter. Prefer a concrete example over placeholders:
@@ -30,7 +59,7 @@ Skills provide lightweight, task-focused features for `Imp` agents through short
 ```markdown
 ---
 name: hello-world
-description: Use this skill when the user asks to greet the world.
+description: Use this skill to generate a hello-world greeting for yourself.
 ---
 
 # Hello World
@@ -81,7 +110,6 @@ printf 'Hello, %s!\n' "$target"
 
 ## Runtime Notes
 
-- `Imp` re-discovers auto-discovered skills on each user turn; edits under auto-discovered catalogs do not require a daemon restart.
+- Skills are re-discovered on each user turn; edits under auto-discovered catalogs do not require a daemon restart.
 - `load_skill` returns the selected `SKILL.md` body and lists bundled `scripts/` and `references/` files.
 - `load_skill` does not read bundled resource contents automatically. Write skills so `SKILL.md` tells the agent what to run or read without needing to inspect script contents first; bundled scripts should usually be executable helpers, not files the agent must read to understand the workflow.
-- If the same skill exists in multiple catalogs, the later entry wins.

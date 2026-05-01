@@ -1,11 +1,11 @@
 ---
-name: imp-plugin-dev
-description: Use this skill to create, extend, debug, or document a plugin that adds tools for yourself.
+name: plugin-creator
+description: Use this skill to create or debug a plugin that adds tools for yourself.
 ---
 
-# Imp Plugin Development
+# Plugin Creator
 
-Use this skill to add local Imp tools for yourself.
+Use this skill to add local tools for yourself.
 
 {{#if agent.home}}
 Create these plugins under `{{agent.home}}/.plugins/<plugin-id>`.
@@ -15,12 +15,11 @@ Your home path is not available in this turn. Ask the user for the target direct
 
 ## Hard Rules
 
-- Create plugins under `{{agent.home}}/.plugins/<plugin-id>` unless the user explicitly gives another target.
+- Create plugins under `{{agent.home}}/.plugins/<plugin-id>`.
 - Use `imp-plugin.json` as the plugin manifest.
-- Do not edit Imp config files or install a package just to expose a local tool. Plugins in `{{agent.home}}/.plugins` are auto-discovered.
 - Do not hardcode secrets, tokens, API keys, auth file contents, or environment values.
-- Keep plugin IDs and tool names to letters, numbers, hyphens, and underscores. Avoid `__` in local tool names because Imp uses `<plugin-id>__<tool-name>` as the runtime tool name.
-- A newly created or changed tool is available on your next turn. The current turn's tool list was already resolved before the plugin was written.
+- Keep plugin IDs and tool names to letters, numbers, hyphens, and underscores. Avoid `__` in local tool names.
+- A newly created or changed tool is available on your next turn.
 
 ## Location And Discovery
 
@@ -39,8 +38,6 @@ Directory shape:
       imp-plugin.json
       plugin.mjs
 ```
-
-Imp scans one directory level below `.plugins`. Each child directory is one plugin. The manifest must be named `imp-plugin.json`.
 
 Runtime tool names are namespaced:
 
@@ -236,7 +233,7 @@ Command tools receive one JSON request on stdin:
 }
 ```
 
-If stdout is JSON with a `content` array, Imp uses it as the tool result. If stdout is other JSON, Imp returns it as `details` and also exposes the trimmed JSON text. If stdout is plain text, Imp returns it as text.
+If stdout is JSON with a `content` array, it is used as the tool result. If stdout is other JSON, it is returned as `details` and the trimmed JSON text is also exposed. If stdout is plain text, it is returned as text.
 
 ## Manifest Reference
 
@@ -248,7 +245,7 @@ Common fields for local tool plugins:
   "id": "plugin_id",
   "name": "Human Name",
   "version": "0.1.0",
-  "description": "Optional description.",
+  "description": "Adds focused local tools for text processing.",
   "runtime": {
     "module": "./plugin.mjs"
   },
@@ -256,7 +253,7 @@ Common fields for local tool plugins:
 }
 ```
 
-Use `runtime` for JavaScript tools and `tools` for command tools. Relative paths are resolved from the plugin root.
+Use `runtime` for JavaScript tools and `tools` for command tools. Relative paths are resolved from the plugin root. The top-level `description` describes the plugin. Each tool still needs its own clear `description` so you can decide when to use it.
 
 ## Development Workflow
 
@@ -270,11 +267,7 @@ Use `runtime` for JavaScript tools and `tools` for command tools. Relative paths
    ```
 
 5. Use the new tool from the next turn.
-6. If the tool does not appear, check recent logs:
-
-   ```sh
-   imp log --lines 10
-   ```
+6. If the tool does not appear, check recent runtime logs if they are available.
 
 ## Troubleshooting
 

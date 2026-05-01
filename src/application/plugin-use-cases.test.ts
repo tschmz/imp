@@ -791,7 +791,6 @@ describe("plugin use cases", () => {
     });
     expect(cody?.skillCatalog?.map((skill) => skill.name).sort()).toEqual([
       "imp-administration",
-      "imp-plugin-dev",
       "release-preparation",
     ]);
     expect((runtimeConfig.pluginTools ?? []).map((tool) => tool.name)).toEqual(

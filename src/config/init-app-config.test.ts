@@ -57,7 +57,8 @@ describe("initAppConfig", () => {
       }>;
       endpoints: unknown[];
     };
-    const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
+    const skillPath = join(root, "state-home", "imp", "skills", "skill-creator", "SKILL.md");
+    const pluginCreatorSkillPath = join(root, "state-home", "imp", "skills", "plugin-creator", "SKILL.md");
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
@@ -95,11 +96,13 @@ describe("initAppConfig", () => {
     await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("{{#each imp.skillCatalogs}}");
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("{{path}}");
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("{{agent.home}}/.skills/<skill-name>");
+    await expect(readFile(skillPath, "utf8")).resolves.not.toContain("{{#each imp.skillCatalogs}}");
     await expect(readFile(skillPath, "utf8")).resolves.not.toContain(join(root, "state-home", "imp", "skills"));
     await expect(readFile(skillPath, "utf8")).resolves.not.toContain("/home/thomas/.imp");
     expect((await stat(skillPath)).mode & 0o777).toBe(0o644);
+    await expect(readFile(pluginCreatorSkillPath, "utf8")).resolves.toContain("# Plugin Creator");
+    expect((await stat(pluginCreatorSkillPath)).mode & 0o777).toBe(0o644);
   });
 
   it("refuses to overwrite an existing config without force", async () => {
@@ -174,7 +177,7 @@ describe("initAppConfig", () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
     const dataRoot = join(root, "state-home", "imp");
-    const skillPath = join(dataRoot, "skills", "imp-skill-creator", "SKILL.md");
+    const skillPath = join(dataRoot, "skills", "skill-creator", "SKILL.md");
     const backupPath = `${skillPath}.2026-04-05T18-15-00.000Z.bak`;
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
@@ -198,14 +201,14 @@ describe("initAppConfig", () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
     const dataRoot = join(root, "state-home", "imp");
-    const skillPath = join(dataRoot, "skills", "imp-skill-creator", "SKILL.md");
+    const pluginCreatorSkillPath = join(dataRoot, "skills", "plugin-creator", "SKILL.md");
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
 
     await initAppConfig({ configPath, env });
     await expect(initAppConfig({ configPath: join(root, "second-config.json"), env })).rejects.toThrowError(
-      `Imp skill already exists: ${skillPath}\nRe-run with --force to overwrite.`,
+      `Imp skill already exists: ${pluginCreatorSkillPath}\nRe-run with --force to overwrite.`,
     );
     await expect(readFile(join(root, "second-config.json"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
@@ -276,11 +279,14 @@ describe("initAppConfig", () => {
     expect(rawConfig).toContain('"model"');
     await expect(readFile(configPath, "utf8")).resolves.toContain('"prompt"');
     await expect(
-      readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain("{{#each imp.skillCatalogs}}");
+      readFile(join(root, "custom-state", "skills", "skill-creator", "SKILL.md"), "utf8"),
+    ).resolves.toContain("{{agent.home}}/.skills/<skill-name>");
     await expect(
-      readFile(join(root, "custom-state", "skills", "imp-skill-creator", "SKILL.md"), "utf8"),
+      readFile(join(root, "custom-state", "skills", "skill-creator", "SKILL.md"), "utf8"),
     ).resolves.not.toContain(join(root, "workspace", ".agents", "skills"));
+    await expect(
+      readFile(join(root, "custom-state", "skills", "plugin-creator", "SKILL.md"), "utf8"),
+    ).resolves.toContain("# Plugin Creator");
   });
 
   it("syncs the managed imp skill from the installed asset", async () => {
@@ -289,14 +295,15 @@ describe("initAppConfig", () => {
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
-    const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
+    const skillPath = join(root, "state-home", "imp", "skills", "skill-creator", "SKILL.md");
+    const pluginCreatorSkillPath = join(root, "state-home", "imp", "skills", "plugin-creator", "SKILL.md");
 
     await initAppConfig({ configPath, env });
     await chmod(skillPath, 0o600);
     await import("node:fs/promises").then(({ writeFile }) => writeFile(skillPath, "stale skill\n", "utf8"));
 
-    await expect(syncManagedSkills({ configPath })).resolves.toEqual([skillPath]);
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Imp Skill Creator");
+    await expect(syncManagedSkills({ configPath })).resolves.toEqual([pluginCreatorSkillPath, skillPath]);
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Skill Creator");
     expect((await stat(skillPath)).mode & 0o777).toBe(0o644);
   });
 
@@ -306,7 +313,7 @@ describe("initAppConfig", () => {
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
-    const skillPath = join(root, "state-home", "imp", "skills", "imp-skill-creator", "SKILL.md");
+    const skillPath = join(root, "state-home", "imp", "skills", "skill-creator", "SKILL.md");
     const backupPath = `${skillPath}.2026-04-05T18-15-00.000Z.bak`;
 
     await initAppConfig({ configPath, env });
