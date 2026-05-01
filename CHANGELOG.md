@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.20.0 - 2026-05-01
+
+### Added
+
+- Install bundled skills dynamically during configuration initialization.
+- Add managed creator skills, including separate plugin and skill creator skill assets.
+
+### Changed
+
+- Bump the bundled `imp-agents` plugin package to `0.1.4`.
+
 ## 0.19.0 - 2026-05-01
 
 ### Added
