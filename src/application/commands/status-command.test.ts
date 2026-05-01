@@ -146,11 +146,11 @@ describe("statusCommandHandler", () => {
     expect(response?.text).toContain("## Last LLM turn");
     expect(response?.text).toContain("- **Model:** `test/stub`");
     expect(response?.text).toContain("- **Tokens:** 23 total · 11 input · 7 output");
-    expect(response?.text).toContain("- **Context:** 0.0% of 128,000");
+    expect(response?.text).toContain("- **Context:** 0.0% · 11 used · 127,989 available · of 128,000 estimated");
     expect(response?.text).toContain("- **Max tokens:** 8,192");
   });
 
-  it("renders last-turn context usage from input tokens only", async () => {
+  it("renders estimated effective conversation context instead of last-turn input tokens", async () => {
     const context = createCommandContext({
       message: createIncomingMessage("status"),
       dependencies: createDependencies({
@@ -158,6 +158,14 @@ describe("statusCommandHandler", () => {
           get: async () => ({
             state: baseConversationState,
             messages: [
+              {
+                kind: "message",
+                id: "msg-0",
+                role: "user",
+                content: "x".repeat(8_000),
+                createdAt: "2026-04-05T00:00:10.000Z",
+                timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
+              },
               {
                 kind: "message",
                 id: "msg-1",
@@ -208,7 +216,8 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("- **Context:** 8.6% of 128,000");
+    expect(response?.text).toContain("- **Context:** 1.6% · 2,004 used · 125,996 available · of 128,000 estimated");
+    expect(response?.text).not.toContain("8.6%");
     expect(response?.text).not.toContain("71.1%");
   });
 
@@ -365,9 +374,99 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("- **Context:** 0.0% of 200,000");
+    expect(response?.text).toContain("- **Context:** 0.0% · 4 used · 199,996 available · of 200,000 estimated");
     expect(response?.text).toContain("- **Max tokens:** 100,000");
     expect(response?.text).not.toContain("123");
+  });
+
+  it("renders context usage from the compacted model projection", async () => {
+    const context = createCommandContext({
+      message: createIncomingMessage("status"),
+      dependencies: createDependencies({
+        conversationStore: {
+          get: async () => ({
+            state: {
+              ...baseConversationState,
+              compaction: {
+                summary: "Short checkpoint.",
+                firstKeptMessageId: "msg-2",
+                compactedThroughMessageId: "msg-1",
+                createdAt: "2026-04-05T00:01:00.000Z",
+                messageCountBefore: 3,
+                messageCountSummarized: 1,
+                messageCountKept: 2,
+                sequence: 1,
+              },
+            },
+            messages: [
+              {
+                kind: "message",
+                id: "msg-1",
+                role: "user",
+                content: "x".repeat(20_000),
+                createdAt: "2026-04-05T00:00:10.000Z",
+                timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
+              },
+              {
+                kind: "message",
+                id: "msg-2",
+                role: "user",
+                content: "continue",
+                createdAt: "2026-04-05T00:01:10.000Z",
+                timestamp: Date.parse("2026-04-05T00:01:10.000Z"),
+              },
+              {
+                kind: "message",
+                id: "msg-3",
+                role: "assistant",
+                content: [{ type: "text", text: "ok" }],
+                createdAt: "2026-04-05T00:01:20.000Z",
+                timestamp: Date.parse("2026-04-05T00:01:20.000Z"),
+                api: "test",
+                provider: "test",
+                model: "stub",
+                stopReason: "stop",
+                usage: {
+                  input: 5_100,
+                  output: 3,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  totalTokens: 5_103,
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+                },
+              },
+            ],
+          }),
+          put: async () => {},
+          listBackups: async () => [],
+          restore: async () => false,
+          ensureActive: async () => {
+            throw new Error("not used");
+          },
+          create: async () => {
+            throw new Error("not used");
+          },
+        },
+        resolveModel: () =>
+          ({
+            id: "stub",
+            name: "Stub",
+            api: "test",
+            provider: "test",
+            baseUrl: "https://example.invalid",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 128000,
+            maxTokens: 8192,
+          }) as never,
+      }),
+    });
+
+    const response = await statusCommandHandler.handle(context);
+
+    expect(response?.text).toContain("- **Context:** 0.0% · 60 used · 127,940 available · of 128,000 estimated");
+    expect(response?.text).not.toContain("5,000 used");
   });
 
   it("falls back to the agent workspace for the working directory", async () => {

@@ -1,5 +1,9 @@
 import type { Usage } from "@mariozechner/pi-ai";
 import type { AgentDefinition } from "../../domain/agent.js";
+import {
+  buildCompactedConversationMessages,
+  estimateConversationTokens,
+} from "../../domain/conversation-compaction.js";
 import type {
   ConversationAssistantMessage,
   ConversationContext,
@@ -53,12 +57,19 @@ function formatCount(value: number | undefined): string {
   return value === undefined ? "unknown" : new Intl.NumberFormat("en-US").format(value);
 }
 
-function formatContextUsage(inputTokens: number, contextWindow: number | undefined): string {
+function formatContextUsage(contextTokens: number, contextWindow: number | undefined): string {
   if (contextWindow === undefined || !Number.isFinite(contextWindow) || contextWindow <= 0) {
-    return "unknown";
+    return "unknown of unknown";
   }
 
-  return `${new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format((inputTokens / contextWindow) * 100)}%`;
+  const usedTokens = Math.max(0, contextTokens);
+  const availableTokens = Math.max(0, contextWindow - usedTokens);
+  return [
+    `${new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format((usedTokens / contextWindow) * 100)}%`,
+    `${formatCount(usedTokens)} used`,
+    `${formatCount(availableTokens)} available`,
+    `of ${formatCount(contextWindow)}`,
+  ].join(" · ");
 }
 
 function countUserTurns(conversation: ConversationContext): number {
@@ -109,12 +120,13 @@ function renderLastLlmTurn(
   }
 
   const model = resolveModel(lastAssistantMessage.provider, lastAssistantMessage.model);
+  const contextTokens = estimateConversationTokens(buildCompactedConversationMessages(conversation));
   return [
     "## Last LLM turn",
     `- **Model:** \`${lastAssistantMessage.provider}/${lastAssistantMessage.model}\``,
     `- **Tokens:** ${formatCount(lastAssistantMessage.usage.totalTokens)} total · ${formatCount(lastAssistantMessage.usage.input)} input · ${formatCount(lastAssistantMessage.usage.output)} output`,
     `- **Cache:** ${formatCount(lastAssistantMessage.usage.cacheRead)} read · ${formatCount(lastAssistantMessage.usage.cacheWrite)} write`,
-    `- **Context:** ${formatContextUsage(lastAssistantMessage.usage.input, model?.contextWindow)} of ${formatCount(model?.contextWindow)}`,
+    `- **Context:** ${formatContextUsage(contextTokens, model?.contextWindow)} estimated`,
     `- **Max tokens:** ${formatCount(model?.maxTokens)}`,
   ];
 }
