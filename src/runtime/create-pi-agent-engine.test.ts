@@ -1372,7 +1372,7 @@ describe("createPiAgentEngine", () => {
       createSkillFile("home-child", "Home child skill."),
     );
     await writeSkillFile(
-      join(childWorkspace, ".skills", "workspace-child", "SKILL.md"),
+      join(childWorkspace, ".agents", "skills", "workspace-child", "SKILL.md"),
       createSkillFile("workspace-child", "Workspace child skill."),
     );
     await writeTextFile(join(parentWorkspace, "AGENTS.md"), "Parent workspace instructions.");

@@ -1,19 +1,21 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPluginConfigContributions, loadRuntimePlugins } from "./plugin-runtime.js";
 import type { AppConfig } from "./types.js";
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(tempDirs.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
 describe("loadRuntimePlugins", () => {
   it("assigns a default home to plugin agents", async () => {
     const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "imp-agents");
     await writePluginManifest(pluginRoot, {
@@ -39,6 +41,7 @@ describe("loadRuntimePlugins", () => {
 
   it("resolves explicit plugin agent home paths relative to the plugin root", async () => {
     const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "imp-agents");
     await writePluginManifest(pluginRoot, {
@@ -65,6 +68,7 @@ describe("loadRuntimePlugins", () => {
 
   it("omits plugin config agents that are shadowed by configured agents", async () => {
     const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "imp-agents");
     await writePluginManifest(pluginRoot, {

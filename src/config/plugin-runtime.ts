@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AgentMcpServerConfig } from "../domain/agent.js";
 import { discoverPluginManifests, readPluginManifestFromDirectory, type DiscoveredPluginManifest, type PluginManifest } from "../plugins/index.js";
@@ -144,7 +145,16 @@ async function discoverPluginsFromRoots(rootDirs: string[]): Promise<DiscoveredP
 function resolveAutomaticPluginRoots(appConfig: AppConfig, configDir: string): string[] {
   return [
     join(appConfig.paths.dataRoot, "plugins"),
-    ...appConfig.agents.map((agent) => join(resolveAgentHomePath(agent, appConfig.paths.dataRoot, configDir), "plugins")),
+    join(homedir(), ".agents", "plugins"),
+    ...appConfig.agents.flatMap((agent) => {
+      const roots = [join(resolveAgentHomePath(agent, appConfig.paths.dataRoot, configDir), ".plugins")];
+
+      if (agent.workspace?.cwd) {
+        roots.push(join(resolveConfigPath(agent.workspace.cwd, configDir), ".agents", "plugins"));
+      }
+
+      return roots;
+    }),
   ];
 }
 

@@ -13,9 +13,7 @@ export interface EffectiveSkillResolutionResult {
   userSharedSkillsPath?: string;
   agentHomeSkillsPath?: string;
   workspaceDirectory?: string;
-  legacyWorkspaceSkillsPath?: string;
   workspaceAgentSkillsPath?: string;
-  workspaceSkillsPath?: string;
 }
 
 export async function resolveEffectiveSkills(options: {
@@ -28,9 +26,7 @@ export async function resolveEffectiveSkills(options: {
   const userSharedSkillsPath = join(homedir(), ".agents", "skills");
   const agentHomeSkillsPath = options.agent.home ? join(options.agent.home, ".skills") : undefined;
   const workspaceDirectory = resolveWorkspaceDirectory(options.agent, options.conversation);
-  const legacyWorkspaceSkillsPath = workspaceDirectory ? join(workspaceDirectory, ".skills") : undefined;
   const workspaceAgentSkillsPath = workspaceDirectory ? join(workspaceDirectory, ".agents", "skills") : undefined;
-  const workspaceSkillsPath = workspaceDirectory ? join(workspaceDirectory, "skills") : undefined;
 
   const globalSkillCatalog = globalSkillsPath
     ? await discoverSkills([globalSkillsPath], { ignoreMissingPaths: true })
@@ -39,14 +35,8 @@ export async function resolveEffectiveSkills(options: {
   const agentHomeSkillCatalog = agentHomeSkillsPath
     ? await discoverSkills([agentHomeSkillsPath], { ignoreMissingPaths: true })
     : { skills: [], issues: [] };
-  const legacyWorkspaceSkillCatalog = legacyWorkspaceSkillsPath
-    ? await discoverSkills([legacyWorkspaceSkillsPath], { ignoreMissingPaths: true })
-    : { skills: [], issues: [] };
   const workspaceAgentSkillCatalog = workspaceAgentSkillsPath
     ? await discoverSkills([workspaceAgentSkillsPath], { ignoreMissingPaths: true })
-    : { skills: [], issues: [] };
-  const workspaceSkillCatalog = workspaceSkillsPath
-    ? await discoverSkills([workspaceSkillsPath], { ignoreMissingPaths: true })
     : { skills: [], issues: [] };
 
   const userSharedMergedSkillCatalog = mergeSkillCatalogs(globalSkillCatalog.skills, userSharedSkillCatalog.skills);
@@ -58,15 +48,7 @@ export async function resolveEffectiveSkills(options: {
     agentHomeMergedSkillCatalog.skills,
     configuredSkillCatalog,
   );
-  const legacyWorkspaceMergedSkillCatalog = mergeSkillCatalogs(
-    configuredMergedSkillCatalog.skills,
-    legacyWorkspaceSkillCatalog.skills,
-  );
-  const workspaceAgentMergedSkillCatalog = mergeSkillCatalogs(
-    legacyWorkspaceMergedSkillCatalog.skills,
-    workspaceAgentSkillCatalog.skills,
-  );
-  const mergedSkillCatalog = mergeSkillCatalogs(workspaceAgentMergedSkillCatalog.skills, workspaceSkillCatalog.skills);
+  const mergedSkillCatalog = mergeSkillCatalogs(configuredMergedSkillCatalog.skills, workspaceAgentSkillCatalog.skills);
 
   return {
     skills: mergedSkillCatalog.skills,
@@ -74,17 +56,13 @@ export async function resolveEffectiveSkills(options: {
       ...globalSkillCatalog.issues,
       ...userSharedSkillCatalog.issues,
       ...agentHomeSkillCatalog.issues,
-      ...legacyWorkspaceSkillCatalog.issues,
       ...workspaceAgentSkillCatalog.issues,
-      ...workspaceSkillCatalog.issues,
     ],
     overriddenSkillNames: [
       ...new Set([
         ...userSharedMergedSkillCatalog.overriddenSkillNames,
         ...agentHomeMergedSkillCatalog.overriddenSkillNames,
         ...configuredMergedSkillCatalog.overriddenSkillNames,
-        ...legacyWorkspaceMergedSkillCatalog.overriddenSkillNames,
-        ...workspaceAgentMergedSkillCatalog.overriddenSkillNames,
         ...mergedSkillCatalog.overriddenSkillNames,
       ]),
     ].sort((left, right) => left.localeCompare(right)),
@@ -92,9 +70,7 @@ export async function resolveEffectiveSkills(options: {
     ...(userSharedSkillsPath ? { userSharedSkillsPath } : {}),
     ...(agentHomeSkillsPath ? { agentHomeSkillsPath } : {}),
     ...(workspaceDirectory ? { workspaceDirectory } : {}),
-    ...(legacyWorkspaceSkillsPath ? { legacyWorkspaceSkillsPath } : {}),
     ...(workspaceAgentSkillsPath ? { workspaceAgentSkillsPath } : {}),
-    ...(workspaceSkillsPath ? { workspaceSkillsPath } : {}),
   };
 }
 

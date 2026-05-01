@@ -230,7 +230,7 @@ describe("discoverSkills", () => {
 
   it("can ignore missing skill roots for optional workspace catalogs", async () => {
     const root = await createTempDir();
-    const missingSkillsRoot = join(root, ".skills");
+    const missingSkillsRoot = join(root, ".agents", "skills");
 
     const result = await discoverSkills([missingSkillsRoot], { ignoreMissingPaths: true });
 

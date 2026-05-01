@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 describe("resolveEffectiveSkills", () => {
-  it("loads shared and workspace catalogs in compatibility order without the unmanaged app-home catalog", async () => {
+  it("loads shared and workspace catalogs in the configured order without unmanaged catalogs", async () => {
     const root = await createTempDir();
     const home = join(root, "home");
     const dataRoot = join(root, "data");
@@ -28,7 +28,6 @@ describe("resolveEffectiveSkills", () => {
     await writeSkillFile(join(home, ".agents", "skills", "shared", "SKILL.md"), createSkillFile("shared", "User shared skill."));
     await writeSkillFile(join(home, ".openclaw", "skills", "ignored", "SKILL.md"), createSkillFile("ignored", "Ignored skill."));
     await writeSkillFile(join(workspace, ".agents", "skills", "workspace", "SKILL.md"), createSkillFile("workspace", "Workspace agent skill."));
-    await writeSkillFile(join(workspace, "skills", "workspace", "SKILL.md"), createSkillFile("workspace", "Workspace project skill."));
 
     const result = await resolveEffectiveSkills({
       dataRoot,
@@ -37,9 +36,9 @@ describe("resolveEffectiveSkills", () => {
 
     expect(result.skills.map((skill) => [skill.name, skill.description, skill.filePath])).toEqual([
       ["shared", "User shared skill.", join(home, ".agents", "skills", "shared", "SKILL.md")],
-      ["workspace", "Workspace project skill.", join(workspace, "skills", "workspace", "SKILL.md")],
+      ["workspace", "Workspace agent skill.", join(workspace, ".agents", "skills", "workspace", "SKILL.md")],
     ]);
-    expect(result.overriddenSkillNames).toEqual(["shared", "workspace"]);
+    expect(result.overriddenSkillNames).toEqual(["shared"]);
     expect(result.skills.map((skill) => skill.name)).not.toContain("ignored");
   });
 });

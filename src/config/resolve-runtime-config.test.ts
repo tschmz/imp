@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { appConfigSchema } from "./schema.js";
 import { loadAppConfig } from "./load-app-config.js";
@@ -14,6 +14,7 @@ type RegisterTransportEntry = Parameters<typeof registerTransport>[1];
 const tempDirs: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(
     tempDirs.splice(0).map(async (path) => {
       const { rm } = await import("node:fs/promises");
@@ -603,6 +604,7 @@ describe("resolveRuntimeConfig", () => {
 
   it("automatically loads user plugins from dataRoot/plugins at runtime", async () => {
     const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "notes");
     await writeRawFile(join(pluginRoot, "imp-plugin.json"), JSON.stringify({
@@ -705,6 +707,7 @@ describe("resolveRuntimeConfig", () => {
 
   it("lets configured agents shadow plugin-provided agents with the same namespaced id", async () => {
     const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "imp-agents");
     await writeRawFile(join(pluginRoot, "plugin.mjs"), `export function registerPlugin() {
@@ -777,6 +780,7 @@ describe("resolveRuntimeConfig", () => {
 
   it("does not reject a plugin agent skill path that is also exported globally", async () => {
     const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "notes");
     await writeRawFile(
@@ -832,12 +836,17 @@ describe("resolveRuntimeConfig", () => {
     expect(pluginAgent?.skillIssues ?? []).toEqual([]);
   });
 
-  it("loads agent home plugins after dataRoot plugins", async () => {
+  it("loads shared, agent-home, and workspace plugins after dataRoot plugins", async () => {
     const root = await createTempDir();
+    const home = join(root, "home");
     const dataRoot = join(root, "state");
     const agentHome = join(root, "agents", "default");
+    const workspaceRoot = join(root, "workspace");
     const dataPluginRoot = join(dataRoot, "plugins", "echo");
-    const homePluginRoot = join(agentHome, "plugins", "echo");
+    const userPluginRoot = join(home, ".agents", "plugins", "echo");
+    const homePluginRoot = join(agentHome, ".plugins", "echo");
+    const workspacePluginRoot = join(workspaceRoot, ".agents", "plugins", "echo");
+    vi.stubEnv("HOME", home);
     await writeRawFile(join(dataPluginRoot, "imp-plugin.json"), JSON.stringify({
       schemaVersion: 1,
       id: "echo",
@@ -848,6 +857,19 @@ describe("resolveRuntimeConfig", () => {
           name: "say",
           description: "Data root echo.",
           runner: { type: "command", command: "node", args: ["./data-root.mjs"] },
+        },
+      ],
+    }, null, 2));
+    await writeRawFile(join(userPluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "echo",
+      name: "Echo",
+      version: "0.1.5",
+      tools: [
+        {
+          name: "say",
+          description: "User shared echo.",
+          runner: { type: "command", command: "node", args: ["./user-shared.mjs"] },
         },
       ],
     }, null, 2));
@@ -864,6 +886,19 @@ describe("resolveRuntimeConfig", () => {
         },
       ],
     }, null, 2));
+    await writeRawFile(join(workspacePluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "echo",
+      name: "Echo",
+      version: "0.3.0",
+      tools: [
+        {
+          name: "say",
+          description: "Workspace echo.",
+          runner: { type: "command", command: "node", args: ["./workspace.mjs"] },
+        },
+      ],
+    }, null, 2));
 
     const result = await resolveRuntimeConfig(
       createAppConfig({
@@ -872,6 +907,7 @@ describe("resolveRuntimeConfig", () => {
           {
             id: "default",
             home: agentHome,
+            workspace: { cwd: workspaceRoot },
             model: { provider: "openai", modelId: "gpt-5.4" },
             prompt: { base: { text: "Default" } },
             tools: ["echo.say"],
@@ -893,13 +929,14 @@ describe("resolveRuntimeConfig", () => {
     expect(result.commandTools).toHaveLength(1);
     expect(result.commandTools?.[0]).toMatchObject({
       pluginId: "echo",
-      pluginRoot: homePluginRoot,
-      manifest: { description: "Agent home echo." },
+      pluginRoot: workspacePluginRoot,
+      manifest: { description: "Workspace echo." },
     });
   });
 
   it("loads JS plugin tools from the runtime module", async () => {
     const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
     const dataRoot = join(root, "state");
     const pluginRoot = join(dataRoot, "plugins", "math");
     await writeRawFile(join(pluginRoot, "plugin.mjs"), `export function registerPlugin(context) {

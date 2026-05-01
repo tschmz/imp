@@ -120,7 +120,7 @@ function renderImpSkillTemplate(config: AppConfig, configPath: string): string {
       configPath,
       dataRoot,
       skillCatalogs: resolveSkillCatalogs(config, configPath),
-      dynamicWorkspaceSkillsPath: "<working-directory>/skills",
+      dynamicWorkspaceSkillsPath: "<working-directory>/.agents/skills",
     },
   };
 
@@ -162,20 +162,10 @@ function resolveSkillCatalogs(config: AppConfig, configPath: string): PromptTemp
 
     if (agent.workspace?.cwd) {
       const workspaceDirectory = resolvePathRelativeToConfig(agent.workspace.cwd, configDir);
-      catalogs.push(
-        {
-          label: `legacy workspace catalog for ${agent.id}`,
-          path: join(workspaceDirectory, ".skills"),
-        },
-        {
-          label: `workspace agent catalog for ${agent.id}`,
-          path: join(workspaceDirectory, ".agents", "skills"),
-        },
-        {
-          label: `workspace catalog for ${agent.id}`,
-          path: join(workspaceDirectory, "skills"),
-        },
-      );
+      catalogs.push({
+        label: `workspace agent catalog for ${agent.id}`,
+        path: join(workspaceDirectory, ".agents", "skills"),
+      });
     }
   }
 

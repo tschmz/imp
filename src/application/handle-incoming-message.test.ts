@@ -289,10 +289,10 @@ describe("createHandleIncomingMessage", () => {
     );
   });
 
-  it("loads workspace .skills and lets them override configured agent skills", async () => {
+  it("loads workspace .agents/skills and lets them override configured agent skills", async () => {
     const workspaceRoot = await createTempDir();
     await writeSkillFile(
-      join(workspaceRoot, ".skills", "git-commit", "SKILL.md"),
+      join(workspaceRoot, ".agents", "skills", "git-commit", "SKILL.md"),
       [
         "---",
         "name: git-commit",
@@ -337,7 +337,7 @@ describe("createHandleIncomingMessage", () => {
       expect.arrayContaining([
         expect.objectContaining({
           name: "git-commit",
-          filePath: join(workspaceRoot, ".skills", "git-commit", "SKILL.md"),
+          filePath: join(workspaceRoot, ".agents", "skills", "git-commit", "SKILL.md"),
         }),
         expect.objectContaining({
           name: "git-review",
@@ -350,8 +350,7 @@ describe("createHandleIncomingMessage", () => {
       expect.objectContaining({
         globalSkillsPath: "/tmp/data/skills",
         workspaceDirectory: workspaceRoot,
-        legacyWorkspaceSkillsPath: join(workspaceRoot, ".skills"),
-        workspaceSkillsPath: join(workspaceRoot, "skills"),
+        workspaceAgentSkillsPath: join(workspaceRoot, ".agents", "skills"),
         overriddenSkillNames: ["git-commit"],
       }),
     );
@@ -417,17 +416,6 @@ describe("createHandleIncomingMessage", () => {
       ].join("\n"),
     );
     await writeSkillFile(
-      join(workspaceRoot, ".skills", "release", "SKILL.md"),
-      [
-        "---",
-        "name: release",
-        "description: Workspace release flow.",
-        "---",
-        "",
-        "Use the workspace release flow.",
-      ].join("\n"),
-    );
-    await writeSkillFile(
       join(workspaceRoot, ".agents", "skills", "git-review", "SKILL.md"),
       [
         "---",
@@ -439,14 +427,14 @@ describe("createHandleIncomingMessage", () => {
       ].join("\n"),
     );
     await writeSkillFile(
-      join(workspaceRoot, "skills", "release", "SKILL.md"),
+      join(workspaceRoot, ".agents", "skills", "release", "SKILL.md"),
       [
         "---",
         "name: release",
-        "description: Workspace project release flow.",
+        "description: Workspace release flow.",
         "---",
         "",
-        "Use the workspace project release flow.",
+        "Use the workspace release flow.",
       ].join("\n"),
     );
 
@@ -500,7 +488,7 @@ describe("createHandleIncomingMessage", () => {
         }),
         expect.objectContaining({
           name: "release",
-          filePath: join(workspaceRoot, "skills", "release", "SKILL.md"),
+          filePath: join(workspaceRoot, ".agents", "skills", "release", "SKILL.md"),
         }),
       ]),
     );
@@ -509,18 +497,17 @@ describe("createHandleIncomingMessage", () => {
       expect.objectContaining({
         globalSkillsPath: join(dataRoot, "skills"),
         agentHomeSkillsPath: join(agentHome, ".skills"),
-        legacyWorkspaceSkillsPath: join(workspaceRoot, ".skills"),
-        workspaceSkillsPath: join(workspaceRoot, "skills"),
+        workspaceAgentSkillsPath: join(workspaceRoot, ".agents", "skills"),
         overriddenSkillNames: ["git-commit", "git-review", "lint", "release"],
       }),
     );
   });
 
-  it("uses the conversation working directory for workspace .skills", async () => {
+  it("uses the conversation working directory for workspace .agents/skills", async () => {
     const agentWorkspaceRoot = await createTempDir();
     const conversationWorkspaceRoot = await createTempDir();
     await writeSkillFile(
-      join(agentWorkspaceRoot, ".skills", "git-commit", "SKILL.md"),
+      join(agentWorkspaceRoot, ".agents", "skills", "git-commit", "SKILL.md"),
       [
         "---",
         "name: git-commit",
@@ -531,7 +518,7 @@ describe("createHandleIncomingMessage", () => {
       ].join("\n"),
     );
     await writeSkillFile(
-      join(conversationWorkspaceRoot, ".skills", "git-commit", "SKILL.md"),
+      join(conversationWorkspaceRoot, ".agents", "skills", "git-commit", "SKILL.md"),
       [
         "---",
         "name: git-commit",
@@ -590,7 +577,7 @@ describe("createHandleIncomingMessage", () => {
       expect.arrayContaining([
         expect.objectContaining({
           name: "git-commit",
-          filePath: join(conversationWorkspaceRoot, ".skills", "git-commit", "SKILL.md"),
+          filePath: join(conversationWorkspaceRoot, ".agents", "skills", "git-commit", "SKILL.md"),
         }),
         expect.objectContaining({
           name: "git-review",
@@ -599,10 +586,10 @@ describe("createHandleIncomingMessage", () => {
     );
   });
 
-  it("does not load .skills from process.cwd() without an explicit workspace", async () => {
+  it("does not load workspace .agents/skills from process.cwd() without an explicit workspace", async () => {
     const root = await createTempDir();
     await writeSkillFile(
-      join(root, ".skills", "git-commit", "SKILL.md"),
+      join(root, ".agents", "skills", "git-commit", "SKILL.md"),
       [
         "---",
         "name: git-commit",

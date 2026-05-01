@@ -27,9 +27,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
         ...(resolution.userSharedSkillsPath ? { userSharedSkillsPath: resolution.userSharedSkillsPath } : {}),
         ...(resolution.agentHomeSkillsPath ? { agentHomeSkillsPath: resolution.agentHomeSkillsPath } : {}),
         ...(resolution.workspaceDirectory ? { workspaceDirectory: resolution.workspaceDirectory } : {}),
-        ...(resolution.legacyWorkspaceSkillsPath ? { legacyWorkspaceSkillsPath: resolution.legacyWorkspaceSkillsPath } : {}),
         ...(resolution.workspaceAgentSkillsPath ? { workspaceAgentSkillsPath: resolution.workspaceAgentSkillsPath } : {}),
-        ...(resolution.workspaceSkillsPath ? { workspaceSkillsPath: resolution.workspaceSkillsPath } : {}),
       });
     }
 
@@ -45,9 +43,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
         ...(resolution.userSharedSkillsPath ? { userSharedSkillsPath: resolution.userSharedSkillsPath } : {}),
         ...(resolution.agentHomeSkillsPath ? { agentHomeSkillsPath: resolution.agentHomeSkillsPath } : {}),
         ...(resolution.workspaceDirectory ? { workspaceDirectory: resolution.workspaceDirectory } : {}),
-        ...(resolution.legacyWorkspaceSkillsPath ? { legacyWorkspaceSkillsPath: resolution.legacyWorkspaceSkillsPath } : {}),
         ...(resolution.workspaceAgentSkillsPath ? { workspaceAgentSkillsPath: resolution.workspaceAgentSkillsPath } : {}),
-        ...(resolution.workspaceSkillsPath ? { workspaceSkillsPath: resolution.workspaceSkillsPath } : {}),
         overriddenSkillNames: resolution.overriddenSkillNames,
       });
     }
@@ -66,9 +62,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
       ...(resolution.userSharedSkillsPath ? { userSharedSkillsPath: resolution.userSharedSkillsPath } : {}),
       ...(resolution.agentHomeSkillsPath ? { agentHomeSkillsPath: resolution.agentHomeSkillsPath } : {}),
       ...(resolution.workspaceDirectory ? { workspaceDirectory: resolution.workspaceDirectory } : {}),
-      ...(resolution.legacyWorkspaceSkillsPath ? { legacyWorkspaceSkillsPath: resolution.legacyWorkspaceSkillsPath } : {}),
       ...(resolution.workspaceAgentSkillsPath ? { workspaceAgentSkillsPath: resolution.workspaceAgentSkillsPath } : {}),
-      ...(resolution.workspaceSkillsPath ? { workspaceSkillsPath: resolution.workspaceSkillsPath } : {}),
       ...(resolution.overriddenSkillNames.length > 0
         ? { overriddenSkillNames: resolution.overriddenSkillNames }
         : {}),

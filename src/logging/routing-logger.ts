@@ -42,8 +42,6 @@ function isAgentScopedLog(message: string, fields: LogFields): boolean {
     fields.globalSkillsPath !== undefined ||
     fields.userSharedSkillsPath !== undefined ||
     fields.agentHomeSkillsPath !== undefined ||
-    fields.legacyWorkspaceSkillsPath !== undefined ||
-    fields.workspaceAgentSkillsPath !== undefined ||
-    fields.workspaceSkillsPath !== undefined
+    fields.workspaceAgentSkillsPath !== undefined
   );
 }

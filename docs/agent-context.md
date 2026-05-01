@@ -80,7 +80,7 @@ If the active working directory contains `AGENTS.md`, Imp loads it as an instruc
 Workspace-local skills live here:
 
 ```text
-/path/to/project/.skills
+/path/to/project/.agents/skills
 ```
 
 If shell tools need extra command locations, set `workspace.shellPath`:
@@ -102,9 +102,10 @@ imp config set agents.default.skills.paths '["./skills"]'
 Imp can make skills available from:
 
 - The shared data-root skill catalog
+- The user shared `~/.agents/skills` catalog
 - The agent-home `.skills` directory
 - Configured `agents.<id>.skills.paths` catalogs
-- The active workspace `.skills` directory
+- The active workspace `.agents/skills` directory
 
 The agent sees skill names and descriptions. Full skill instructions are loaded only when the agent decides to use a skill.
 

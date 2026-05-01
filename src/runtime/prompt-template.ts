@@ -401,20 +401,10 @@ function resolveRuntimeSkillCatalogs(
 
   const workspaceDirectory = resolveRuntimeWorkspaceDirectory(agent, conversation);
   if (workspaceDirectory) {
-    catalogs.push(
-      {
-        label: `legacy workspace catalog for ${agent.id}`,
-        path: join(workspaceDirectory, ".skills"),
-      },
-      {
-        label: `workspace agent catalog for ${agent.id}`,
-        path: join(workspaceDirectory, ".agents", "skills"),
-      },
-      {
-        label: `workspace catalog for ${agent.id}`,
-        path: join(workspaceDirectory, "skills"),
-      },
-    );
+    catalogs.push({
+      label: `workspace agent catalog for ${agent.id}`,
+      path: join(workspaceDirectory, ".agents", "skills"),
+    });
   }
 
   return catalogs;
@@ -432,7 +422,7 @@ function resolveRuntimeWorkspaceSkillsPath(
   conversation: ConversationContext | undefined,
 ): string {
   const workspaceDirectory = resolveRuntimeWorkspaceDirectory(agent, conversation);
-  return workspaceDirectory ? join(workspaceDirectory, "skills") : "";
+  return workspaceDirectory ? join(workspaceDirectory, ".agents", "skills") : "";
 }
 
 function createPromptTemplateRuntimeContext(

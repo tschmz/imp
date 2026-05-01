@@ -191,7 +191,7 @@ describe("createPromptTemplateContext", () => {
       { label: "global", path: "/var/lib/imp/skills" },
       { label: "agent-home for default", path: "/agents/default/.skills" },
     ];
-    context.imp.dynamicWorkspaceSkillsPath = "<working-directory>/.skills";
+    context.imp.dynamicWorkspaceSkillsPath = "<working-directory>/.agents/skills";
 
     const rendered = renderPromptTemplate(
       "{{#each imp.skillCatalogs}}{{label}}={{path}};{{/each}}{{imp.dynamicWorkspaceSkillsPath}}",
@@ -202,7 +202,7 @@ describe("createPromptTemplateContext", () => {
     );
 
     expect(rendered).toBe(
-      "global=/var/lib/imp/skills;agent-home for default=/agents/default/.skills;<working-directory>/.skills",
+      "global=/var/lib/imp/skills;agent-home for default=/agents/default/.skills;<working-directory>/.agents/skills",
     );
   });
 
@@ -229,11 +229,9 @@ describe("createPromptTemplateContext", () => {
       { label: "agent-home catalog for default", path: "/agents/default/.skills" },
       { label: "configured shared catalog for default", path: "/shared/skills-a" },
       { label: "configured shared catalog for default", path: "/shared/skills-b" },
-      { label: "legacy workspace catalog for default", path: "/workspace/project/.skills" },
       { label: "workspace agent catalog for default", path: "/workspace/project/.agents/skills" },
-      { label: "workspace catalog for default", path: "/workspace/project/skills" },
     ]);
-    expect(context.imp.dynamicWorkspaceSkillsPath).toBe("/workspace/project/skills");
+    expect(context.imp.dynamicWorkspaceSkillsPath).toBe("/workspace/project/.agents/skills");
   });
 
   it("renders included prompt sections through the shared helper", () => {
