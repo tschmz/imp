@@ -1,4 +1,5 @@
 import type { AgentRegistry } from "../../agents/registry.js";
+import type { AgentRuntimeCommandSurfaceResolver } from "../../application/commands/types.js";
 import type { AgentDefinition } from "../../domain/agent.js";
 import { createAgentLoggers, createScopedLogger, type AgentLoggers } from "../../logging/agent-loggers.js";
 import { createFileLogger, type FileLoggerOptions } from "../../logging/file-logger.js";
@@ -9,7 +10,10 @@ import {
   type WorkingDirectoryState,
   createPiAgentEngine,
 } from "../../runtime/create-pi-agent-engine.js";
+import { createAgentRuntimeSurfaceResolver } from "../../runtime/agent-runtime-surface.js";
 import { createOAuthApiKeyResolver } from "../../runtime/create-oauth-api-key-resolver.js";
+import { createMcpToolCache } from "../../runtime/mcp-tool-cache.js";
+import { resolveMcpTools } from "../../runtime/mcp-tool-runtime.js";
 import type { AgentEngine } from "../../runtime/types.js";
 import { createFsConversationStore } from "../../storage/fs-store.js";
 import type { ConversationStore } from "../../storage/types.js";
@@ -23,6 +27,8 @@ export interface RuntimeComponents {
   agentLoggers: AgentLoggers;
   conversationStore: ConversationStore;
   engine: AgentEngine;
+  resolveAgentRuntimeSurface: AgentRuntimeCommandSurfaceResolver;
+  closeAgentRuntimeSurface(): Promise<void>;
 }
 
 export interface BuildRuntimeComponentsDependencies {
@@ -61,6 +67,16 @@ export function buildRuntimeComponents(
   );
   const logger = createRoutingLogger(endpointLogger, agentLoggers);
   const conversationStore = createConversationStore(endpointConfig.paths);
+  const mcpToolCache = createMcpToolCache({
+    logger,
+    resolveMcpTools,
+  });
+  const resolveRuntimeSurface = createAgentRuntimeSurfaceResolver({
+    ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
+    createBuiltInToolRegistry: createBuiltInRegistry,
+    mcpToolCache,
+    ...(dependencies.agentRegistry ? { agentRegistry: dependencies.agentRegistry } : {}),
+  });
 
   const getApiKey = async (provider: string, agent: AgentDefinition) => {
     if (provider === agent.model.provider && agent.model.apiKey) {
@@ -77,6 +93,7 @@ export function buildRuntimeComponents(
       ...(dependencies.agentRegistry ? { agentRegistry: dependencies.agentRegistry } : {}),
       ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
       createBuiltInToolRegistry: createBuiltInRegistry,
+      mcpToolCache,
     });
   return {
     loggingLevel: config.logging.level,
@@ -85,6 +102,30 @@ export function buildRuntimeComponents(
     agentLoggers,
     conversationStore,
     engine,
+    resolveAgentRuntimeSurface: async ({ agent, conversation, message, runtimeInfo }) => resolveRuntimeSurface({
+      agent,
+      conversation,
+      message,
+      runtime: {
+        configPath: runtimeInfo.configPath,
+        dataRoot: runtimeInfo.dataRoot,
+        invocation: {
+          kind: "direct",
+        },
+        ingress: {
+          endpointId: message.endpointId,
+          transportKind: message.conversation.transport,
+        },
+        output: {
+          mode: "reply-channel",
+          ...(runtimeInfo.replyChannel ? { replyChannel: runtimeInfo.replyChannel } : {}),
+        },
+        ...(runtimeInfo.replyChannel ? { replyChannel: runtimeInfo.replyChannel } : {}),
+      },
+    }),
+    closeAgentRuntimeSurface: async () => {
+      await mcpToolCache.close();
+    },
   };
 }
 

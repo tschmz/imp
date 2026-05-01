@@ -2,11 +2,13 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { createAgentRegistry } from "../../agents/registry.js";
 import type { AppConfig } from "../../config/types.js";
 import type { ConversationStore } from "../../storage/types.js";
 import { agentCommandHandler } from "./agent-command.js";
 import {
   createCommandContext,
+  createDefaultAgent,
   createDependencies,
   createIncomingMessage,
 } from "./test-helpers.js";
@@ -18,6 +20,35 @@ afterEach(async () => {
 });
 
 describe("agentCommandHandler", () => {
+  it("shows tools and skills resolved for runtime instead of only configured values", async () => {
+    const defaultAgent = {
+      ...createDefaultAgent(),
+      tools: ["configured_tool"],
+      skills: { paths: ["/configured/skills"] },
+    };
+    const context = createCommandContext({
+      message: createIncomingMessage("agent"),
+      dependencies: createDependencies({
+        agentRegistry: createAgentRegistry([defaultAgent]),
+        resolveAgentRuntimeSurface: async ({ agent, runtimeInfo }) => {
+          expect(agent.id).toBe("default");
+          expect(runtimeInfo.dataRoot).toBe("/tmp/data");
+          return {
+            tools: ["runtime_tool", "mcp__search"],
+            skills: ["runtime-skill"],
+          };
+        },
+      }),
+    });
+
+    const response = await agentCommandHandler.handle(context);
+
+    expect(response?.text).toContain("Tools: `runtime_tool`, `mcp__search`");
+    expect(response?.text).toContain("Skills: `runtime-skill`");
+    expect(response?.text).not.toContain("configured_tool");
+    expect(response?.text).not.toContain("/configured/skills");
+  });
+
   it("switches the chat to the requested agent active session without mutating the prior session", async () => {
     const sessions = new Map([
       ["default", {

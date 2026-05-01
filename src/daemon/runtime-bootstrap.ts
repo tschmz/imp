@@ -19,6 +19,8 @@ export interface BootstrappedRuntime {
   loggingLevel: ReturnType<typeof buildRuntimeComponents>["loggingLevel"];
   conversationStore: ReturnType<typeof buildRuntimeComponents>["conversationStore"];
   engine: ReturnType<typeof buildRuntimeComponents>["engine"];
+  resolveAgentRuntimeSurface?: ReturnType<typeof buildRuntimeComponents>["resolveAgentRuntimeSurface"];
+  closeAgentRuntimeSurface?: ReturnType<typeof buildRuntimeComponents>["closeAgentRuntimeSurface"];
 }
 
 export type RuntimeBootstrapDependencies = BuildRuntimeComponentsDependencies;

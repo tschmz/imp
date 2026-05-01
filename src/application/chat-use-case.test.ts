@@ -272,6 +272,11 @@ function createDependencies(
         run: vi.fn(),
         close: vi.fn(async () => undefined),
       },
+      resolveAgentRuntimeSurface: vi.fn(async () => ({
+        tools: [],
+        skills: [],
+      })),
+      closeAgentRuntimeSurface: vi.fn(async () => undefined),
     })),
     createRuntimeEntries: vi.fn(() => [runtimeEntry]),
     runRuntimeEntries: vi.fn(async () => undefined),

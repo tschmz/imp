@@ -1,6 +1,8 @@
 import type { AgentRegistry } from "../../agents/registry.js";
 import { loadAppConfig } from "../../config/load-app-config.js";
 import type { IncomingMessage, IncomingMessageCommand, OutgoingMessage } from "../../domain/message.js";
+import type { AgentDefinition } from "../../domain/agent.js";
+import type { ConversationContext } from "../../domain/conversation.js";
 import type { LogLevel, Logger } from "../../logging/types.js";
 import { readRecentLogLines } from "../../logging/view-logs.js";
 import type { HookRegistration, InboundMessageLifecycleHooks } from "../../extensions/types.js";
@@ -19,12 +21,28 @@ export interface RuntimeCommandInfo {
   replyChannel?: ReplyChannelContext;
 }
 
+export interface AgentRuntimeCommandSurface {
+  tools: string[];
+  skills: string[];
+  missingBuiltInTools?: string[];
+  failedMcpServers?: string[];
+  skillIssues?: string[];
+}
+
+export type AgentRuntimeCommandSurfaceResolver = (input: {
+  agent: AgentDefinition;
+  conversation?: ConversationContext;
+  message: IncomingMessage;
+  runtimeInfo: RuntimeCommandInfo;
+}) => Promise<AgentRuntimeCommandSurface>;
+
 export interface HandleIncomingMessageDependencies {
   agentRegistry: AgentRegistry;
   conversationStore: ConversationStore;
   engine: AgentEngine;
   defaultAgentId: string;
   runtimeInfo: RuntimeCommandInfo;
+  resolveAgentRuntimeSurface?: AgentRuntimeCommandSurfaceResolver;
   availableCommands?: ReadonlyArray<InboundCommandHandler>;
   loadAppConfig?: typeof loadAppConfig;
   readRecentLogLines?: typeof readRecentLogLines;

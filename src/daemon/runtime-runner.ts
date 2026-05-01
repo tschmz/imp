@@ -56,6 +56,9 @@ export function createRuntimeEntries(
         activeEndpointIds: runtimes.map((entry) => entry.endpointConfig.id),
         replyChannel,
       },
+      ...(runtime.resolveAgentRuntimeSurface
+        ? { resolveAgentRuntimeSurface: runtime.resolveAgentRuntimeSurface }
+        : {}),
       logger: runtime.logger,
     });
     const messageProcessor = createMessageProcessor({
@@ -197,8 +200,15 @@ export function createRuntimeEntries(
         try {
           await transport?.stop?.();
         } finally {
-          await runtime.engine.close?.();
-          await runtime.logger.close?.();
+          try {
+            try {
+              await runtime.engine.close?.();
+            } finally {
+              await runtime.closeAgentRuntimeSurface?.();
+            }
+          } finally {
+            await runtime.logger.close?.();
+          }
         }
       },
     };

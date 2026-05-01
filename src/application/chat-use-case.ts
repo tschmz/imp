@@ -82,6 +82,7 @@ export function createChatUseCase(
       chatRuntimeConfig.activeEndpoints.map(async (endpointConfig): Promise<BootstrappedRuntime> => {
         await deps.prepareRuntimeFilesystem(endpointConfig.paths);
         const components = deps.buildRuntimeComponents(chatRuntimeConfig, endpointConfig, {
+          agentRegistry,
           createLogger: createFileOnlyLogger,
         });
         const endpointConfigWithReplay = endpointConfig.type === "cli"

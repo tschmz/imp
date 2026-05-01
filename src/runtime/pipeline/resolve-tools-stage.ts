@@ -1,11 +1,13 @@
 import type { AgentRegistry } from "../../agents/registry.js";
 import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
+import type { IncomingMessage } from "../../domain/message.js";
 import type { ToolRegistry } from "../../tools/registry.js";
 import type { McpToolCache } from "../mcp-tool-cache.js";
 import { loadAgentHomePluginTools } from "../agent-home-plugin-tools.js";
 import { createAgentDelegationTools } from "../agent-delegation-tool.js";
 import { validateResolvedToolNames } from "../validate-resolved-tool-names.js";
+import type { PromptTemplateContext } from "../prompt-template.js";
 import {
   createOnPayloadOverride,
   createLoadSkillTool,
@@ -15,22 +17,32 @@ import {
   type WorkingDirectoryState,
 } from "../tool-resolution.js";
 import type { AgentEngine, AgentRunContext } from "../types.js";
+import type { AgentRunRuntimeContext } from "../context.js";
 import type { ResolvePromptStageContext } from "./resolve-prompt-stage.js";
+
+export interface RuntimeToolResolutionDetails {
+  configuredBuiltInTools: string[];
+  resolvedBuiltInTools: string[];
+  missingBuiltInTools: string[];
+  configuredMcpServers: string[];
+  initializedMcpServers: string[];
+  failedMcpServers: string[];
+  resolvedMcpTools: string[];
+  resolvedTools: string[];
+}
+
+export interface ResolvedRuntimeTools {
+  tools: NonNullable<AgentRunContext["tools"]>;
+  workingDirectoryState: WorkingDirectoryState;
+  initialWorkingDirectory: string;
+  toolResolution: RuntimeToolResolutionDetails;
+}
 
 export interface ResolveToolsStageContext extends ResolvePromptStageContext {
   tools: NonNullable<AgentRunContext["tools"]>;
   workingDirectoryState: WorkingDirectoryState;
   initialWorkingDirectory: string;
-  toolResolution: {
-    configuredBuiltInTools: string[];
-    resolvedBuiltInTools: string[];
-    missingBuiltInTools: string[];
-    configuredMcpServers: string[];
-    initializedMcpServers: string[];
-    failedMcpServers: string[];
-    resolvedMcpTools: string[];
-    resolvedTools: string[];
-  };
+  toolResolution: RuntimeToolResolutionDetails;
 }
 
 export async function resolveToolsStage(
@@ -46,6 +58,39 @@ export async function resolveToolsStage(
     runDelegatedAgent?: AgentEngine["run"];
   },
 ): Promise<ResolveToolsStageContext> {
+  const resolvedTools = await resolveRuntimeTools({
+    agent: context.agent,
+    conversation: context.conversation,
+    message: context.input.message,
+    runtime: context.input.runtime,
+    templateContext: context.templateContext,
+  }, dependencies);
+
+  return {
+    ...context,
+    ...resolvedTools,
+  };
+}
+
+export async function resolveRuntimeTools(
+  context: {
+    agent: AgentDefinition;
+    conversation: ConversationContext;
+    message: IncomingMessage;
+    runtime?: AgentRunRuntimeContext;
+    templateContext: PromptTemplateContext;
+  },
+  dependencies: {
+    toolRegistry?: ToolRegistry;
+    createBuiltInToolRegistry: (
+      workingDirectory: string | WorkingDirectoryState,
+      agent?: AgentDefinition,
+    ) => ToolRegistry;
+    mcpToolCache: McpToolCache;
+    agentRegistry?: AgentRegistry;
+    runDelegatedAgent?: AgentEngine["run"];
+  },
+): Promise<ResolvedRuntimeTools> {
   const initialWorkingDirectory = resolveConversationWorkingDirectory(context.agent, context.conversation);
   const workingDirectoryState = createWorkingDirectoryState(initialWorkingDirectory);
   const baseToolRegistry =
@@ -64,7 +109,7 @@ export async function resolveToolsStage(
   }, toolRegistry);
   const builtInTools = resolveTurnBuiltInTools(
     configuredTools,
-    context.input.runtime?.availableSkills ?? [],
+    context.runtime?.availableSkills ?? [],
     context.templateContext,
   );
   const delegationTools =
@@ -72,8 +117,8 @@ export async function resolveToolsStage(
       ? createAgentDelegationTools(
           context.agent,
           context.conversation,
-          context.input.message,
-          context.input.runtime,
+          context.message,
+          context.runtime,
           {
             agentRegistry: dependencies.agentRegistry,
             runDelegatedAgent: dependencies.runDelegatedAgent,
@@ -96,7 +141,6 @@ export async function resolveToolsStage(
   const resolvedTools = [...resolvedBuiltInTools, ...resolvedDelegationTools, ...resolvedMcpTools];
 
   return {
-    ...context,
     initialWorkingDirectory,
     workingDirectoryState,
     toolResolution: {

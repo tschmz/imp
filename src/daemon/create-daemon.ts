@@ -77,7 +77,11 @@ export function createDaemon(
         await Promise.all(
           runtimes.map(async (runtime) => {
             try {
-              await runtime.engine.close?.();
+              try {
+                await runtime.engine.close?.();
+              } finally {
+                await runtime.closeAgentRuntimeSurface?.();
+              }
             } finally {
               await cleanupRuntimeState(runtime.endpointConfig.paths.runtimeStatePath);
             }

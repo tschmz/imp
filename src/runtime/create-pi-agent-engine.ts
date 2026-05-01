@@ -7,7 +7,7 @@ import { createHookRunner } from "../extensions/hook-runner.js";
 import type { AgentEngineLifecycleHooks, HookRegistration } from "../extensions/types.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { AgentHandle } from "./agent-execution.js";
-import { createMcpToolCache } from "./mcp-tool-cache.js";
+import { createMcpToolCache, type McpToolCache } from "./mcp-tool-cache.js";
 import { resolveMcpTools, type ResolvedMcpTools } from "./mcp-tool-runtime.js";
 import { defaultResolveModel, type ModelResolver } from "./model-resolution.js";
 import {
@@ -49,6 +49,7 @@ interface PiAgentEngineDependencies {
       logger?: Logger;
     },
   ) => Promise<ResolvedMcpTools>;
+  mcpToolCache?: McpToolCache;
   promptTemplateSystemContext?: PromptTemplateSystemContext;
   agentEngineHooks?: ReadonlyArray<HookRegistration<AgentEngineLifecycleHooks>>;
 }
@@ -112,10 +113,12 @@ export function createPiAgentEngine(
     getContextFileFingerprint,
     strategy: new InMemoryCacheStrategy<string>(),
   });
-  const mcpToolCache = createMcpToolCache({
-    logger,
-    resolveMcpTools: loadMcpTools,
-  });
+  const mcpToolCache =
+    dependencies.mcpToolCache
+    ?? createMcpToolCache({
+      logger,
+      resolveMcpTools: loadMcpTools,
+    });
   const hookRunner = createHookRunner(dependencies.agentEngineHooks, { logger });
   let closed = false;
   const runInternal: AgentEngine["run"] = async (input) => {

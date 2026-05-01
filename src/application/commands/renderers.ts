@@ -229,27 +229,43 @@ export function renderAgentMessage(
   options: {
     currentAgentId: string;
     availableAgentIds: string[];
+    runtimeTools?: string[];
+    runtimeSkills?: string[];
   },
 ): string {
+  const tools = options.runtimeTools ?? agent.tools;
+  const skills = options.runtimeSkills ?? agent.skills?.paths ?? [];
+
   return [
     "**Agent**",
     `Selected: \`${options.currentAgentId}\` (${agent.name})`,
     `Model: \`${agent.model.provider}/${agent.model.modelId}\``,
     `Workspace: ${renderInlineCode(agent.workspace?.cwd ?? agent.home)}`,
-    `Tools: ${renderCodeCsv(agent.tools)}`,
-    `Skills: ${renderCodeCsv(agent.skills?.paths ?? [])}`,
+    `Tools: ${renderCodeCsv(tools)}`,
+    `Skills: ${renderCodeCsv(skills)}`,
     `Available: ${renderCodeCsv(options.availableAgentIds)}`,
     "",
     "Switch: `/agent <id>`",
   ].join("\n");
 }
 
-export function renderAgentSwitchMessage(agent: AgentDefinition): string {
+export function renderAgentSwitchMessage(
+  agent: AgentDefinition,
+  options: {
+    runtimeTools?: string[];
+    runtimeSkills?: string[];
+  } = {},
+): string {
+  const tools = options.runtimeTools ?? agent.tools;
+  const skills = options.runtimeSkills ?? agent.skills?.paths ?? [];
+
   return [
     "**Agent**",
     `Switched to \`${agent.id}\` (${agent.name}).`,
     `Model: \`${agent.model.provider}/${agent.model.modelId}\``,
     `Workspace: ${renderInlineCode(agent.workspace?.cwd ?? agent.home)}`,
+    `Tools: ${renderCodeCsv(tools)}`,
+    `Skills: ${renderCodeCsv(skills)}`,
     "",
     "Next: `/status`, `/new [title]`",
   ].join("\n");
