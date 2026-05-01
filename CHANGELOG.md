@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.21.1 - 2026-05-01
+
+### Fixed
+
+- Use `imp daemon run` in generated service definitions.
+
 ## 0.21.0 - 2026-05-01
 
 ### Added
