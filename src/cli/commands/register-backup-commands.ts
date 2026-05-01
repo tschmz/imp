@@ -23,6 +23,18 @@ export function registerBackupCommands(programOrSubcommand: Command, deps: CliDe
     }),
   );
 
+  backupCommand
+    .command("inspect")
+    .description("Inspect an imp backup archive")
+    .argument("<inputPath>", "Path to the backup archive")
+    .action(
+      withAsyncAction(async (inputPath: string) => {
+        await deps.inspectBackup({
+          inputPath,
+        });
+      }),
+    );
+
   addConfigOption(
     programOrSubcommand
       .command("restore")

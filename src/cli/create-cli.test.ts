@@ -54,10 +54,13 @@ describe("createCli", () => {
 
     expect(findCommand(configCommand, "reload").helpInformation()).toContain("Usage: imp config reload");
 
+    expect(backupCommand.helpInformation()).toContain("inspect");
     expect(findCommand(backupCommand, "create").helpInformation()).toContain("Usage: imp backup create");
     expect(findCommand(backupCommand, "create").helpInformation()).toContain("--output <path>");
     expect(findCommand(backupCommand, "create").helpInformation()).toContain("--only <scopes>");
     expect(findCommand(backupCommand, "create").helpInformation()).toContain("--force");
+    expect(findCommand(backupCommand, "inspect").helpInformation()).toContain("Usage: imp backup inspect");
+    expect(findCommand(backupCommand, "inspect").helpInformation()).toContain("<inputPath>");
 
     expect(findCommand(pluginCommand, "list").helpInformation()).toContain("Usage: imp plugin list");
     expect(findCommand(pluginCommand, "list").helpInformation()).toContain("--root <path>");
@@ -113,6 +116,7 @@ describe("createCli", () => {
     await cli.parseAsync(["node", "imp", "config", "schema"]);
     await cli.parseAsync(["node", "imp", "config", "set", "--config", "/tmp/imp.json", "endpoints.0.enabled", "false"]);
     await cli.parseAsync(["node", "imp", "chat", "--endpoint", "local-cli", "--config", "/tmp/imp.json"]);
+    await cli.parseAsync(["node", "imp", "backup", "inspect", "/tmp/backup.tar"]);
     await cli.parseAsync(["node", "imp", "restore", "/tmp/backup.tar", "--config", "/tmp/imp.json", "--data-root", "/tmp/state", "--only", "agents", "--force"]);
     await cli.parseAsync(["node", "imp", "plugin", "list", "--config", "/tmp/imp.json", "--root", "/tmp/plugins"]);
     await cli.parseAsync(["node", "imp", "plugin", "inspect", "imp-voice", "--config", "/tmp/imp.json", "--root", "/tmp/plugins"]);
@@ -165,6 +169,9 @@ describe("createCli", () => {
     expect(dependencies.startChat).toHaveBeenCalledWith({
       configPath: "/tmp/imp.json",
       endpointId: "local-cli",
+    });
+    expect(dependencies.inspectBackup).toHaveBeenCalledWith({
+      inputPath: "/tmp/backup.tar",
     });
     expect(dependencies.restoreBackup).toHaveBeenCalledWith({
       configPath: "/tmp/imp.json",
@@ -297,6 +304,7 @@ function createDependencies(): CliDependencies {
     initConfig: vi.fn(async () => undefined),
     syncManagedSkills: vi.fn(async () => undefined),
     createBackup: vi.fn(async () => undefined),
+    inspectBackup: vi.fn(async () => undefined),
     restoreBackup: vi.fn(async () => undefined),
     listPlugins: vi.fn(async () => undefined),
     inspectPlugin: vi.fn(async () => undefined),

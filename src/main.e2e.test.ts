@@ -131,6 +131,13 @@ describe("imp CLI e2e", () => {
 
     expect(backupResult.stdout).toContain(`Created backup at ${backupPath}`);
 
+    const inspectResult = await runCli(["backup", "inspect", backupPath], env);
+
+    expect(inspectResult.stdout).toContain(`Backup: ${backupPath}`);
+    expect(inspectResult.stdout).toContain("Scopes: config, agents, conversations");
+    expect(inspectResult.stdout).toContain("Agent files: 2");
+    expect(inspectResult.stdout).toContain("Conversations: 1");
+
     await overwriteConfig(configPath, {
       instance: { name: "mutated" },
       paths: { dataRoot },

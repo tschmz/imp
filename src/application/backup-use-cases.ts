@@ -9,6 +9,7 @@ import { createTarArchive, extractTarArchive } from "../files/tar-archive.js";
 
 export interface BackupUseCases {
   createBackup: (options: BackupCreateOptions) => Promise<void>;
+  inspectBackup: (options: BackupInspectOptions) => Promise<void>;
   restoreBackup: (options: BackupRestoreOptions) => Promise<void>;
 }
 
@@ -25,6 +26,10 @@ export interface BackupRestoreOptions {
   inputPath: string;
   only?: string;
   force: boolean;
+}
+
+export interface BackupInspectOptions {
+  inputPath: string;
 }
 
 export type BackupScope = "config" | "agents" | "conversations";
@@ -108,6 +113,19 @@ export function createBackupUseCases(dependencies: Partial<BackupDependencies> =
 
         deps.writeOutput(`Created backup at ${resolvedOutputPath}`);
         deps.writeOutput(`Scopes: ${manifest.scopes.join(", ")}`);
+      } finally {
+        await rm(stageRoot, { recursive: true, force: true });
+      }
+    },
+    inspectBackup: async ({ inputPath }) => {
+      const resolvedInputPath = resolve(inputPath);
+      const stageRoot = await mkdtemp(join(tmpdir(), "imp-inspect-"));
+
+      try {
+        await extractTarArchive(resolvedInputPath, stageRoot);
+        const manifest = await readBackupManifest(stageRoot);
+
+        deps.writeOutput(renderBackupInspection(resolvedInputPath, manifest));
       } finally {
         await rm(stageRoot, { recursive: true, force: true });
       }
@@ -808,6 +826,37 @@ function selectedScopes(selection: ScopeSelection): BackupScope[] {
 function selectedManifestScopes(manifest: BackupManifest, selection: ScopeSelection): BackupScope[] {
   const available = new Set(manifest.scopes);
   return selectedScopes(selection).filter((scope) => available.has(scope));
+}
+
+function renderBackupInspection(inputPath: string, manifest: BackupManifest): string {
+  const lines = [
+    `Backup: ${inputPath}`,
+    `Created: ${manifest.createdAt}`,
+    `Scopes: ${formatList(manifest.scopes)}`,
+    `Source config: ${manifest.source.configPath}`,
+    `Source data root: ${manifest.source.dataRoot}`,
+    "",
+    `Config: ${manifest.config?.archivePath ?? "not included"}`,
+    "",
+    `Agent files: ${manifest.agentFiles?.length ?? 0}`,
+  ];
+
+  for (const entry of manifest.agentFiles ?? []) {
+    lines.push(`- ${entry.agentId} ${entry.reference}: ${entry.sourcePath} -> ${entry.archivePath}`);
+  }
+
+  lines.push("");
+  lines.push(`Conversations: ${manifest.conversations?.length ?? 0}`);
+
+  for (const entry of manifest.conversations ?? []) {
+    lines.push(`- ${entry.endpointId}: ${entry.relativeToDataRoot} -> ${entry.archivePath}`);
+  }
+
+  return lines.join("\n");
+}
+
+function formatList(values: string[]): string {
+  return values.length > 0 ? values.join(", ") : "none";
 }
 
 function resolveBackupOutputPath(outputPath: string | undefined, configPath: string): string {

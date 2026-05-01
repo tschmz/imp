@@ -18,6 +18,9 @@ export interface CliDependencies {
     only?: string;
     force: boolean;
   }) => Promise<void>;
+  inspectBackup: (options: {
+    inputPath: string;
+  }) => Promise<void>;
   restoreBackup: (options: {
     configPath?: string;
     dataRoot?: string;

@@ -51,6 +51,7 @@ async function main(): Promise<void> {
     initConfig: createInitConfigUseCase(),
     syncManagedSkills: createSyncManagedSkillsUseCase(),
     createBackup: backupUseCases.createBackup,
+    inspectBackup: backupUseCases.inspectBackup,
     restoreBackup: backupUseCases.restoreBackup,
     listPlugins: pluginUseCases.listPlugins,
     inspectPlugin: pluginUseCases.inspectPlugin,

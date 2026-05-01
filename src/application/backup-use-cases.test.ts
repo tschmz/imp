@@ -103,6 +103,51 @@ describe("backup use cases", () => {
     ).resolves.toContain("relative-root");
   });
 
+  it("inspects a backup archive manifest", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config", "config.json");
+    const dataRoot = join(root, "state");
+    const promptPath = join(root, "config", "prompts", "SYSTEM.md");
+    const authPath = join(root, "config", "oauth.json");
+    const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
+    const backupPath = join(root, "backup.tar");
+    const writeOutput = vi.fn();
+
+    await writeConfig(configPath, dataRoot);
+    await writeTextFile(promptPath, "prompt\n");
+    await writeTextFile(authPath, "{\"token\":\"secret\"}\n");
+    await writeTextFile(conversationPath, "{\"messages\":[{\"id\":\"inspect\"}]}\n");
+
+    const useCases = createBackupUseCases({
+      writeOutput,
+    });
+
+    await useCases.createBackup({
+      configPath,
+      outputPath: backupPath,
+      force: false,
+    });
+
+    writeOutput.mockClear();
+
+    await useCases.inspectBackup({
+      inputPath: backupPath,
+    });
+
+    const output = writeOutput.mock.calls[0]?.[0] ?? "";
+    expect(writeOutput).toHaveBeenCalledTimes(1);
+    expect(output).toContain(`Backup: ${backupPath}`);
+    expect(output).toContain("Scopes: config, agents, conversations");
+    expect(output).toContain(`Source config: ${configPath}`);
+    expect(output).toContain(`Source data root: ${dataRoot}`);
+    expect(output).toContain("Config: config/config.json");
+    expect(output).toContain("Agent files: 2");
+    expect(output).toContain(`- default model.authFile: ${authPath} -> agents/`);
+    expect(output).toContain(`- default prompt.base.file: ${promptPath} -> agents/`);
+    expect(output).toContain("Conversations: 1");
+    expect(output).toContain("- global: conversations -> conversations");
+  });
+
   it("restores only the targeted conversations subtree and preserves unrelated data-root content", async () => {
     const sourceRoot = await createTempDir();
     const sourceConfigPath = join(sourceRoot, "config", "config.json");
