@@ -1,6 +1,6 @@
 ---
 name: imp-administration
-description: Use this skill when user asks about the live Imp installation, config, endpoints, routing, logs, plugins, services, backups, restore or runtime diagnosis.
+description: Use this skill to inspect, configure, diagnose, back up, restore, or manage the live Imp installation.
 ---
 
 # Imp Administration
