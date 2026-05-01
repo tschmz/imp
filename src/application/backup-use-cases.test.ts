@@ -24,6 +24,7 @@ describe("backup use cases", () => {
     const dataRoot = join(root, "state");
     const promptPath = join(root, "config", "prompts", "SYSTEM.md");
     const authPath = join(root, "config", "oauth.json");
+    const agentHomeSkillPath = join(dataRoot, "agents", "default", ".skills", "home-skill", "SKILL.md");
     const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
     const logPath = join(dataRoot, "logs", "endpoints.log");
     const backupPath = join(root, "backup.tar");
@@ -32,6 +33,7 @@ describe("backup use cases", () => {
     await writeConfig(configPath, dataRoot);
     await writeTextFile(promptPath, "prompt\n");
     await writeTextFile(authPath, "{\"token\":\"secret\"}\n");
+    await writeTextFile(agentHomeSkillPath, "# Home skill\n");
     await writeTextFile(conversationPath, "{\"messages\":[{\"id\":\"1\"}]}\n");
     await writeTextFile(logPath, "ignore me\n");
 
@@ -52,14 +54,19 @@ describe("backup use cases", () => {
       scopes: string[];
       config?: unknown;
       agentFiles?: Array<{ archivePath: string }>;
+      agentHomes?: Array<{ archivePath: string }>;
       conversations?: Array<{ archivePath: string }>;
     };
 
     expect(manifest.scopes).toEqual(["agents", "conversations"]);
     expect(manifest.config).toBeUndefined();
     expect(manifest.agentFiles).toHaveLength(2);
+    expect(manifest.agentHomes).toHaveLength(1);
     expect(manifest.conversations).toHaveLength(1);
     await expect(readFile(join(extractDir, manifest.agentFiles?.[0]?.archivePath ?? ""), "utf8")).resolves.toBeDefined();
+    await expect(
+      readFile(join(extractDir, manifest.agentHomes?.[0]?.archivePath ?? "", ".skills", "home-skill", "SKILL.md"), "utf8"),
+    ).resolves.toBe("# Home skill\n");
     await expect(
       readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "chats", "telegram", "42", "meta.json"), "utf8"),
     ).resolves.toContain('"id":"1"');
@@ -109,6 +116,8 @@ describe("backup use cases", () => {
     const dataRoot = join(root, "state");
     const promptPath = join(root, "config", "prompts", "SYSTEM.md");
     const authPath = join(root, "config", "oauth.json");
+    const agentHomePath = join(dataRoot, "agents", "default");
+    const agentHomeSkillPath = join(agentHomePath, ".skills", "home-skill", "SKILL.md");
     const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
     const backupPath = join(root, "backup.tar");
     const writeOutput = vi.fn();
@@ -116,6 +125,7 @@ describe("backup use cases", () => {
     await writeConfig(configPath, dataRoot);
     await writeTextFile(promptPath, "prompt\n");
     await writeTextFile(authPath, "{\"token\":\"secret\"}\n");
+    await writeTextFile(agentHomeSkillPath, "# Home skill\n");
     await writeTextFile(conversationPath, "{\"messages\":[{\"id\":\"inspect\"}]}\n");
 
     const useCases = createBackupUseCases({
@@ -144,6 +154,8 @@ describe("backup use cases", () => {
     expect(output).toContain("Agent files: 2");
     expect(output).toContain(`- default model.authFile: ${authPath} -> agents/`);
     expect(output).toContain(`- default prompt.base.file: ${promptPath} -> agents/`);
+    expect(output).toContain("Agent homes: 1");
+    expect(output).toContain(`- default: ${agentHomePath} -> agent-homes/`);
     expect(output).toContain("Conversations: 1");
     expect(output).toContain("- global: conversations -> conversations");
   });
@@ -386,7 +398,7 @@ describe("backup use cases", () => {
         force: false,
       }),
     ).rejects.toThrow(
-      "Agent file restore requires either restoring config in the same command or pointing --config at an existing target config file.",
+      "Agent restore requires either restoring config in the same command or pointing --config at an existing target config file.",
     );
   });
 
@@ -446,10 +458,73 @@ describe("backup use cases", () => {
     await expect(readFile(join(targetDataRoot, "agents", "SYSTEM.md"), "utf8")).resolves.toBe("base prompt\n");
   });
 
+  it("restores agent homes during agents-only restore without duplicating files inside the home", async () => {
+    const sourceRoot = await createTempDir();
+    const sourceConfigPath = join(sourceRoot, "config", "config.json");
+    const sourceDataRoot = join(sourceRoot, "state");
+    const sourceAgentHome = join(sourceDataRoot, "agents", "default");
+    const sourcePromptPath = join(sourceAgentHome, "SYSTEM.md");
+    const backupPath = join(sourceRoot, "backup.tar");
+    const targetRoot = await createTempDir();
+    const targetConfigPath = join(targetRoot, "config", "config.json");
+    const targetDataRoot = join(targetRoot, "state");
+    const targetAgentHome = join(targetDataRoot, "agents", "default");
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await writeTextFile(
+      sourceConfigPath,
+      `${JSON.stringify(
+        {
+          instance: { name: "default" },
+          paths: { dataRoot: sourceDataRoot },
+          logging: { level: "info" },
+          defaults: { agentId: "default" },
+          agents: [
+            {
+              id: "default",
+              model: { provider: "openai-codex", modelId: "gpt-5.4" },
+              prompt: {
+                base: { file: sourcePromptPath },
+              },
+            },
+          ],
+          endpoints: [],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeTextFile(sourcePromptPath, "home prompt\n");
+    await writeTextFile(join(sourceAgentHome, ".skills", "home-skill", "SKILL.md"), "# Home skill\n");
+    await writeConfig(targetConfigPath, targetDataRoot);
+
+    await useCases.createBackup({
+      configPath: sourceConfigPath,
+      outputPath: backupPath,
+      only: "agents",
+      force: false,
+    });
+
+    await useCases.restoreBackup({
+      inputPath: backupPath,
+      configPath: targetConfigPath,
+      only: "agents",
+      force: false,
+    });
+
+    await expect(readFile(join(targetAgentHome, "SYSTEM.md"), "utf8")).resolves.toBe("home prompt\n");
+    await expect(readFile(join(targetAgentHome, ".skills", "home-skill", "SKILL.md"), "utf8")).resolves.toBe(
+      "# Home skill\n",
+    );
+  });
+
   it("restores absolute agent file paths into the target layout and rewrites config references", async () => {
     const sourceRoot = await createTempDir();
     const sourceConfigPath = join(sourceRoot, "config", "config.json");
     const sourceDataRoot = join(sourceRoot, "state");
+    const sourceAgentHome = join(sourceDataRoot, "agents", "default");
     const sourceBasePromptPath = join(sourceDataRoot, "agents", "SYSTEM.md");
     const sourceInstructionPath = join(sourceDataRoot, "agents", "instructions", "STYLE.md");
     const sourceConversationPath = join(
@@ -480,6 +555,7 @@ describe("backup use cases", () => {
           agents: [
             {
               id: "default",
+              home: sourceAgentHome,
               model: { provider: "openai-codex", modelId: "gpt-5.4", authFile: "./oauth.json" },
               prompt: {
                 base: { file: sourceBasePromptPath },
@@ -503,6 +579,7 @@ describe("backup use cases", () => {
     );
     await writeTextFile(sourceBasePromptPath, "base prompt\n");
     await writeTextFile(sourceInstructionPath, "instruction prompt\n");
+    await writeTextFile(join(sourceAgentHome, "notes.md"), "agent home note\n");
     await writeTextFile(join(sourceRoot, "config", "oauth.json"), "{\"token\":\"secret\"}\n");
     await writeTextFile(sourceConversationPath, "{\"messages\":[{\"id\":\"1\"}]}\n");
 
@@ -522,6 +599,7 @@ describe("backup use cases", () => {
     const restoredConfig = JSON.parse(await readFile(targetConfigPath, "utf8")) as {
       paths: { dataRoot: string };
       agents: Array<{
+        home?: string;
         model?: {
           authFile?: string;
         };
@@ -533,6 +611,7 @@ describe("backup use cases", () => {
     };
 
     expect(restoredConfig.paths.dataRoot).toBe(targetDataRoot);
+    expect(restoredConfig.agents[0]?.home).toBe(join(targetDataRoot, "agents", "default"));
     expect(restoredConfig.agents[0]?.model?.authFile).toBe("./oauth.json");
     expect(restoredConfig.agents[0]?.prompt.base.file).toBe(join(targetDataRoot, "agents", "SYSTEM.md"));
     expect(restoredConfig.agents[0]?.prompt.instructions?.[0]?.file).toBe(
@@ -543,6 +622,9 @@ describe("backup use cases", () => {
       "instruction prompt\n",
     );
     await expect(readFile(join(targetRoot, "config", "oauth.json"), "utf8")).resolves.toBe("{\"token\":\"secret\"}\n");
+    await expect(readFile(join(targetDataRoot, "agents", "default", "notes.md"), "utf8")).resolves.toBe(
+      "agent home note\n",
+    );
   });
 
   it("fails clearly when manifest.json contains invalid JSON", async () => {

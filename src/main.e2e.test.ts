@@ -80,6 +80,7 @@ describe("imp CLI e2e", () => {
     const backupPath = join(root, "backup.tar");
     const promptPath = join(dataRoot, "SYSTEM.md");
     const authPath = join(dataRoot, "auth.json");
+    const agentHomeSkillPath = join(dataRoot, "agents", "default", ".skills", "home-skill", "SKILL.md");
     const conversationPath = join(dataRoot, "conversations", "agents", "default", "sessions", "session-1", "meta.json");
 
     await writeDefaultConfig(root);
@@ -125,6 +126,7 @@ describe("imp CLI e2e", () => {
     });
     await writeTextFile(promptPath, "backup prompt\n");
     await writeTextFile(authPath, '{"token":"secret"}\n');
+    await writeTextFile(agentHomeSkillPath, "# Home skill\n");
     await writeTextFile(conversationPath, '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}\n');
 
     const backupResult = await runCli(["backup", "create", "--config", configPath, "--output", backupPath], env);
@@ -136,6 +138,7 @@ describe("imp CLI e2e", () => {
     expect(inspectResult.stdout).toContain(`Backup: ${backupPath}`);
     expect(inspectResult.stdout).toContain("Scopes: config, agents, conversations");
     expect(inspectResult.stdout).toContain("Agent files: 2");
+    expect(inspectResult.stdout).toContain("Agent homes: 1");
     expect(inspectResult.stdout).toContain("Conversations: 1");
 
     await overwriteConfig(configPath, {
@@ -169,6 +172,7 @@ describe("imp CLI e2e", () => {
     });
     await writeTextFile(promptPath, "mutated prompt\n");
     await writeTextFile(authPath, '{"token":"changed"}\n');
+    await writeTextFile(agentHomeSkillPath, "# Changed home skill\n");
     await writeTextFile(conversationPath, '{"messages":[]}\n');
 
     const restoreResult = await runCli(["restore", backupPath, "--config", configPath, "--force"], env);
@@ -177,6 +181,7 @@ describe("imp CLI e2e", () => {
     expect(await readFile(configPath, "utf8")).toContain('"token": "test-token"');
     expect(await readFile(promptPath, "utf8")).toBe("backup prompt\n");
     expect(await readFile(authPath, "utf8")).toBe('{"token":"secret"}\n');
+    expect(await readFile(agentHomeSkillPath, "utf8")).toBe("# Home skill\n");
     expect(await readFile(conversationPath, "utf8")).toContain('"hi"');
   }, cliE2eTimeoutMs);
 

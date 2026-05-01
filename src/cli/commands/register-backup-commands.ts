@@ -8,7 +8,7 @@ export function registerBackupCommands(programOrSubcommand: Command, deps: CliDe
   addConfigOption(
     backupCommand
       .command("create")
-      .description("Create a backup archive from config, agent files, and conversation data")
+      .description("Create a backup archive from config, agent data, and conversation data")
       .option("-o, --output <path>", "Path to the backup archive")
       .option("--only <scopes>", "Comma-separated scopes: config,agents,conversations")
       .option("-f, --force", "Overwrite an existing backup archive"),
@@ -38,7 +38,7 @@ export function registerBackupCommands(programOrSubcommand: Command, deps: CliDe
   addConfigOption(
     programOrSubcommand
       .command("restore")
-      .description("Restore config, agent files, and conversations from a backup archive")
+      .description("Restore config, agent data, and conversations from a backup archive")
       .argument("<inputPath>", "Path to the backup archive")
       .option("--data-root <path>", "Override paths.dataRoot when restoring conversations or config")
       .option(
