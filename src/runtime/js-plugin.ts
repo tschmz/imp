@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import type { PluginManifest } from "../plugins/manifest.js";
@@ -31,6 +32,10 @@ interface JsPluginModuleShape {
   tools?: unknown;
 }
 
+interface LoadJsPluginToolDefinitionsOptions {
+  reload?: boolean;
+}
+
 export function resolvePluginJsRuntime(manifest: PluginManifest, pluginRoot: string): JsPluginRuntimeConfig | undefined {
   if (!manifest.runtime) {
     return undefined;
@@ -43,12 +48,15 @@ export function resolvePluginJsRuntime(manifest: PluginManifest, pluginRoot: str
   };
 }
 
-export async function loadJsPluginToolDefinitions(plugins: JsPluginRuntimeConfig[]): Promise<ToolDefinition[]> {
+export async function loadJsPluginToolDefinitions(
+  plugins: JsPluginRuntimeConfig[],
+  options: LoadJsPluginToolDefinitionsOptions = {},
+): Promise<ToolDefinition[]> {
   const tools: ToolDefinition[] = [];
   const names = new Set<string>();
 
   for (const plugin of plugins) {
-    const registration = await loadJsPluginRegistration(plugin);
+    const registration = await loadJsPluginRegistration(plugin, options);
     for (const tool of registration.tools ?? []) {
       const namespacedTool = namespaceJsPluginTool(plugin, tool);
       if (names.has(namespacedTool.name)) {
@@ -62,8 +70,14 @@ export async function loadJsPluginToolDefinitions(plugins: JsPluginRuntimeConfig
   return tools;
 }
 
-async function loadJsPluginRegistration(plugin: JsPluginRuntimeConfig): Promise<JsPluginRegistration> {
-  const loaded = await import(pathToFileURL(plugin.modulePath).href).catch((error: unknown) => {
+async function loadJsPluginRegistration(
+  plugin: JsPluginRuntimeConfig,
+  options: LoadJsPluginToolDefinitionsOptions,
+): Promise<JsPluginRegistration> {
+  const moduleSpecifier = await resolvePluginModuleSpecifier(plugin, options).catch((error: unknown) => {
+    throw new Error(`Could not load JS plugin "${plugin.pluginId}" from ${plugin.modulePath}: ${formatError(error)}`);
+  });
+  const loaded = await import(moduleSpecifier).catch((error: unknown) => {
     throw new Error(`Could not load JS plugin "${plugin.pluginId}" from ${plugin.modulePath}: ${formatError(error)}`);
   }) as JsPluginModuleShape;
 
@@ -93,6 +107,20 @@ async function loadJsPluginRegistration(plugin: JsPluginRuntimeConfig): Promise<
   throw new Error(
     `JS plugin "${plugin.pluginId}" must export registerPlugin(context), a default initializer, a default registration object, or a tools array.`,
   );
+}
+
+async function resolvePluginModuleSpecifier(
+  plugin: JsPluginRuntimeConfig,
+  options: LoadJsPluginToolDefinitionsOptions,
+): Promise<string> {
+  const moduleUrl = pathToFileURL(plugin.modulePath);
+  if (!options.reload) {
+    return moduleUrl.href;
+  }
+
+  const metadata = await stat(plugin.modulePath);
+  moduleUrl.searchParams.set("mtime", String(metadata.mtimeMs));
+  return moduleUrl.href;
 }
 
 function parseRegistration(value: unknown, plugin: JsPluginRuntimeConfig): JsPluginRegistration {

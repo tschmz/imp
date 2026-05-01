@@ -55,6 +55,8 @@ The install command can update the config with:
 
 Plugin agents and skills are loaded from the installed package at runtime. Plugin-provided agents use namespaced IDs such as `imp-agents.cody`.
 
+Tools from plugins under an agent home at `<agent.home>/.plugins/*` are also attached to that agent automatically at run time. This lets an agent extend itself with local plugin tools without editing the agent tool list or restarting the daemon.
+
 Plugin MCP servers are not attached to agents automatically. Enable them per agent in [Agent Tools](./agent-tools.md).
 
 ## Check a Plugin

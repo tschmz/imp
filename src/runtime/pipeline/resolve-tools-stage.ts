@@ -3,6 +3,7 @@ import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
 import type { ToolRegistry } from "../../tools/registry.js";
 import type { McpToolCache } from "../mcp-tool-cache.js";
+import { loadAgentHomePluginTools } from "../agent-home-plugin-tools.js";
 import { createAgentDelegationTools } from "../agent-delegation-tool.js";
 import { validateResolvedToolNames } from "../validate-resolved-tool-names.js";
 import {
@@ -47,11 +48,20 @@ export async function resolveToolsStage(
 ): Promise<ResolveToolsStageContext> {
   const initialWorkingDirectory = resolveConversationWorkingDirectory(context.agent, context.conversation);
   const workingDirectoryState = createWorkingDirectoryState(initialWorkingDirectory);
-  const toolRegistry =
+  const baseToolRegistry =
     dependencies.toolRegistry
     ?? dependencies.createBuiltInToolRegistry(workingDirectoryState, context.agent);
+  const agentHomePlugins = await loadAgentHomePluginTools(context.agent);
+  const toolRegistry = mergeToolRegistries(baseToolRegistry, agentHomePlugins.tools);
   const configuredBuiltInTools = [...context.agent.tools];
-  const configuredTools = resolveAgentTools(context.agent, toolRegistry);
+  const resolvedConfiguredToolNames = dedupe([
+    ...context.agent.tools.map((toolName) => agentHomePlugins.toolNameAliases[toolName] ?? toolName),
+    ...agentHomePlugins.automaticToolNames,
+  ]);
+  const configuredTools = resolveAgentTools({
+    ...context.agent,
+    tools: resolvedConfiguredToolNames,
+  }, toolRegistry);
   const builtInTools = resolveTurnBuiltInTools(
     configuredTools,
     context.input.runtime?.availableSkills ?? [],
@@ -126,3 +136,33 @@ function resolveConversationWorkingDirectory(
 }
 
 export { createOnPayloadOverride };
+
+function dedupe(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function mergeToolRegistries(baseRegistry: ToolRegistry, tools: ReturnType<ToolRegistry["list"]>): ToolRegistry {
+  if (tools.length === 0) {
+    return baseRegistry;
+  }
+
+  const pluginTools = new Map(tools.map((tool) => [tool.name, tool]));
+  return {
+    list() {
+      const merged = new Map(baseRegistry.list().map((tool) => [tool.name, tool]));
+      for (const tool of tools) {
+        merged.set(tool.name, tool);
+      }
+      return [...merged.values()];
+    },
+    get(name) {
+      return pluginTools.get(name) ?? baseRegistry.get(name);
+    },
+    pick(names) {
+      return names.flatMap((name) => {
+        const tool = pluginTools.get(name) ?? baseRegistry.get(name);
+        return tool ? [tool] : [];
+      });
+    },
+  };
+}

@@ -1750,6 +1750,123 @@ describe("createPiAgentEngine", () => {
     expect(close).toHaveBeenCalledTimes(1);
   });
 
+  it("automatically exposes agent-home plugin tools without restarting the engine", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-agent-home-plugin-tools-"));
+    tempDirs.push(root);
+    const agentHome = join(root, "agent-home");
+    let capturedTools: ToolDefinition[] | undefined;
+
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.4",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        capturedTools = options.initialState?.tools as ToolDefinition[];
+        return createAgentDouble({ messages: [fauxAssistantMessage("tool-ready")] });
+      },
+    });
+    const agent = {
+      ...createAgent(),
+      home: agentHome,
+      tools: ["read"],
+    };
+
+    await engine.run({
+      agent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    expect(capturedTools?.map((tool) => tool.name)).toEqual(["read"]);
+
+    const pluginRoot = join(agentHome, ".plugins", "trading");
+    await writeTextFile(join(pluginRoot, "imp-plugin.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "trading",
+      name: "Trading",
+      version: "0.1.0",
+      runtime: { module: "./plugin.mjs" },
+    }, null, 2));
+    await writeTextFile(join(pluginRoot, "plugin.mjs"), `export function registerPlugin() {
+  return {
+    tools: [
+      {
+        name: "quote",
+        description: "Load a quote.",
+        parameters: {
+          type: "object",
+          properties: {},
+          additionalProperties: false,
+        },
+        async execute() {
+          return { content: [{ type: "text", text: "1.23" }], details: { source: "v1" } };
+        },
+      },
+    ],
+  };
+}
+`);
+
+    await engine.run({
+      agent,
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        messageId: "3",
+        correlationId: "corr-3",
+      },
+    });
+
+    expect(capturedTools?.map((tool) => tool.name)).toEqual(["read", "trading__quote"]);
+    const firstQuoteTool = capturedTools?.find((tool) => tool.name === "trading__quote");
+    expect(firstQuoteTool).toBeDefined();
+    await expect(firstQuoteTool!.execute("tool-1", {})).resolves.toEqual({
+      content: [{ type: "text", text: "1.23" }],
+      details: { source: "v1" },
+    });
+
+    await writeTextFile(join(pluginRoot, "plugin.mjs"), `export function registerPlugin() {
+  return {
+    tools: [
+      {
+        name: "quote",
+        description: "Load a quote.",
+        parameters: {
+          type: "object",
+          properties: {},
+          additionalProperties: false,
+        },
+        async execute() {
+          return { content: [{ type: "text", text: "1.24" }], details: { source: "v2" } };
+        },
+      },
+    ],
+  };
+}
+`);
+
+    await engine.run({
+      agent,
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        messageId: "4",
+        correlationId: "corr-4",
+      },
+    });
+
+    const secondQuoteTool = capturedTools?.find((tool) => tool.name === "trading__quote");
+    expect(secondQuoteTool).toBeDefined();
+    await expect(secondQuoteTool!.execute("tool-2", {})).resolves.toEqual({
+      content: [{ type: "text", text: "1.24" }],
+      details: { source: "v2" },
+    });
+  });
+
   it("fails tool resolution when a delegated agent tool collides with an MCP tool", async () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>

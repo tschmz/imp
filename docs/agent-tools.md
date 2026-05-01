@@ -91,6 +91,10 @@ Calls are limited to configured contacts.
 
 When skills are available, Imp automatically enables `load_skill` for that turn. See [Agent Context](./agent-context.md#skills) for skill discovery.
 
+## Agent-Home Plugin Tools
+
+Any plugin tool under `<agent.home>/.plugins/*` is added to that agent automatically at run time. You do not need to list those tools under `agents.<id>.tools`, and new agent-home plugin tools become available without restarting the daemon.
+
 ## Apply Changes
 
 Validate and reload after changing tool access:
