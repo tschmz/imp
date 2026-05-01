@@ -14,7 +14,7 @@ description: Use this skill when user asks about the live Imp installation, conf
 ## Config Commands
 
 - Show schema: `imp config schema`
-- Validate: `imp config validate`
+- Validate: `imp config validate --preflight`
 - Read value: `imp config get <keyPath>`
 - Set value: `imp config set <keyPath> <json-or-value>`
 
@@ -29,9 +29,9 @@ imp config get endpoints.*.enabled
 
 ## Diagnosis Commands
 
-- Recent logs: `imp log --lines 50`
+- Recent logs: `imp log --lines 10`
 - Follow logs: `imp log --follow`
-- Endpoint logs: `imp log --endpoint <endpoint-id> --lines 50`
+- Endpoint logs: `imp log --endpoint <endpoint-id> --lines 10`
 - Service status: `imp service status`
 - Plugin health: `imp plugin status <plugin-id>`
 - Plugin diagnostics: `imp plugin doctor <plugin-id>`
@@ -41,17 +41,20 @@ When diagnosing, start with status and recent logs. Report symptoms, likely caus
 ### Plugin Operations
 
 - List installable plugins: `imp plugin list`
+- List plugins from a checked-out root: `imp plugin list --root <plugin-root>`
 - Inspect plugin manifest: `imp plugin inspect <plugin-id>`
+- Inspect plugin manifest from a checked-out root: `imp plugin inspect <plugin-id> --root <plugin-root>`
 - Install published plugin package: `imp plugin install <npm-package-spec>`
 - Update configured plugin package: `imp plugin update <plugin-id-or-npm-package-spec>`
 - Check configured plugin: `imp plugin doctor <plugin-id>`
 - Reinstall configured plugin services: `imp plugin install <plugin-id> --services-only`
+- Skip plugin service installation when requested: `imp plugin install <npm-package-spec> --no-services`
+- Update without starting plugin services when requested: `imp plugin update <plugin-id-or-npm-package-spec> --no-services`
+- Overwrite existing plugin service definitions when explicitly requested: `imp plugin install <plugin-id-or-npm-package-spec> --force`
 
 Use published npm package specs such as `@tschmz/imp-agents@latest` for normal installs and updates.
-Use `--root <plugin-root>` only when the user explicitly wants to test a checked-out plugin directory.
-Do not invent local workspace, tarball, or temporary package paths for published plugin operations.
 
-After plugin installs, updates, or service changes, run `imp config validate` and inspect `imp plugin status <plugin-id>`.
+After plugin installs, updates, or plugin service reinstalls, run `imp config validate` and inspect `imp plugin status <plugin-id>`.
 
 ### Service Operations
 
@@ -65,7 +68,11 @@ After plugin installs, updates, or service changes, run `imp config validate` an
 
 - Create backup: `imp backup create`
 - Scoped backup: `imp backup create --only config,agents,conversations`
+- Inspect backup: `imp backup inspect <inputPath>`
 - Restore: `imp restore <inputPath>`
 - Scoped restore: `imp restore <inputPath> --only <scopes>`
+- Restore to a requested config: `imp restore <inputPath> --config <path>`
+- Restore data to a requested data root: `imp restore <inputPath> --data-root <path>`
+- Overwrite existing restored files only when explicitly requested: `imp restore <inputPath> --force`
 
-Before risky changes, create a backup unless user says not to. If a command requires a backup path, ask user for it rather than inventing or revealing local directory locations.
+Before risky changes, create a backup unless user says not to.
