@@ -63,7 +63,8 @@ export function getPluginPackageStoreRoot(config: AppConfig, configPath: string)
 }
 
 export function normalizePackageSpec(packageSpec: string): string {
-  return packageSpec.startsWith("npm:") ? packageSpec.slice("npm:".length) : packageSpec;
+  const normalized = packageSpec.startsWith("npm:") ? packageSpec.slice("npm:".length) : packageSpec;
+  return addDefaultRegistryTag(normalized);
 }
 
 export function parseNpmPackageName(packageSpec: string): string {
@@ -99,6 +100,7 @@ async function installNpmPackage(options: {
   env?: NodeJS.ProcessEnv;
 }): Promise<{ packageRoot: string }> {
   await ensurePackageStore(options.storeRoot);
+  await repairMissingLocalDependencySpecs(options.storeRoot);
   const declaredBefore = await readDeclaredTopLevelDependencies(options.storeRoot);
   await execFileAsync("npm", ["install", options.packageSpec, "--omit=dev", "--no-audit", "--no-fund"], {
     cwd: options.storeRoot,
@@ -137,6 +139,106 @@ async function ensurePackageStore(storeRoot: string): Promise<void> {
       )}\n`,
       "utf8",
     );
+  }
+}
+
+export async function repairMissingLocalDependencySpecs(storeRoot: string): Promise<void> {
+  const packageJsonPath = join(storeRoot, "package.json");
+  const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8")) as {
+    dependencies?: unknown;
+    [key: string]: unknown;
+  };
+  if (!isStringRecord(packageJson.dependencies)) {
+    return;
+  }
+
+  let changed = false;
+  const dependencies = packageJson.dependencies;
+  for (const [dependencyName, dependencySpec] of Object.entries(dependencies)) {
+    let parsed: ReturnType<typeof npa.resolve>;
+    try {
+      parsed = npa.resolve(dependencyName, dependencySpec, storeRoot);
+    } catch {
+      continue;
+    }
+
+    if ((parsed.type !== "file" && parsed.type !== "directory") || !parsed.fetchSpec) {
+      continue;
+    }
+    if (await pathExists(parsed.fetchSpec)) {
+      continue;
+    }
+
+    const installedVersion = await readInstalledPackageVersion(storeRoot, dependencyName);
+    if (installedVersion) {
+      dependencies[dependencyName] = installedVersion;
+    } else {
+      delete dependencies[dependencyName];
+    }
+    changed = true;
+  }
+
+  if (changed) {
+    await writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
+  }
+}
+
+function addDefaultRegistryTag(packageSpec: string): string {
+  let parsed: ReturnType<typeof npa> & { subSpec?: ReturnType<typeof npa> };
+  try {
+    parsed = npa(packageSpec);
+  } catch {
+    return packageSpec;
+  }
+
+  if (parsed.type === "range" && parsed.name && parsed.rawSpec === "*") {
+    return `${parsed.name}@latest`;
+  }
+  if (
+    parsed.type === "alias"
+    && parsed.name
+    && parsed.subSpec?.type === "range"
+    && parsed.subSpec.name
+    && parsed.subSpec.rawSpec === "*"
+  ) {
+    return `${parsed.name}@npm:${parsed.subSpec.name}@latest`;
+  }
+  return packageSpec;
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    typeof value === "object"
+    && value !== null
+    && !Array.isArray(value)
+    && Object.values(value).every((entry) => typeof entry === "string")
+  );
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readInstalledPackageVersion(storeRoot: string, packageName: string): Promise<string | undefined> {
+  try {
+    const packageManifest = JSON.parse(
+      await readFile(join(storeRoot, "node_modules", ...packageName.split("/"), "package.json"), "utf8"),
+    ) as {
+      name?: unknown;
+      version?: unknown;
+    };
+    return packageManifest.name === packageName
+      && typeof packageManifest.version === "string"
+      && packageManifest.version.length > 0
+      ? packageManifest.version
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 

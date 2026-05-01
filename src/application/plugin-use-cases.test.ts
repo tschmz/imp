@@ -727,7 +727,7 @@ describe("plugin use cases", () => {
 
     expect(packageInstalls).toEqual([
       {
-        packageSpec: "@tschmz/imp-agents",
+        packageSpec: "@tschmz/imp-agents@latest",
         packageName: "@tschmz/imp-agents",
       },
     ]);
