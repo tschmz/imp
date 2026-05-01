@@ -42,11 +42,16 @@ When diagnosing, start with status and recent logs. Report symptoms, likely caus
 
 - List installable plugins: `imp plugin list`
 - Inspect plugin manifest: `imp plugin inspect <plugin-id>`
-- Install plugin: `imp plugin install <plugin-id>`
+- Install published plugin package: `imp plugin install <npm-package-spec>`
+- Update configured plugin package: `imp plugin update <plugin-id-or-npm-package-spec>`
 - Check configured plugin: `imp plugin doctor <plugin-id>`
 - Reinstall configured plugin services: `imp plugin install <plugin-id> --services-only`
 
-After plugin installs or service changes, run `imp config validate` and inspect `imp plugin status <plugin-id>`.
+Use published npm package specs such as `@tschmz/imp-agents@latest` for normal installs and updates.
+Use `--root <plugin-root>` only when the user explicitly wants to test a checked-out plugin directory.
+Do not invent local workspace, tarball, or temporary package paths for published plugin operations.
+
+After plugin installs, updates, or service changes, run `imp config validate` and inspect `imp plugin status <plugin-id>`.
 
 ### Service Operations
 
