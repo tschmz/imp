@@ -119,7 +119,7 @@ export function updatePluginInConfig(
 ): PluginConfigUpdateResult {
   const pluginIndex = (config.plugins ?? []).findIndex((entry) => entry.id === plugin.manifest.id);
   if (pluginIndex < 0) {
-    throw new Error(`Plugin "${plugin.manifest.id}" is not configured. Run imp plugin install first.`);
+    throw new Error(`Plugin "${plugin.manifest.id}" is not configured.`);
   }
 
   const nextContributions = createPluginConfigContributions(config, plugin, configPath);

@@ -44,12 +44,11 @@ When diagnosing, start with status and recent logs. Report symptoms, likely caus
 - List plugins from a checked-out root: `imp plugin list --root <plugin-root>`
 - Inspect plugin manifest: `imp plugin inspect <plugin>`
 - Inspect plugin manifest from a checked-out root: `imp plugin inspect <plugin> --root <plugin-root>`
-- Install published plugin package: `imp plugin install <plugin>`
-- Update configured plugin package: `imp plugin update <plugin>`
+- Install or update plugin package: `imp plugin install <plugin>`
 - Check configured plugin: `imp plugin check <plugin>`
 - Reinstall configured plugin services: `imp plugin install <plugin> --services-only`
 - Skip plugin service installation when requested: `imp plugin install <plugin> --no-services`
-- Update without starting plugin services when requested: `imp plugin update <plugin> --no-services`
+- Install or update without starting plugin services when requested: `imp plugin install <plugin> --no-services`
 - Overwrite existing plugin service definitions when explicitly requested: `imp plugin install <plugin> --force`
 
 Use published npm package specs such as `@tschmz/imp-agents@latest` for normal installs and updates.

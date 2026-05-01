@@ -126,7 +126,7 @@ See [`config.example.json`](./config.example.json) for a complete example.
 | `imp backup create`                | Create a backup archive                             |
 | `imp backup restore <archive>`     | Restore from a backup archive                       |
 | `imp plugin list`                  | List installable plugins                            |
-| `imp plugin install <plugin>`      | Install a plugin into the config                    |
+| `imp plugin install <plugin>`      | Install or update a plugin                          |
 | `imp service install`              | Install a background service definition             |
 | `imp skill sync`                   | Refresh bundled managed skills                      |
 

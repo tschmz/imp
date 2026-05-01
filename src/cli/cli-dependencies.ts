@@ -40,13 +40,6 @@ export interface CliDependencies {
     servicesOnly?: boolean;
     force?: boolean;
   }) => Promise<void>;
-  updatePlugin: (options: {
-    configPath?: string;
-    root?: string;
-    id: string;
-    autoStartServices?: boolean;
-    force?: boolean;
-  }) => Promise<void>;
   installService: (options: { configPath?: string; dryRun: boolean; force: boolean }) => Promise<void>;
   uninstallService: (options: { configPath?: string }) => Promise<void>;
   startService: (options: { configPath?: string }) => Promise<void>;

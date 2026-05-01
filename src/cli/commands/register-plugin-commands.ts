@@ -63,7 +63,7 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
   addConfigOption(
     pluginCommand
       .command("install")
-      .description("Install a plugin manifest into the config")
+      .description("Install or update a plugin in the config")
       .argument("<plugin>", "Plugin ID or npm package spec")
       .option("--root <path>", "Plugin root directory to scan")
       .option("--no-services", "Do not install or start plugin services")
@@ -85,25 +85,5 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
         });
       },
     ),
-  );
-
-  addConfigOption(
-    pluginCommand
-      .command("update")
-      .description("Update a configured plugin package and config contributions")
-      .argument("<plugin>", "Plugin ID or npm package spec")
-      .option("--root <path>", "Plugin root directory to scan")
-      .option("--no-services", "Do not install or start plugin services")
-      .option("-f, --force", "Overwrite existing plugin service definitions"),
-  ).action(
-    withAsyncAction(async (id: string, options: { config?: string; root?: string; services?: boolean; force?: boolean }) => {
-      await deps.updatePlugin({
-        configPath: options.config,
-        root: options.root,
-        id,
-        autoStartServices: booleanWithDefault(options.services, true),
-        force: booleanWithDefault(options.force, false),
-      });
-    }),
   );
 }

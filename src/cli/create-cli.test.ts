@@ -88,12 +88,7 @@ describe("createCli", () => {
     expect(findCommand(pluginCommand, "install").helpInformation()).toContain("--no-services");
     expect(findCommand(pluginCommand, "install").helpInformation()).toContain("--services-only");
     expect(findCommand(pluginCommand, "install").helpInformation()).toContain("--force");
-    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("Usage: imp plugin update");
-    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("<plugin>");
-    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("--config <path>");
-    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("--root <path>");
-    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("--no-services");
-    expect(findCommand(pluginCommand, "update").helpInformation()).toContain("--force");
+    expect(pluginCommand.helpInformation()).not.toContain("update [options]");
 
     const serviceInstallHelp = findCommand(serviceCommand, "install").helpInformation();
     expect(serviceInstallHelp).toContain("Usage: imp service install");
@@ -136,19 +131,6 @@ describe("createCli", () => {
       "/tmp/plugins",
       "--no-services",
       "--services-only",
-      "--force",
-    ]);
-    await cli.parseAsync([
-      "node",
-      "imp",
-      "plugin",
-      "update",
-      "imp-voice",
-      "--config",
-      "/tmp/imp.json",
-      "--root",
-      "/tmp/plugins",
-      "--no-services",
       "--force",
     ]);
     await cli.parseAsync(["node", "imp", "service", "install", "--config", "/tmp/imp.json", "--dry-run"]);
@@ -215,13 +197,6 @@ describe("createCli", () => {
       id: "imp-voice",
       autoStartServices: false,
       servicesOnly: true,
-      force: true,
-    });
-    expect(dependencies.updatePlugin).toHaveBeenCalledWith({
-      configPath: "/tmp/imp.json",
-      root: "/tmp/plugins",
-      id: "imp-voice",
-      autoStartServices: false,
       force: true,
     });
     expect(dependencies.installService).toHaveBeenCalledWith({
@@ -314,7 +289,6 @@ function createDependencies(): CliDependencies {
     checkPlugin: vi.fn(async () => undefined),
     statusPlugin: vi.fn(async () => undefined),
     installPlugin: vi.fn(async () => undefined),
-    updatePlugin: vi.fn(async () => undefined),
     installService: vi.fn(async () => undefined),
     uninstallService: vi.fn(async () => undefined),
     startService: vi.fn(async () => undefined),

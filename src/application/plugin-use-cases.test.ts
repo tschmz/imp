@@ -609,7 +609,7 @@ describe("plugin use cases", () => {
       },
     });
 
-    await useCases.updatePlugin({
+    await useCases.installPlugin({
       configPath,
       id: "@tschmz/imp-agents@0.1.1",
       autoStartServices: false,
@@ -719,7 +719,7 @@ describe("plugin use cases", () => {
       },
     });
 
-    await useCases.updatePlugin({
+    await useCases.installPlugin({
       configPath,
       id: "imp-agents",
       autoStartServices: false,
@@ -1386,7 +1386,7 @@ describe("plugin use cases", () => {
       id: "imp-agents",
     });
 
-    await useCases.updatePlugin({
+    await useCases.installPlugin({
       root: newRoot,
       configPath,
       id: "imp-agents",
@@ -1467,7 +1467,7 @@ describe("plugin use cases", () => {
     });
     writeOutput.mockClear();
 
-    await useCases.updatePlugin({
+    await useCases.installPlugin({
       root: newRoot,
       configPath,
       id: "imp-voice",
@@ -1593,7 +1593,7 @@ describe("plugin use cases", () => {
     await writeFile(configPath, `${JSON.stringify(installed, null, 2)}\n`, "utf8");
     writeOutput.mockClear();
 
-    await useCases.updatePlugin({
+    await useCases.installPlugin({
       root: newRoot,
       configPath,
       id: "imp-voice",
@@ -1719,7 +1719,7 @@ describe("plugin use cases", () => {
     ).rejects.toThrow('Plugin "imp-voice" is not configured.');
   });
 
-  it("rejects duplicate plugin ids during install", async () => {
+  it("updates already configured plugin ids during install", async () => {
     const root = await createPluginRoot();
     const configPath = join(root, "config.json");
     await writeManifest(root, "imp-voice", {
@@ -1733,12 +1733,21 @@ describe("plugin use cases", () => {
       `${JSON.stringify({ ...createConfig(), plugins: [{ id: "imp-voice", enabled: true }] }, null, 2)}\n`,
       "utf8",
     );
-    const useCases = createPluginUseCases();
+    const writeOutput = vi.fn();
+    const useCases = createPluginUseCases({ writeOutput });
 
-    await expect(useCases.installPlugin({ root, configPath, id: "imp-voice" })).rejects.toThrow([
-      'Plugin "imp-voice" is already configured.',
-      "Re-run with --services-only to reinstall plugin services.",
-    ].join("\n"));
+    await useCases.installPlugin({ root, configPath, id: "imp-voice", autoStartServices: false });
+
+    const updated = JSON.parse(await readConfig(configPath)) as AppConfig;
+    expect(updated.plugins?.find((plugin) => plugin.id === "imp-voice")?.package).toEqual({
+      path: join(root, "imp-voice"),
+      source: {
+        version: "0.1.0",
+        manifestHash: expect.stringMatching(/^sha256:/),
+      },
+    });
+    expect(writeOutput).toHaveBeenCalledWith(`Updated plugin "imp-voice" in ${configPath}`);
+    expect(writeOutput).toHaveBeenCalledWith("Version: 0.1.0");
   });
 
   it("rejects duplicate endpoint ids during install", async () => {

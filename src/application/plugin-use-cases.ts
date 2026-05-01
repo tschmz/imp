@@ -46,12 +46,6 @@ export interface InstallPluginOptions extends InspectPluginOptions {
   force?: boolean;
 }
 
-export interface UpdatePluginOptions extends InspectPluginOptions {
-  configPath?: string;
-  autoStartServices?: boolean;
-  force?: boolean;
-}
-
 export interface PluginUseCaseDependencies extends PluginServiceInstallDependencies {
   writeOutput?: (text: string) => void;
   env?: NodeJS.ProcessEnv;
@@ -121,84 +115,53 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
         return;
       }
 
-      const plugin = await resolveInstallablePlugin({
-        options,
-        config,
-        configPath,
-        discovery,
-        packageInstaller,
-        writeOutput,
-      });
-      const updatedConfig = installPluginIntoConfig(config, plugin, configPath);
-      await configInstaller.writeConfig(configPath, updatedConfig);
-      for (const line of renderPluginInstallSummary({
-        pluginId: plugin.manifest.id,
-        configPath,
-        endpointIds: (plugin.manifest.endpoints ?? []).map((endpoint) => endpoint.id),
-        mcpServerIds: (plugin.manifest.mcpServers ?? []).map((server) => server.id),
-      })) {
-        writeOutput(line);
-      }
-      if (shouldInstallPluginServices(plugin, options.autoStartServices)) {
-        await services.installForPlugin({
-          config: updatedConfig,
-          configPath,
-          plugin,
-          force: options.force,
-          writeOutput,
-        });
-      }
-      if (plugin.manifest.init?.postInstallMessage) {
-        writeOutput(plugin.manifest.init.postInstallMessage);
-      }
-    },
-
-    async updatePlugin(options: UpdatePluginOptions): Promise<void> {
-      const { configPath, config } = await configInstaller.readValidatedConfig({
-        configPath: options.configPath,
-      });
       const previousPlugin = await findPreviousPluginForUpdate({
         config,
         configPath,
         updateTarget: options.id,
       });
-      const plugin = await resolveUpdatePlugin({
+      const plugin = previousPlugin
+        ? await resolveUpdatePlugin({
+            options,
+            config,
+            configPath,
+            previousPlugin,
+            discovery,
+            packageInstaller,
+            writeOutput,
+          })
+        : await resolveInstallablePlugin({
+            options,
+            config,
+            configPath,
+            discovery,
+            packageInstaller,
+            writeOutput,
+          });
+
+      if (previousPlugin || findConfiguredPluginConfig(config, plugin.manifest.id)) {
+        await updateConfiguredPlugin({
+          options,
+          config,
+          configPath,
+          plugin,
+          previousPlugin,
+          configInstaller,
+          services,
+          writeOutput,
+        });
+        return;
+      }
+
+      await installNewPlugin({
         options,
         config,
         configPath,
-        previousPlugin,
-        discovery,
-        packageInstaller,
+        plugin,
+        configInstaller,
+        services,
         writeOutput,
       });
-      const currentPlugin = previousPlugin?.plugin.manifest.id === plugin.manifest.id
-        ? previousPlugin.plugin
-        : await tryFindConfiguredPluginManifest({
-            config,
-            configPath,
-            pluginId: plugin.manifest.id,
-          });
-      const result = updatePluginInConfig(config, plugin, configPath, currentPlugin);
-      await configInstaller.writeConfig(configPath, result.config);
-      for (const line of renderPluginUpdateSummary({
-        pluginId: plugin.manifest.id,
-        configPath,
-        changes: result.changes,
-      })) {
-        writeOutput(line);
-      }
-      if (shouldInstallPluginServices(plugin, options.autoStartServices)) {
-        await services.installForPlugin({
-          config: result.config,
-          configPath,
-          plugin,
-          force: options.force,
-          writeOutput,
-        });
-      }
-      if (plugin.manifest.init?.postInstallMessage) {
-        writeOutput(plugin.manifest.init.postInstallMessage);
-      }
     },
 
     async doctorPlugin(options: { configPath?: string; id: string }): Promise<void> {
@@ -252,6 +215,79 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
   };
 }
 
+async function installNewPlugin(options: {
+  options: InstallPluginOptions;
+  config: AppConfig;
+  configPath: string;
+  plugin: DiscoveredPluginManifest;
+  configInstaller: ReturnType<typeof createPluginConfigInstaller>;
+  services: ReturnType<typeof createPluginServiceOrchestrator>;
+  writeOutput: (text: string) => void;
+}): Promise<void> {
+  const updatedConfig = installPluginIntoConfig(options.config, options.plugin, options.configPath);
+  await options.configInstaller.writeConfig(options.configPath, updatedConfig);
+  for (const line of renderPluginInstallSummary({
+    pluginId: options.plugin.manifest.id,
+    configPath: options.configPath,
+    endpointIds: (options.plugin.manifest.endpoints ?? []).map((endpoint) => endpoint.id),
+    mcpServerIds: (options.plugin.manifest.mcpServers ?? []).map((server) => server.id),
+  })) {
+    options.writeOutput(line);
+  }
+  if (shouldInstallPluginServices(options.plugin, options.options.autoStartServices)) {
+    await options.services.installForPlugin({
+      config: updatedConfig,
+      configPath: options.configPath,
+      plugin: options.plugin,
+      force: options.options.force,
+      writeOutput: options.writeOutput,
+    });
+  }
+  if (options.plugin.manifest.init?.postInstallMessage) {
+    options.writeOutput(options.plugin.manifest.init.postInstallMessage);
+  }
+}
+
+async function updateConfiguredPlugin(options: {
+  options: InstallPluginOptions;
+  config: AppConfig;
+  configPath: string;
+  plugin: DiscoveredPluginManifest;
+  previousPlugin?: PreviousPluginMatch;
+  configInstaller: ReturnType<typeof createPluginConfigInstaller>;
+  services: ReturnType<typeof createPluginServiceOrchestrator>;
+  writeOutput: (text: string) => void;
+}): Promise<void> {
+  const currentPlugin = options.previousPlugin?.plugin.manifest.id === options.plugin.manifest.id
+    ? options.previousPlugin.plugin
+    : await tryFindConfiguredPluginManifest({
+        config: options.config,
+        configPath: options.configPath,
+        pluginId: options.plugin.manifest.id,
+      });
+  const result = updatePluginInConfig(options.config, options.plugin, options.configPath, currentPlugin);
+  await options.configInstaller.writeConfig(options.configPath, result.config);
+  for (const line of renderPluginUpdateSummary({
+    pluginId: options.plugin.manifest.id,
+    configPath: options.configPath,
+    changes: result.changes,
+  })) {
+    options.writeOutput(line);
+  }
+  if (shouldInstallPluginServices(options.plugin, options.options.autoStartServices)) {
+    await options.services.installForPlugin({
+      config: result.config,
+      configPath: options.configPath,
+      plugin: options.plugin,
+      force: options.options.force,
+      writeOutput: options.writeOutput,
+    });
+  }
+  if (options.plugin.manifest.init?.postInstallMessage) {
+    options.writeOutput(options.plugin.manifest.init.postInstallMessage);
+  }
+}
+
 async function resolveInstallablePlugin(options: {
   options: InstallPluginOptions;
   config: Parameters<typeof installPluginIntoConfig>[0];
@@ -282,7 +318,7 @@ function shouldInstallPluginServices(plugin: DiscoveredPluginManifest, autoStart
 }
 
 async function resolveUpdatePlugin(options: {
-  options: UpdatePluginOptions;
+  options: InstallPluginOptions;
   config: AppConfig;
   configPath: string;
   previousPlugin?: PreviousPluginMatch;

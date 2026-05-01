@@ -45,6 +45,8 @@ Install into a specific config:
 imp plugin install @tschmz/imp-voice@latest --config /path/to/config.json
 ```
 
+Run `imp plugin install` again to update a configured plugin to the requested plugin ID, package spec, or local plugin manifest.
+
 The install command can update the config with:
 
 - A top-level plugin entry
