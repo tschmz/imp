@@ -167,6 +167,59 @@ describe("createFsConversationStore", () => {
     });
   });
 
+  it("persists and reloads conversation compaction metadata", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const created = await store.create(createChatRef(), {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+    });
+    const next: ConversationContext = {
+      state: {
+        ...created.state,
+        updatedAt: "2026-04-05T00:02:00.000Z",
+        compaction: {
+          summary: "Earlier context summary.",
+          firstKeptMessageId: "msg-2",
+          compactedThroughMessageId: "msg-1",
+          createdAt: "2026-04-05T00:02:00.000Z",
+          messageCountBefore: 2,
+          messageCountSummarized: 1,
+          messageCountKept: 1,
+          sequence: 1,
+          tokensBefore: 100,
+          tokensAfter: 40,
+        },
+      },
+      messages: [
+        {
+          kind: "message",
+          id: "msg-1",
+          role: "user",
+          content: "older",
+          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
+          createdAt: "2026-04-05T00:01:00.000Z",
+        },
+        {
+          kind: "message",
+          id: "msg-2",
+          role: "user",
+          content: "recent",
+          timestamp: Date.parse("2026-04-05T00:02:00.000Z"),
+          createdAt: "2026-04-05T00:02:00.000Z",
+        },
+      ],
+    };
+
+    await store.put(next);
+
+    await expect(store.get(created.state.conversation)).resolves.toMatchObject({
+      state: {
+        compaction: next.state.compaction,
+      },
+    });
+  });
+
   it("writes system prompt snapshots as session artifacts", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));

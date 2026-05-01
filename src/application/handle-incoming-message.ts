@@ -7,6 +7,7 @@ import { inboundCommandHandlers } from "./commands/registry.js";
 import type { HandleIncomingMessageDependencies } from "./commands/types.js";
 import { dispatchCommand } from "./inbound/dispatch-command.js";
 import { executeAgent } from "./inbound/execute-agent.js";
+import { compactConversationIfNeeded } from "./inbound/compact-conversation.js";
 import { persistConversation } from "./inbound/persist-conversation.js";
 import { resolveConversation } from "./inbound/resolve-conversation.js";
 import { resolveSkills } from "./inbound/resolve-skills.js";
@@ -68,6 +69,7 @@ export function createHandleIncomingMessage(
         await dispatchCommand(context);
         await resolveConversation(context);
         await resolveSkills(context);
+        await compactConversationIfNeeded(context);
         await executeAgent(context);
         await persistConversation(context);
         await runHooksSuccess(context);

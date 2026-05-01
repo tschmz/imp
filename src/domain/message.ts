@@ -9,6 +9,7 @@ export type IncomingMessageCommand =
   | "whoami"
   | "rename"
   | "reset"
+  | "compact"
   | "export"
   | "ping"
   | "config"

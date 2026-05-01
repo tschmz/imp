@@ -1,6 +1,7 @@
 import type { AgentOptions } from "@mariozechner/pi-agent-core";
 import type { AgentDefinition } from "../../domain/agent.js";
 import type { Logger } from "../../logging/types.js";
+import { buildCompactedConversationMessages } from "../../domain/conversation-compaction.js";
 import type { AgentHandle } from "../agent-execution.js";
 import { executeAgent } from "../agent-execution.js";
 import type { AgentRunResult } from "../context.js";
@@ -31,8 +32,9 @@ export async function executeAgentStage(
     };
   },
 ): Promise<ExecuteAgentStageContext> {
+  const conversationMessages = buildCompactedConversationMessages(context.conversation);
   const previousResponseState = resolvePreviousResponseState(
-    context.conversation.messages,
+    conversationMessages,
     context.model,
   );
   const result = await executeAgent({

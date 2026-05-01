@@ -108,6 +108,7 @@ export interface ConversationState {
   metadata?: Record<string, unknown>;
   title?: string;
   workingDirectory?: string;
+  compaction?: ConversationCompactionState;
   run?: ConversationRunState;
   createdAt: string;
   updatedAt: string;
@@ -149,4 +150,22 @@ export interface ConversationRunState {
   startedAt?: string;
   updatedAt?: string;
   error?: string;
+}
+
+export interface ConversationCompactionState {
+  summary: string;
+  firstKeptMessageId: string;
+  compactedThroughMessageId: string;
+  createdAt: string;
+  messageCountBefore: number;
+  messageCountSummarized: number;
+  messageCountKept: number;
+  sequence: number;
+  tokensBefore?: number;
+  tokensAfter?: number;
+  model?: {
+    provider: string;
+    model: string;
+    api?: string;
+  };
 }

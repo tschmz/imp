@@ -843,6 +843,7 @@ function toConversationState(meta: StoredConversationMeta): ConversationState {
     ...(meta.metadata ? { metadata: meta.metadata } : {}),
     ...(meta.title ? { title: meta.title } : {}),
     ...(meta.workingDirectory ? { workingDirectory: meta.workingDirectory } : {}),
+    ...(meta.compaction ? { compaction: meta.compaction } : {}),
     ...(meta.run ? { run: meta.run } : {}),
     createdAt: meta.createdAt,
     updatedAt: meta.updatedAt,
