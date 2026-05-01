@@ -48,13 +48,13 @@ If a referenced prompt or auth file is missing, backup creation fails instead of
 Restore everything and overwrite existing files:
 
 ```sh
-imp restore /path/to/imp-backup.tar --force
+imp backup restore /path/to/imp-backup.tar --force
 ```
 
 Restore into a different installation target:
 
 ```sh
-imp restore /path/to/imp-backup.tar \
+imp backup restore /path/to/imp-backup.tar \
   --config /path/to/config.json \
   --data-root /path/to/data-root \
   --force
@@ -63,7 +63,7 @@ imp restore /path/to/imp-backup.tar \
 Restore only selected scopes:
 
 ```sh
-imp restore /path/to/imp-backup.tar --only conversations --force
+imp backup restore /path/to/imp-backup.tar --only conversations --force
 ```
 
 ## Restore Behavior

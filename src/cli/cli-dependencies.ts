@@ -30,7 +30,7 @@ export interface CliDependencies {
   }) => Promise<void>;
   listPlugins: (options: { configPath?: string; root?: string }) => Promise<void>;
   inspectPlugin: (options: { configPath?: string; root?: string; id: string }) => Promise<void>;
-  doctorPlugin: (options: { configPath?: string; id: string }) => Promise<void>;
+  checkPlugin: (options: { configPath?: string; id: string }) => Promise<void>;
   statusPlugin: (options: { configPath?: string; id: string }) => Promise<void>;
   installPlugin: (options: {
     configPath?: string;

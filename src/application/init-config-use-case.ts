@@ -84,7 +84,7 @@ function writeNextStep(
   );
 
   if (hasEnabledDaemonEndpoint) {
-    writeOutput("Start the daemon with: imp start");
+    writeOutput("Start the daemon with: imp daemon run");
     return;
   }
 

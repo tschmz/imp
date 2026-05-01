@@ -5,13 +5,13 @@ import { addConfigOption, withAsyncAction } from "../command-helpers.js";
 export function registerConfigCommands(programOrSubcommand: Command, deps: CliDependencies): void {
   const configCommand = programOrSubcommand
     .command("config")
-    .description("Inspect, reload, and validate config files");
+    .description("Inspect and update config");
 
   addConfigOption(
     configCommand
       .command("get")
-      .description("Read an effective value from a discovered or explicit config file")
-      .argument("<keyPath>", "Dot-separated config key path; use * to select multiple values"),
+      .description("Print a config value")
+      .argument("<key-path>", "Dot-separated config key path; use * to select multiple values"),
   ).action(
     withAsyncAction(async (keyPath: string, options: { config?: string }) => {
       await deps.getConfigValue({
@@ -24,8 +24,8 @@ export function registerConfigCommands(programOrSubcommand: Command, deps: CliDe
   addConfigOption(
     configCommand
       .command("set")
-      .description("Update a value in a discovered or explicit config file")
-      .argument("<keyPath>", "Dot-separated config key path")
+      .description("Update a config value")
+      .argument("<key-path>", "Dot-separated config key path")
       .argument("<value>", "JSON literal/object/array or plain string value"),
   ).action(
     withAsyncAction(async (keyPath: string, value: string, options: { config?: string }) => {
@@ -40,7 +40,7 @@ export function registerConfigCommands(programOrSubcommand: Command, deps: CliDe
   addConfigOption(
     configCommand
       .command("validate")
-      .description("Validate a discovered or explicit config file")
+      .description("Validate config")
       .option("--preflight", "Also resolve runtime agent config, tools, and prompt files"),
   ).action(
     withAsyncAction(async (options: { config?: string; preflight?: boolean }) => {
@@ -48,14 +48,14 @@ export function registerConfigCommands(programOrSubcommand: Command, deps: CliDe
     }),
   );
 
-  configCommand.command("schema").description("Print the Imp config JSON Schema").action(
+  configCommand.command("schema").description("Print the config JSON Schema").action(
     withAsyncAction(async () => {
       await deps.showConfigSchema();
     }),
   );
 
   addConfigOption(
-    configCommand.command("reload").description("Reload a discovered or explicit config in the installed service"),
+    configCommand.command("reload").description("Reload config by restarting the service"),
   ).action(
     withAsyncAction(async (options: { config?: string }) => {
       await deps.reloadConfig({ configPath: options.config });

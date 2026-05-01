@@ -21,7 +21,7 @@ imp config validate --preflight
 Use `--config` when you want to remove ambiguity:
 
 ```sh
-imp start --config /path/to/config.json
+imp daemon run --config /path/to/config.json
 ```
 
 ## Config Validation Fails
@@ -37,7 +37,7 @@ Common causes:
 - A token, prompt, reference, or auth file is missing or unreadable
 - A configured tool name, MCP server, or delegated agent does not exist
 
-If `imp start` reports `Config must enable at least one daemon endpoint.`, enable a non-CLI endpoint such as Telegram, or use `imp chat` for a local terminal chat.
+If `imp daemon run` reports `Config must enable at least one daemon endpoint.`, enable a non-CLI endpoint such as Telegram, or use `imp chat` for a local terminal chat.
 
 ## Telegram Does Not Respond
 

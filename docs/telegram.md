@@ -35,7 +35,7 @@ Use `/whoami` in Telegram once the bot is reachable to confirm chat and user IDs
 Start enabled daemon endpoints:
 
 ```sh
-imp start
+imp daemon run
 ```
 
 Or install and start Imp as a background service:

@@ -64,7 +64,7 @@ Plugin MCP servers are not attached to agents automatically. Enable them per age
 Check a configured plugin installation:
 
 ```sh
-imp plugin doctor imp-voice
+imp plugin check imp-voice
 ```
 
 Print a short status line:

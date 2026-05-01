@@ -3,12 +3,12 @@ import type { CliDependencies } from "../cli-dependencies.js";
 import { addConfigOption, booleanWithDefault, withAsyncAction } from "../command-helpers.js";
 
 export function registerServiceCommands(programOrSubcommand: Command, deps: CliDependencies): void {
-  const serviceCommand = programOrSubcommand.command("service").description("Manage imp background services");
+  const serviceCommand = programOrSubcommand.command("service").description("Manage background services");
 
   addConfigOption(
     serviceCommand
       .command("install")
-      .description("Generate or install a background service definition")
+      .description("Install a background service definition")
       .option("-f, --force", "Overwrite an existing service definition")
       .option("--dry-run", "Print the generated service definition instead of installing it"),
   ).action(
@@ -45,7 +45,7 @@ export function registerServiceCommands(programOrSubcommand: Command, deps: CliD
     }),
   );
 
-  addConfigOption(serviceCommand.command("status").description("Show the native status for an installed background service")).action(
+  addConfigOption(serviceCommand.command("status").description("Show background service status")).action(
     withAsyncAction(async (options: { config?: string }) => {
       await deps.statusService({ configPath: options.config });
     }),

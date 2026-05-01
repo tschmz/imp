@@ -3,7 +3,7 @@ import type { CliDependencies } from "../cli-dependencies.js";
 import { addConfigOption, booleanWithDefault, withAsyncAction } from "../command-helpers.js";
 
 export function registerPluginCommands(programOrSubcommand: Command, deps: CliDependencies): void {
-  const pluginCommand = programOrSubcommand.command("plugin").description("Inspect configured and installable imp plugins");
+  const pluginCommand = programOrSubcommand.command("plugin").description("Manage plugins");
 
   addConfigOption(
     pluginCommand
@@ -20,7 +20,7 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
     pluginCommand
       .command("inspect")
       .description("Show a configured or installable plugin manifest")
-      .argument("<id>", "Plugin ID")
+      .argument("<plugin>", "Plugin ID")
       .option("--root <path>", "Plugin root directory to scan"),
   ).action(
     withAsyncAction(async (id: string, options: { config?: string; root?: string }) => {
@@ -34,12 +34,12 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
 
   addConfigOption(
     pluginCommand
-      .command("doctor")
+      .command("check")
       .description("Check a configured plugin installation")
-      .argument("<id>", "Plugin ID"),
+      .argument("<plugin>", "Plugin ID"),
   ).action(
     withAsyncAction(async (id: string, options: { config?: string }) => {
-      await deps.doctorPlugin({
+      await deps.checkPlugin({
         configPath: options.config,
         id,
       });
@@ -50,7 +50,7 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
     pluginCommand
       .command("status")
       .description("Show configured plugin health")
-      .argument("<id>", "Plugin ID"),
+      .argument("<plugin>", "Plugin ID"),
   ).action(
     withAsyncAction(async (id: string, options: { config?: string }) => {
       await deps.statusPlugin({
@@ -64,7 +64,7 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
     pluginCommand
       .command("install")
       .description("Install a plugin manifest into the config")
-      .argument("<id>", "Plugin ID or npm package spec")
+      .argument("<plugin>", "Plugin ID or npm package spec")
       .option("--root <path>", "Plugin root directory to scan")
       .option("--no-services", "Do not install or start plugin services")
       .option("--services-only", "Reinstall and start services for an already configured plugin")
@@ -91,7 +91,7 @@ export function registerPluginCommands(programOrSubcommand: Command, deps: CliDe
     pluginCommand
       .command("update")
       .description("Update a configured plugin package and config contributions")
-      .argument("<id>", "Plugin ID or npm package spec")
+      .argument("<plugin>", "Plugin ID or npm package spec")
       .option("--root <path>", "Plugin root directory to scan")
       .option("--no-services", "Do not install or start plugin services")
       .option("-f, --force", "Overwrite existing plugin service definitions"),

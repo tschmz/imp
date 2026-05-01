@@ -74,7 +74,7 @@ Send a message. When the agent replies, your local Imp setup is working. Use `/h
 To run enabled daemon endpoints such as Telegram or file-based plugin endpoints, start the daemon:
 
 ```sh
-imp start
+imp daemon run
 ```
 
 ## Core Concepts
@@ -117,18 +117,18 @@ See [`config.example.json`](./config.example.json) for a complete example.
 | ---------------------------------- | --------------------------------------------------- |
 | `imp init`                         | Create an initial config interactively              |
 | `imp chat`                         | Start a local terminal chat                         |
-| `imp start`                        | Start enabled daemon endpoints                      |
-| `imp log`                          | Show daemon logs                                    |
-| `imp config get <path>`            | Read an effective config value                      |
-| `imp config set <path> <value>`    | Update a config value                               |
+| `imp daemon run`                   | Run enabled daemon endpoints                        |
+| `imp logs`                         | Show daemon logs                                    |
+| `imp config get <key-path>`        | Read an effective config value                      |
+| `imp config set <key-path> <value>` | Update a config value                              |
 | `imp config validate [--preflight]` | Validate the active config and optional agent preflight |
 | `imp config reload`                | Reload config by restarting the installed service |
 | `imp backup create`                | Create a backup archive                             |
-| `imp restore <archive>`            | Restore from a backup archive                       |
+| `imp backup restore <archive>`     | Restore from a backup archive                       |
 | `imp plugin list`                  | List installable plugins                            |
-| `imp plugin install <id-or-spec>`  | Install a plugin into the config                    |
+| `imp plugin install <plugin>`      | Install a plugin into the config                    |
 | `imp service install`              | Install a background service definition             |
-| `imp skills sync-managed`          | Refresh managed skills from the installed package   |
+| `imp skill sync`                   | Refresh bundled managed skills                      |
 
 Most commands that operate on an installation accept `--config` to target a specific config file.
 
@@ -165,7 +165,7 @@ Telegram endpoints require a bot token and an allowlist of Telegram user IDs. To
 imp config set endpoints.private-telegram.token '{"env":"IMP_TELEGRAM_BOT_TOKEN"}'
 imp config set endpoints.private-telegram.access.allowedUserIds '["123456789"]'
 imp config validate
-imp start
+imp daemon run
 ```
 
 Read more in [Telegram](./docs/telegram.md).
@@ -176,9 +176,9 @@ Plugins are local companion components. They can contribute installable endpoint
 
 ```sh
 imp plugin list
-imp plugin inspect <plugin-id>
-imp plugin install <plugin-id-or-npm-spec>
-imp plugin doctor <plugin-id>
+imp plugin inspect <plugin>
+imp plugin install <plugin>
+imp plugin check <plugin>
 ```
 
 Read more in [Plugins](./docs/plugins.md) and [plugins/README.md](./plugins/README.md).

@@ -40,10 +40,9 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli([], env);
 
     expect(stdout).toContain("Usage: imp");
-    expect(stdout).toContain("start");
+    expect(stdout).toContain("daemon");
     expect(stdout).toContain("init");
     expect(stdout).toContain("backup");
-    expect(stdout).toContain("restore");
     expect(stdout).toContain("plugin");
     expect(stdout).toContain("service");
   }, cliE2eTimeoutMs);
@@ -57,7 +56,7 @@ describe("imp CLI e2e", () => {
     expect(stdout.trim()).toBe(packageJson.version);
   }, cliE2eTimeoutMs);
 
-  it("refreshes a managed skill through `imp skills sync-managed`", async () => {
+  it("refreshes a managed skill through `imp skill sync`", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
@@ -67,7 +66,7 @@ describe("imp CLI e2e", () => {
     await writeDefaultConfig(root);
     await writeTextFile(skillPath, "stale skill\n");
 
-    const { stdout } = await runCli(["skills", "sync-managed", "--config", configPath], env);
+    const { stdout } = await runCli(["skill", "sync", "--config", configPath], env);
 
     expect(stdout).toContain(`Updated managed skill at ${skillPath}`);
     await expect(readFile(skillPath, "utf8")).resolves.not.toBe("stale skill\n");
@@ -176,7 +175,7 @@ describe("imp CLI e2e", () => {
     await writeTextFile(agentHomeSkillPath, "# Changed home skill\n");
     await writeTextFile(conversationPath, '{"messages":[]}\n');
 
-    const restoreResult = await runCli(["restore", backupPath, "--config", configPath, "--force"], env);
+    const restoreResult = await runCli(["backup", "restore", backupPath, "--config", configPath, "--force"], env);
 
     expect(restoreResult.stdout).toContain(`Restored backup from ${backupPath}`);
     expect(await readFile(configPath, "utf8")).toContain('"token": "test-token"');
@@ -311,7 +310,7 @@ describe("imp CLI e2e", () => {
       ],
     });
 
-    await expect(runCli(["start", "--config", configPath], env)).rejects.toSatisfy((error: { stderr?: string }) => {
+    await expect(runCli(["daemon", "run", "--config", configPath], env)).rejects.toSatisfy((error: { stderr?: string }) => {
       const stderr = error.stderr ?? "";
       return (
         stderr.includes('Invalid Telegram endpoint token for endpoint "private-telegram"') ||
@@ -383,7 +382,7 @@ describe("imp CLI e2e", () => {
     });
     await writeLogFile(logFilePath, ["one", "two", "three"]);
 
-    const { stdout } = await runCli(["log", "--config", configPath, "--lines", "2"], env);
+    const { stdout } = await runCli(["logs", "--config", configPath, "--lines", "2"], env);
 
     expect(stdout).toBe("two\nthree\n");
   }, cliE2eTimeoutMs);

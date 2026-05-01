@@ -3,13 +3,13 @@ import type { CliDependencies } from "../cli-dependencies.js";
 import { addConfigOption, booleanWithDefault, withAsyncAction } from "../command-helpers.js";
 
 export function registerBackupCommands(programOrSubcommand: Command, deps: CliDependencies): void {
-  const backupCommand = programOrSubcommand.command("backup").description("Create and inspect imp backup archives");
+  const backupCommand = programOrSubcommand.command("backup").description("Create, inspect, and restore backups");
 
   addConfigOption(
     backupCommand
       .command("create")
-      .description("Create a backup archive from config, agent data, and conversation data")
-      .option("-o, --output <path>", "Path to the backup archive")
+      .description("Create a backup archive")
+      .option("-o, --output <archive>", "Path to the backup archive")
       .option("--only <scopes>", "Comma-separated scopes: config,agents,conversations")
       .option("-f, --force", "Overwrite an existing backup archive"),
   ).action(
@@ -25,8 +25,8 @@ export function registerBackupCommands(programOrSubcommand: Command, deps: CliDe
 
   backupCommand
     .command("inspect")
-    .description("Inspect an imp backup archive")
-    .argument("<inputPath>", "Path to the backup archive")
+    .description("Inspect a backup archive")
+    .argument("<archive>", "Path to the backup archive")
     .action(
       withAsyncAction(async (inputPath: string) => {
         await deps.inspectBackup({
@@ -36,10 +36,10 @@ export function registerBackupCommands(programOrSubcommand: Command, deps: CliDe
     );
 
   addConfigOption(
-    programOrSubcommand
+    backupCommand
       .command("restore")
-      .description("Restore config, agent data, and conversations from a backup archive")
-      .argument("<inputPath>", "Path to the backup archive")
+      .description("Restore from a backup archive")
+      .argument("<archive>", "Path to the backup archive")
       .option("--data-root <path>", "Override paths.dataRoot when restoring conversations or config")
       .option(
         "--only <scopes>",

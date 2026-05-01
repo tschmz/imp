@@ -55,7 +55,7 @@ async function main(): Promise<void> {
     restoreBackup: backupUseCases.restoreBackup,
     listPlugins: pluginUseCases.listPlugins,
     inspectPlugin: pluginUseCases.inspectPlugin,
-    doctorPlugin: pluginUseCases.doctorPlugin,
+    checkPlugin: pluginUseCases.doctorPlugin,
     statusPlugin: pluginUseCases.statusPlugin,
     installPlugin: pluginUseCases.installPlugin,
     updatePlugin: pluginUseCases.updatePlugin,

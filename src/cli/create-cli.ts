@@ -15,11 +15,13 @@ export function createCli(dependencies: CliDependencies): Command {
 
   program
     .name("imp")
-    .description("Run and manage imp agent daemons")
+    .description("Run and manage Imp agent daemons")
     .showHelpAfterError()
     .version(getCliVersion());
 
-  addConfigOption(program.command("start").description("Start the imp daemon")).action(
+  const daemonCommand = program.command("daemon").description("Run daemon endpoints");
+
+  addConfigOption(daemonCommand.command("run").description("Run enabled daemon endpoints")).action(
     withAsyncAction(async (options: { config?: string }) => {
       await dependencies.startDaemon({ configPath: options.config });
     }),
@@ -28,8 +30,8 @@ export function createCli(dependencies: CliDependencies): Command {
   addConfigOption(
     program
       .command("chat")
-      .description("Start an interactive CLI chat endpoint")
-      .option("-b, --endpoint <id>", "CLI endpoint ID to use"),
+      .description("Start a local terminal chat")
+      .option("-e, --endpoint <endpoint-id>", "Endpoint ID to use"),
   ).action(
     withAsyncAction(async (options: { config?: string; endpoint?: string }) => {
       await dependencies.startChat({
@@ -41,9 +43,9 @@ export function createCli(dependencies: CliDependencies): Command {
 
   addConfigOption(
     program
-      .command("log")
-      .description("Show daemon log output")
-      .option("-b, --endpoint <id>", "Show logs for a specific endpoint ID")
+      .command("logs")
+      .description("Show daemon logs")
+      .option("-e, --endpoint <endpoint-id>", "Show logs for one endpoint")
       .option("-f, --follow", "Follow appended log lines")
       .option("-n, --lines <count>", "Number of recent lines to show", parsePositiveIntegerOption, 50),
   ).action(
@@ -60,7 +62,7 @@ export function createCli(dependencies: CliDependencies): Command {
   addConfigOption(
     program
       .command("init")
-      .description("Create an initial config file")
+      .description("Create an initial config")
       .option("-f, --force", "Overwrite an existing config file"),
   ).action(
     withAsyncAction(async (options: { config?: string; force?: boolean }) => {

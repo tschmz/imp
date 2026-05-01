@@ -11,7 +11,7 @@ Quick repo map for getting into the code. Prefer `src/` over generated `dist/`.
 - `package.json`: npm scripts and CLI bin (`imp -> ./dist/main.js`)
 - `src/main.ts`: executable entry point; wires CLI commands to application use cases
 - `src/cli/create-cli.ts`: top-level CLI definition
-- `src/cli/commands/*.ts`: command group registration for `config`, `skills`, `backup`, `plugin`, and `service`
+- `src/cli/commands/*.ts`: command group registration for `config`, `skill`, `backup`, `plugin`, and `service`
 - `src/application/runtime-target.ts`: config discovery + runtime/service target resolution
 - `src/daemon/create-daemon.ts`: daemon assembly and runtime validation
 - `src/daemon/bootstrap/*`: runtime bootstrap steps
