@@ -76,6 +76,48 @@ describe("createOAuthApiKeyResolver", () => {
     );
   });
 
+  it("retries transient invalid JSON while loading oauth credentials", async () => {
+    const readTextFile = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce("")
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          "openai-codex": {
+            type: "oauth",
+            access: "access-token-1",
+            refresh: "refresh-token-1",
+            expires: 100,
+          },
+        }),
+      );
+    const getOAuthApiKeyFn = vi.fn<
+      (providerId: string, credentials: Record<string, unknown>) => Promise<{
+        apiKey: string;
+        newCredentials: {
+          access: string;
+          refresh: string;
+          expires: number;
+        };
+      }>
+    >(async () => ({
+      apiKey: "access-token",
+      newCredentials: {
+        access: "access-token",
+        refresh: "refresh-token-2",
+        expires: 200,
+      },
+    }));
+    const resolveApiKey = createOAuthApiKeyResolver("/tmp/auth.json", undefined, {
+      readTextFile,
+      writeTextFile: async () => {},
+      getOAuthApiKeyFn,
+    });
+
+    await expect(resolveApiKey("openai-codex")).resolves.toBe("access-token");
+    expect(readTextFile).toHaveBeenCalledTimes(2);
+    expect(getOAuthApiKeyFn).toHaveBeenCalledTimes(1);
+  });
+
   it("logs and returns undefined when oauth refresh fails", async () => {
     const logger = createMockLogger();
     const resolveApiKey = createOAuthApiKeyResolver("/tmp/auth.json", logger, {

@@ -1,12 +1,17 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { getOAuthApiKey, getOAuthProvider } from "@mariozechner/pi-ai/oauth";
+import writeFileAtomic from "write-file-atomic";
 import type { Logger } from "../logging/types.js";
 
 type OAuthCredentialStore = Parameters<typeof getOAuthApiKey>[1];
 type StoredOAuthCredentials = OAuthCredentialStore[string] & {
   type?: "oauth";
 };
+
+const authFileReadRetryCount = 5;
+const authFileReadRetryDelayMs = 25;
 
 interface OAuthApiKeyResolverDependencies {
   readTextFile?: (path: string) => Promise<string>;
@@ -59,18 +64,28 @@ async function loadAuthFile(
   path: string,
   readTextFile: (path: string) => Promise<string>,
 ): Promise<Record<string, StoredOAuthCredentials>> {
-  try {
-    const raw = await readTextFile(path);
-    const parsed = JSON.parse(raw) as unknown;
-    return isRecord(parsed)
-      ? (parsed as OAuthCredentialStore & Record<string, StoredOAuthCredentials>)
-      : {};
-  } catch (error) {
-    if (isMissingFileError(error)) {
-      return {};
+  for (let attempt = 0; attempt <= authFileReadRetryCount; attempt += 1) {
+    try {
+      const raw = await readTextFile(path);
+      const parsed = JSON.parse(raw) as unknown;
+      return isRecord(parsed)
+        ? (parsed as OAuthCredentialStore & Record<string, StoredOAuthCredentials>)
+        : {};
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        return {};
+      }
+
+      if (isJsonParseError(error) && attempt < authFileReadRetryCount) {
+        await sleep(authFileReadRetryDelayMs);
+        continue;
+      }
+
+      throw error;
     }
-    throw error;
   }
+
+  return {};
 }
 
 async function defaultReadTextFile(path: string): Promise<string> {
@@ -79,7 +94,7 @@ async function defaultReadTextFile(path: string): Promise<string> {
 
 async function defaultWriteTextFile(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, content, "utf8");
+  await writeFileAtomic(path, content, { encoding: "utf8" });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -88,4 +103,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function isJsonParseError(error: unknown): error is SyntaxError {
+  return error instanceof SyntaxError;
 }
