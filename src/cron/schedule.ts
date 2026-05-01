@@ -3,6 +3,7 @@ const maxScanMinutes = 60 * 24 * 366;
 
 interface CronField {
   values: Set<number>;
+  wildcard: boolean;
 }
 
 interface ParsedCronExpression {
@@ -56,13 +57,14 @@ export function parseCronExpression(expression: string): ParsedCronExpression {
 
 function parseField(field: string, min: number, max: number, label: string): CronField {
   const values = new Set<number>();
-  for (const part of field.split(",")) {
-    parseFieldPart(part.trim(), min, max, label).forEach((value) => values.add(value));
+  const parts = field.split(",").map((part) => part.trim());
+  for (const part of parts) {
+    parseFieldPart(part, min, max, label).forEach((value) => values.add(value));
   }
   if (values.size === 0) {
     throw new Error(`Cron ${label} field is empty.`);
   }
-  return { values };
+  return { values, wildcard: parts.includes("*") };
 }
 
 function parseFieldPart(part: string, min: number, max: number, label: string): number[] {
@@ -119,11 +121,16 @@ function normalizeDayOfWeek(value: number, label: string): number {
 }
 
 function matchesCronExpression(expression: ParsedCronExpression, parts: ZonedParts): boolean {
+  const dayOfMonthMatches = expression.dayOfMonth.values.has(parts.day);
+  const dayOfWeekMatches = expression.dayOfWeek.values.has(parts.dayOfWeek);
+  const dayMatches = expression.dayOfMonth.wildcard || expression.dayOfWeek.wildcard
+    ? dayOfMonthMatches && dayOfWeekMatches
+    : dayOfMonthMatches || dayOfWeekMatches;
+
   return expression.minute.values.has(parts.minute) &&
     expression.hour.values.has(parts.hour) &&
-    expression.dayOfMonth.values.has(parts.day) &&
     expression.month.values.has(parts.month) &&
-    expression.dayOfWeek.values.has(parts.dayOfWeek);
+    dayMatches;
 }
 
 function getZonedParts(date: Date, timezone: string): ZonedParts {
