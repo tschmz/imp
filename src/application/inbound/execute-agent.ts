@@ -1,5 +1,6 @@
 import type { ConversationEvent } from "../../domain/conversation.js";
 import { getAssistantCommentaryText } from "../../runtime/message-mapping.js";
+import { toUserConversationMessage } from "./incoming-message-event.js";
 import type { InboundProcessingContext } from "./types.js";
 
 export async function executeAgent(context: InboundProcessingContext): Promise<void> {
@@ -168,17 +169,4 @@ async function deliverProgressUpdates(
       text,
     });
   }
-}
-
-function toUserConversationMessage(message: InboundProcessingContext["message"]) {
-  return {
-    kind: "message" as const,
-    id: message.messageId,
-    role: "user" as const,
-    content: message.text,
-    timestamp: Date.parse(message.receivedAt),
-    createdAt: message.receivedAt,
-    correlationId: message.correlationId,
-    ...(message.source ? { source: message.source } : {}),
-  };
 }
