@@ -1,8 +1,7 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { initAppConfig } from "../config/init-app-config.js";
 import { createSyncManagedSkillsUseCase } from "./sync-managed-skills-use-case.js";
 
 const tempDirs: string[] = [];
@@ -17,28 +16,28 @@ afterEach(async () => {
 });
 
 describe("createSyncManagedSkillsUseCase", () => {
-  it("refreshes the installed managed skill from the current package asset", async () => {
+  it("prints the managed skill paths returned by the sync operation", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
     const dataRoot = join(root, "state-home", "imp");
-    const env = {
-      XDG_STATE_HOME: join(root, "state-home"),
-    };
     const writeOutput = vi.fn();
+    const syncManagedSkills = vi.fn(async () => [
+      join(dataRoot, "skills", "alpha-skill", "SKILL.md"),
+      join(dataRoot, "skills", "beta-skill", "SKILL.md"),
+    ]);
+    const skillPath = join(dataRoot, "skills", "alpha-skill", "SKILL.md");
 
-    await initAppConfig({ configPath, env });
-
-    const skillPath = join(dataRoot, "skills", "skill-creator", "SKILL.md");
-    await writeFile(skillPath, "stale skill\n", "utf8");
+    await writeFile(configPath, `${JSON.stringify(createConfig(dataRoot), null, 2)}\n`, "utf8");
 
     const syncManagedSkillsUseCase = createSyncManagedSkillsUseCase({
       writeOutput,
+      syncManagedSkills,
     });
     await syncManagedSkillsUseCase({ configPath });
 
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Skill Creator");
+    expect(syncManagedSkills).toHaveBeenCalledWith({ configPath });
     expect(writeOutput).toHaveBeenCalledWith(
-      `Updated managed skill at ${join(dataRoot, "skills", "plugin-creator", "SKILL.md")}`,
+      `Updated managed skill at ${join(dataRoot, "skills", "beta-skill", "SKILL.md")}`,
     );
     expect(writeOutput).toHaveBeenCalledWith(`Updated managed skill at ${skillPath}`);
   });
@@ -48,4 +47,28 @@ async function createTempDir(): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), "imp-sync-managed-skills-test-"));
   tempDirs.push(path);
   return path;
+}
+
+function createConfig(dataRoot: string) {
+  return {
+    instance: {
+      name: "default",
+    },
+    paths: {
+      dataRoot,
+    },
+    defaults: {
+      agentId: "default",
+    },
+    agents: [
+      {
+        id: "default",
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+      },
+    ],
+    endpoints: [],
+  };
 }

@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, stat } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -23,8 +23,9 @@ describe("initAppConfig", () => {
       XDG_CONFIG_HOME: join(root, "config-home"),
       XDG_STATE_HOME: join(root, "state-home"),
     };
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    const configPath = await initAppConfig({ env });
+    const configPath = await initAppConfig({ env, managedSkillsRoot });
     const raw = await readFile(configPath, "utf8");
     const config = JSON.parse(raw) as {
       paths: { dataRoot: string };
@@ -57,8 +58,8 @@ describe("initAppConfig", () => {
       }>;
       endpoints: unknown[];
     };
-    const skillPath = join(root, "state-home", "imp", "skills", "skill-creator", "SKILL.md");
-    const pluginCreatorSkillPath = join(root, "state-home", "imp", "skills", "plugin-creator", "SKILL.md");
+    const alphaSkillPath = join(root, "state-home", "imp", "skills", "alpha-skill", "SKILL.md");
+    const betaSkillPath = join(root, "state-home", "imp", "skills", "beta-skill", "SKILL.md");
 
     expect(configPath).toBe(join(root, "config-home", "imp", "config.json"));
     expect(config.paths.dataRoot).toBe(join(root, "state-home", "imp"));
@@ -96,13 +97,11 @@ describe("initAppConfig", () => {
     await expect(readFile(join(root, "state-home", "imp", "SYSTEM.md"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("{{agent.home}}/.skills/<skill-name>");
-    await expect(readFile(skillPath, "utf8")).resolves.not.toContain("{{#each imp.skillCatalogs}}");
-    await expect(readFile(skillPath, "utf8")).resolves.not.toContain(join(root, "state-home", "imp", "skills"));
-    await expect(readFile(skillPath, "utf8")).resolves.not.toContain("/home/thomas/.imp");
-    expect((await stat(skillPath)).mode & 0o777).toBe(0o644);
-    await expect(readFile(pluginCreatorSkillPath, "utf8")).resolves.toContain("# Plugin Creator");
-    expect((await stat(pluginCreatorSkillPath)).mode & 0o777).toBe(0o644);
+    await expect(readFile(alphaSkillPath, "utf8")).resolves.toContain("{{agent.home}}/.skills/example");
+    await expect(readFile(alphaSkillPath, "utf8")).resolves.not.toContain(join(root, "state-home", "imp", "skills"));
+    expect((await stat(alphaSkillPath)).mode & 0o777).toBe(0o644);
+    await expect(readFile(betaSkillPath, "utf8")).resolves.toContain("# Beta Skill");
+    expect((await stat(betaSkillPath)).mode & 0o777).toBe(0o644);
   });
 
   it("refuses to overwrite an existing config without force", async () => {
@@ -111,8 +110,9 @@ describe("initAppConfig", () => {
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    await initAppConfig({ configPath, env });
+    await initAppConfig({ configPath, env, managedSkillsRoot });
 
     await expect(assertInitConfigCanBeCreated({ configPath })).rejects.toThrowError(
       `Config file already exists: ${configPath}\nRe-run with --force to overwrite.`,
@@ -125,8 +125,9 @@ describe("initAppConfig", () => {
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    await initAppConfig({ configPath, env });
+    await initAppConfig({ configPath, env, managedSkillsRoot });
 
     await expect(assertInitConfigCanBeCreated({ configPath, force: true })).resolves.toBe(
       configPath,
@@ -139,11 +140,12 @@ describe("initAppConfig", () => {
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    await initAppConfig({ configPath, env });
+    await initAppConfig({ configPath, env, managedSkillsRoot });
     await chmod(configPath, 0o644);
 
-    await initAppConfig({ configPath, force: true, env });
+    await initAppConfig({ configPath, force: true, env, managedSkillsRoot });
 
     const fileMode = (await stat(configPath)).mode & 0o777;
     expect(fileMode).toBe(0o600);
@@ -156,8 +158,9 @@ describe("initAppConfig", () => {
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    await initAppConfig({ configPath, env });
+    await initAppConfig({ configPath, env, managedSkillsRoot });
     const originalContent = await readFile(configPath, "utf8");
 
     await chmod(configPath, 0o644);
@@ -166,6 +169,7 @@ describe("initAppConfig", () => {
       force: true,
       env,
       now: new Date("2026-04-05T18:15:00.000Z"),
+      managedSkillsRoot,
     });
 
     await expect(readFile(backupPath, "utf8")).resolves.toBe(originalContent);
@@ -177,13 +181,14 @@ describe("initAppConfig", () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
     const dataRoot = join(root, "state-home", "imp");
-    const skillPath = join(dataRoot, "skills", "skill-creator", "SKILL.md");
+    const skillPath = join(dataRoot, "skills", "alpha-skill", "SKILL.md");
     const backupPath = `${skillPath}.2026-04-05T18-15-00.000Z.bak`;
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    await initAppConfig({ configPath, env });
+    await initAppConfig({ configPath, env, managedSkillsRoot });
     const originalContent = await readFile(skillPath, "utf8");
 
     await initAppConfig({
@@ -191,6 +196,7 @@ describe("initAppConfig", () => {
       force: true,
       env,
       now: new Date("2026-04-05T18:15:00.000Z"),
+      managedSkillsRoot,
     });
 
     await expect(readFile(backupPath, "utf8")).resolves.toBe(originalContent);
@@ -201,14 +207,17 @@ describe("initAppConfig", () => {
     const root = await createTempDir();
     const configPath = join(root, "config.json");
     const dataRoot = join(root, "state-home", "imp");
-    const pluginCreatorSkillPath = join(dataRoot, "skills", "plugin-creator", "SKILL.md");
+    const alphaSkillPath = join(dataRoot, "skills", "alpha-skill", "SKILL.md");
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    await initAppConfig({ configPath, env });
-    await expect(initAppConfig({ configPath: join(root, "second-config.json"), env })).rejects.toThrowError(
-      `Imp skill already exists: ${pluginCreatorSkillPath}\nRe-run with --force to overwrite.`,
+    await initAppConfig({ configPath, env, managedSkillsRoot });
+    await expect(
+      initAppConfig({ configPath: join(root, "second-config.json"), env, managedSkillsRoot }),
+    ).rejects.toThrowError(
+      `Imp skill already exists: ${alphaSkillPath}\nRe-run with --force to overwrite.`,
     );
     await expect(readFile(join(root, "second-config.json"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
@@ -221,8 +230,9 @@ describe("initAppConfig", () => {
       XDG_CONFIG_HOME: join(root, "config-home"),
       XDG_STATE_HOME: join(root, "state-home"),
     };
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    await initAppConfig({ env });
+    await initAppConfig({ env, managedSkillsRoot });
 
     const promptPath = join(root, "state-home", "imp", "SYSTEM.md");
     await expect(readFile(promptPath, "utf8")).rejects.toMatchObject({
@@ -247,7 +257,9 @@ describe("initAppConfig", () => {
     await expect(readFile(promptPath, "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
-    await initAppConfig({ configPath, config });
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
+
+    await initAppConfig({ configPath, config, managedSkillsRoot });
     await expect(readFile(promptPath, "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
@@ -271,22 +283,23 @@ describe("initAppConfig", () => {
       instructionFiles: [join(root, "workspace", "AGENTS.md")],
       promptBaseFile: join(root, "SYSTEM.md"),
     });
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
 
-    await initAppConfig({ configPath, config });
+    await initAppConfig({ configPath, config, managedSkillsRoot });
 
     const rawConfig = await readFile(configPath, "utf8");
     expect(rawConfig).toContain('"authFile"');
     expect(rawConfig).toContain('"model"');
     await expect(readFile(configPath, "utf8")).resolves.toContain('"prompt"');
     await expect(
-      readFile(join(root, "custom-state", "skills", "skill-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain("{{agent.home}}/.skills/<skill-name>");
+      readFile(join(root, "custom-state", "skills", "alpha-skill", "SKILL.md"), "utf8"),
+    ).resolves.toContain("{{agent.home}}/.skills/example");
     await expect(
-      readFile(join(root, "custom-state", "skills", "skill-creator", "SKILL.md"), "utf8"),
+      readFile(join(root, "custom-state", "skills", "alpha-skill", "SKILL.md"), "utf8"),
     ).resolves.not.toContain(join(root, "workspace", ".agents", "skills"));
     await expect(
-      readFile(join(root, "custom-state", "skills", "plugin-creator", "SKILL.md"), "utf8"),
-    ).resolves.toContain("# Plugin Creator");
+      readFile(join(root, "custom-state", "skills", "beta-skill", "SKILL.md"), "utf8"),
+    ).resolves.toContain("# Beta Skill");
   });
 
   it("syncs the managed imp skill from the installed asset", async () => {
@@ -295,15 +308,16 @@ describe("initAppConfig", () => {
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
-    const skillPath = join(root, "state-home", "imp", "skills", "skill-creator", "SKILL.md");
-    const pluginCreatorSkillPath = join(root, "state-home", "imp", "skills", "plugin-creator", "SKILL.md");
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
+    const skillPath = join(root, "state-home", "imp", "skills", "alpha-skill", "SKILL.md");
+    const betaSkillPath = join(root, "state-home", "imp", "skills", "beta-skill", "SKILL.md");
 
-    await initAppConfig({ configPath, env });
+    await initAppConfig({ configPath, env, managedSkillsRoot });
     await chmod(skillPath, 0o600);
     await import("node:fs/promises").then(({ writeFile }) => writeFile(skillPath, "stale skill\n", "utf8"));
 
-    await expect(syncManagedSkills({ configPath })).resolves.toEqual([pluginCreatorSkillPath, skillPath]);
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Skill Creator");
+    await expect(syncManagedSkills({ configPath, managedSkillsRoot })).resolves.toEqual([skillPath, betaSkillPath]);
+    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Alpha Skill");
     expect((await stat(skillPath)).mode & 0o777).toBe(0o644);
   });
 
@@ -313,15 +327,17 @@ describe("initAppConfig", () => {
     const env = {
       XDG_STATE_HOME: join(root, "state-home"),
     };
-    const skillPath = join(root, "state-home", "imp", "skills", "skill-creator", "SKILL.md");
+    const managedSkillsRoot = await createManagedSkillsFixture(root);
+    const skillPath = join(root, "state-home", "imp", "skills", "alpha-skill", "SKILL.md");
     const backupPath = `${skillPath}.2026-04-05T18-15-00.000Z.bak`;
 
-    await initAppConfig({ configPath, env });
+    await initAppConfig({ configPath, env, managedSkillsRoot });
     await import("node:fs/promises").then(({ writeFile }) => writeFile(skillPath, "stale skill\n", "utf8"));
 
     await syncManagedSkills({
       configPath,
       now: new Date("2026-04-05T18:15:00.000Z"),
+      managedSkillsRoot,
     });
 
     await expect(readFile(backupPath, "utf8")).resolves.toBe("stale skill\n");
@@ -333,4 +349,44 @@ async function createTempDir(): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), "imp-init-test-"));
   tempDirs.push(path);
   return path;
+}
+
+async function createManagedSkillsFixture(root: string): Promise<string> {
+  const managedSkillsRoot = join(root, "managed-skills-assets");
+  await writeSkillFixture(
+    managedSkillsRoot,
+    "alpha-skill",
+    [
+      "---",
+      "name: alpha-skill",
+      "description: Alpha fixture skill.",
+      "---",
+      "",
+      "# Alpha Skill",
+      "",
+      "Use {{agent.home}}/.skills/example.",
+      "",
+    ].join("\n"),
+  );
+  await writeSkillFixture(
+    managedSkillsRoot,
+    "beta-skill",
+    [
+      "---",
+      "name: beta-skill",
+      "description: Beta fixture skill.",
+      "---",
+      "",
+      "# Beta Skill",
+      "",
+    ].join("\n"),
+  );
+  await mkdir(join(managedSkillsRoot, "not-a-skill"), { recursive: true });
+  await writeFile(join(managedSkillsRoot, "not-a-skill", "README.md"), "ignored\n", "utf8");
+  return managedSkillsRoot;
+}
+
+async function writeSkillFixture(root: string, name: string, content: string): Promise<void> {
+  await mkdir(join(root, name), { recursive: true });
+  await writeFile(join(root, name, "SKILL.md"), content, "utf8");
 }

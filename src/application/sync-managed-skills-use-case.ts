@@ -1,8 +1,11 @@
 import { discoverConfigPath } from "../config/discover-config-path.js";
-import { syncManagedSkills } from "../config/init-app-config.js";
+import { syncManagedSkills as syncManagedSkillsFromConfig } from "../config/init-app-config.js";
+
+type SyncManagedSkills = (options: { configPath: string }) => Promise<string[]>;
 
 interface SyncManagedSkillsUseCaseDependencies {
   writeOutput: (line: string) => void;
+  syncManagedSkills: SyncManagedSkills;
 }
 
 export function createSyncManagedSkillsUseCase(
@@ -10,6 +13,7 @@ export function createSyncManagedSkillsUseCase(
 ): (options: { configPath?: string }) => Promise<void> {
   const deps: SyncManagedSkillsUseCaseDependencies = {
     writeOutput: console.log,
+    syncManagedSkills: syncManagedSkillsFromConfig,
     ...dependencies,
   };
 
@@ -17,7 +21,7 @@ export function createSyncManagedSkillsUseCase(
     const { configPath: resolvedConfigPath } = await discoverConfigPath({
       cliConfigPath: configPath,
     });
-    const updatedPaths = await syncManagedSkills({
+    const updatedPaths = await deps.syncManagedSkills({
       configPath: resolvedConfigPath,
     });
 

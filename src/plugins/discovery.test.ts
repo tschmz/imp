@@ -46,15 +46,35 @@ describe("discoverPluginManifests", () => {
   });
 
 
-  it("discovers bundled plugin manifests", async () => {
-    const result = await discoverPluginManifests([join(process.cwd(), "plugins")]);
+  it("prefers user plugin manifests over packaged plugin manifests", async () => {
+    const root = await createTempRoot();
+    await mkdir(join(root, "local-tools"), { recursive: true });
+    await writeFile(
+      join(root, "local-tools", "plugin.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        id: "packaged-tools",
+        name: "Packaged Tools",
+        version: "0.1.0",
+      }),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "local-tools", "imp-plugin.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        id: "local-tools",
+        name: "Local Tools",
+        version: "0.1.0",
+      }),
+      "utf8",
+    );
+
+    const result = await discoverPluginManifests([root]);
 
     expect(result.issues).toEqual([]);
-    expect(result.plugins.map((plugin) => plugin.manifest.id)).toContain("imp-agents");
-    expect(result.plugins.find((plugin) => plugin.manifest.id === "imp-agents")?.manifest).toMatchObject({
-      runtime: { module: "./plugin.mjs" },
-      agents: [expect.objectContaining({ id: "cody" })],
-    });
+    expect(result.plugins.map((plugin) => plugin.manifest.id)).toEqual(["local-tools"]);
+    expect(result.plugins[0]?.manifestPath).toBe(join(root, "local-tools", "imp-plugin.json"));
   });
 
   it("reports invalid manifests without failing the full discovery run", async () => {

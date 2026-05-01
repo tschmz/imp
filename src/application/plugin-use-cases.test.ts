@@ -733,11 +733,77 @@ describe("plugin use cases", () => {
     ]);
   });
 
-  it("installs bundled imp-agents and resolves Cody with skills and runtime tools", async () => {
+  it("installs a local plugin and resolves its agent, skills, and runtime tools", async () => {
     const root = await createPluginRoot();
     const configPath = join(root, "config.json");
     const dataRoot = join(root, "state");
+    const pluginId = "agent-tools";
     const writeOutput = vi.fn();
+    await writeManifest(root, pluginId, {
+      schemaVersion: 1,
+      id: pluginId,
+      name: "Agent Tools",
+      version: "0.1.0",
+      runtime: {
+        module: "./plugin.mjs",
+      },
+      agents: [
+        {
+          id: "assistant",
+          name: "Assistant",
+          prompt: {
+            base: {
+              text: "Use local tools.",
+            },
+          },
+          skills: {
+            paths: ["./skills"],
+          },
+          tools: {
+            builtIn: ["read", "load_skill", "snapshot", "applyPatch"],
+          },
+        },
+      ],
+    });
+    await writeFile(
+      join(root, pluginId, "plugin.mjs"),
+      `export function registerPlugin() {
+  return {
+    tools: [
+      {
+        name: "snapshot",
+        description: "Read a workspace snapshot.",
+        async execute() {
+          return { content: [{ type: "text", text: "snapshot" }] };
+        },
+      },
+      {
+        name: "applyPatch",
+        description: "Apply a patch.",
+        async execute() {
+          return { content: [{ type: "text", text: "patched" }] };
+        },
+      },
+    ],
+  };
+}
+`,
+      "utf8",
+    );
+    await mkdir(join(root, pluginId, "skills", "repo-helper"), { recursive: true });
+    await writeFile(
+      join(root, pluginId, "skills", "repo-helper", "SKILL.md"),
+      [
+        "---",
+        "name: repo-helper",
+        "description: Help with repository work.",
+        "---",
+        "",
+        "# Repo Helper",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
     await writeFile(
       configPath,
       `${JSON.stringify({
@@ -760,43 +826,40 @@ describe("plugin use cases", () => {
     const useCases = createPluginUseCases({ writeOutput });
 
     await useCases.installPlugin({
-      root: join(process.cwd(), "plugins"),
+      root,
       configPath,
-      id: "imp-agents",
+      id: pluginId,
       autoStartServices: false,
     });
 
     const updated = JSON.parse(await readConfig(configPath)) as AppConfig;
     const runtimeConfig = await resolveRuntimeConfig(updated, configPath, { includeCliEndpoints: true });
-    const cody = runtimeConfig.agents.find((agent) => agent.id === "imp-agents.cody");
+    const pluginAgent = runtimeConfig.agents.find((agent) => agent.id === `${pluginId}.assistant`);
 
     expect(updated.plugins).toEqual([
       {
-        id: "imp-agents",
+        id: pluginId,
         enabled: true,
         package: {
-          path: join(process.cwd(), "plugins", "imp-agents"),
+          path: join(root, pluginId),
           source: {
-            version: "0.1.3",
+            version: "0.1.0",
             manifestHash: expect.stringMatching(/^sha256:/),
           },
         },
       },
     ]);
-    expect(cody).toMatchObject({
-      id: "imp-agents.cody",
-      name: "Cody",
-      home: join(dataRoot, "agents", "imp-agents.cody"),
-      tools: expect.arrayContaining(["read", "load_skill", "imp-agents__workspaceSnapshot", "imp-agents__apply_patch"]),
+    expect(pluginAgent).toMatchObject({
+      id: `${pluginId}.assistant`,
+      name: "Assistant",
+      home: join(dataRoot, "agents", `${pluginId}.assistant`),
+      tools: expect.arrayContaining(["read", "load_skill", `${pluginId}__snapshot`, `${pluginId}__applyPatch`]),
     });
-    expect(cody?.skillCatalog?.map((skill) => skill.name).sort()).toEqual([
-      "imp-administration",
-      "release-preparation",
-    ]);
+    expect(pluginAgent?.skillCatalog?.map((skill) => skill.name)).toEqual(["repo-helper"]);
     expect((runtimeConfig.pluginTools ?? []).map((tool) => tool.name)).toEqual(
-      expect.arrayContaining(["imp-agents__workspaceSnapshot", "imp-agents__apply_patch"]),
+      expect.arrayContaining([`${pluginId}__snapshot`, `${pluginId}__applyPatch`]),
     );
-    expect(writeOutput).toHaveBeenCalledWith(`Installed plugin "imp-agents" into ${configPath}`);
+    expect(writeOutput).toHaveBeenCalledWith(`Installed plugin "${pluginId}" into ${configPath}`);
   });
 
   it("installs and starts auto-start plugin services", async () => {

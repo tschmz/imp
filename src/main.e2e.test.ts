@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, stat } from "node:fs/promises";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -57,11 +57,12 @@ describe("imp CLI e2e", () => {
     expect(stdout.trim()).toBe(packageJson.version);
   }, cliE2eTimeoutMs);
 
-  it("refreshes the managed imp skill through `imp skills sync-managed`", async () => {
+  it("refreshes a managed skill through `imp skills sync-managed`", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
-    const skillPath = join(root, "state-home", "imp", "skills", "skill-creator", "SKILL.md");
+    const skillName = await findFirstBundledManagedSkillName();
+    const skillPath = join(root, "state-home", "imp", "skills", skillName, "SKILL.md");
 
     await writeDefaultConfig(root);
     await writeTextFile(skillPath, "stale skill\n");
@@ -69,7 +70,7 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["skills", "sync-managed", "--config", configPath], env);
 
     expect(stdout).toContain(`Updated managed skill at ${skillPath}`);
-    await expect(readFile(skillPath, "utf8")).resolves.toContain("# Skill Creator");
+    await expect(readFile(skillPath, "utf8")).resolves.not.toBe("stale skill\n");
   }, cliE2eTimeoutMs);
 
   it("creates and restores a backup with config, agent files, and conversations", async () => {
@@ -506,4 +507,23 @@ async function runCli(
 
 function resolveProjectRoot(): string {
   return dirname(dirname(fileURLToPath(import.meta.url)));
+}
+
+async function findFirstBundledManagedSkillName(): Promise<string> {
+  const skillsRoot = join(projectRoot, "assets", "skills");
+  const entries = await readdir(skillsRoot, { withFileTypes: true });
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    try {
+      await stat(join(skillsRoot, entry.name, "SKILL.md"));
+      return entry.name;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error(`No bundled managed skills found in ${skillsRoot}.`);
 }

@@ -27,11 +27,12 @@ export async function initAppConfig(options: {
   env?: NodeJS.ProcessEnv;
   now?: Date;
   config?: AppConfig;
+  managedSkillsRoot?: string;
 } = {}): Promise<string> {
   const env = options.env ?? process.env;
   const configPath = resolveConfigPath({ configPath: options.configPath, env });
   const config = appConfigSchema.parse(options.config ?? createDefaultAppConfig(env));
-  const managedSkillFiles = await discoverManagedSkillFiles(config, configPath);
+  const managedSkillFiles = await discoverManagedSkillFiles(config, configPath, options.managedSkillsRoot ?? bundledSkillsRoot);
 
   await assertManagedFileCanBeWritten({
     path: configPath,
@@ -68,10 +69,11 @@ export async function initAppConfig(options: {
 export async function syncManagedSkills(options: {
   configPath: string;
   now?: Date;
+  managedSkillsRoot?: string;
 }): Promise<string[]> {
   const configPath = resolve(options.configPath);
   const config = await loadAppConfig(configPath);
-  const managedSkillFiles = await discoverManagedSkillFiles(config, configPath);
+  const managedSkillFiles = await discoverManagedSkillFiles(config, configPath, options.managedSkillsRoot ?? bundledSkillsRoot);
 
   for (const file of managedSkillFiles) {
     await writeManagedSkillFile(file, {
@@ -110,9 +112,13 @@ function resolveManagedSkillsRoot(config: AppConfig, configPath: string): string
   return join(dataRoot, "skills");
 }
 
-async function discoverManagedSkillFiles(config: AppConfig, configPath: string): Promise<ManagedSkillFile[]> {
+async function discoverManagedSkillFiles(
+  config: AppConfig,
+  configPath: string,
+  sourceRoot: string,
+): Promise<ManagedSkillFile[]> {
   const targetRoot = resolveManagedSkillsRoot(config, configPath);
-  const entries = await readdir(bundledSkillsRoot, { withFileTypes: true });
+  const entries = await readdir(sourceRoot, { withFileTypes: true });
   const files: ManagedSkillFile[] = [];
 
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
@@ -120,7 +126,7 @@ async function discoverManagedSkillFiles(config: AppConfig, configPath: string):
       continue;
     }
 
-    const sourceSkillRoot = join(bundledSkillsRoot, entry.name);
+    const sourceSkillRoot = join(sourceRoot, entry.name);
     if (!(await hasSkillManifest(sourceSkillRoot))) {
       continue;
     }
