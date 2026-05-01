@@ -93,9 +93,11 @@ export function buildCompactedConversationMessages(
   const firstKeptIndex = conversation.messages.findIndex(
     (message) => message.id === compaction.firstKeptMessageId,
   );
-  const recentMessages = firstKeptIndex >= 0
-    ? conversation.messages.slice(firstKeptIndex)
-    : [];
+  if (firstKeptIndex < 0) {
+    return conversation.messages;
+  }
+
+  const recentMessages = conversation.messages.slice(firstKeptIndex);
 
   return [
     createCompactionSummaryMessage(conversation),

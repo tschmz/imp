@@ -17,7 +17,11 @@ export const compactCommandHandler: InboundCommandHandler = {
     const agentId =
       await dependencies.conversationStore.getSelectedAgent?.(message.conversation) ??
       dependencies.defaultAgentId;
+    const explicitSession = message.conversation.sessionId
+      ? await dependencies.conversationStore.get(message.conversation)
+      : undefined;
     const conversation =
+      explicitSession ??
       await dependencies.conversationStore.getActiveForAgent?.(agentId) ??
       await dependencies.conversationStore.get(message.conversation);
     if (!conversation) {

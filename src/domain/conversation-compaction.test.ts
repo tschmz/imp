@@ -67,6 +67,25 @@ describe("conversation compaction", () => {
       responseId: "resp-2",
     });
   });
+
+  it("falls back to the full conversation when compaction metadata is stale", () => {
+    const conversation = createConversation({
+      compaction: {
+        summary: "Earlier work.",
+        firstKeptMessageId: "missing-message",
+        compactedThroughMessageId: "a1",
+        createdAt: "2026-04-05T00:02:30.000Z",
+        messageCountBefore: 4,
+        messageCountSummarized: 2,
+        messageCountKept: 2,
+        sequence: 1,
+      },
+    });
+
+    const messages = buildCompactedConversationMessages(conversation);
+
+    expect(messages.map((message) => message.id)).toEqual(["u1", "a1", "u2", "a2"]);
+  });
 });
 
 function createConversation(
