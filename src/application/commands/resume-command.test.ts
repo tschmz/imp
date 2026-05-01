@@ -37,9 +37,10 @@ describe("resumeCommandHandler", () => {
     const response = await resumeCommandHandler.handle(context);
 
     expect(resume).toHaveBeenCalledWith(context.message.conversation, "session-1");
-    expect(response?.text).toContain("Resumed session 1: deploy prep");
+    expect(response?.text).toContain("**Resume**");
+    expect(response?.text).toContain("Session: deploy prep (#1)");
     expect(response?.text).not.toContain("backed up");
-    expect(response?.text).toContain("Agent: ops");
+    expect(response?.text).toContain("Agent: `ops`");
     expect(response?.replay).toEqual([
       { role: "user", text: "old question", createdAt: "2026-04-05T00:00:10.000Z" },
       { role: "assistant", text: "old answer", createdAt: "2026-04-05T00:00:20.000Z" },
@@ -77,7 +78,7 @@ describe("resumeCommandHandler", () => {
 
     const response = await resumeCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Resumed session 1: untitled");
+    expect(response?.text).toContain("Session: untitled (#1)");
   });
 
   it("rejects partially numeric session selections", async () => {
@@ -113,7 +114,7 @@ describe("resumeCommandHandler", () => {
     const response = await resumeCommandHandler.handle(context);
 
     expect(resume).not.toHaveBeenCalled();
-    expect(response?.text).toContain("Usage: /resume <n>");
+    expect(response?.text).toContain("Usage: `/resume <n>`");
   });
 
   it("renders session-based usage when no history is available", async () => {
@@ -125,7 +126,7 @@ describe("resumeCommandHandler", () => {
     const response = await resumeCommandHandler.handle(context);
 
     expect(response?.text).toContain("No previous sessions are available yet.");
-    expect(response?.text).toContain("/new to start another session");
+    expect(response?.text).toContain("Next: `/new [title]`");
   });
 });
 

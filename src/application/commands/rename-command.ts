@@ -17,7 +17,7 @@ export const renameCommandHandler: InboundCommandHandler = {
     if (!title) {
       return {
         conversation: message.conversation,
-        text: "Usage: /rename <title>",
+        text: ["**Rename**", "Usage: `/rename <title>`"].join("\n"),
       };
     }
 
@@ -37,7 +37,7 @@ export const renameCommandHandler: InboundCommandHandler = {
     });
     return {
       conversation: message.conversation,
-      text: `Renamed the active session to "${title}".`,
+      text: ["**Rename**", `Title: ${title}`].join("\n"),
     };
   },
 };

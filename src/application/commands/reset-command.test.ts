@@ -39,7 +39,8 @@ describe("resetCommandHandler", () => {
     const updated = await conversationStore.get(context.message.conversation);
 
     expect(resetCommandHandler.canHandle("reset")).toBe(true);
-    expect(response?.text).toContain("Reset the messages in the current session.");
+    expect(response?.text).toContain("**Reset**");
+    expect(response?.text).toContain("Messages: 0");
     expect(updated?.messages).toEqual([]);
     expect(updated?.state.agentId).toBe("ops");
     expect(updated?.state.title).toBe("Sprint planning");
@@ -60,6 +61,6 @@ describe("resetCommandHandler", () => {
 
     const response = await resetCommandHandler.handle(context);
 
-    expect(response?.text).toBe("There is no active session whose messages can be reset.");
+    expect(response?.text).toBe(["**Reset**", "No active session to reset."].join("\n"));
   });
 });

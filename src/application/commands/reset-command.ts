@@ -20,7 +20,7 @@ export const resetCommandHandler: InboundCommandHandler = {
     if (!existing) {
       return {
         conversation: message.conversation,
-        text: "There is no active session whose messages can be reset.",
+        text: ["**Reset**", "No active session to reset."].join("\n"),
       };
     }
 
@@ -37,7 +37,12 @@ export const resetCommandHandler: InboundCommandHandler = {
     });
     return {
       conversation: message.conversation,
-      text: "Reset the messages in the current session. The current agent and title were preserved.",
+      text: [
+        "**Reset**",
+        "Messages: 0",
+        `Agent: \`${existing.state.agentId}\``,
+        `Title: ${existing.state.title ?? "untitled"}`,
+      ].join("\n"),
     };
   },
 };

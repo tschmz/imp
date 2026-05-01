@@ -53,8 +53,12 @@ function aggregateLlmUsage(conversation: ConversationContext): Pick<Usage, "inpu
   );
 }
 
-function formatCount(value: number | undefined): string {
+export function formatCount(value: number | undefined): string {
   return value === undefined ? "unknown" : new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatCountLabel(value: number, singular: string, plural = `${singular}s`): string {
+  return `${formatCount(value)} ${value === 1 ? singular : plural}`;
 }
 
 function formatContextUsage(contextTokens: number, contextWindow: number | undefined): string {
@@ -93,42 +97,50 @@ function renderMarkdownValue(value: string | number | undefined): string {
   return value === undefined || value === "" ? "not set" : String(value);
 }
 
-function renderInlineCode(value: string | undefined): string {
+export function renderInlineCode(value: string | undefined): string {
   const rendered = renderMarkdownValue(value);
   return rendered === "not set" ? rendered : `\`${rendered}\``;
 }
 
-function renderCsv(values: readonly string[]): string {
-  return values.length > 0 ? values.join(", ") : "none";
-}
-
-function renderCodeCsv(values: readonly string[]): string {
+export function renderCodeCsv(values: readonly string[]): string {
   return values.length > 0 ? values.map((value) => `\`${value}\``).join(", ") : "none";
 }
 
-function renderPromptSource(source: AgentDefinition["prompt"]["base"]): string {
-  return source.file ?? (source.builtIn ? `built-in:${source.builtIn}` : "inline");
+function renderSessionLabel(title: string | undefined): string {
+  const label = title?.trim();
+  return label && label.length > 0 ? label : "untitled";
 }
 
-function renderLastLlmTurn(
+function renderLastLlmTurnSummary(
   conversation: ConversationContext,
+  agent: AgentDefinition | undefined,
   resolveModel: ModelResolver,
-): string[] {
+): {
+  contextUsage: string;
+  lastTurn: string;
+} {
   const lastAssistantMessage = getLastAssistantMessage(conversation);
+  const contextTokens = estimateConversationTokens(buildCompactedConversationMessages(conversation));
+
   if (!lastAssistantMessage) {
-    return ["## Last LLM turn", "No LLM turn recorded yet."];
+    const configuredModel = agent
+      ? resolveModel(agent.model.provider, agent.model.modelId)
+      : undefined;
+    return {
+      contextUsage: `${formatContextUsage(contextTokens, configuredModel?.contextWindow)} estimated`,
+      lastTurn: "none yet",
+    };
   }
 
   const model = resolveModel(lastAssistantMessage.provider, lastAssistantMessage.model);
-  const contextTokens = estimateConversationTokens(buildCompactedConversationMessages(conversation));
-  return [
-    "## Last LLM turn",
-    `- **Model:** \`${lastAssistantMessage.provider}/${lastAssistantMessage.model}\``,
-    `- **Tokens:** ${formatCount(lastAssistantMessage.usage.totalTokens)} total · ${formatCount(lastAssistantMessage.usage.input)} input · ${formatCount(lastAssistantMessage.usage.output)} output`,
-    `- **Cache:** ${formatCount(lastAssistantMessage.usage.cacheRead)} read · ${formatCount(lastAssistantMessage.usage.cacheWrite)} write`,
-    `- **Context:** ${formatContextUsage(contextTokens, model?.contextWindow)} estimated`,
-    `- **Max tokens:** ${formatCount(model?.maxTokens)}`,
-  ];
+  return {
+    contextUsage: `${formatContextUsage(contextTokens, model?.contextWindow)} estimated`,
+    lastTurn: [
+      `\`${lastAssistantMessage.provider}/${lastAssistantMessage.model}\``,
+      `${formatCount(lastAssistantMessage.usage.totalTokens)} tokens`,
+      `max ${formatCount(model?.maxTokens)}`,
+    ].join(" · "),
+  };
 }
 
 export function renderStatusMessage(
@@ -138,32 +150,33 @@ export function renderStatusMessage(
 ): string {
   if (!conversation) {
     return [
-      "# Status",
+      "**Status**",
       "No active session.",
       "",
-      "Use `/new` to start a session or `/history` to inspect previous sessions.",
+      "Next: `/new [title]`, `/history`",
     ].join("\n");
   }
 
   const llmUsage = aggregateLlmUsage(conversation);
+  const llmTurn = renderLastLlmTurnSummary(conversation, agent, resolveModel);
+  const runStatus = conversation.state.run?.status ?? "idle";
 
   return [
-    "# Status",
+    "**Status**",
+    `Session: ${renderSessionLabel(conversation.state.title)}`,
+    `Agent: \`${conversation.state.agentId}\``,
+    `State: ${runStatus}`,
+    `Turns/events: ${formatCount(countUserTurns(conversation))} / ${formatCount(conversation.messages.length)}`,
+    `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
+    `Working dir: ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
+    ...(conversation.state.run?.error ? [`Error: ${conversation.state.run.error}`] : []),
     "",
-    "## Session",
-    `- **Title:** ${renderMarkdownValue(conversation.state.title)}`,
-    `- **Agent:** \`${conversation.state.agentId}\``,
-    `- **Turns:** ${formatCount(countUserTurns(conversation))}`,
-    `- **Events:** ${formatCount(conversation.messages.length)}`,
-    `- **Created:** ${formatTimestamp(conversation.state.createdAt)}`,
-    `- **Updated:** ${formatTimestamp(conversation.state.updatedAt)}`,
-    `- **Working directory:** ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
+    `Context: ${llmTurn.contextUsage}`,
+    `Tokens: ${formatCount(llmUsage.totalTokens)} total · ${formatCount(llmUsage.input)} in · ${formatCount(llmUsage.output)} out`,
+    `Cache: ${formatCount(llmUsage.cacheRead)} read · ${formatCount(llmUsage.cacheWrite)} write`,
+    `Last turn: ${llmTurn.lastTurn}`,
     "",
-    "## Usage",
-    `- **Tokens:** ${formatCount(llmUsage.totalTokens)} total · ${formatCount(llmUsage.input)} input · ${formatCount(llmUsage.output)} output`,
-    `- **Cache:** ${formatCount(llmUsage.cacheRead)} read · ${formatCount(llmUsage.cacheWrite)} write`,
-    "",
-    ...renderLastLlmTurn(conversation, resolveModel),
+    "Next: `/history`, `/agent`, `/export`",
   ].join("\n");
 }
 
@@ -172,22 +185,19 @@ export function renderHistoryMessage(
   backups: ConversationBackupSummary[],
   agent: AgentDefinition | undefined,
 ): string {
-  const lines = ["# History", "", "## Current session"];
+  const lines = ["**History**"];
 
   if (conversation) {
     lines.push(
-      `- **Title:** ${renderMarkdownValue(renderHistoryEntryLabel(conversation.state.title))}`,
-      `- **Agent:** \`${conversation.state.agentId}\``,
-      `- **Turns:** ${formatCount(countUserTurns(conversation))}`,
-      `- **Events:** ${formatCount(conversation.messages.length)}`,
-      `- **Updated:** ${formatTimestamp(conversation.state.updatedAt)}`,
-      `- **Working directory:** ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
+      `Current: ${renderHistoryEntryLabel(conversation.state.title)} · \`${conversation.state.agentId}\` · ${formatCountLabel(countUserTurns(conversation), "turn")} · ${formatCountLabel(conversation.messages.length, "event")}`,
+      `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
+      `Working dir: ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
     );
   } else {
-    lines.push("No active session.");
+    lines.push("Current: none");
   }
 
-  lines.push("", "## Previous sessions");
+  lines.push("", "Previous:");
 
   if (backups.length === 0) {
     lines.push("No previous sessions.");
@@ -196,20 +206,20 @@ export function renderHistoryMessage(
 
   for (const [index, backup] of backups.entries()) {
     lines.push(
-      `${index + 1}. **${renderHistoryEntryLabel(backup.title)}** — \`${backup.agentId}\` — ${formatCount(backup.messageCount)} event${backup.messageCount === 1 ? "" : "s"} — updated ${formatTimestamp(backup.updatedAt)}`,
+      `${index + 1}. ${renderHistoryEntryLabel(backup.title)} · \`${backup.agentId}\` · ${formatCountLabel(backup.messageCount, "event")} · updated ${formatTimestamp(backup.updatedAt)}`,
     );
   }
 
-  lines.push("", "Use `/resume <n>` to switch sessions.");
+  lines.push("", "Next: `/resume <n>`, `/new [title]`");
   return lines.join("\n");
 }
 
 export function renderResumeUsage(backupCount: number): string {
   if (backupCount === 0) {
-    return "No previous sessions are available yet. Use /new to start another session, then /history to inspect earlier ones.";
+    return ["**Resume**", "No previous sessions are available yet.", "", "Next: `/new [title]`"].join("\n");
   }
 
-  return ["Usage: /resume <n>", "Choose a numbered session from /history.", "Example: /resume 1"].join(
+  return ["**Resume**", "Usage: `/resume <n>`", "Choose a numbered session from `/history`.", "Example: `/resume 1`"].join(
     "\n",
   );
 }
@@ -221,32 +231,50 @@ export function renderAgentMessage(
     availableAgentIds: string[];
   },
 ): string {
-  const basePrompt = renderPromptSource(agent.prompt.base);
-  const instructionSources = (agent.prompt.instructions ?? []).map(renderPromptSource);
-  const referenceSources = (agent.prompt.references ?? []).map(renderPromptSource);
+  return [
+    "**Agent**",
+    `Selected: \`${options.currentAgentId}\` (${agent.name})`,
+    `Model: \`${agent.model.provider}/${agent.model.modelId}\``,
+    `Workspace: ${renderInlineCode(agent.workspace?.cwd ?? agent.home)}`,
+    `Tools: ${renderCodeCsv(agent.tools)}`,
+    `Skills: ${renderCodeCsv(agent.skills?.paths ?? [])}`,
+    `Available: ${renderCodeCsv(options.availableAgentIds)}`,
+    "",
+    "Switch: `/agent <id>`",
+  ].join("\n");
+}
+
+export function renderAgentSwitchMessage(agent: AgentDefinition): string {
+  return [
+    "**Agent**",
+    `Switched to \`${agent.id}\` (${agent.name}).`,
+    `Model: \`${agent.model.provider}/${agent.model.modelId}\``,
+    `Workspace: ${renderInlineCode(agent.workspace?.cwd ?? agent.home)}`,
+    "",
+    "Next: `/status`, `/new [title]`",
+  ].join("\n");
+}
+
+export function renderUnknownAgentMessage(
+  requestedAgentId: string,
+  availableAgentIds: string[],
+  options: { configuredButNotLoaded?: boolean } = {},
+): string {
+  if (options.configuredButNotLoaded) {
+    return [
+      "**Agent**",
+      `\`${requestedAgentId}\` is configured but this daemon has not loaded it yet.`,
+      `Available: ${renderCodeCsv(availableAgentIds)}`,
+      "",
+      "Next: `/reload`",
+    ].join("\n");
+  }
 
   return [
-    "# Agent",
+    "**Agent**",
+    `Unknown agent: \`${requestedAgentId}\``,
+    `Available: ${renderCodeCsv(availableAgentIds)}`,
     "",
-    "## Selected",
-    `- **ID:** \`${options.currentAgentId}\``,
-    `- **Name:** ${agent.name}`,
-    `- **Model:** \`${agent.model.provider}/${agent.model.modelId}\``,
-    `- **Home:** ${renderInlineCode(agent.home)}`,
-    `- **Workspace:** ${renderInlineCode(agent.workspace?.cwd)}`,
-    `- **Tools:** ${renderCodeCsv(agent.tools)}`,
-    `- **Skills:** ${renderCsv(agent.skills?.paths ?? [])}`,
-    "",
-    "## Prompt",
-    `- **Base:** ${renderInlineCode(basePrompt)}`,
-    `- **Instructions:** ${renderCsv(instructionSources)}`,
-    `- **References:** ${renderCsv(referenceSources)}`,
-    "",
-    "## Credentials",
-    `- **Auth file:** ${renderInlineCode(agent.model.authFile)}`,
-    `- **API key:** ${agent.model.apiKey ? "configured" : "not set"}`,
-    "",
-    "## Available agents",
-    renderCodeCsv(options.availableAgentIds),
+    "Switch: `/agent <id>`",
   ].join("\n");
 }

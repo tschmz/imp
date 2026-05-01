@@ -1,4 +1,5 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
+import { renderCodeCsv, renderInlineCode } from "./renderers.js";
 
 async function readAppConfigSummary(
   loadAppConfigImpl: InboundCommandContext["loadAppConfig"],
@@ -30,14 +31,15 @@ export const configCommandHandler: InboundCommandHandler = {
     return {
       conversation: message.conversation,
       text: [
-        "Runtime config:",
+        "**Config**",
         ...(appConfigSummary.instanceName ? [`Instance: ${appConfigSummary.instanceName}`] : []),
-        `Config path: ${dependencies.runtimeInfo.configPath}`,
-        `Data root: ${dependencies.runtimeInfo.dataRoot}`,
-        `Logging level: ${dependencies.runtimeInfo.loggingLevel}`,
-        `Endpoint: ${dependencies.runtimeInfo.endpointId}`,
-        `Enabled endpoints: ${dependencies.runtimeInfo.activeEndpointIds.join(", ")}`,
-        `Default agent: ${dependencies.defaultAgentId}`,
+        `Endpoint: \`${dependencies.runtimeInfo.endpointId}\``,
+        `Default agent: \`${dependencies.defaultAgentId}\``,
+        `Logging: \`${dependencies.runtimeInfo.loggingLevel}\``,
+        `Config: ${renderInlineCode(dependencies.runtimeInfo.configPath)}`,
+        `Data: ${renderInlineCode(dependencies.runtimeInfo.dataRoot)}`,
+        `Log file: ${renderInlineCode(dependencies.runtimeInfo.logFilePath)}`,
+        `Enabled endpoints: ${renderCodeCsv(dependencies.runtimeInfo.activeEndpointIds)}`,
       ].join("\n"),
     };
   },

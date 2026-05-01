@@ -2,6 +2,7 @@ import {
   createConversationExport,
   parseConversationExportOptions,
 } from "../export/conversation-export.js";
+import { renderInlineCode } from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const exportCommandHandler: InboundCommandHandler = {
@@ -20,7 +21,7 @@ export const exportCommandHandler: InboundCommandHandler = {
     if (!options) {
       return {
         conversation: message.conversation,
-        text: "Usage: /export [readable|full] [html]",
+        text: ["**Export**", "Usage: `/export [readable|full] [html]`"].join("\n"),
       };
     }
 
@@ -33,7 +34,7 @@ export const exportCommandHandler: InboundCommandHandler = {
     if (!conversation) {
       return {
         conversation: message.conversation,
-        text: "There is no active session to export.",
+        text: ["**Export**", "No active session to export."].join("\n"),
       };
     }
 
@@ -53,10 +54,10 @@ export const exportCommandHandler: InboundCommandHandler = {
     return {
       conversation: message.conversation,
       text: [
-        "Export created.",
-        `Mode: ${result.mode}`,
-        `Format: ${result.format.toUpperCase()}`,
-        `Path: ${result.path}`,
+        "**Export**",
+        `${result.format.toUpperCase()} export created.`,
+        `Mode: \`${result.mode}\``,
+        `Path: ${renderInlineCode(result.path)}`,
         `Link: ${result.fileUrl}`,
       ].join("\n"),
       attachments: [

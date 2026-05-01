@@ -40,8 +40,9 @@ describe("newCommandHandler", () => {
       agentId: context.dependencies.defaultAgentId,
       now: context.message.receivedAt,
     });
-    expect(response?.text).toContain("Started a fresh session.");
-    expect(response?.text).toContain("still available in /history");
+    expect(response?.text).toContain("**New session**");
+    expect(response?.text).toContain("Session: untitled");
+    expect(response?.text).toContain("Previous sessions: `/history`");
   });
 
   it("creates a fresh session with a title when command args are provided", async () => {
@@ -82,6 +83,6 @@ describe("newCommandHandler", () => {
       now: context.message.receivedAt,
       title: "sprint planning",
     });
-    expect(response?.text).toContain('Started a fresh session titled "sprint planning".');
+    expect(response?.text).toContain("Session: sprint planning");
   });
 });

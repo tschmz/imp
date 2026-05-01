@@ -15,12 +15,12 @@ export const whoamiCommandHandler: InboundCommandHandler = {
     return {
       conversation: message.conversation,
       text: [
-        "Identity:",
-        `Endpoint: ${dependencies.runtimeInfo.endpointId}`,
-        `Transport: ${message.conversation.transport}`,
-        `Chat ID: ${message.conversation.externalId}`,
-        `User ID: ${message.userId}`,
-        `Current agent: ${conversation?.state.agentId ?? dependencies.defaultAgentId}`,
+        "**Identity**",
+        `Endpoint: \`${dependencies.runtimeInfo.endpointId}\``,
+        `Transport: \`${message.conversation.transport}\``,
+        `Chat: \`${message.conversation.externalId}\``,
+        `User: \`${message.userId}\``,
+        `Agent: \`${conversation?.state.agentId ?? dependencies.defaultAgentId}\``,
         `Title: ${conversation?.state.title ?? "not set"}`,
       ].join("\n"),
     };

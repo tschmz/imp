@@ -28,9 +28,9 @@ describe("exportCommandHandler", () => {
     const html = await readFile(exportPath, "utf8");
 
     expect(exportCommandHandler.canHandle("export")).toBe(true);
-    expect(response?.text).toContain("Export created.");
-    expect(response?.text).toContain("Mode: readable");
-    expect(response?.text).toContain("Format: HTML");
+    expect(response?.text).toContain("**Export**");
+    expect(response?.text).toContain("HTML export created.");
+    expect(response?.text).toContain("Mode: `readable`");
     expect(response?.text).toContain("Link: file://");
     expect(exportPath).toContain(join(dataRoot, "exports", "default", "session-1"));
     expect(html).toContain("Conversation export");
@@ -60,7 +60,7 @@ describe("exportCommandHandler", () => {
     const response = await exportCommandHandler.handle(context);
     const html = await readFile(extractExportPath(response?.text), "utf8");
 
-    expect(response?.text).toContain("Mode: full");
+    expect(response?.text).toContain("Mode: `full`");
     expect(html).toContain("<dd>full</dd>");
     expect(html).toContain("test/stub");
     expect(html).toContain("&quot;cmd&quot;: &quot;npm test&quot;");
@@ -84,7 +84,7 @@ describe("exportCommandHandler", () => {
 
     const response = await exportCommandHandler.handle(context);
 
-    expect(response?.text).toBe("Usage: /export [readable|full] [html]");
+    expect(response?.text).toBe(["**Export**", "Usage: `/export [readable|full] [html]`"].join("\n"));
   });
 
   it("returns a clear message when there is no active session", async () => {
@@ -95,7 +95,7 @@ describe("exportCommandHandler", () => {
 
     const response = await exportCommandHandler.handle(context);
 
-    expect(response?.text).toBe("There is no active session to export.");
+    expect(response?.text).toBe(["**Export**", "No active session to export."].join("\n"));
   });
 });
 
@@ -198,7 +198,7 @@ function createRuntimeInfo(dataRoot: string) {
 }
 
 function extractExportPath(text: string | undefined): string {
-  const match = text?.match(/^Path: (.+)$/m);
+  const match = text?.match(/^Path: `?(.+?)`?$/m);
   if (!match) {
     throw new Error(`missing export path in response: ${text}`);
   }

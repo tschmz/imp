@@ -1,31 +1,44 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 const helpGroupOrder = ["Sessions", "Context", "Diagnostics"] as const;
+const commonCommandOrder = ["status", "agent", "new", "history", "help"] as const;
 
 export function renderHelpMessage(handlers: ReadonlyArray<InboundCommandHandler>): string {
+  const commandByName = new Map(handlers.map((handler) => [handler.metadata.name, handler]));
+  const commonHandlers = commonCommandOrder
+    .map((command) => commandByName.get(command))
+    .filter((handler): handler is InboundCommandHandler => Boolean(handler));
+  const commonNames = new Set(commonHandlers.map((handler) => handler.metadata.name));
   const groupedCommands = helpGroupOrder
     .map((group) => ({
       group,
-      handlers: handlers.filter((handler) => handler.metadata.helpGroup === group),
+      handlers: handlers.filter((handler) => handler.metadata.helpGroup === group && !commonNames.has(handler.metadata.name)),
     }))
     .filter(({ handlers }) => handlers.length > 0);
 
-  const lines = ["Available commands:", ""];
+  const lines = ["**Commands**"];
 
-  groupedCommands.forEach(({ group, handlers }, groupIndex) => {
-    lines.push(`${group}:`);
-    for (const handler of handlers) {
-      const commandLabel = handler.metadata.usage ?? `/${handler.metadata.name}`;
-      const description = handler.metadata.helpDescription ?? handler.metadata.description;
-      lines.push(`${commandLabel} ${description}.`);
+  if (commonHandlers.length > 0) {
+    lines.push("", "Common:");
+    for (const handler of commonHandlers) {
+      lines.push(renderHelpCommandLine(handler));
     }
+  }
 
-    if (groupIndex < groupedCommands.length - 1) {
-      lines.push("");
+  groupedCommands.forEach(({ group, handlers }) => {
+    lines.push("", `${group}:`);
+    for (const handler of handlers) {
+      lines.push(renderHelpCommandLine(handler));
     }
   });
 
   return lines.join("\n");
+}
+
+function renderHelpCommandLine(handler: InboundCommandHandler): string {
+  const commandLabel = handler.metadata.usage ?? `/${handler.metadata.name}`;
+  const description = handler.metadata.helpDescription ?? handler.metadata.description;
+  return `\`${commandLabel}\` - ${description}.`;
 }
 
 export const helpCommandHandler: InboundCommandHandler = {

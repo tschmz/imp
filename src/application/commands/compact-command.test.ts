@@ -50,7 +50,8 @@ describe("compactCommandHandler", () => {
     const updated = await conversationStore.get(context.message.conversation);
 
     expect(compactCommandHandler.canHandle("compact")).toBe(true);
-    expect(response?.text).toContain("Compacted the current session.");
+    expect(response?.text).toContain("**Compact**");
+    expect(response?.text).toContain("Context compacted:");
     expect(run).toHaveBeenCalledOnce();
     expect(run.mock.calls[0]?.[0].message.text).toContain("focus on release state");
     expect(updated?.messages).toHaveLength(4);
@@ -73,7 +74,7 @@ describe("compactCommandHandler", () => {
 
     const response = await compactCommandHandler.handle(context);
 
-    expect(response?.text).toBe("There is no active session to compact.");
+    expect(response?.text).toBe(["**Compact**", "No active session to compact."].join("\n"));
   });
 
   it("does not store compaction metadata when the summary would increase context", async () => {
@@ -114,7 +115,7 @@ describe("compactCommandHandler", () => {
     const response = await compactCommandHandler.handle(context);
     const updated = await conversationStore.get(context.message.conversation);
 
-    expect(response?.text).toBe("There is not enough previous context to compact yet.");
+    expect(response?.text).toBe(["**Compact**", "Not enough previous context to compact yet."].join("\n"));
     expect(run).toHaveBeenCalledOnce();
     expect(updated?.state.compaction).toBeUndefined();
   });
@@ -178,7 +179,7 @@ describe("compactCommandHandler", () => {
 
     const response = await compactCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Compacted the current session.");
+    expect(response?.text).toContain("Context compacted:");
     expect(run.mock.calls[0]?.[0].message.text).toContain("Target session plan");
     expect(run.mock.calls[0]?.[0].message.text).not.toContain("Active session plan");
     expect(sessions.get("target-session")?.state.compaction).toMatchObject({

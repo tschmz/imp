@@ -35,7 +35,7 @@ export const resumeCommandHandler: InboundCommandHandler = {
     if (!restored) {
       return {
         conversation: message.conversation,
-        text: "That session is no longer available. Run /history and try again.",
+        text: ["**Resume**", "That session is no longer available.", "", "Next: `/history`"].join("\n"),
       };
     }
 
@@ -58,10 +58,12 @@ export const resumeCommandHandler: InboundCommandHandler = {
     return {
       conversation: message.conversation,
       text: [
-        `Resumed session ${backups.indexOf(selectedBackup) + 1}: ${title && title.length > 0 ? title : "untitled"}`,
-        `Agent: ${selectedBackup.agentId}`,
+        "**Resume**",
+        `Session: ${title && title.length > 0 ? title : "untitled"} (#${backups.indexOf(selectedBackup) + 1})`,
+        `Agent: \`${selectedBackup.agentId}\``,
         `Messages: ${selectedBackup.messageCount}`,
         `Updated: ${formatTimestamp(selectedBackup.updatedAt)}`,
+        ...(resumedConversation ? ["Replay follows."] : []),
       ].join("\n"),
       ...(resumedConversation
         ? { replay: toVisibleReplayItems(resumedConversation) }

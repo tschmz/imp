@@ -14,8 +14,8 @@ export const restartCommandHandler: InboundCommandHandler = {
     return {
       conversation: message.conversation,
       text: [
-        "Restart scheduled.",
-        "The daemon will exit after this reply so a supervisor can restart it.",
+        "**Restart**",
+        "Scheduled after this reply.",
         "If imp is not running under a service manager yet, start it again manually.",
       ].join("\n"),
       deliveryAction: "restart",

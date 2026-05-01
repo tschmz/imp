@@ -1,4 +1,5 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
+import { renderInlineCode } from "./renderers.js";
 import { normalizeCommandArgument } from "./utils.js";
 
 export const newCommandHandler: InboundCommandHandler = {
@@ -19,7 +20,7 @@ export const newCommandHandler: InboundCommandHandler = {
       dependencies.defaultAgentId;
     const create = dependencies.conversationStore.createForAgent ?? dependencies.conversationStore.create;
 
-    await create(message.conversation, {
+    const created = await create(message.conversation, {
       agentId,
       now: message.receivedAt,
       ...(title ? { title } : {}),
@@ -36,9 +37,14 @@ export const newCommandHandler: InboundCommandHandler = {
 
     return {
       conversation: message.conversation,
-      text: title
-        ? `Started a fresh session titled "${title}". Your previous session is still available in /history.`
-        : "Started a fresh session. Your previous session is still available in /history.",
+      text: [
+        "**New session**",
+        `Session: ${title ?? "untitled"}`,
+        `Agent: \`${agentId}\``,
+        `ID: ${renderInlineCode(created.state.conversation.sessionId)}`,
+        "",
+        "Previous sessions: `/history`",
+      ].join("\n"),
     };
   },
 };

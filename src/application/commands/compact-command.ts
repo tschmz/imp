@@ -1,5 +1,6 @@
 import { compactConversation } from "../conversation-compaction.js";
 import { defaultResolveModel, resolveConfiguredModel } from "../../runtime/model-resolution.js";
+import { formatCount } from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 
 export const compactCommandHandler: InboundCommandHandler = {
@@ -27,7 +28,7 @@ export const compactCommandHandler: InboundCommandHandler = {
     if (!conversation) {
       return {
         conversation: message.conversation,
-        text: "There is no active session to compact.",
+        text: ["**Compact**", "No active session to compact."].join("\n"),
       };
     }
 
@@ -35,7 +36,10 @@ export const compactCommandHandler: InboundCommandHandler = {
     if (!agent) {
       return {
         conversation: message.conversation,
-        text: `Cannot compact the session because agent "${conversation.state.agentId}" is not available.`,
+        text: [
+          "**Compact**",
+          `Cannot compact because agent \`${conversation.state.agentId}\` is not available.`,
+        ].join("\n"),
       };
     }
 
@@ -58,18 +62,16 @@ export const compactCommandHandler: InboundCommandHandler = {
     if (!result) {
       return {
         conversation: message.conversation,
-        text: "There is not enough previous context to compact yet.",
+        text: ["**Compact**", "Not enough previous context to compact yet."].join("\n"),
       };
     }
 
     return {
       conversation: message.conversation,
       text: [
-        "Compacted the current session.",
-        `Summarized messages: ${result.compaction.messageCountSummarized}`,
-        `Kept recent messages: ${result.compaction.messageCountKept}`,
-        `Estimated tokens before: ${result.compaction.tokensBefore ?? "unknown"}`,
-        `Estimated tokens after: ${result.compaction.tokensAfter ?? "unknown"}`,
+        "**Compact**",
+        `Context compacted: ${formatCount(result.compaction.messageCountSummarized)} summarized, ${formatCount(result.compaction.messageCountKept)} kept`,
+        `Tokens: ${formatCount(result.compaction.tokensBefore)} -> ${formatCount(result.compaction.tokensAfter)}`,
       ].join("\n"),
     };
   },

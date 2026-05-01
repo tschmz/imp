@@ -73,7 +73,7 @@ describe("createHandleIncomingMessage", () => {
 
     const response = await service.handle(createIncomingMessage("1", "/help", "help"));
 
-    expect(response.text).toContain("Available commands:");
+    expect(response.text).toContain("**Commands**");
     expect(engine.run).not.toHaveBeenCalled();
   });
 

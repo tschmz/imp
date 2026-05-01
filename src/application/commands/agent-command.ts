@@ -1,4 +1,8 @@
-import { renderAgentMessage } from "./renderers.js";
+import {
+  renderAgentMessage,
+  renderAgentSwitchMessage,
+  renderUnknownAgentMessage,
+} from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 import { normalizeCommandArgument } from "./utils.js";
 
@@ -44,22 +48,11 @@ export const agentCommandHandler: InboundCommandHandler = {
     const requestedAgent = dependencies.agentRegistry.get(requestedAgentId);
     if (!requestedAgent) {
       const configuredButNotLoaded = availableAgentIds.includes(requestedAgentId);
-      const availableAgents = availableAgentIds.map((agentId) => `\`${agentId}\``).join(", ");
       return {
         conversation: message.conversation,
-        text: configuredButNotLoaded
-          ? [
-              "# Agent",
-              `Agent \`${requestedAgentId}\` is configured but not loaded in this daemon yet.`,
-              "",
-              "Use `/reload` so the daemon restarts with the latest plugin agents.",
-              `Available agents: ${availableAgents}`,
-            ].join("\n")
-          : [
-              "# Agent",
-              `Unknown agent: \`${requestedAgentId}\``,
-              `Available agents: ${availableAgents}`,
-            ].join("\n"),
+        text: renderUnknownAgentMessage(requestedAgentId, availableAgentIds, {
+          configuredButNotLoaded,
+        }),
       };
     }
 
@@ -82,14 +75,7 @@ export const agentCommandHandler: InboundCommandHandler = {
         ...message.conversation,
         agentId: requestedAgent.id,
       },
-      text: [
-        `Switched this chat to agent \`${requestedAgent.id}\`.`,
-        "",
-        renderAgentMessage(requestedAgent, {
-          currentAgentId: requestedAgent.id,
-          availableAgentIds,
-        }),
-      ].join("\n"),
+      text: renderAgentSwitchMessage(requestedAgent),
     };
   },
 };

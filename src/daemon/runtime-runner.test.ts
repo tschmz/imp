@@ -192,7 +192,7 @@ describe("createRuntimeEntries", () => {
         sessionId: "session-1",
         agentId: "default",
       }),
-      text: "Usage: /export [readable|full] [html]",
+      text: ["**Export**", "Usage: `/export [readable|full] [html]`"].join("\n"),
     });
   });
 

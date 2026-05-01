@@ -17,7 +17,7 @@ export const logsCommandHandler: InboundCommandHandler = {
     if (message.commandArgs && requestedLineCount === undefined) {
       return {
         conversation: message.conversation,
-        text: "Usage: /logs [lines]",
+        text: ["**Logs**", "Usage: `/logs [lines]`"].join("\n"),
       };
     }
 
@@ -33,14 +33,22 @@ export const logsCommandHandler: InboundCommandHandler = {
         conversation: message.conversation,
         text:
           lines.length > 0
-            ? [`Recent logs (${lines.length}):`, ...lines].join("\n")
-            : "No log lines are available yet for this endpoint.",
+            ? [
+                "**Logs**",
+                `Endpoint: \`${dependencies.runtimeInfo.endpointId}\``,
+                `Lines: ${lines.length}`,
+                "",
+                "```jsonl",
+                ...lines,
+                "```",
+              ].join("\n")
+            : ["**Logs**", "No log lines are available yet for this endpoint."].join("\n"),
       };
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("Log file not found:")) {
         return {
           conversation: message.conversation,
-          text: "No log file is available yet for this endpoint.",
+          text: ["**Logs**", "No log file is available yet for this endpoint."].join("\n"),
         };
       }
 
