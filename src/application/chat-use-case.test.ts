@@ -394,7 +394,8 @@ function createActiveConversation(): ConversationContext {
 function createRuntimePaths(endpointId: string): DaemonConfig["activeEndpoints"][number]["paths"] {
   return {
     dataRoot: "/var/lib/imp",
-    conversationsDir: `/var/lib/imp/endpoints/${endpointId}/conversations`,
+    sessionsDir: `/var/lib/imp/sessions`,
+    bindingsDir: "/var/lib/imp/bindings",
     logsDir: "/var/lib/imp/logs",
     logFilePath: "/var/lib/imp/logs/endpoints.log",
     runtimeDir: "/var/lib/imp/runtime/endpoints",

@@ -29,7 +29,9 @@ describe("CLI prompt history", () => {
 
     expect(await store.read("default")).toEqual(["first"]);
     expect(await store.read("ops/agent")).toEqual(["second"]);
-    expect(getCliPromptHistoryPath(root, "ops/agent")).toContain(join("history", "cli"));
+    expect(getCliPromptHistoryPath(root, "ops/agent")).toBe(
+      join(root, "sessions", "ops_agent", "prompt-history.json"),
+    );
   });
 
   it("keeps newest prompts first and skips consecutive duplicates", async () => {

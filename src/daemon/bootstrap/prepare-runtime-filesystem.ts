@@ -5,7 +5,8 @@ import type { RuntimePaths } from "../types.js";
 
 export async function prepareRuntimeFilesystem(paths: RuntimePaths): Promise<void> {
   await mkdir(paths.dataRoot, { recursive: true });
-  await mkdir(paths.conversationsDir, { recursive: true });
+  await mkdir(paths.sessionsDir, { recursive: true });
+  await mkdir(paths.bindingsDir, { recursive: true });
   await mkdir(paths.logsDir, { recursive: true });
   await mkdir(paths.runtimeDir, { recursive: true });
   if (paths.file) {

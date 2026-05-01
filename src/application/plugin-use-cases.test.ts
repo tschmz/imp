@@ -258,7 +258,7 @@ describe("plugin use cases", () => {
 
   it("resolves package store roots below the configured data root", () => {
     expect(getPluginPackageStoreRoot({ ...createConfig(), paths: { dataRoot: "state" } }, "/tmp/imp/config.json")).toBe(
-      "/tmp/imp/state/plugins/npm",
+      "/tmp/imp/state/packages/npm",
     );
   });
 
@@ -495,7 +495,7 @@ describe("plugin use cases", () => {
       autoStartServices: false,
     });
 
-    const packageStoreRoot = join(configDir, "state", "plugins", "npm");
+    const packageStoreRoot = join(configDir, "state", "packages", "npm");
     const packageRoot = join(packageStoreRoot, "node_modules", "@tschmz", "imp-voice");
     const updated = JSON.parse(await readConfig(configPath)) as AppConfig;
     expect(packageInstalls).toEqual([
@@ -528,7 +528,7 @@ describe("plugin use cases", () => {
     const root = await createPluginRoot();
     const configDir = join(root, "config");
     const configPath = join(configDir, "config.json");
-    const packageStoreRoot = join(configDir, "state", "plugins", "npm");
+    const packageStoreRoot = join(configDir, "state", "packages", "npm");
     const packageRoot = join(packageStoreRoot, "node_modules", "@tschmz", "imp-agents");
     await mkdir(packageRoot, { recursive: true });
     await writeFile(
@@ -641,7 +641,7 @@ describe("plugin use cases", () => {
     const root = await createPluginRoot();
     const configDir = join(root, "config");
     const configPath = join(configDir, "config.json");
-    const packageStoreRoot = join(configDir, "state", "plugins", "npm");
+    const packageStoreRoot = join(configDir, "state", "packages", "npm");
     const packageRoot = join(packageStoreRoot, "node_modules", "@tschmz", "imp-agents");
     await mkdir(packageRoot, { recursive: true });
     await writeFile(
@@ -960,7 +960,7 @@ describe("plugin use cases", () => {
     );
     await expect(readFile(inEnvironmentPath, "utf8")).resolves.toContain('OPENAI_API_KEY="sk-test"');
     await expect(readFile(inEnvironmentPath, "utf8")).resolves.toContain(
-      `IMP_VOICE_PYTHON="${join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv", "bin", "python")}"`,
+      `IMP_VOICE_PYTHON="${join(dataRoot, "plugin-state", "imp-voice", "python", ".venv", "bin", "python")}"`,
     );
     await expect(readFile(inEnvironmentPath, "utf8")).resolves.toContain(
       `IMP_VOICE_RUNTIME_DIR="${join(dataRoot, "runtime", "plugins", "imp-voice", "endpoints", "audio-ingress")}"`,
@@ -985,10 +985,10 @@ describe("plugin use cases", () => {
     expect(setupCalls).toEqual([
       {
         command: "python3",
-        args: ["-m", "venv", join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv")],
+        args: ["-m", "venv", join(dataRoot, "plugin-state", "imp-voice", "python", ".venv")],
       },
       {
-        command: join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv", "bin", "python"),
+        command: join(dataRoot, "plugin-state", "imp-voice", "python", ".venv", "bin", "python"),
         args: ["-m", "pip", "install", "-r", join(root, "imp-voice", "requirements.txt")],
       },
     ]);
@@ -1061,10 +1061,10 @@ describe("plugin use cases", () => {
     expect(setupCalls).toEqual([
       {
         command: "python3",
-        args: ["-m", "venv", join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv")],
+        args: ["-m", "venv", join(dataRoot, "plugin-state", "imp-voice", "python", ".venv")],
       },
       {
-        command: join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv", "Scripts", "python.exe"),
+        command: join(dataRoot, "plugin-state", "imp-voice", "python", ".venv", "Scripts", "python.exe"),
         args: ["-m", "pip", "install", "-r", join(root, "imp-voice", "requirements.txt")],
       },
     ]);
@@ -1122,10 +1122,10 @@ describe("plugin use cases", () => {
     expect(setupCalls).toEqual([
       {
         command: "python3",
-        args: ["-m", "venv", join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv")],
+        args: ["-m", "venv", join(dataRoot, "plugin-state", "imp-voice", "python", ".venv")],
       },
       {
-        command: join(dataRoot, "plugins", "state", "imp-voice", "python", ".venv", expectedPython),
+        command: join(dataRoot, "plugin-state", "imp-voice", "python", ".venv", expectedPython),
         args: ["-m", "pip", "install", "-r", join(root, "imp-voice", "requirements.txt")],
       },
     ]);

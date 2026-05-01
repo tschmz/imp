@@ -90,10 +90,9 @@ describe("createDaemon", () => {
 
     const persistedEvents = await readFile(
       join(
-        endpointConfig.paths.conversationsDir,
-        "agents",
+        endpointConfig.paths.sessionsDir,
         "default",
-        "sessions",
+        "entries",
         runInputs[1]!.conversation.state.conversation.sessionId!,
         "events.jsonl",
       ),
@@ -780,7 +779,8 @@ async function createTempDir(): Promise<string> {
 function createRuntimePaths(root: string, endpointId = "private-telegram"): RuntimePaths {
   return {
     dataRoot: root,
-    conversationsDir: join(root, "endpoints", endpointId, "conversations"),
+    sessionsDir: join(root, "sessions"),
+    bindingsDir: join(root, "bindings"),
     logsDir: join(root, "logs"),
     logFilePath: join(root, "logs", "endpoints.log"),
     runtimeDir: join(root, "runtime", "endpoints"),

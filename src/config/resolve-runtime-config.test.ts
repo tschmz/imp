@@ -130,7 +130,8 @@ describe("resolveRuntimeConfig", () => {
         defaultAgentId: "ops-agent",
         paths: {
           dataRoot: "/var/lib/imp",
-          conversationsDir: "/var/lib/imp/conversations",
+          sessionsDir: "/var/lib/imp/sessions",
+          bindingsDir: "/var/lib/imp/bindings",
           logsDir: "/var/lib/imp/logs",
           logFilePath: "/var/lib/imp/logs/endpoints.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",
@@ -1051,7 +1052,8 @@ describe("resolveRuntimeConfig", () => {
     expect(result.agents[0]?.home).toBe(join(dataRoot, "agents", "default"));
     expect(result.activeEndpoints[0]?.paths).toMatchObject({
       dataRoot,
-      conversationsDir: join(dataRoot, "conversations"),
+      sessionsDir: join(dataRoot, "sessions"),
+      bindingsDir: join(dataRoot, "bindings"),
       logsDir: join(dataRoot, "logs"),
       runtimeDir: join(dataRoot, "runtime", "endpoints"),
     });
@@ -1383,7 +1385,8 @@ describe("resolveRuntimeConfig", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/var/lib/imp",
-          conversationsDir: "/var/lib/imp/conversations",
+          sessionsDir: "/var/lib/imp/sessions",
+          bindingsDir: "/var/lib/imp/bindings",
           logsDir: "/var/lib/imp/logs",
           logFilePath: "/var/lib/imp/logs/endpoints.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",
@@ -1561,7 +1564,7 @@ describe("resolveRuntimeConfig", () => {
         defaultAgentId: typedContext.defaultAgentId,
         paths: {
           dataRoot: typedContext.dataRoot,
-          conversationsDir: "/var/lib/imp/conversations",
+          sessionsDir: "/var/lib/imp/sessions",
           logsDir: "/var/lib/imp/logs",
           logFilePath: "/var/lib/imp/logs/endpoints.log",
           runtimeDir: "/var/lib/imp/runtime/endpoints",

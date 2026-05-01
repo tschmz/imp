@@ -32,7 +32,7 @@ export interface BackupInspectOptions {
   inputPath: string;
 }
 
-export type BackupScope = "config" | "agents" | "conversations";
+export type BackupScope = "config" | "agents" | "sessions" | "bindings";
 
 interface BackupManifest {
   version: 1;
@@ -47,7 +47,8 @@ interface BackupManifest {
   };
   agentFiles?: BackupAgentFileEntry[];
   agentHomes?: BackupAgentHomeEntry[];
-  conversations?: BackupConversationEntry[];
+  sessions?: BackupDataRootTreeEntry[];
+  bindings?: BackupDataRootTreeEntry[];
 }
 
 interface BackupAgentFileEntry {
@@ -70,7 +71,7 @@ interface BackupAgentHomeEntry {
   agentId: string;
 }
 
-interface BackupConversationEntry {
+interface BackupDataRootTreeEntry {
   archivePath: string;
   endpointId: string;
   relativeToDataRoot: string;
@@ -208,17 +209,33 @@ export function createBackupUseCases(dependencies: Partial<BackupDependencies> =
           });
         }
 
-        if (selection.conversations) {
+        if (selection.sessions || selection.bindings) {
           if (!targetDataRoot) {
             throw new Error(
-              "Conversation restore requires --data-root, a restorable config in the backup, or an existing discovered config path.",
+              "Session or binding restore requires --data-root, a restorable config in the backup, or an existing discovered config path.",
             );
           }
+        }
 
-          await restoreConversationTrees({
+        const resolvedTargetDataRoot = targetDataRoot!;
+        if (selection.sessions) {
+          await restoreDataRootTrees({
             stageRoot,
-            manifest,
-            targetDataRoot,
+            entries: manifest.sessions ?? [],
+            manifestProperty: "sessions",
+            resourceLabel: "Session store",
+            targetDataRoot: resolvedTargetDataRoot,
+            force,
+          });
+        }
+
+        if (selection.bindings) {
+          await restoreDataRootTrees({
+            stageRoot,
+            entries: manifest.bindings ?? [],
+            manifestProperty: "bindings",
+            resourceLabel: "Binding store",
+            targetDataRoot: resolvedTargetDataRoot,
             force,
           });
         }
@@ -294,23 +311,36 @@ async function stageBackup(options: {
     }
   }
 
-  if (selection.conversations) {
-    manifest.conversations = [];
+  if (selection.sessions) {
+    manifest.sessions = await stageDataRootTree(archiveRoot, appConfig.paths.dataRoot, "sessions");
+  }
 
-    const relativeToDataRoot = "conversations";
-    const sourcePath = join(appConfig.paths.dataRoot, relativeToDataRoot);
-    if (await pathExists(sourcePath)) {
-      const archivePath = "conversations";
-      await cp(sourcePath, join(archiveRoot, archivePath), { recursive: true });
-      manifest.conversations.push({
-        archivePath,
-        endpointId: "global",
-        relativeToDataRoot,
-      });
-    }
+  if (selection.bindings) {
+    manifest.bindings = await stageDataRootTree(archiveRoot, appConfig.paths.dataRoot, "bindings");
   }
 
   return manifest;
+}
+
+async function stageDataRootTree(
+  archiveRoot: string,
+  dataRoot: string,
+  relativeToDataRoot: "sessions" | "bindings",
+): Promise<BackupDataRootTreeEntry[]> {
+  const sourcePath = join(dataRoot, relativeToDataRoot);
+  if (!(await pathExists(sourcePath))) {
+    return [];
+  }
+
+  const archivePath = relativeToDataRoot;
+  await cp(sourcePath, join(archiveRoot, archivePath), { recursive: true });
+  return [
+    {
+      archivePath,
+      endpointId: "global",
+      relativeToDataRoot,
+    },
+  ];
 }
 
 function collectAgentFiles(appConfig: AppConfig, configPath: string): Omit<BackupAgentFileEntry, "archivePath">[] {
@@ -507,27 +537,29 @@ async function restoreAgentFiles(options: {
   }
 }
 
-async function restoreConversationTrees(options: {
+async function restoreDataRootTrees(options: {
   stageRoot: string;
-  manifest: BackupManifest;
+  entries: BackupDataRootTreeEntry[];
+  manifestProperty: "sessions" | "bindings";
+  resourceLabel: string;
   targetDataRoot: string;
   force: boolean;
 }): Promise<void> {
-  for (const entry of options.manifest.conversations ?? []) {
+  for (const entry of options.entries) {
     const sourcePath = safeJoin(
       options.stageRoot,
       entry.archivePath,
-      `manifest.conversations[].archivePath (${entry.endpointId})`,
+      `manifest.${options.manifestProperty}[].archivePath (${entry.endpointId})`,
     );
     const targetPath = safeJoin(
       options.targetDataRoot,
       entry.relativeToDataRoot,
-      `manifest.conversations[].relativeToDataRoot (${entry.endpointId})`,
+      `manifest.${options.manifestProperty}[].relativeToDataRoot (${entry.endpointId})`,
     );
 
     await assertDirectoryCanBeRestored({
       path: targetPath,
-      resourceLabel: `Conversation store for endpoint ${entry.endpointId}`,
+      resourceLabel: `${options.resourceLabel} ${entry.endpointId}`,
       force: options.force,
     });
 
@@ -564,7 +596,7 @@ async function resolveTargetConfigPath(options: {
     return resolve(options.cliConfigPath);
   }
 
-  if (!options.selection.config && !options.selection.agents && !options.selection.conversations) {
+  if (!options.selection.config && !options.selection.agents && !options.selection.sessions && !options.selection.bindings) {
     return undefined;
   }
 
@@ -587,7 +619,7 @@ function resolveTargetDataRoot(options: {
   archiveConfig?: AppConfig;
   selection: ScopeSelection;
 }): string | undefined {
-  if (!options.selection.agents && !options.selection.conversations) {
+  if (!options.selection.agents && !options.selection.sessions && !options.selection.bindings) {
     return undefined;
   }
 
@@ -895,9 +927,14 @@ async function readBackupManifest(stageRoot: string): Promise<BackupManifest> {
     }
   }
 
-  for (const [index, entry] of (parsed.conversations ?? []).entries()) {
-    assertSafeManifestRelativePath(entry.archivePath, `manifest.conversations[${index}].archivePath`);
-    assertSafeManifestRelativePath(entry.relativeToDataRoot, `manifest.conversations[${index}].relativeToDataRoot`);
+  for (const [index, entry] of (parsed.sessions ?? []).entries()) {
+    assertSafeManifestRelativePath(entry.archivePath, `manifest.sessions[${index}].archivePath`);
+    assertSafeManifestRelativePath(entry.relativeToDataRoot, `manifest.sessions[${index}].relativeToDataRoot`);
+  }
+
+  for (const [index, entry] of (parsed.bindings ?? []).entries()) {
+    assertSafeManifestRelativePath(entry.archivePath, `manifest.bindings[${index}].archivePath`);
+    assertSafeManifestRelativePath(entry.relativeToDataRoot, `manifest.bindings[${index}].relativeToDataRoot`);
   }
 
   return {
@@ -908,7 +945,8 @@ async function readBackupManifest(stageRoot: string): Promise<BackupManifest> {
     ...(parsed.config ? { config: parsed.config } : {}),
     ...(parsed.agentFiles ? { agentFiles: parsed.agentFiles } : {}),
     ...(parsed.agentHomes ? { agentHomes: parsed.agentHomes } : {}),
-    ...(parsed.conversations ? { conversations: parsed.conversations } : {}),
+    ...(parsed.sessions ? { sessions: parsed.sessions } : {}),
+    ...(parsed.bindings ? { bindings: parsed.bindings } : {}),
   };
 }
 
@@ -952,7 +990,8 @@ function assertSafeManifestRelativePath(path: string, label: string): void {
     label === "manifest.config.archivePath" ||
     label.startsWith("manifest.agentFiles[") ||
     label.startsWith("manifest.agentHomes[") ||
-    label.startsWith("manifest.conversations[");
+    label.startsWith("manifest.sessions[") ||
+    label.startsWith("manifest.bindings[");
   if (expectsFilePath && (portablePath.endsWith("/") || portablePath === ".")) {
     throw new Error(`Invalid backup archive: unsafe manifest path (${label})`);
   }
@@ -1005,7 +1044,8 @@ function parseScopeSelection(only: string | undefined): ScopeSelection {
     return {
       config: true,
       agents: true,
-      conversations: true,
+      sessions: true,
+      bindings: true,
     };
   }
 
@@ -1015,18 +1055,19 @@ function parseScopeSelection(only: string | undefined): ScopeSelection {
     .filter(Boolean);
 
   if (parsed.length === 0) {
-    throw new Error("Expected --only to include at least one scope: config, agents, conversations");
+    throw new Error("Expected --only to include at least one scope: config, agents, sessions, bindings");
   }
 
   const selection: ScopeSelection = {
     config: false,
     agents: false,
-    conversations: false,
+    sessions: false,
+    bindings: false,
   };
 
   for (const scope of parsed) {
-    if (scope !== "config" && scope !== "agents" && scope !== "conversations") {
-      throw new Error(`Unsupported backup scope "${scope}". Expected: config, agents, conversations`);
+    if (scope !== "config" && scope !== "agents" && scope !== "sessions" && scope !== "bindings") {
+      throw new Error(`Unsupported backup scope "${scope}". Expected: config, agents, sessions, bindings`);
     }
 
     selection[scope] = true;
@@ -1036,7 +1077,7 @@ function parseScopeSelection(only: string | undefined): ScopeSelection {
 }
 
 function selectedScopes(selection: ScopeSelection): BackupScope[] {
-  return (["config", "agents", "conversations"] as const).filter((scope) => selection[scope]);
+  return (["config", "agents", "sessions", "bindings"] as const).filter((scope) => selection[scope]);
 }
 
 function selectedManifestScopes(manifest: BackupManifest, selection: ScopeSelection): BackupScope[] {
@@ -1069,9 +1110,16 @@ function renderBackupInspection(inputPath: string, manifest: BackupManifest): st
   }
 
   lines.push("");
-  lines.push(`Conversations: ${manifest.conversations?.length ?? 0}`);
+  lines.push(`Sessions: ${manifest.sessions?.length ?? 0}`);
 
-  for (const entry of manifest.conversations ?? []) {
+  for (const entry of manifest.sessions ?? []) {
+    lines.push(`- ${entry.endpointId}: ${entry.relativeToDataRoot} -> ${entry.archivePath}`);
+  }
+
+  lines.push("");
+  lines.push(`Bindings: ${manifest.bindings?.length ?? 0}`);
+
+  for (const entry of manifest.bindings ?? []) {
     lines.push(`- ${entry.endpointId}: ${entry.relativeToDataRoot} -> ${entry.archivePath}`);
   }
 

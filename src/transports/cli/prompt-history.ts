@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import writeFileAtomic from "write-file-atomic";
@@ -43,7 +42,7 @@ export function createCliPromptHistoryStore(dataRoot: string): CliPromptHistoryS
 }
 
 export function getCliPromptHistoryPath(dataRoot: string, agentId: string): string {
-  return join(dataRoot, "history", "cli", `${encodeHistoryFileSegment(agentId)}.json`);
+  return join(dataRoot, "sessions", sanitizePathSegment(agentId), "prompt-history.json");
 }
 
 export function addCliPromptHistoryEntry(entries: readonly string[], text: string): string[] {
@@ -97,6 +96,7 @@ async function writeCliPromptHistory(
   await writeFileAtomic(path, `${JSON.stringify(history, null, 2)}\n`);
 }
 
-function encodeHistoryFileSegment(value: string): string {
-  return Buffer.from(value, "utf8").toString("base64url");
+function sanitizePathSegment(value: string): string {
+  const sanitized = value.replaceAll(/[\\/]/g, "_");
+  return sanitized.length === 0 || sanitized === "." || sanitized === ".." ? "_" : sanitized;
 }

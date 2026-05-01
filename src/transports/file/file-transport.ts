@@ -243,6 +243,7 @@ function createPluginInboundEvent(
   const message: IncomingMessage = {
     endpointId: config.id,
     conversation: {
+      endpointId: config.id,
       transport: "file",
       externalId: conversationId,
       ...(event.session ? { sessionId: event.session.id } : {}),
@@ -312,6 +313,7 @@ async function deliverPluginResponse(
         target: config.response.target,
         message: {
           conversation: {
+            endpointId: config.response.endpointId,
             transport: responseTransport,
             externalId: config.response.target.conversationId,
           },

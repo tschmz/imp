@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 describe("createFsConversationStore", () => {
-  it("returns undefined for missing active conversations", async () => {
+  it("returns undefined for missing active sessions", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
 
@@ -29,14 +29,7 @@ describe("createFsConversationStore", () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const selectedAgentPath = join(
-      root,
-      "conversations",
-      "chats",
-      "telegram",
-      "42",
-      "selected-agent.json",
-    );
+    const selectedAgentPath = getSelectedAgentPath(root);
     await mkdir(dirname(selectedAgentPath), { recursive: true });
     await writeFile(selectedAgentPath, "{not-json", "utf8");
 
@@ -52,15 +45,8 @@ describe("createFsConversationStore", () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const selectedAgentPath = join(
-      root,
-      "conversations",
-      "chats",
-      "telegram",
-      "42",
-      "selected-agent.json",
-    );
-    const activePath = join(root, "conversations", "agents", "default", "active.json");
+    const selectedAgentPath = getSelectedAgentPath(root);
+    const activePath = join(root, "sessions", "default", "active.json");
     await mkdir(dirname(selectedAgentPath), { recursive: true });
     await mkdir(dirname(activePath), { recursive: true });
     await writeFile(selectedAgentPath, `${JSON.stringify({ agentId: "default" })}\n`, "utf8");
@@ -78,16 +64,9 @@ describe("createFsConversationStore", () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const selectedAgentPath = join(
-      root,
-      "conversations",
-      "chats",
-      "telegram",
-      "42",
-      "selected-agent.json",
-    );
-    const activePath = join(root, "conversations", "agents", "default", "active.json");
-    const sessionDir = join(root, "conversations", "agents", "default", "sessions", "session-1");
+    const selectedAgentPath = getSelectedAgentPath(root);
+    const activePath = join(root, "sessions", "default", "active.json");
+    const sessionDir = join(root, "sessions", "default", "entries", "session-1");
     const metaPath = join(sessionDir, "meta.json");
     await mkdir(dirname(selectedAgentPath), { recursive: true });
     await mkdir(sessionDir, { recursive: true });
@@ -106,14 +85,7 @@ describe("createFsConversationStore", () => {
   it("keeps throwing non-ENOENT I/O errors for selected-agent reads", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
-    const selectedAgentPath = join(
-      root,
-      "conversations",
-      "chats",
-      "telegram",
-      "42",
-      "selected-agent.json",
-    );
+    const selectedAgentPath = getSelectedAgentPath(root);
     await mkdir(selectedAgentPath, { recursive: true });
 
     await expect(store.get(createChatRef())).rejects.toMatchObject({ code: "EISDIR" });
@@ -250,10 +222,9 @@ describe("createFsConversationStore", () => {
 
     const promptDir = join(
       root,
-      "conversations",
-      "agents",
-      "default",
       "sessions",
+      "default",
+      "entries",
       created.state.conversation.sessionId!,
       "system-prompts",
     );
@@ -320,10 +291,9 @@ describe("createFsConversationStore", () => {
     });
     const savedPath = join(
       root,
-      "conversations",
-      "agents",
-      "default",
       "sessions",
+      "default",
+      "entries",
       created.state.conversation.sessionId!,
       "attachments",
       "msg-1-report.txt",
@@ -379,10 +349,9 @@ describe("createFsConversationStore", () => {
     const raw = await readFile(
       join(
         root,
-        "conversations",
-        "agents",
-        "default",
         "sessions",
+        "default",
+        "entries",
         created.state.conversation.sessionId!,
         "events.jsonl",
       ),
@@ -401,10 +370,9 @@ describe("createFsConversationStore", () => {
     });
     const savedPath = join(
       root,
-      "conversations",
-      "agents",
-      "default",
       "sessions",
+      "default",
+      "entries",
       created.state.conversation.sessionId!,
       "attachments",
       "msg-1-image.png",
@@ -466,10 +434,9 @@ describe("createFsConversationStore", () => {
     const raw = await readFile(
       join(
         root,
-        "conversations",
-        "agents",
-        "default",
         "sessions",
+        "default",
+        "entries",
         created.state.conversation.sessionId!,
         "events.jsonl",
       ),
@@ -488,10 +455,9 @@ describe("createFsConversationStore", () => {
     });
     const sourceSavedPath = join(
       sourceRoot,
-      "conversations",
-      "agents",
-      "default",
       "sessions",
+      "default",
+      "entries",
       created.state.conversation.sessionId!,
       "attachments",
       "msg-1-report.txt",
@@ -526,17 +492,16 @@ describe("createFsConversationStore", () => {
     });
 
     const targetRoot = await createTempDir();
-    await cp(join(sourceRoot, "conversations"), join(targetRoot, "conversations"), {
+    await cp(join(sourceRoot, "sessions"), join(targetRoot, "sessions"), {
       recursive: true,
     });
     const targetStore = createFsConversationStore(createRuntimePaths(targetRoot));
     const targetConversation = await targetStore.get(created.state.conversation);
     const targetSavedPath = join(
       targetRoot,
-      "conversations",
-      "agents",
-      "default",
       "sessions",
+      "default",
+      "entries",
       created.state.conversation.sessionId!,
       "attachments",
       "msg-1-report.txt",
@@ -670,10 +635,9 @@ describe("createFsConversationStore", () => {
     const written = await readFile(
       join(
         root,
-        "conversations",
-        "agents",
-        "default",
         "sessions",
+        "default",
+        "entries",
         created.state.conversation.sessionId!,
         "meta.json",
       ),
@@ -707,7 +671,7 @@ describe("createFsConversationStore", () => {
     await store.put(context);
 
     await expect(
-      readFile(join(root, "conversations", "agents", "default", "sessions", "_", "meta.json"), "utf8"),
+      readFile(join(root, "sessions", "default", "entries", "_", "meta.json"), "utf8"),
     ).resolves.toContain('"sessionId": ".."');
   });
 
@@ -935,7 +899,7 @@ describe("createFsConversationStore", () => {
     await expect(store.markInterruptedRuns!("2026-04-05T00:03:00.000Z")).resolves.toBe(0);
   });
 
-  it("shares one active session per agent across chats", async () => {
+  it("shares one active session per agent across bindings", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));
     const telegramChat = createChatRef();
@@ -1079,9 +1043,14 @@ describe("createFsConversationStore", () => {
 
 function createChatRef(): ChatRef {
   return {
+    endpointId: "private-telegram",
     transport: "telegram",
     externalId: "42",
   };
+}
+
+function getSelectedAgentPath(root: string): string {
+  return join(root, "bindings", "private-telegram", "telegram", "42", "selected-agent.json");
 }
 
 async function createTempDir(): Promise<string> {
@@ -1093,7 +1062,8 @@ async function createTempDir(): Promise<string> {
 function createRuntimePaths(root: string): RuntimePaths {
   return {
     dataRoot: root,
-    conversationsDir: join(root, "conversations"),
+    sessionsDir: join(root, "sessions"),
+    bindingsDir: join(root, "bindings"),
     logsDir: join(root, "logs"),
     logFilePath: join(root, "logs", "daemon.log"),
     runtimeDir: join(root, "runtime"),

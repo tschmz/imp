@@ -80,6 +80,7 @@ describe("createTelegramTransport", () => {
 
     expect(capturedEvent?.message).toEqual({
       conversation: {
+        endpointId: "private-telegram",
         transport: "telegram",
         externalId: "42",
       },
@@ -974,7 +975,8 @@ describe("createTelegramTransport", () => {
           maxDownloadBytes: 1024,
         },
         paths: {
-          conversationsDir: join(root, "conversations"),
+          sessionsDir: join(root, "sessions"),
+          bindingsDir: join(root, "bindings"),
         },
       },
       bot,
@@ -1033,10 +1035,9 @@ describe("createTelegramTransport", () => {
     expect(savedPath).toBe(
       join(
         root,
-        "conversations",
-        "agents",
-        "default",
         "sessions",
+        "default",
+        "entries",
         "session-1",
         "attachments",
         "100-report.txt",
@@ -1072,7 +1073,8 @@ describe("createTelegramTransport", () => {
           maxDownloadBytes: 1024,
         },
         paths: {
-          conversationsDir: join(root, "conversations"),
+          sessionsDir: join(root, "sessions"),
+          bindingsDir: join(root, "bindings"),
         },
       },
       bot,
@@ -1157,7 +1159,8 @@ describe("createTelegramTransport", () => {
           maxDownloadBytes: 1024,
         },
         paths: {
-          conversationsDir: join(root, "conversations"),
+          sessionsDir: join(root, "sessions"),
+          bindingsDir: join(root, "bindings"),
         },
       },
       bot,
@@ -1250,7 +1253,8 @@ describe("createTelegramTransport", () => {
           maxDownloadBytes: 1024,
         },
         paths: {
-          conversationsDir: join(root, "conversations"),
+          sessionsDir: join(root, "sessions"),
+          bindingsDir: join(root, "bindings"),
         },
       },
       bot,
@@ -1318,10 +1322,9 @@ describe("createTelegramTransport", () => {
     expect(capturedMessage?.source?.image?.savedPath).toBe(
       join(
         root,
-        "conversations",
-        "agents",
-        "default",
         "sessions",
+        "default",
+        "entries",
         "session-1",
         "attachments",
         "102-telegram-photo-102.jpg",
@@ -1403,7 +1406,8 @@ describe("createTelegramTransport", () => {
         token: "telegram-token",
         allowedUserIds: ["7"],
         paths: {
-          conversationsDir: "/tmp/imp-telegram-doc-test",
+          sessionsDir: "/tmp/imp-telegram-doc-test",
+          bindingsDir: "/tmp/imp-telegram-doc-test-bindings",
         },
       },
       bot,

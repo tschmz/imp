@@ -238,6 +238,7 @@ function createCliInboundEvent(
     message: {
       endpointId: config.id,
       conversation: {
+        endpointId: config.id,
         transport: "cli",
         externalId: config.userId,
       },

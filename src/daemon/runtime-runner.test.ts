@@ -417,7 +417,8 @@ describe("createRuntimeEntries", () => {
         },
         paths: {
           dataRoot: "/tmp",
-          conversationsDir: "/tmp/conversations",
+          sessionsDir: "/tmp/sessions",
+          bindingsDir: "/tmp/bindings",
           logsDir: "/tmp/logs",
           logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
@@ -546,7 +547,8 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "grimoire",
         paths: {
           dataRoot: "/tmp",
-          conversationsDir: "/tmp/conversations",
+          sessionsDir: "/tmp/sessions",
+          bindingsDir: "/tmp/bindings",
           logsDir: "/tmp/logs",
           logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
@@ -805,7 +807,8 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          conversationsDir: "/tmp/endpoints/audio-ingress/conversations",
+          sessionsDir: "/tmp/sessions",
+          bindingsDir: "/tmp/bindings",
           logsDir: "/tmp/logs",
           logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
@@ -909,7 +912,8 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          conversationsDir: "/tmp/endpoints/audio-ingress/conversations",
+          sessionsDir: "/tmp/sessions",
+          bindingsDir: "/tmp/bindings",
           logsDir: "/tmp/logs",
           logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
@@ -940,7 +944,8 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          conversationsDir: "/tmp/endpoints/silent-ingress/conversations",
+          sessionsDir: "/tmp/sessions",
+          bindingsDir: "/tmp/bindings",
           logsDir: "/tmp/logs",
           logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
@@ -1080,7 +1085,8 @@ describe("createRuntimeEntries", () => {
         defaultAgentId: "default",
         paths: {
           dataRoot: "/tmp",
-          conversationsDir: "/tmp/endpoints/phone-ingress/conversations",
+          sessionsDir: "/tmp/sessions",
+          bindingsDir: "/tmp/bindings",
           logsDir: "/tmp/logs",
           logFilePath: "/tmp/logs/endpoints.log",
           runtimeDir: "/tmp/runtime/endpoints",
@@ -1216,7 +1222,8 @@ function createRuntime(overrides: Partial<BootstrappedRuntime> = {}): Bootstrapp
       defaultAgentId: "default",
       paths: {
         dataRoot: "/tmp",
-        conversationsDir: "/tmp/endpoints/private-telegram/conversations",
+        sessionsDir: "/tmp/sessions",
+        bindingsDir: "/tmp/bindings",
         logsDir: "/tmp/logs",
         logFilePath: "/tmp/logs/endpoints.log",
         runtimeDir: "/tmp/runtime/endpoints",

@@ -18,14 +18,14 @@ afterEach(async () => {
 });
 
 describe("backup use cases", () => {
-  it("creates a scoped archive with agent files and conversations only", async () => {
+  it("creates a scoped archive with agent files and sessions only", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config", "config.json");
     const dataRoot = join(root, "state");
     const promptPath = join(root, "config", "prompts", "SYSTEM.md");
     const authPath = join(root, "config", "oauth.json");
     const agentHomeSkillPath = join(dataRoot, "agents", "default", ".skills", "home-skill", "SKILL.md");
-    const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
+    const conversationPath = join(dataRoot, "sessions", "default", "entries", "session-1", "meta.json");
     const logPath = join(dataRoot, "logs", "endpoints.log");
     const backupPath = join(root, "backup.tar");
     const extractDir = join(root, "extract");
@@ -44,7 +44,7 @@ describe("backup use cases", () => {
     await useCases.createBackup({
       configPath,
       outputPath: backupPath,
-      only: "agents,conversations",
+      only: "agents,sessions",
       force: false,
     });
 
@@ -55,20 +55,20 @@ describe("backup use cases", () => {
       config?: unknown;
       agentFiles?: Array<{ archivePath: string }>;
       agentHomes?: Array<{ archivePath: string }>;
-      conversations?: Array<{ archivePath: string }>;
+      sessions?: Array<{ archivePath: string }>;
     };
 
-    expect(manifest.scopes).toEqual(["agents", "conversations"]);
+    expect(manifest.scopes).toEqual(["agents", "sessions"]);
     expect(manifest.config).toBeUndefined();
     expect(manifest.agentFiles).toHaveLength(2);
     expect(manifest.agentHomes).toHaveLength(1);
-    expect(manifest.conversations).toHaveLength(1);
+    expect(manifest.sessions).toHaveLength(1);
     await expect(readFile(join(extractDir, manifest.agentFiles?.[0]?.archivePath ?? ""), "utf8")).resolves.toBeDefined();
     await expect(
       readFile(join(extractDir, manifest.agentHomes?.[0]?.archivePath ?? "", ".skills", "home-skill", "SKILL.md"), "utf8"),
     ).resolves.toBe("# Home skill\n");
     await expect(
-      readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "chats", "telegram", "42", "meta.json"), "utf8"),
+      readFile(join(extractDir, manifest.sessions?.[0]?.archivePath ?? "", "default", "entries", "session-1", "meta.json"), "utf8"),
     ).resolves.toContain('"id":"1"');
     await expect(readFile(join(extractDir, "logs", "endpoints.log"), "utf8")).rejects.toThrow();
   });
@@ -77,7 +77,7 @@ describe("backup use cases", () => {
     const root = await createTempDir();
     const configPath = join(root, "config", "config.json");
     const dataRoot = join(root, "config", "state");
-    const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
+    const conversationPath = join(dataRoot, "sessions", "default", "entries", "session-1", "meta.json");
     const backupPath = join(root, "backup.tar");
     const extractDir = join(root, "extract");
 
@@ -93,20 +93,20 @@ describe("backup use cases", () => {
     await useCases.createBackup({
       configPath,
       outputPath: backupPath,
-      only: "conversations",
+      only: "sessions",
       force: false,
     });
 
     await extractTarArchive(backupPath, extractDir);
     const manifest = JSON.parse(await readFile(join(extractDir, "manifest.json"), "utf8")) as {
       source: { dataRoot: string };
-      conversations?: Array<{ archivePath: string }>;
+      sessions?: Array<{ archivePath: string }>;
     };
 
     expect(manifest.source.dataRoot).toBe(dataRoot);
-    expect(manifest.conversations).toHaveLength(1);
+    expect(manifest.sessions).toHaveLength(1);
     await expect(
-      readFile(join(extractDir, manifest.conversations?.[0]?.archivePath ?? "", "chats", "telegram", "42", "meta.json"), "utf8"),
+      readFile(join(extractDir, manifest.sessions?.[0]?.archivePath ?? "", "default", "entries", "session-1", "meta.json"), "utf8"),
     ).resolves.toContain("relative-root");
   });
 
@@ -118,7 +118,7 @@ describe("backup use cases", () => {
     const authPath = join(root, "config", "oauth.json");
     const agentHomePath = join(dataRoot, "agents", "default");
     const agentHomeSkillPath = join(agentHomePath, ".skills", "home-skill", "SKILL.md");
-    const conversationPath = join(dataRoot, "conversations", "chats", "telegram", "42", "meta.json");
+    const conversationPath = join(dataRoot, "sessions", "default", "entries", "session-1", "meta.json");
     const backupPath = join(root, "backup.tar");
     const writeOutput = vi.fn();
 
@@ -147,7 +147,7 @@ describe("backup use cases", () => {
     const output = writeOutput.mock.calls[0]?.[0] ?? "";
     expect(writeOutput).toHaveBeenCalledTimes(1);
     expect(output).toContain(`Backup: ${backupPath}`);
-    expect(output).toContain("Scopes: config, agents, conversations");
+    expect(output).toContain("Scopes: config, agents, sessions, bindings");
     expect(output).toContain(`Source config: ${configPath}`);
     expect(output).toContain(`Source data root: ${dataRoot}`);
     expect(output).toContain("Config: config/config.json");
@@ -156,11 +156,12 @@ describe("backup use cases", () => {
     expect(output).toContain(`- default prompt.base.file: ${promptPath} -> agents/`);
     expect(output).toContain("Agent homes: 1");
     expect(output).toContain(`- default: ${agentHomePath} -> agent-homes/`);
-    expect(output).toContain("Conversations: 1");
-    expect(output).toContain("- global: conversations -> conversations");
+    expect(output).toContain("Sessions: 1");
+    expect(output).toContain("- global: sessions -> sessions");
+    expect(output).toContain("Bindings: 0");
   });
 
-  it("restores only the targeted conversations subtree and preserves unrelated data-root content", async () => {
+  it("restores only the targeted sessions subtree and preserves unrelated data-root content", async () => {
     const sourceRoot = await createTempDir();
     const sourceConfigPath = join(sourceRoot, "config", "config.json");
     const sourceDataRoot = join(sourceRoot, "state");
@@ -168,7 +169,7 @@ describe("backup use cases", () => {
 
     await writeConfig(sourceConfigPath, sourceDataRoot);
     await writeTextFile(
-      join(sourceDataRoot, "conversations", "chats", "telegram", "42", "meta.json"),
+      join(sourceDataRoot, "sessions", "default", "entries", "session-1", "meta.json"),
       "{\"messages\":[{\"id\":\"source\"}]}\n",
     );
 
@@ -179,14 +180,14 @@ describe("backup use cases", () => {
     await useCases.createBackup({
       configPath: sourceConfigPath,
       outputPath: backupPath,
-      only: "conversations",
+      only: "sessions",
       force: false,
     });
 
     const targetRoot = await createTempDir();
     const targetDataRoot = join(targetRoot, "state");
     await writeTextFile(
-      join(targetDataRoot, "conversations", "chats", "telegram", "42", "meta.json"),
+      join(targetDataRoot, "sessions", "default", "entries", "session-1", "meta.json"),
       "{\"messages\":[{\"id\":\"old\"}]}\n",
     );
     await writeTextFile(
@@ -194,7 +195,7 @@ describe("backup use cases", () => {
       "keep log\n",
     );
     await writeTextFile(
-      join(targetDataRoot, "endpoints", "another-endpoint", "conversations", "telegram", "7", "meta.json"),
+      join(targetDataRoot, "unrelated", "sessions", "telegram", "7", "meta.json"),
       "{\"messages\":[{\"id\":\"other\"}]}\n",
     );
 
@@ -208,13 +209,13 @@ describe("backup use cases", () => {
     await restoreUseCases.restoreBackup({
       inputPath: backupPath,
       dataRoot: targetDataRoot,
-      only: "conversations",
+      only: "sessions",
       force: true,
     });
 
     await expect(
       readFile(
-        join(targetDataRoot, "conversations", "chats", "telegram", "42", "meta.json"),
+        join(targetDataRoot, "sessions", "default", "entries", "session-1", "meta.json"),
         "utf8",
       ),
     ).resolves.toContain('"source"');
@@ -223,7 +224,7 @@ describe("backup use cases", () => {
     );
     await expect(
       readFile(
-        join(targetDataRoot, "endpoints", "another-endpoint", "conversations", "telegram", "7", "meta.json"),
+        join(targetDataRoot, "unrelated", "sessions", "telegram", "7", "meta.json"),
         "utf8",
       ),
     ).resolves.toContain('"other"');
@@ -233,17 +234,16 @@ describe("backup use cases", () => {
     const sourceRoot = await createTempDir();
     const sourceConfigPath = join(sourceRoot, "config", "config.json");
     const sourceDataRoot = join(sourceRoot, "state");
-    const sourceConversationsDir = join(sourceDataRoot, "conversations");
+    const sourceSessionsDir = join(sourceDataRoot, "sessions");
     const sourceStore = createFsConversationStore(createRuntimePaths(sourceDataRoot));
     const created = await sourceStore.create({ transport: "telegram", externalId: "42" }, {
       agentId: "default",
       now: "2026-04-05T00:00:00.000Z",
     });
     const sourceAttachmentPath = join(
-      sourceConversationsDir,
-      "agents",
+      sourceSessionsDir,
       "default",
-      "sessions",
+      "entries",
       created.state.conversation.sessionId!,
       "attachments",
       "msg-1-report.txt",
@@ -284,7 +284,7 @@ describe("backup use cases", () => {
     await useCases.createBackup({
       configPath: sourceConfigPath,
       outputPath: backupPath,
-      only: "conversations",
+      only: "sessions",
       force: false,
     });
 
@@ -300,7 +300,7 @@ describe("backup use cases", () => {
     await restoreUseCases.restoreBackup({
       inputPath: backupPath,
       dataRoot: targetDataRoot,
-      only: "conversations",
+      only: "sessions",
       force: true,
     });
 
@@ -308,10 +308,9 @@ describe("backup use cases", () => {
     const restored = await targetStore.get(created.state.conversation);
     const targetAttachmentPath = join(
       targetDataRoot,
-      "conversations",
-      "agents",
-      "default",
       "sessions",
+      "default",
+      "entries",
       created.state.conversation.sessionId!,
       "attachments",
       "msg-1-report.txt",
@@ -331,10 +330,9 @@ describe("backup use cases", () => {
       readFile(
         join(
           targetDataRoot,
-          "conversations",
-          "agents",
-          "default",
           "sessions",
+          "default",
+          "entries",
           created.state.conversation.sessionId!,
           "meta.json",
         ),
@@ -531,7 +529,7 @@ describe("backup use cases", () => {
       sourceDataRoot,
       "endpoints",
       "private-telegram",
-      "conversations",
+      "sessions",
       "telegram",
       "42",
       "meta.json",
@@ -702,22 +700,22 @@ describe("backup use cases", () => {
 
     await writeConfig(sourceConfigPath, sourceDataRoot);
     await writeTextFile(
-      join(sourceDataRoot, "conversations", "chats", "telegram", "42", "meta.json"),
+      join(sourceDataRoot, "sessions", "default", "entries", "session-1", "meta.json"),
       "{\"messages\":[{\"id\":\"source\"}]}\n",
     );
     await useCases.createBackup({
       configPath: sourceConfigPath,
       outputPath: backupPath,
-      only: "conversations",
+      only: "sessions",
       force: false,
     });
 
     await extractTarArchive(backupPath, extractDir);
     const manifestPath = join(extractDir, "manifest.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
-      conversations: Array<{ archivePath: string; endpointId: string; relativeToDataRoot: string }>;
+      sessions: Array<{ archivePath: string; endpointId: string; relativeToDataRoot: string }>;
     };
-    manifest.conversations[0]!.relativeToDataRoot = "../../escape";
+    manifest.sessions[0]!.relativeToDataRoot = "../../escape";
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
     await createTarArchive(extractDir, backupPath);
 
@@ -725,7 +723,7 @@ describe("backup use cases", () => {
       useCases.restoreBackup({
         inputPath: backupPath,
         dataRoot: targetDataRoot,
-        only: "conversations",
+        only: "sessions",
         force: true,
       }),
     ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
@@ -746,16 +744,16 @@ describe("backup use cases", () => {
           {
             version: 1,
             createdAt: "2026-04-07T00:00:00.000Z",
-            scopes: ["conversations"],
+            scopes: ["sessions"],
             source: {
               configPath: "/source/config.json",
               dataRoot: "/source/state",
             },
-            conversations: [
+            sessions: [
               {
-                archivePath: "/conversations/private-telegram",
+                archivePath: "/sessions/private-telegram",
                 endpointId: "private-telegram",
-                relativeToDataRoot: "endpoints/private-telegram/conversations",
+                relativeToDataRoot: "endpoints/private-telegram/sessions",
               },
             ],
           },
@@ -769,7 +767,7 @@ describe("backup use cases", () => {
       useCases.restoreBackup({
         inputPath: archivePath,
         dataRoot: targetDataRoot,
-        only: "conversations",
+        only: "sessions",
         force: true,
       }),
     ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
@@ -790,16 +788,16 @@ describe("backup use cases", () => {
           {
             version: 1,
             createdAt: "2026-04-07T00:00:00.000Z",
-            scopes: ["conversations"],
+            scopes: ["sessions"],
             source: {
               configPath: "/source/config.json",
               dataRoot: "/source/state",
             },
-            conversations: [
+            sessions: [
               {
                 archivePath: ".",
                 endpointId: "private-telegram",
-                relativeToDataRoot: "endpoints/private-telegram/conversations",
+                relativeToDataRoot: "endpoints/private-telegram/sessions",
               },
             ],
           },
@@ -813,7 +811,7 @@ describe("backup use cases", () => {
       useCases.restoreBackup({
         inputPath: archivePath,
         dataRoot: targetDataRoot,
-        only: "conversations",
+        only: "sessions",
         force: true,
       }),
     ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
@@ -834,16 +832,16 @@ describe("backup use cases", () => {
           {
             version: 1,
             createdAt: "2026-04-07T00:00:00.000Z",
-            scopes: ["conversations"],
+            scopes: ["sessions"],
             source: {
               configPath: "/source/config.json",
               dataRoot: "/source/state",
             },
-            conversations: [
+            sessions: [
               {
                 archivePath: "a/./b",
                 endpointId: "private-telegram",
-                relativeToDataRoot: "endpoints/private-telegram/conversations",
+                relativeToDataRoot: "endpoints/private-telegram/sessions",
               },
             ],
           },
@@ -857,7 +855,7 @@ describe("backup use cases", () => {
       useCases.restoreBackup({
         inputPath: archivePath,
         dataRoot: targetDataRoot,
-        only: "conversations",
+        only: "sessions",
         force: true,
       }),
     ).rejects.toThrow("Invalid backup archive: unsafe manifest path");
@@ -926,7 +924,8 @@ async function createBackupArchive(archivePath: string, files: Array<[archivePat
 function createRuntimePaths(dataRoot: string) {
   return {
     dataRoot,
-    conversationsDir: join(dataRoot, "conversations"),
+    sessionsDir: join(dataRoot, "sessions"),
+    bindingsDir: join(dataRoot, "bindings"),
     logsDir: join(dataRoot, "logs"),
     logFilePath: join(dataRoot, "logs", "endpoints.log"),
     runtimeDir: join(dataRoot, "runtime", "endpoints"),

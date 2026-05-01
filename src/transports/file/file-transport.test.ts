@@ -183,6 +183,7 @@ describe("createFileTransport", () => {
       },
       message: {
         conversation: {
+          endpointId: "private-telegram",
           transport: "telegram",
           externalId: "123456789",
         },
@@ -376,7 +377,8 @@ function createPluginRuntimeConfig(
     defaultAgentId: "default",
     paths: {
       dataRoot: root,
-      conversationsDir: join(root, "endpoints", "audio-ingress", "conversations"),
+      sessionsDir: join(root, "sessions"),
+      bindingsDir: join(root, "bindings"),
       logsDir: join(root, "logs"),
       logFilePath: join(root, "logs", "endpoints.log"),
       runtimeDir: join(root, "runtime", "endpoints"),

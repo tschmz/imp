@@ -89,7 +89,8 @@ describe("createRuntimeTransportFactory", () => {
       defaultAgentId: "default",
       paths: {
         dataRoot: "/tmp",
-        conversationsDir: "/tmp/endpoint/conversations",
+        sessionsDir: "/tmp/sessions",
+        bindingsDir: "/tmp/bindings",
         logsDir: "/tmp/logs",
         logFilePath: "/tmp/logs/endpoints.log",
         runtimeDir: "/tmp/runtime/endpoints",

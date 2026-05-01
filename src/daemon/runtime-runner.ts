@@ -118,7 +118,8 @@ export function createRuntimeEntries(
           defaultAgentId: defaultAgent?.id ?? "unknown",
           paths: {
             dataRoot: runtime.endpointConfig.paths.dataRoot,
-            conversationsDir: runtime.endpointConfig.paths.conversationsDir,
+            sessionsDir: runtime.endpointConfig.paths.sessionsDir,
+            bindingsDir: runtime.endpointConfig.paths.bindingsDir,
             logsDir: runtime.endpointConfig.paths.logsDir,
             logFilePath: runtime.endpointConfig.paths.logFilePath,
             runtimeDir: runtime.endpointConfig.paths.runtimeDir,

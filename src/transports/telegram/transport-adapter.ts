@@ -78,7 +78,8 @@ export function normalizeTelegramRuntimeConfig(
     defaultAgentId: endpoint.routing?.defaultAgentId ?? options.defaultAgentId,
     paths: {
       dataRoot: options.dataRoot,
-      conversationsDir: join(options.dataRoot, "conversations"),
+      sessionsDir: join(options.dataRoot, "sessions"),
+      bindingsDir: join(options.dataRoot, "bindings"),
       logsDir,
       logFilePath: join(logsDir, "endpoints.log"),
       runtimeDir,

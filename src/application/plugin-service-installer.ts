@@ -248,7 +248,7 @@ function createPluginSetupPaths(options: {
   const dataRoot = resolvePathRelativeToConfig(options.config.paths.dataRoot, configDir);
   const venvDir = resolve(
     dataRoot,
-    pythonSetup.venv ?? join("plugins", "state", options.plugin.manifest.id, "python", ".venv"),
+    pythonSetup.venv ?? join("plugin-state", options.plugin.manifest.id, "python", ".venv"),
   );
   const venvPython = resolveVenvPythonPath({
     venvDir,

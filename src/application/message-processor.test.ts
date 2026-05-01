@@ -5,7 +5,7 @@ import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import { createMessageProcessor } from "./message-processor.js";
 
 describe("createMessageProcessor", () => {
-  it("preserves message order within a conversation while allowing other conversations to run", async () => {
+  it("preserves message order within a session while allowing other sessions to run", async () => {
     let active = 0;
     let maxActive = 0;
     const starts: string[] = [];
@@ -376,7 +376,7 @@ describe("createMessageProcessor", () => {
     await Promise.all([first, second]);
   });
 
-  it("never exceeds maxParallel while handing permits to waiting conversations", async () => {
+  it("never exceeds maxParallel while handing permits to waiting sessions", async () => {
     let active = 0;
     let maxActive = 0;
     const starts: string[] = [];

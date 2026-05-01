@@ -84,7 +84,7 @@ describe("imp CLI e2e", () => {
     await expect(readFile(skillPath, "utf8")).resolves.not.toBe("stale skill\n");
   }, cliE2eTimeoutMs);
 
-  it("creates and restores a backup with config, agent files, and conversations", async () => {
+  it("creates and restores a backup with config, agent files, and sessions", async () => {
     const root = await createTempDir();
     const env = createTestEnv(root);
     const configPath = join(root, "config-home", "imp", "config.json");
@@ -93,7 +93,7 @@ describe("imp CLI e2e", () => {
     const promptPath = join(dataRoot, "SYSTEM.md");
     const authPath = join(dataRoot, "auth.json");
     const agentHomeSkillPath = join(dataRoot, "agents", "default", ".skills", "home-skill", "SKILL.md");
-    const conversationPath = join(dataRoot, "conversations", "agents", "default", "sessions", "session-1", "meta.json");
+    const conversationPath = join(dataRoot, "sessions", "default", "entries", "session-1", "meta.json");
 
     await writeDefaultConfig(root);
     await overwriteConfig(configPath, {
@@ -148,10 +148,10 @@ describe("imp CLI e2e", () => {
     const inspectResult = await runCli(["backup", "inspect", backupPath], env);
 
     expect(inspectResult.stdout).toContain(`Backup: ${backupPath}`);
-    expect(inspectResult.stdout).toContain("Scopes: config, agents, conversations");
+    expect(inspectResult.stdout).toContain("Scopes: config, agents, sessions, bindings");
     expect(inspectResult.stdout).toContain("Agent files: 2");
     expect(inspectResult.stdout).toContain("Agent homes: 1");
-    expect(inspectResult.stdout).toContain("Conversations: 1");
+    expect(inspectResult.stdout).toContain("Sessions: 1");
 
     await overwriteConfig(configPath, {
       instance: { name: "mutated" },

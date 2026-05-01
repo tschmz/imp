@@ -25,7 +25,8 @@ const defaultTelegramDocumentMaxDownloadBytes = 20 * 1024 * 1024;
 
 type TelegramTransportRuntimeConfig = TelegramEndpointRuntimeConfig & {
   paths?: {
-    conversationsDir?: string;
+    sessionsDir?: string;
+    bindingsDir?: string;
   };
 };
 
@@ -767,10 +768,9 @@ function getTelegramDocumentSavedPath(
 
   const fileName = document.file_name ?? `telegram-document-${message.messageId}${getDocumentExtension(document)}`;
   return join(
-    getTelegramConversationsDir(config),
-    "agents",
+    getTelegramSessionsDir(config),
     sanitizePathSegment(agentId),
-    "sessions",
+    "entries",
     sanitizePathSegment(sessionId),
     "attachments",
     `${sanitizePathSegment(message.messageId)}-${sanitizeFileName(fileName)}`,
@@ -820,10 +820,9 @@ function getTelegramImageSavedPath(
 
   const fileName = getTelegramImageFileName(message, image, filePath, downloadedMimeType);
   return join(
-    getTelegramConversationsDir(config),
-    "agents",
+    getTelegramSessionsDir(config),
     sanitizePathSegment(agentId),
-    "sessions",
+    "entries",
     sanitizePathSegment(sessionId),
     "attachments",
     `${sanitizePathSegment(message.messageId)}-${sanitizeFileName(fileName)}`,
@@ -850,15 +849,15 @@ function getTelegramDocumentMaxDownloadBytes(config: TelegramTransportRuntimeCon
   return config.document?.maxDownloadBytes ?? defaultTelegramDocumentMaxDownloadBytes;
 }
 
-function getTelegramConversationsDir(config: TelegramTransportRuntimeConfig): string {
-  if (!config.paths?.conversationsDir) {
+function getTelegramSessionsDir(config: TelegramTransportRuntimeConfig): string {
+  if (!config.paths?.sessionsDir) {
     throw new UserVisibleProcessingError(
       "file_document_persistence",
-      "Telegram document cannot be stored because the endpoint conversations directory is unavailable.",
+      "Telegram document cannot be stored because the endpoint sessions directory is unavailable.",
     );
   }
 
-  return config.paths.conversationsDir;
+  return config.paths.sessionsDir;
 }
 
 function getDocumentExtension(document: TelegramDocument): string {
@@ -1176,6 +1175,7 @@ function createTelegramInboundEvent(
     message: {
       endpointId,
       conversation: {
+        endpointId,
         transport: "telegram",
         externalId: String(ctx.chat.id),
       },

@@ -13,6 +13,7 @@ export function createIncomingMessage(
   return {
     endpointId: "private-telegram",
     conversation: {
+      endpointId: "private-telegram",
       transport: "telegram",
       externalId: "42",
     },

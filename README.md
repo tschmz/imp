@@ -22,9 +22,9 @@ The project is designed for users who want useful AI assistants in familiar plac
 
 - **Multiple agents**: Give each agent its own model, instructions, reference files, skills, tools, and workspace.
 - **Multiple entry points**: Use a local terminal chat, private Telegram bots, or file-based plugin endpoints with the same daemon.
-- **Persistent sessions**: Resume, rename, export, or reset conversations without losing local history.
+- **Persistent sessions**: Resume, rename, export, or reset sessions without losing local history.
 - **Controlled tool access**: Enable built-in tools, MCP servers, and delegated agents per agent.
-- **Local runtime state**: Keep configuration, agent files, logs, and conversations in local paths you control.
+- **Local runtime state**: Keep configuration, agent files, logs, and sessions in local paths you control.
 - **Operational commands**: Validate config, inspect logs, create backups, restore archives, and manage background services from the CLI.
 
 ## Requirements

@@ -59,7 +59,7 @@ export function createPluginPackageInstaller(dependencies: PluginPackageInstalla
 export function getPluginPackageStoreRoot(config: AppConfig, configPath: string): string {
   const configDir = dirname(configPath);
   const dataRoot = resolvePathRelativeToConfig(config.paths.dataRoot, configDir);
-  return join(dataRoot, "plugins", "npm");
+  return join(dataRoot, "packages", "npm");
 }
 
 export function normalizePackageSpec(packageSpec: string): string {
