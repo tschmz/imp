@@ -11,6 +11,7 @@ describe("createCli", () => {
     const serviceCommand = findCommand(cli, "service");
     const backupCommand = findCommand(cli, "backup");
     const pluginCommand = findCommand(cli, "plugin");
+    const completionCommand = findCommand(cli, "completion");
 
     expect(cli.helpInformation()).toContain("Usage: imp");
     expect(cli.helpInformation()).toContain("daemon");
@@ -22,6 +23,7 @@ describe("createCli", () => {
     expect(cli.helpInformation()).toContain("backup");
     expect(cli.helpInformation()).toContain("plugin");
     expect(cli.helpInformation()).toContain("service");
+    expect(cli.helpInformation()).toContain("completion");
     expect(cli.helpInformation()).toContain("--version");
 
     expect(findCommand(daemonCommand, "run").helpInformation()).toContain("Usage: imp daemon run");
@@ -101,6 +103,9 @@ describe("createCli", () => {
     expect(findCommand(serviceCommand, "stop").helpInformation()).toContain("Usage: imp service stop");
     expect(findCommand(serviceCommand, "restart").helpInformation()).toContain("Usage: imp service restart");
     expect(findCommand(serviceCommand, "status").helpInformation()).toContain("Usage: imp service status");
+
+    expect(findCommand(completionCommand, "bash").helpInformation()).toContain("Usage: imp completion bash");
+    expect(completionCommand.helpInformation()).not.toContain("complete");
   });
 
   it("parses representative commands into dependency calls", async () => {
@@ -227,6 +232,7 @@ describe("createCli", () => {
         "backup",
         "plugin",
         "service",
+        "completion",
       ]
     `);
   });

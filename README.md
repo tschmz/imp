@@ -129,8 +129,24 @@ See [`config.example.json`](./config.example.json) for a complete example.
 | `imp plugin install <plugin>`      | Install or update a plugin                          |
 | `imp service install`              | Install a background service definition             |
 | `imp skill sync`                   | Refresh bundled managed skills                      |
+| `imp completion bash`              | Print a Bash completion script                      |
 
 Most commands that operate on an installation accept `--config` to target a specific config file.
+
+### Shell Completion
+
+Load Bash completion for the current shell:
+
+```sh
+source <(imp completion bash)
+```
+
+Install it persistently for the current user:
+
+```sh
+mkdir -p ~/.local/share/bash-completion/completions
+imp completion bash > ~/.local/share/bash-completion/completions/imp
+```
 
 ## Configuration
 

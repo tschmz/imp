@@ -7,6 +7,7 @@ import { registerPluginCommands } from "./commands/register-plugin-commands.js";
 import { registerServiceCommands } from "./commands/register-service-commands.js";
 import { registerSkillsCommands } from "./commands/register-skills-commands.js";
 import { addConfigOption, booleanWithDefault, withAsyncAction } from "./command-helpers.js";
+import { registerCompletionCommands } from "./completion.js";
 
 export type { CliDependencies } from "./cli-dependencies.js";
 
@@ -78,6 +79,7 @@ export function createCli(dependencies: CliDependencies): Command {
   registerBackupCommands(program, dependencies);
   registerPluginCommands(program, dependencies);
   registerServiceCommands(program, dependencies);
+  registerCompletionCommands(program);
 
   return program;
 }

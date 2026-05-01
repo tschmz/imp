@@ -45,6 +45,7 @@ describe("imp CLI e2e", () => {
     expect(stdout).toContain("backup");
     expect(stdout).toContain("plugin");
     expect(stdout).toContain("service");
+    expect(stdout).toContain("completion");
   }, cliE2eTimeoutMs);
 
   it("shows version output", async () => {
@@ -54,6 +55,17 @@ describe("imp CLI e2e", () => {
     const { stdout } = await runCli(["--version"], env);
 
     expect(stdout.trim()).toBe(packageJson.version);
+  }, cliE2eTimeoutMs);
+
+  it("prints bash completion candidates through the hidden resolver", async () => {
+    const root = await createTempDir();
+    const env = createTestEnv(root);
+
+    const scriptResult = await runCli(["completion", "bash"], env);
+    const completionResult = await runCli(["completion", "complete", "--", "plugin", "i"], env);
+
+    expect(scriptResult.stdout).toContain('"$command" completion complete --');
+    expect(completionResult.stdout.split("\n").filter(Boolean)).toEqual(["inspect", "install"]);
   }, cliE2eTimeoutMs);
 
   it("refreshes a managed skill through `imp skill sync`", async () => {
