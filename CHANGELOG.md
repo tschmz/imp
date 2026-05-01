@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.21.0 - 2026-05-01
+
+### Added
+
+- Add shell completion generation for the CLI, including bash completion support.
+
+### Changed
+
+- Simplify the CLI command surface.
+- Let `imp plugin install` update already configured plugins instead of requiring a separate update flow.
+- Lazy-load CLI use cases to reduce startup work.
+
 ## 0.20.0 - 2026-05-01
 
 ### Added
