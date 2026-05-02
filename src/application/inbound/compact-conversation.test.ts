@@ -7,7 +7,11 @@ import { createHookRunner } from "../../extensions/hook-runner.js";
 import type { AgentEngine } from "../../runtime/types.js";
 import type { ConversationStore } from "../../storage/types.js";
 import { compactConversationIfNeeded } from "./compact-conversation.js";
-import type { InboundProcessingContext } from "./types.js";
+import {
+  createInboundProcessingContext,
+  type ResolvedInboundProcessingContext,
+  withResolvedConversation,
+} from "./types.js";
 
 describe("compactConversationIfNeeded", () => {
   it("triggers automatic compaction when the incoming message pushes context over the model window", async () => {
@@ -43,13 +47,13 @@ describe("compactConversationIfNeeded", () => {
       message: createIncomingMessage("incoming overflow trigger ".concat("e".repeat(12_000))),
     });
 
-    await compactConversationIfNeeded(context);
+    const compactedContext = await compactConversationIfNeeded(context);
 
     expect(run).toHaveBeenCalledOnce();
     expect(run.mock.calls[0]?.[0].message.text).toContain("Old context marker.");
     expect(run.mock.calls[0]?.[0].message.text).not.toContain("incoming overflow trigger");
     expect(updateState).toHaveBeenCalledOnce();
-    expect(context.conversation?.state.compaction).toMatchObject({
+    expect(compactedContext.conversation.state.compaction).toMatchObject({
       summary: "Short checkpoint.",
       firstKeptMessageId: "u2",
       compactedThroughMessageId: "a1",
@@ -65,8 +69,8 @@ function createProcessingContext(options: {
   conversationStore: ConversationStore;
   engine: AgentEngine;
   message: IncomingMessage;
-}): InboundProcessingContext {
-  return {
+}): ResolvedInboundProcessingContext {
+  return withResolvedConversation(createInboundProcessingContext({
     message: options.message,
     dependencies: {
       agentRegistry: createAgentRegistry([options.agent]),
@@ -103,10 +107,10 @@ function createProcessingContext(options: {
     readRecentLogLines: async () => [],
     hookRunner: createHookRunner(),
     startedAt: Date.now(),
+  }), {
     conversation: options.conversation,
     agent: options.agent,
-    availableSkills: [],
-  };
+  });
 }
 
 function createConversation(messages: ConversationEvent[]): ConversationContext {

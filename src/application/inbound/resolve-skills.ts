@@ -1,19 +1,18 @@
 import { resolveEffectiveSkills } from "../../skills/resolve-effective-skills.js";
-import type { InboundProcessingContext } from "./types.js";
+import {
+  type ResolvedInboundProcessingContext,
+  withAvailableSkills,
+} from "./types.js";
 
-export async function resolveSkills(context: InboundProcessingContext): Promise<void> {
-  if (context.response || !context.agent) {
-    return;
-  }
-
+export async function resolveSkills(
+  context: ResolvedInboundProcessingContext,
+): Promise<ResolvedInboundProcessingContext> {
   try {
     const resolution = await resolveEffectiveSkills({
       agent: context.agent,
       dataRoot: context.dependencies.runtimeInfo.dataRoot,
       conversation: context.conversation,
     });
-
-    context.availableSkills = resolution.skills;
 
     for (const issue of resolution.issues) {
       await context.dependencies.logger?.info(issue, {
@@ -67,8 +66,9 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
         ? { overriddenSkillNames: resolution.overriddenSkillNames }
         : {}),
     });
+
+    return withAvailableSkills(context, resolution.skills);
   } catch (error) {
-    context.availableSkills = [];
     void context.dependencies.logger?.error(
       "failed to resolve effective agent skills for turn; continuing without skills",
       {
@@ -81,5 +81,7 @@ export async function resolveSkills(context: InboundProcessingContext): Promise<
       },
       error,
     );
+
+    return withAvailableSkills(context, []);
   }
 }

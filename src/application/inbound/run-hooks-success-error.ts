@@ -1,10 +1,9 @@
-import type { InboundProcessingContext } from "./types.js";
+import type {
+  InboundHandledContext,
+  InboundProcessingContext,
+} from "./types.js";
 
-export async function runHooksSuccess(context: InboundProcessingContext): Promise<void> {
-  if (!context.response) {
-    return;
-  }
-
+export async function runHooksSuccess(context: InboundHandledContext): Promise<void> {
   await context.hookRunner.run(
     "onInboundMessageSuccess",
     (hooks) => hooks.onInboundMessageSuccess,

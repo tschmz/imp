@@ -13,7 +13,11 @@ import { resolveConversation } from "./inbound/resolve-conversation.js";
 import { resolveSkills } from "./inbound/resolve-skills.js";
 import { runHooksStart } from "./inbound/run-hooks-start.js";
 import { runHooksError, runHooksSuccess } from "./inbound/run-hooks-success-error.js";
-import type { InboundProcessingContext } from "./inbound/types.js";
+import {
+  createInboundProcessingContext,
+  hasResponse,
+  type InboundProcessingContext,
+} from "./inbound/types.js";
 
 export type { HandleIncomingMessageDependencies, RuntimeCommandInfo } from "./commands/types.js";
 
@@ -50,7 +54,7 @@ export function createHandleIncomingMessage(
         midRunMessages?: MidRunMessageSource;
       } = {},
     ): Promise<OutgoingMessage> {
-      const context: InboundProcessingContext = {
+      const context = createInboundProcessingContext({
         message,
         dependencies,
         defaultAgent,
@@ -61,26 +65,33 @@ export function createHandleIncomingMessage(
         startedAt: Date.now(),
         deliverProgress: options.deliverProgress,
         midRunMessages: options.midRunMessages,
-        availableSkills: [],
-      };
+      });
+      let activeContext: InboundProcessingContext = context;
 
       try {
         await runHooksStart(context);
-        await dispatchCommand(context);
-        await resolveConversation(context);
-        await resolveSkills(context);
-        await compactConversationIfNeeded(context);
-        await executeAgent(context);
-        await persistConversation(context);
-        await runHooksSuccess(context);
-
-        if (!context.response) {
-          throw new Error("Inbound processing completed without a response");
+        const commandContext = await dispatchCommand(context);
+        activeContext = commandContext;
+        if (hasResponse(commandContext)) {
+          await runHooksSuccess(commandContext);
+          return commandContext.response;
         }
 
-        return context.response;
+        const resolvedContext = await resolveConversation(commandContext);
+        activeContext = resolvedContext;
+        const contextWithSkills = await resolveSkills(resolvedContext);
+        activeContext = contextWithSkills;
+        const compactedContext = await compactConversationIfNeeded(contextWithSkills);
+        activeContext = compactedContext;
+        const responseContext = await executeAgent(compactedContext);
+        activeContext = responseContext;
+        const persistedContext = await persistConversation(responseContext);
+        activeContext = persistedContext;
+        await runHooksSuccess(persistedContext);
+
+        return persistedContext.response;
       } catch (error) {
-        await runHooksError(context, error);
+        await runHooksError(activeContext, error);
         throw error;
       }
     },

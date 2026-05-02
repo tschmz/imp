@@ -1,13 +1,16 @@
 import type { ConversationEvent } from "../../domain/conversation.js";
 import { getAssistantCommentaryText } from "../../runtime/message-mapping.js";
 import { toUserConversationMessage } from "./incoming-message-event.js";
-import type { InboundProcessingContext } from "./types.js";
+import {
+  type ResolvedHandledInboundProcessingContext,
+  type ResolvedInboundProcessingContext,
+  withConversation,
+  withResponse,
+} from "./types.js";
 
-export async function executeAgent(context: InboundProcessingContext): Promise<void> {
-  if (context.response || !context.agent || !context.conversation) {
-    return;
-  }
-
+export async function executeAgent(
+  context: ResolvedInboundProcessingContext,
+): Promise<ResolvedHandledInboundProcessingContext> {
   const conversationBeforeRun = context.conversation;
   const userConversationMessage = toUserConversationMessage(context.message);
   let persistedConversation = context.conversation;
@@ -87,7 +90,7 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
           ...(replyChannel ? { replyChannel } : {}),
         },
         ...(replyChannel ? { replyChannel } : {}),
-        ...(context.availableSkills.length > 0 ? { availableSkills: context.availableSkills } : {}),
+        ...(context.availableSkills.length > 0 ? { availableSkills: [...context.availableSkills] } : {}),
       },
     });
   } catch (error) {
@@ -109,8 +112,8 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
   }
 
   const completedAt = new Date().toISOString();
-  context.response = result.message;
-  context.conversation = {
+  const responseContext = withResponse(context, result.message);
+  return withConversation(responseContext, {
     state: {
       ...context.conversation.state,
       ...(result.workingDirectory ? { workingDirectory: result.workingDirectory } : {}),
@@ -126,10 +129,10 @@ export async function executeAgent(context: InboundProcessingContext): Promise<v
       ...midRunUserMessages,
       ...result.conversationEvents,
     ],
-  };
+  });
 }
 
-function resolveMessageReplyChannel(context: InboundProcessingContext) {
+function resolveMessageReplyChannel(context: ResolvedInboundProcessingContext) {
   const response = context.message.source?.plugin?.metadata?.response;
   if (isResponseNoneOverride(response)) {
     return {
@@ -146,7 +149,7 @@ function isResponseNoneOverride(value: unknown): value is { type: "none" } {
 }
 
 async function deliverProgressUpdates(
-  context: InboundProcessingContext,
+  context: ResolvedInboundProcessingContext,
   events: ConversationEvent[],
   replyChannel: ReturnType<typeof resolveMessageReplyChannel>,
 ): Promise<void> {

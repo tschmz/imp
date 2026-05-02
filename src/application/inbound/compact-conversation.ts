@@ -7,19 +7,20 @@ import {
 } from "../../domain/conversation-compaction.js";
 import { defaultResolveModel, resolveConfiguredModel } from "../../runtime/model-resolution.js";
 import { toUserConversationMessage } from "./incoming-message-event.js";
-import type { InboundProcessingContext } from "./types.js";
+import {
+  type ResolvedInboundProcessingContext,
+  withConversation,
+} from "./types.js";
 
-export async function compactConversationIfNeeded(context: InboundProcessingContext): Promise<void> {
-  if (context.response || !context.agent || !context.conversation) {
-    return;
-  }
-
+export async function compactConversationIfNeeded(
+  context: ResolvedInboundProcessingContext,
+): Promise<ResolvedInboundProcessingContext> {
   const model = resolveConfiguredModel(
     context.agent.model,
     context.dependencies.resolveModel ?? defaultResolveModel,
   );
   if (!model) {
-    return;
+    return context;
   }
 
   const incomingMessage = toUserConversationMessage(context.message);
@@ -28,7 +29,7 @@ export async function compactConversationIfNeeded(context: InboundProcessingCont
     messages: [...context.conversation.messages, incomingMessage],
   };
   if (!shouldCompactConversation(projectedConversation, model.contextWindow)) {
-    return;
+    return context;
   }
 
   try {
@@ -46,7 +47,7 @@ export async function compactConversationIfNeeded(context: InboundProcessingCont
     });
 
     if (result) {
-      context.conversation = result.conversation;
+      return withConversation(context, result.conversation);
     }
   } catch (error) {
     await context.dependencies.logger?.error("automatic conversation compaction failed", {
@@ -59,6 +60,8 @@ export async function compactConversationIfNeeded(context: InboundProcessingCont
       errorType: error instanceof Error ? error.name : typeof error,
     }, error);
   }
+
+  return context;
 }
 
 function resolveAutomaticKeepRecentTokens(contextWindow: number, incomingTokens: number): number {

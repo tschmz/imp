@@ -1,11 +1,13 @@
 import { getOrCreateConversationContext } from "../commands/conversation-context.js";
-import type { InboundProcessingContext } from "./types.js";
+import {
+  type InboundProcessingContext,
+  type ResolvedInboundProcessingContext,
+  withResolvedConversation,
+} from "./types.js";
 
-export async function resolveConversation(context: InboundProcessingContext): Promise<void> {
-  if (context.response) {
-    return;
-  }
-
+export async function resolveConversation(
+  context: InboundProcessingContext,
+): Promise<ResolvedInboundProcessingContext> {
   const conversation = await getOrCreateConversationContext(
     context.message,
     context.defaultAgent.id,
@@ -24,6 +26,8 @@ export async function resolveConversation(context: InboundProcessingContext): Pr
     agentId: agent.id,
   });
 
-  context.conversation = conversation;
-  context.agent = agent;
+  return withResolvedConversation(context, {
+    conversation,
+    agent,
+  });
 }

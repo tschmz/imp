@@ -1,42 +1,49 @@
 import type { IncomingMessageCommand } from "../../domain/message.js";
 import { parseInboundCommand } from "../commands/parse-inbound-command.js";
 import type { InboundCommandHandler } from "../commands/types.js";
-import type { InboundProcessingContext } from "./types.js";
+import {
+  type InboundHandledContext,
+  type InboundProcessingContext,
+  withInboundMessage,
+  withResponse,
+} from "./types.js";
 
-export async function dispatchCommand(context: InboundProcessingContext): Promise<void> {
+export async function dispatchCommand(
+  context: InboundProcessingContext,
+): Promise<InboundProcessingContext | InboundHandledContext> {
   const command = resolveCommand(context);
   if (!command) {
-    return;
+    return context;
   }
+
+  const commandContext = withInboundMessage(context, {
+    ...context.message,
+    command: command.command,
+    ...(command.commandArgs ? { commandArgs: command.commandArgs } : {}),
+  });
 
   const handler = context.availableCommands.find((candidate) =>
     candidate.canHandle(command.command),
   );
 
   if (!handler) {
-    return;
+    return commandContext;
   }
-
-  context.message = {
-    ...context.message,
-    command: command.command,
-    ...(command.commandArgs ? { commandArgs: command.commandArgs } : {}),
-  };
 
   const commandResponse = await handler.handle({
-    message: context.message,
+    message: commandContext.message,
     dependencies: {
-      ...context.dependencies,
-      availableCommands: context.availableCommands,
+      ...commandContext.dependencies,
+      availableCommands: commandContext.availableCommands,
     },
-    logger: context.dependencies.logger,
-    loadAppConfig: context.loadAppConfig,
-    readRecentLogLines: context.readRecentLogLines,
+    logger: commandContext.dependencies.logger,
+    loadAppConfig: commandContext.loadAppConfig,
+    readRecentLogLines: commandContext.readRecentLogLines,
   });
 
-  if (commandResponse) {
-    context.response = commandResponse;
-  }
+  return commandResponse
+    ? withResponse(commandContext, commandResponse)
+    : commandContext;
 }
 
 function resolveCommand(

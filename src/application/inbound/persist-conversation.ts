@@ -1,9 +1,8 @@
-import type { InboundProcessingContext } from "./types.js";
+import type { ResolvedHandledInboundProcessingContext } from "./types.js";
 
-export async function persistConversation(context: InboundProcessingContext): Promise<void> {
-  if (!context.conversation || !context.agent || !context.response) {
-    return;
-  }
-
+export async function persistConversation(
+  context: ResolvedHandledInboundProcessingContext,
+): Promise<ResolvedHandledInboundProcessingContext> {
   await context.dependencies.conversationStore.put(context.conversation);
+  return context;
 }
