@@ -1,3 +1,4 @@
+import { createKeyedSerialTaskQueue, createSemaphore } from "../concurrency/async-primitives.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { MidRunMessageSource } from "../runtime/context.js";
 import type { OutgoingMessageDeliveryAction } from "../domain/message.js";
@@ -34,7 +35,7 @@ export function createMessageProcessor(
   dependencies: MessageProcessorDependencies,
 ): MessageProcessor {
   const semaphore = createSemaphore(Math.max(1, dependencies.maxParallel ?? 4));
-  const conversationQueues = new Map<string, Promise<void>>();
+  const conversationQueues = createKeyedSerialTaskQueue<string>();
   const activeMidRunSinks = new Map<string, MidRunMessageSink>();
 
   return {
@@ -56,7 +57,7 @@ export function createMessageProcessor(
         return;
       }
 
-      await enqueueByConversation(preparedEvent, conversationKey, async () => {
+      await conversationQueues.run(conversationKey, async () => {
         await semaphore.withPermit(async () => {
           const readyEvent = await prepareTransportMessage(preparedEvent);
           const midRunMessages = createMidRunMessageSink({
@@ -72,31 +73,6 @@ export function createMessageProcessor(
       });
     },
   };
-
-  async function enqueueByConversation(
-    event: TransportInboundEvent,
-    key: string,
-    operation: () => Promise<void>,
-  ): Promise<void> {
-    const previous = conversationQueues.get(key) ?? Promise.resolve();
-    let release: (() => void) | undefined;
-    const current = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const next = previous.catch(() => undefined).then(() => current);
-
-    conversationQueues.set(key, next);
-    await previous.catch(() => undefined);
-
-    try {
-      await operation();
-    } finally {
-      release?.();
-      if (conversationQueues.get(key) === next) {
-        conversationQueues.delete(key);
-      }
-    }
-  }
 }
 
 async function prepareTransportMessage(event: TransportInboundEvent): Promise<TransportInboundEvent> {
@@ -238,45 +214,6 @@ function normalizeRetryDelayMs(value: number | undefined, maxDelayMs: number): n
   }
 
   return Math.min(value, maxDelayMs);
-}
-
-function createSemaphore(maxPermits: number): {
-  withPermit<T>(operation: () => Promise<T>): Promise<T>;
-} {
-  let activePermits = 0;
-  const waiters: Array<() => void> = [];
-
-  async function acquirePermit(): Promise<void> {
-    if (activePermits < maxPermits && waiters.length === 0) {
-      activePermits += 1;
-      return;
-    }
-
-    await new Promise<void>((resolve) => {
-      waiters.push(() => {
-        activePermits += 1;
-        resolve();
-      });
-    });
-  }
-
-  function releasePermit(): void {
-    activePermits -= 1;
-    const next = waiters.shift();
-    next?.();
-  }
-
-  return {
-    async withPermit<T>(operation: () => Promise<T>): Promise<T> {
-      await acquirePermit();
-
-      try {
-        return await operation();
-      } finally {
-        releasePermit();
-      }
-    },
-  };
 }
 
 async function delay(ms: number): Promise<void> {

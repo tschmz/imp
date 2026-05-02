@@ -7,6 +7,7 @@ import type {
 } from "@mariozechner/pi-ai";
 import { lock as lockFile } from "proper-lockfile";
 import writeFileAtomic from "write-file-atomic";
+import { createKeyedSerialTaskQueue } from "../concurrency/async-primitives.js";
 import type {
   ChatRef,
   ConversationAssistantMessage,
@@ -26,7 +27,7 @@ interface StoredConversationMeta extends ConversationState {
   messageCount?: number;
 }
 
-const conversationWriteQueues = new Map<string, Promise<void>>();
+const conversationWriteQueues = createKeyedSerialTaskQueue<string>();
 const lockTtlMs = 30_000;
 const lockRetryDelayMs = 25;
 const lockRetryCount = 400;
@@ -1320,24 +1321,7 @@ async function withWriteQueue<T>(
   queueKey: string,
   action: () => Promise<T>,
 ): Promise<T> {
-  const previous = conversationWriteQueues.get(queueKey) ?? Promise.resolve();
-  let releaseQueue: (() => void) | undefined;
-  const current = new Promise<void>((resolve) => {
-    releaseQueue = resolve;
-  });
-  const next = previous.catch(() => undefined).then(() => current);
-
-  conversationWriteQueues.set(queueKey, next);
-  await previous.catch(() => undefined);
-
-  try {
-    return await action();
-  } finally {
-    releaseQueue?.();
-    if (conversationWriteQueues.get(queueKey) === next) {
-      conversationWriteQueues.delete(queueKey);
-    }
-  }
+  return conversationWriteQueues.run(queueKey, action);
 }
 
 async function withAgentLock<T>(
