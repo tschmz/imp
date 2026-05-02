@@ -1,6 +1,14 @@
 import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import {
+  assertBackupAgentFileIsReadable,
+  type BackupAgentFileEntry,
+  type BackupAgentHomeEntry,
+  collectBackupAgentAssets,
+  createBackupAgentAssetRelocator,
+  shouldIncludeBackupAgentHome,
+} from "./backup-agent-assets.js";
 import { discoverConfigPath, getDefaultUserConfigPath } from "../config/discover-config-path.js";
 import { loadAppConfig } from "../config/load-app-config.js";
 import type { AppConfig } from "../config/types.js";
@@ -49,26 +57,6 @@ interface BackupManifest {
   agentHomes?: BackupAgentHomeEntry[];
   sessions?: BackupDataRootTreeEntry[];
   bindings?: BackupDataRootTreeEntry[];
-}
-
-interface BackupAgentFileEntry {
-  archivePath: string;
-  sourcePath: string;
-  configRelativePath?: string;
-  agentId: string;
-  reference:
-    | "prompt.base.file"
-    | "prompt.instructions[].file"
-    | "prompt.references[].file"
-    | "defaults.model.authFile"
-    | "model.authFile";
-}
-
-interface BackupAgentHomeEntry {
-  archivePath: string;
-  sourcePath: string;
-  configRelativePath?: string;
-  agentId: string;
 }
 
 interface BackupDataRootTreeEntry {
@@ -193,14 +181,7 @@ export function createBackupUseCases(dependencies: Partial<BackupDependencies> =
             );
           }
 
-          await restoreAgentHomes({
-            stageRoot,
-            manifest,
-            targetConfigPath,
-            targetDataRoot,
-            force,
-          });
-          await restoreAgentFiles({
+          await restoreAgentAssets({
             stageRoot,
             manifest,
             targetConfigPath,
@@ -281,11 +262,11 @@ async function stageBackup(options: {
   }
 
   if (selection.agents) {
-    const agentHomes = collectAgentHomes(appConfig, configPath);
+    const agentAssets = collectBackupAgentAssets(appConfig, configPath);
     manifest.agentHomes = [];
 
-    for (const entry of agentHomes) {
-      if (!(await shouldBackUpAgentHome(entry))) {
+    for (const entry of agentAssets.homes) {
+      if (!(await shouldIncludeBackupAgentHome(entry))) {
         continue;
       }
 
@@ -297,11 +278,10 @@ async function stageBackup(options: {
       });
     }
 
-    const agentFiles = collectAgentFiles(appConfig, configPath);
     manifest.agentFiles = [];
 
-    for (const [index, entry] of agentFiles.entries()) {
-      await assertAgentFileCanBeBackedUp(entry);
+    for (const [index, entry] of agentAssets.files.entries()) {
+      await assertBackupAgentFileIsReadable(entry);
       const archivePath = `agents/${index.toString().padStart(3, "0")}-${sanitizeArchiveName(entry.agentId)}-${sanitizeArchiveName(entry.reference)}${getArchiveFileExtension(entry.sourcePath)}`;
       await copyFileIntoArchive(entry.sourcePath, join(archiveRoot, archivePath));
       manifest.agentFiles.push({
@@ -343,155 +323,20 @@ async function stageDataRootTree(
   ];
 }
 
-function collectAgentFiles(appConfig: AppConfig, configPath: string): Omit<BackupAgentFileEntry, "archivePath">[] {
-  const configDir = dirname(configPath);
-  const files = new Map<string, Omit<BackupAgentFileEntry, "archivePath">>();
-
-  addAgentFile(files, {
-    agentId: appConfig.defaults.agentId,
-    reference: "defaults.model.authFile",
-    configDir,
-    configuredPath: appConfig.defaults.model?.authFile,
-  });
-
-  for (const agent of appConfig.agents) {
-    addAgentFile(files, {
-      agentId: agent.id,
-      reference: "prompt.base.file",
-      configDir,
-      configuredPath: agent.prompt?.base?.file,
-    });
-
-    for (const source of agent.prompt?.instructions ?? []) {
-      addAgentFile(files, {
-        agentId: agent.id,
-        reference: "prompt.instructions[].file",
-        configDir,
-        configuredPath: source.file,
-      });
-    }
-
-    for (const source of agent.prompt?.references ?? []) {
-      addAgentFile(files, {
-        agentId: agent.id,
-        reference: "prompt.references[].file",
-        configDir,
-        configuredPath: source.file,
-      });
-    }
-
-    addAgentFile(files, {
-      agentId: agent.id,
-      reference: "model.authFile",
-      configDir,
-      configuredPath: agent.model?.authFile,
-    });
-  }
-
-  return [...files.values()].sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
-}
-
-function collectAgentHomes(appConfig: AppConfig, configPath: string): Omit<BackupAgentHomeEntry, "archivePath">[] {
-  const configDir = dirname(configPath);
-  const homes = new Map<string, Omit<BackupAgentHomeEntry, "archivePath">>();
-
-  for (const agent of appConfig.agents) {
-    const configuredPath = agent.home ?? join(appConfig.paths.dataRoot, "agents", agent.id);
-    const sourcePath = resolveConfigPath(configuredPath, configDir);
-    if (homes.has(sourcePath)) {
-      continue;
-    }
-
-    homes.set(sourcePath, {
-      agentId: agent.id,
-      sourcePath,
-      ...(agent.home && !isAbsolute(agent.home) ? { configRelativePath: toPortablePath(agent.home) } : {}),
-    });
-  }
-
-  return [...homes.values()].sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
-}
-
-function addAgentFile(
-  files: Map<string, Omit<BackupAgentFileEntry, "archivePath">>,
-  options: {
-    agentId: string;
-    reference: BackupAgentFileEntry["reference"];
-    configDir: string;
-    configuredPath?: string;
-  },
-): void {
-  if (!options.configuredPath) {
-    return;
-  }
-
-  const sourcePath = resolveConfigPath(options.configuredPath, options.configDir);
-  if (files.has(sourcePath)) {
-    return;
-  }
-
-  files.set(sourcePath, {
-    agentId: options.agentId,
-    reference: options.reference,
-    sourcePath,
-    ...(isAbsolute(options.configuredPath) ? {} : { configRelativePath: toPortablePath(options.configuredPath) }),
-  });
-}
-
-async function assertAgentFileCanBeBackedUp(
-  entry: Omit<BackupAgentFileEntry, "archivePath">,
-): Promise<void> {
-  let fileStat;
-  try {
-    fileStat = await stat(entry.sourcePath);
-  } catch (error) {
-    if (isMissingPathError(error)) {
-      throw new Error(
-        `Referenced agent file not found for agent "${entry.agentId}" at ${entry.reference}: ${entry.sourcePath}`,
-      );
-    }
-
-    throw error;
-  }
-
-  if (!fileStat.isFile()) {
-    throw new Error(
-      `Referenced agent file is not a regular file for agent "${entry.agentId}" at ${entry.reference}: ${entry.sourcePath}`,
-    );
-  }
-}
-
-async function shouldBackUpAgentHome(entry: Omit<BackupAgentHomeEntry, "archivePath">): Promise<boolean> {
-  let homeStat;
-  try {
-    homeStat = await stat(entry.sourcePath);
-  } catch (error) {
-    if (isMissingPathError(error)) {
-      return false;
-    }
-
-    throw error;
-  }
-
-  if (!homeStat.isDirectory()) {
-    throw new Error(`Agent home is not a directory for agent "${entry.agentId}": ${entry.sourcePath}`);
-  }
-
-  return true;
-}
-
-async function restoreAgentHomes(options: {
+async function restoreAgentAssets(options: {
   stageRoot: string;
   manifest: BackupManifest;
   targetConfigPath: string;
   targetDataRoot?: string;
   force: boolean;
 }): Promise<void> {
+  const relocator = createBackupAgentAssetRelocator(options.manifest, {
+    targetConfigPath: options.targetConfigPath,
+    targetDataRoot: options.targetDataRoot,
+  });
+
   for (const entry of options.manifest.agentHomes ?? []) {
-    const targetPath = relocateArchivedAgentHome(entry, options.manifest, {
-      targetConfigPath: options.targetConfigPath,
-      targetDataRoot: options.targetDataRoot,
-    });
+    const targetPath = relocator.relocateArchivedHome(entry);
     const sourcePath = safeJoin(options.stageRoot, entry.archivePath, `manifest.agentHomes[].archivePath (${entry.agentId})`);
 
     await assertDirectoryCanBeRestored({
@@ -507,24 +352,13 @@ async function restoreAgentHomes(options: {
     await mkdir(dirname(targetPath), { recursive: true });
     await cp(sourcePath, targetPath, { recursive: true });
   }
-}
 
-async function restoreAgentFiles(options: {
-  stageRoot: string;
-  manifest: BackupManifest;
-  targetConfigPath: string;
-  targetDataRoot?: string;
-  force: boolean;
-}): Promise<void> {
   for (const entry of options.manifest.agentFiles ?? []) {
-    if (isContainedInArchivedAgentHome(options.manifest, entry.sourcePath)) {
+    if (relocator.isFileContainedInArchivedHome(entry.sourcePath)) {
       continue;
     }
 
-    const targetPath = relocateArchivedAgentFile(entry, options.manifest, {
-      targetConfigPath: options.targetConfigPath,
-      targetDataRoot: options.targetDataRoot,
-    });
+    const targetPath = relocator.relocateArchivedFile(entry);
     const sourcePath = safeJoin(options.stageRoot, entry.archivePath, `manifest.agentFiles[].archivePath (${entry.agentId})`);
     const content = await readFile(sourcePath, "utf8");
 
@@ -680,7 +514,7 @@ function relocateConfigFileReferences(
     targetDataRoot?: string;
   },
 ): AppConfig {
-  const relocationMap = createAgentFileRelocationMap(options.manifest, {
+  const relocator = createBackupAgentAssetRelocator(options.manifest, {
     targetConfigPath: options.targetConfigPath,
     targetDataRoot: options.targetDataRoot,
   });
@@ -695,7 +529,7 @@ function relocateConfigFileReferences(
         ? {
             model: {
               ...appConfig.defaults.model,
-              authFile: relocateConfiguredFilePath(appConfig.defaults.model.authFile, sourceConfigDir, relocationMap),
+              authFile: relocator.relocateConfiguredFilePath(appConfig.defaults.model.authFile, sourceConfigDir),
             },
           }
         : {}),
@@ -704,17 +538,14 @@ function relocateConfigFileReferences(
       ...agent,
       ...(agent.home
         ? {
-            home: relocateConfiguredAgentHome(agent.home, sourceConfigDir, options.manifest, {
-              targetConfigPath: options.targetConfigPath,
-              targetDataRoot: options.targetDataRoot,
-            }),
+            home: relocator.relocateConfiguredAgentHome(agent.home, sourceConfigDir),
           }
         : {}),
       ...(agent.model
         ? {
             model: {
               ...agent.model,
-              authFile: relocateConfiguredFilePath(agent.model.authFile, sourceConfigDir, relocationMap),
+              authFile: relocator.relocateConfiguredFilePath(agent.model.authFile, sourceConfigDir),
             },
           }
         : {}),
@@ -723,13 +554,13 @@ function relocateConfigFileReferences(
             prompt: {
               ...agent.prompt,
               ...(agent.prompt.base
-                ? { base: relocatePromptSource(agent.prompt.base, sourceConfigDir, relocationMap) }
+                ? { base: relocatePromptSource(agent.prompt.base, sourceConfigDir, relocator) }
                 : {}),
               instructions: agent.prompt.instructions?.map((source) =>
-                relocatePromptSource(source, sourceConfigDir, relocationMap),
+                relocatePromptSource(source, sourceConfigDir, relocator),
               ),
               references: agent.prompt.references?.map((source) =>
-                relocatePromptSource(source, sourceConfigDir, relocationMap),
+                relocatePromptSource(source, sourceConfigDir, relocator),
               ),
             },
           }
@@ -741,7 +572,7 @@ function relocateConfigFileReferences(
 function relocatePromptSource(
   source: NonNullable<NonNullable<AppConfig["agents"][number]["prompt"]>["base"]>,
   sourceConfigDir: string,
-  relocationMap: ReadonlyMap<string, string>,
+  relocator: ReturnType<typeof createBackupAgentAssetRelocator>,
 ): NonNullable<NonNullable<AppConfig["agents"][number]["prompt"]>["base"]> {
   if (!source.file) {
     return source;
@@ -749,156 +580,8 @@ function relocatePromptSource(
 
   return {
     ...source,
-    file: relocateConfiguredFilePath(source.file, sourceConfigDir, relocationMap) ?? source.file,
+    file: relocator.relocateConfiguredFilePath(source.file, sourceConfigDir) ?? source.file,
   };
-}
-
-function relocateConfiguredFilePath(
-  configuredPath: string | undefined,
-  sourceConfigDir: string,
-  relocationMap: ReadonlyMap<string, string>,
-): string | undefined {
-  if (!configuredPath) {
-    return undefined;
-  }
-
-  const resolvedSourcePath = resolveConfigPath(configuredPath, sourceConfigDir);
-  const relocatedPath = relocationMap.get(resolvedSourcePath);
-  if (!relocatedPath) {
-    return configuredPath;
-  }
-
-  return isAbsolute(configuredPath) ? relocatedPath : configuredPath;
-}
-
-function relocateConfiguredAgentHome(
-  configuredPath: string,
-  sourceConfigDir: string,
-  manifest: BackupManifest,
-  options: {
-    targetConfigPath?: string;
-    targetDataRoot?: string;
-  },
-): string {
-  if (!isAbsolute(configuredPath)) {
-    return configuredPath;
-  }
-
-  const resolvedSourcePath = resolveConfigPath(configuredPath, sourceConfigDir);
-  const archivedHome = findArchivedAgentHome(manifest, resolvedSourcePath);
-  if (archivedHome) {
-    return relocateArchivedAgentHome(archivedHome, manifest, options);
-  }
-
-  return relocateSourcePathByKnownRoots(resolvedSourcePath, manifest, options) ?? configuredPath;
-}
-
-function createAgentFileRelocationMap(
-  manifest: BackupManifest,
-  options: {
-    targetConfigPath?: string;
-    targetDataRoot?: string;
-  },
-): Map<string, string> {
-  const relocationMap = new Map<string, string>();
-
-  for (const entry of manifest.agentFiles ?? []) {
-    const relocatedPath = relocateArchivedAgentFile(entry, manifest, options);
-    relocationMap.set(entry.sourcePath, relocatedPath);
-  }
-
-  return relocationMap;
-}
-
-function relocateArchivedAgentFile(
-  entry: BackupAgentFileEntry,
-  manifest: BackupManifest,
-  options: {
-    targetConfigPath?: string;
-    targetDataRoot?: string;
-  },
-): string {
-  const containingHome = findContainingAgentHome(manifest, entry.sourcePath);
-  if (containingHome) {
-    const relativeToHome = relativeIfContainedOrSelf(containingHome.sourcePath, entry.sourcePath);
-    const targetHome = relocateArchivedAgentHome(containingHome, manifest, options);
-    return relativeToHome ? resolve(targetHome, relativeToHome) : targetHome;
-  }
-
-  if (entry.configRelativePath && options.targetConfigPath) {
-    return resolve(dirname(options.targetConfigPath), entry.configRelativePath);
-  }
-
-  return relocateSourcePathByKnownRoots(entry.sourcePath, manifest, options) ?? entry.sourcePath;
-}
-
-function relocateArchivedAgentHome(
-  entry: BackupAgentHomeEntry,
-  manifest: BackupManifest,
-  options: {
-    targetConfigPath?: string;
-    targetDataRoot?: string;
-  },
-): string {
-  if (entry.configRelativePath && options.targetConfigPath) {
-    return resolve(dirname(options.targetConfigPath), entry.configRelativePath);
-  }
-
-  return relocateSourcePathByKnownRoots(entry.sourcePath, manifest, options) ?? entry.sourcePath;
-}
-
-function relocateSourcePathByKnownRoots(
-  sourcePath: string,
-  manifest: BackupManifest,
-  options: {
-    targetConfigPath?: string;
-    targetDataRoot?: string;
-  },
-): string | undefined {
-  const sourceDataRootRelativePath = relativeIfContainedOrSelf(manifest.source.dataRoot, sourcePath);
-  if (sourceDataRootRelativePath !== undefined && options.targetDataRoot) {
-    return resolve(options.targetDataRoot, sourceDataRootRelativePath);
-  }
-
-  const sourceConfigDirRelativePath = relativeIfContainedOrSelf(dirname(manifest.source.configPath), sourcePath);
-  if (sourceConfigDirRelativePath !== undefined && options.targetConfigPath) {
-    return resolve(dirname(options.targetConfigPath), sourceConfigDirRelativePath);
-  }
-
-  return undefined;
-}
-
-function findArchivedAgentHome(manifest: BackupManifest, sourcePath: string): BackupAgentHomeEntry | undefined {
-  return (manifest.agentHomes ?? []).find((entry) => resolve(entry.sourcePath) === resolve(sourcePath));
-}
-
-function findContainingAgentHome(manifest: BackupManifest, sourcePath: string): BackupAgentHomeEntry | undefined {
-  let containingHome: BackupAgentHomeEntry | undefined;
-
-  for (const entry of manifest.agentHomes ?? []) {
-    if (relativeIfContainedOrSelf(entry.sourcePath, sourcePath) === undefined) {
-      continue;
-    }
-
-    if (!containingHome || resolve(entry.sourcePath).length > resolve(containingHome.sourcePath).length) {
-      containingHome = entry;
-    }
-  }
-
-  return containingHome;
-}
-
-function isContainedInArchivedAgentHome(manifest: BackupManifest, sourcePath: string): boolean {
-  return findContainingAgentHome(manifest, sourcePath) !== undefined;
-}
-
-function relativeIfContainedOrSelf(rootPath: string, candidatePath: string): string | undefined {
-  const relativePath = relative(resolve(rootPath), resolve(candidatePath));
-  if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
-    return undefined;
-  }
-
-  return relativePath;
 }
 
 async function readBackupManifest(stageRoot: string): Promise<BackupManifest> {
@@ -1139,10 +822,6 @@ function resolveBackupOutputPath(outputPath: string | undefined, configPath: str
   return resolve(dirname(configPath), `imp-backup-${timestamp}.tar`);
 }
 
-function resolveConfigPath(path: string, configDir: string): string {
-  return isAbsolute(path) ? path : resolve(configDir, path);
-}
-
 async function copyFileIntoArchive(sourcePath: string, targetPath: string): Promise<void> {
   await mkdir(dirname(targetPath), { recursive: true });
   await cp(sourcePath, targetPath, { force: true });
@@ -1175,10 +854,6 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function sanitizeArchiveName(value: string): string {
