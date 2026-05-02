@@ -541,6 +541,50 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts namespaced plugin agent references", () => {
+    const result = appConfigSchema.safeParse({
+      ...createConfig({
+        id: "default",
+        prompt: {
+          base: {
+            text: "You are concise.",
+          },
+        },
+        model: {
+          provider: "openai",
+          modelId: "gpt-5.4",
+        },
+        tools: {
+          agents: [
+            {
+              agentId: "trading-agents.forex-risk-manager",
+              toolName: "consult_risk_manager",
+            },
+          ],
+        },
+      }),
+      defaults: {
+        agentId: "trading-agents.forex-trader",
+      },
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+          routing: {
+            defaultAgentId: "trading-agents.forex-trader",
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("rejects delegated agent tools that reference unknown agents", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({

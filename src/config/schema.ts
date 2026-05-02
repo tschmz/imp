@@ -432,7 +432,7 @@ function validateAgentDelegationReferences(
     }
 
     for (const [delegationIndex, delegation] of (agent.tools?.agents ?? []).entries()) {
-      if (!knownAgentIds.has(delegation.agentId)) {
+      if (!knownAgentIds.has(delegation.agentId) && !isNamespacedReference(delegation.agentId)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["agents", agentIndex, "tools", "agents", delegationIndex, "agentId"],
@@ -458,7 +458,7 @@ function validateDefaultAgent(
   knownAgentIds: Set<string>,
   ctx: RefinementContext<AppConfig>,
 ): void {
-  if (knownAgentIds.has(config.defaults.agentId)) {
+  if (knownAgentIds.has(config.defaults.agentId) || isNamespacedReference(config.defaults.agentId)) {
     return;
   }
 
@@ -476,7 +476,7 @@ function validateEndpointDefaultAgents(
 ): void {
   for (const [index, endpoint] of config.endpoints.entries()) {
     const defaultAgentId = endpoint.routing?.defaultAgentId;
-    if (!defaultAgentId || knownAgentIds.has(defaultAgentId)) {
+    if (!defaultAgentId || knownAgentIds.has(defaultAgentId) || isNamespacedReference(defaultAgentId)) {
       continue;
     }
 
