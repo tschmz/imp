@@ -57,7 +57,8 @@
           "grep",
           "find",
           "ls",
-          "update_plan"
+          "update_plan",
+          "attach_file"
         ],
         "agents": [
           {
@@ -125,7 +126,8 @@
         "grep",
         "find",
         "ls",
-        "update_plan"
+        "update_plan",
+        "attach_file"
       ],
       "prompt": {
         "base": {

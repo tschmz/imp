@@ -38,7 +38,7 @@ interface TelegramBotAdapter {
     sendDocument(
       chatId: number | string,
       document: InputFile,
-      other?: { caption?: string },
+      other?: { caption?: string; disable_content_type_detection?: boolean },
     ): Promise<unknown>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
     setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;
@@ -129,12 +129,18 @@ export function createTelegramTransport(
     async start(handler: TransportHandler): Promise<void> {
       registeredDeliveryCleanup = context?.deliveryRouter.register(config.id, {
         async deliver(request): Promise<void> {
-          for (const chunk of renderTelegramMessages(request.message.text)) {
-            await bot.api.sendMessage(request.target.conversationId, chunk, {
-              parse_mode: "HTML",
-            });
+          if (request.message.text.length > 0) {
+            for (const chunk of renderTelegramMessages(request.message.text)) {
+              await bot.api.sendMessage(request.target.conversationId, chunk, {
+                parse_mode: "HTML",
+              });
+            }
           }
-          await sendTelegramAttachments(bot, request.target.conversationId, request.message);
+          await sendTelegramAttachments(bot, request.target.conversationId, request.message, logger, {
+            endpointId: config.id,
+            transport: "telegram",
+            conversationId: String(request.target.conversationId),
+          });
           await sendTelegramReplay(bot, request.target.conversationId, request.message);
         },
       });
@@ -1245,7 +1251,13 @@ function createTelegramInboundEvent(
     async deliver(message): Promise<void> {
       await deliverTranscriptIfNeeded();
       await replyWithTelegramText(ctx.reply, message.text);
-      await sendTelegramAttachments(bot, ctx.chat.id, message);
+      await sendTelegramAttachments(bot, ctx.chat.id, message, logger, {
+        endpointId,
+        transport: "telegram",
+        conversationId: String(ctx.chat.id),
+        messageId: String(ctx.message.message_id),
+        correlationId,
+      });
       await sendTelegramReplay(bot, ctx.chat.id, message);
     },
     async deliverProgress(message): Promise<void> {
@@ -1274,6 +1286,10 @@ async function replyWithTelegramText(
   ) => Promise<unknown>,
   text: string,
 ): Promise<void> {
+  if (text.length === 0) {
+    return;
+  }
+
   for (const chunk of renderTelegramMessages(text)) {
     await reply(chunk, {
       parse_mode: "HTML",
@@ -1342,15 +1358,38 @@ async function sendTelegramAttachments(
   bot: TelegramBotAdapter,
   chatId: number | string,
   message: OutgoingMessage,
+  logger?: Logger,
+  logContext?: {
+    endpointId: string;
+    transport: "telegram";
+    conversationId: string;
+    messageId?: string;
+    correlationId?: string;
+  },
 ): Promise<void> {
   for (const attachment of message.attachments ?? []) {
+    await logger?.debug("sending telegram attachment", {
+      ...logContext,
+      attachmentKind: attachment.kind,
+      attachmentPath: attachment.path,
+      ...(attachment.fileName ? { attachmentFileName: attachment.fileName } : {}),
+      ...(attachment.mimeType ? { attachmentMimeType: attachment.mimeType } : {}),
+    });
     await bot.api.sendDocument(
       chatId,
       new InputFile(attachment.path, attachment.fileName),
       {
         caption: attachment.fileName ?? "Export file",
+        disable_content_type_detection: true,
       },
     );
+    await logger?.debug("sent telegram attachment", {
+      ...logContext,
+      attachmentKind: attachment.kind,
+      attachmentPath: attachment.path,
+      ...(attachment.fileName ? { attachmentFileName: attachment.fileName } : {}),
+      ...(attachment.mimeType ? { attachmentMimeType: attachment.mimeType } : {}),
+    });
   }
 }
 

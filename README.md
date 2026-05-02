@@ -164,7 +164,7 @@ Use `--preflight` to also resolve runtime agent config, tools, and prompt files 
 Pass arrays and objects as JSON:
 
 ```sh
-imp config set agents.default.tools '["read","bash","edit","write","grep","find","ls","update_plan"]'
+imp config set agents.default.tools '["read","bash","edit","write","grep","find","ls","update_plan","attach_file"]'
 ```
 
 Relative paths in the config are resolved from the config file directory, not from the shell directory where you run `imp`.

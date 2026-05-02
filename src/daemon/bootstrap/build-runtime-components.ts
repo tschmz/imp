@@ -7,7 +7,6 @@ import type { LogLevel, Logger } from "../../logging/types.js";
 import { createRoutingLogger } from "../../logging/routing-logger.js";
 import {
   createBuiltInToolRegistry,
-  type WorkingDirectoryState,
   createPiAgentEngine,
 } from "../../runtime/create-pi-agent-engine.js";
 import { createAgentRuntimeSurfaceResolver } from "../../runtime/agent-runtime-surface.js";
@@ -35,10 +34,7 @@ export interface BuildRuntimeComponentsDependencies {
   agentRegistry?: AgentRegistry;
   engine?: AgentEngine;
   toolRegistry?: ToolRegistry;
-  createBuiltInToolRegistry?: (
-    workingDirectory: string | WorkingDirectoryState,
-    agent?: AgentDefinition,
-  ) => ToolRegistry;
+  createBuiltInToolRegistry?: typeof createBuiltInToolRegistry;
   createLogger?: (path: string, level: DaemonConfig["logging"]["level"], options?: FileLoggerOptions) => Logger;
   createConversationStore?: (paths: RuntimePaths) => ConversationStore;
 }
@@ -134,8 +130,8 @@ function createRuntimeToolRegistryFactory(
   createBuiltInRegistry: NonNullable<BuildRuntimeComponentsDependencies["createBuiltInToolRegistry"]>,
 ): NonNullable<BuildRuntimeComponentsDependencies["createBuiltInToolRegistry"]> {
   const pluginTools = config.pluginTools ?? [];
-  return (workingDirectory, agent) => {
-    const builtInRegistry = createBuiltInRegistry(workingDirectory, agent);
+  return (workingDirectory, agent, attachmentCollector, context) => {
+    const builtInRegistry = createBuiltInRegistry(workingDirectory, agent, attachmentCollector, context);
     if (pluginTools.length === 0) {
       return builtInRegistry;
     }

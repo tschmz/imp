@@ -60,6 +60,7 @@ export async function executeAgentStage(
     continueFromContext: context.input.continueFromContext,
     midRunMessages: context.input.midRunMessages,
     onMidRunMessageInjected: context.input.onMidRunMessageInjected,
+    getAttachments: () => context.attachmentCollector.list(),
   });
 
   return {

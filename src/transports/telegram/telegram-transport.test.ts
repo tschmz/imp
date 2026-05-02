@@ -446,7 +446,7 @@ describe("createTelegramTransport", () => {
     expect(bot.api.sendDocument).toHaveBeenCalledWith(
       "42",
       expect.objectContaining({ fileData: "/tmp/export.html", filename: "conversation-readable.html" }),
-      { caption: "conversation-readable.html" },
+      { caption: "conversation-readable.html", disable_content_type_detection: true },
     );
   });
 
@@ -498,7 +498,7 @@ describe("createTelegramTransport", () => {
     expect(bot.api.sendDocument).toHaveBeenCalledWith(
       42,
       expect.objectContaining({ fileData: "/tmp/export.html", filename: "conversation-readable.html" }),
-      { caption: "conversation-readable.html" },
+      { caption: "conversation-readable.html", disable_content_type_detection: true },
     );
   });
 
@@ -1567,7 +1567,7 @@ function createFakeBot(): {
     sendDocument(
       chatId: number | string,
       document: unknown,
-      other?: { caption?: string },
+      other?: { caption?: string; disable_content_type_detection?: boolean },
     ): Promise<unknown>;
     sendChatAction(chatId: number, action: "typing"): Promise<unknown>;
     setMyCommands(commands: ReadonlyArray<{ command: string; description: string }>): Promise<unknown>;

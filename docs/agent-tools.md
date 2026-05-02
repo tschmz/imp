@@ -30,11 +30,14 @@ Common built-in tools are:
 | `edit` | Edit existing files |
 | `write` | Create or overwrite files |
 | `update_plan` | Maintain a visible multi-step plan |
+| `attach_file` | Attach a local file to the final response |
+
+`attach_file` accepts a local `path` plus optional `fileName` and `mimeType`. Relative paths are resolved from the agent's current tool working directory. The tool validates that the file is readable and copies it into Imp's export area for the active session before queuing it. Telegram delivers queued files as documents after the text response; CLI chat shows them under `Attachments:`. Agents should not include local paths or `file://` links in the final text because those links are only meaningful on the machine running Imp.
 
 A broader coding-agent tool set might look like this:
 
 ```sh
-imp config set agents.default.tools '["read","bash","edit","write","grep","find","ls","pwd","cd","update_plan"]'
+imp config set agents.default.tools '["read","bash","edit","write","grep","find","ls","pwd","cd","update_plan","attach_file"]'
 ```
 
 Only enable `bash`, `edit`, and `write` for agents you trust with that level of access.

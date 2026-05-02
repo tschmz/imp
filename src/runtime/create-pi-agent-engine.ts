@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import type { AgentOptions } from "@mariozechner/pi-agent-core";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
+import type { ConversationContext } from "../domain/conversation.js";
 import type { Logger } from "../logging/types.js";
 import { createHookRunner } from "../extensions/hook-runner.js";
 import type { AgentEngineLifecycleHooks, HookRegistration } from "../extensions/types.js";
@@ -24,6 +25,7 @@ import type { AgentEngine, AgentRunContext } from "./types.js";
 import { AgentExecutionError } from "./agent-execution.js";
 import {
   createBuiltInToolRegistry,
+  type AttachmentCollector,
   type WorkingDirectoryState,
 } from "./tool-resolution.js";
 
@@ -41,6 +43,11 @@ interface PiAgentEngineDependencies {
   createBuiltInToolRegistry?: (
     workingDirectory: string | WorkingDirectoryState,
     agent?: AgentDefinition,
+    attachmentCollector?: AttachmentCollector,
+    context?: {
+      dataRoot?: string;
+      conversation?: ConversationContext;
+    },
   ) => ToolRegistry;
   agentRegistry?: AgentRegistry;
   resolveMcpTools?: (

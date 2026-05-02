@@ -20,8 +20,7 @@ import { parseInboundCommand } from "../../application/commands/parse-inbound-co
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import { renderUserFacingError } from "../../application/render-user-facing-error.js";
 import type { ActiveEndpointRuntimeConfig, CliEndpointRuntimeConfig } from "../../daemon/types.js";
-import type { IncomingMessageCommand } from "../../domain/message.js";
-import type { OutgoingMessageReplayItem } from "../../domain/message.js";
+import type { IncomingMessageCommand, OutgoingMessageAttachment, OutgoingMessageReplayItem } from "../../domain/message.js";
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
 import {
@@ -266,7 +265,10 @@ function createCliInboundEvent(
         options.onAgentResolved(message.conversation.agentId);
       }
       options.chatContainer.addChild(new Text(cyan("imp"), 0, 0));
-      options.chatContainer.addChild(new Markdown(message.text, 1, 0, markdownTheme));
+      if (message.text.length > 0) {
+        options.chatContainer.addChild(new Markdown(message.text, 1, 0, markdownTheme));
+      }
+      renderCliAttachments(message.attachments ?? [], options.chatContainer);
       options.chatContainer.addChild(new Spacer(1));
       renderCliReplay(message.replay ?? [], options.chatContainer);
       options.ui.requestRender();
@@ -292,6 +294,21 @@ function createCliInboundEvent(
       options.ui.requestRender();
     },
   };
+}
+
+function renderCliAttachments(
+  attachments: OutgoingMessageAttachment[],
+  chatContainer: Container,
+): void {
+  if (attachments.length === 0) {
+    return;
+  }
+
+  chatContainer.addChild(new Text(dim("Attachments:"), 1, 0));
+  for (const attachment of attachments) {
+    const label = attachment.fileName ? `${attachment.fileName}: ${attachment.path}` : attachment.path;
+    chatContainer.addChild(new Text(dim(`- ${label}`), 1, 0));
+  }
 }
 
 async function loadCliPromptHistoryIntoEditor(

@@ -14,7 +14,6 @@ import {
 import { resolveRuntimeTools } from "./pipeline/resolve-tools-stage.js";
 import {
   createBuiltInToolRegistry,
-  type WorkingDirectoryState,
 } from "./tool-resolution.js";
 import type { AgentEngine } from "./types.js";
 
@@ -39,10 +38,7 @@ export type AgentRuntimeSurfaceResolver = (
 
 export function createAgentRuntimeSurfaceResolver(dependencies: {
   toolRegistry?: ToolRegistry;
-  createBuiltInToolRegistry?: (
-    workingDirectory: string | WorkingDirectoryState,
-    agent?: AgentDefinition,
-  ) => ToolRegistry;
+  createBuiltInToolRegistry?: typeof createBuiltInToolRegistry;
   mcpToolCache: McpToolCache;
   agentRegistry?: AgentRegistry;
   promptTemplateSystemContext?: PromptTemplateSystemContext;

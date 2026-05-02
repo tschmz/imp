@@ -42,6 +42,10 @@ export interface LogFields {
   assistantToolCallNames?: string[];
   assistantHasThinking?: boolean;
   fileName?: string;
+  attachmentKind?: string;
+  attachmentPath?: string;
+  attachmentFileName?: string;
+  attachmentMimeType?: string;
   failedPath?: string;
   errorRecordPath?: string;
   rootDir?: string;

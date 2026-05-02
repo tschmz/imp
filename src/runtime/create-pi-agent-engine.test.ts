@@ -22,7 +22,7 @@ import {
   expectSystemPrompt,
   renderSystemPromptForTest,
 } from "./prompt-test-helpers.js";
-import { createLoadSkillTool } from "./tool-resolution.js";
+import { createLoadSkillTool, resolveAgentTools } from "./tool-resolution.js";
 import { toAgentMessages } from "./message-mapping.js";
 
 const registrations: FauxProviderRegistration[] = [];
@@ -1258,6 +1258,70 @@ describe("createPiAgentEngine", () => {
     expect(executionEvents.indexOf("slow_a:start")).toBeLessThan(
       executionEvents.indexOf("slow_b:end"),
     );
+  });
+
+  it("lets agents attach local files to the final response", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-attach-file-"));
+    tempDirs.push(root);
+    const reportPath = join(root, "report.txt");
+    await writeFile(reportPath, "report", "utf8");
+    const registration = registerFauxProvider({
+      provider: "faux",
+      models: [{ id: "faux-1", name: "Faux 1" }],
+    });
+    registrations.push(registration);
+    registration.setResponses([
+      () =>
+        fauxAssistantMessage(
+          [
+            {
+              type: "toolCall",
+              id: "call-attach",
+              name: "attach_file",
+              arguments: {
+                path: reportPath,
+                fileName: "final-report.txt",
+                mimeType: "text/plain",
+              },
+            },
+          ],
+          { stopReason: "toolUse" },
+        ),
+      () => fauxAssistantMessage("Here is the report."),
+    ]);
+
+    const engine = createPiAgentEngine({
+      resolveModel: () => registration.getModel("faux-1"),
+      readTextFile: async () => "unused context",
+    });
+
+    const result = await engine.run({
+      agent: {
+        ...createAgent(),
+        tools: ["attach_file"],
+      },
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+      runtime: {
+        dataRoot: root,
+      },
+    });
+
+    const attachmentPath = result.message.attachments?.[0]?.path;
+
+    expect(result.message).toMatchObject({
+      text: "Here is the report.",
+      attachments: [
+        {
+          kind: "file",
+          fileName: "final-report.txt",
+          mimeType: "text/plain",
+        },
+      ],
+    });
+    expect(attachmentPath).toContain(join(root, "exports", "default", "session-1", "attachments"));
+    expect(attachmentPath).toMatch(/final-report\.txt$/);
+    await expect(readFile(attachmentPath!, "utf8")).resolves.toBe("report");
   });
 
   it("registers delegated agent tools and executes child runs with the child's prompt, model, tools, and workspace", async () => {
@@ -2686,6 +2750,16 @@ describe("createPiAgentEngine", () => {
       kind: "tool_command_execution",
       message: "update_plan accepts at most one in_progress step.",
     } satisfies Partial<UserVisibleProcessingError>);
+  });
+
+  it("registers attach_file for startup validation without an active run collector", () => {
+    const registry = createBuiltInToolRegistry(process.cwd(), createAgent());
+
+    expect(registry.get("attach_file")).toBeDefined();
+    expect(resolveAgentTools({
+      ...createAgent(),
+      tools: ["attach_file"],
+    }, registry).map((tool) => tool.name)).toEqual(["attach_file"]);
   });
 
   it("marks stateful and mutating built-in tools for sequential execution", () => {

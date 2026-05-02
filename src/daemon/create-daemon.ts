@@ -206,11 +206,11 @@ async function logSkippedAgents(runtimes: BootstrappedRuntime[], skippedAgents: 
 
 
 function createRuntimeToolRegistryFactory(
-  createBuiltInRegistry: (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry,
+  createBuiltInRegistry: typeof createBuiltInToolRegistry,
   pluginTools: NonNullable<DaemonConfig["pluginTools"]>,
-): (workingDirectory: string | WorkingDirectoryState, agent?: AgentDefinition) => ToolRegistry {
-  return (workingDirectory, agent) => {
-    const builtInRegistry = createBuiltInRegistry(workingDirectory, agent);
+): typeof createBuiltInToolRegistry {
+  return (workingDirectory, agent, attachmentCollector, context) => {
+    const builtInRegistry = createBuiltInRegistry(workingDirectory, agent, attachmentCollector, context);
     if (pluginTools.length === 0) {
       return builtInRegistry;
     }

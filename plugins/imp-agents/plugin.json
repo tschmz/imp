@@ -32,6 +32,7 @@
           "write",
           "apply_patch",
           "update_plan",
+          "attach_file",
           "load_skill",
           "pwd",
           "cd",

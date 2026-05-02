@@ -86,6 +86,7 @@ describe("initAppConfig", () => {
       "find",
       "ls",
       "update_plan",
+      "attach_file",
     ]);
     expect(config.agents[0]?.workspace).toBeUndefined();
     expect(config.agents[0]).not.toHaveProperty("inference");

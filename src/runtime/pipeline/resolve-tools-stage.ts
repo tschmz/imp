@@ -18,6 +18,7 @@ import {
 } from "../tool-resolution.js";
 import type { AgentEngine, AgentRunContext } from "../types.js";
 import type { AgentRunRuntimeContext } from "../context.js";
+import { createAttachmentCollector, type AttachmentCollector } from "../attach-file-tool.js";
 import type { ResolvePromptStageContext } from "./resolve-prompt-stage.js";
 
 export interface RuntimeToolResolutionDetails {
@@ -35,6 +36,7 @@ export interface ResolvedRuntimeTools {
   tools: NonNullable<AgentRunContext["tools"]>;
   workingDirectoryState: WorkingDirectoryState;
   initialWorkingDirectory: string;
+  attachmentCollector: AttachmentCollector;
   toolResolution: RuntimeToolResolutionDetails;
 }
 
@@ -42,6 +44,7 @@ export interface ResolveToolsStageContext extends ResolvePromptStageContext {
   tools: NonNullable<AgentRunContext["tools"]>;
   workingDirectoryState: WorkingDirectoryState;
   initialWorkingDirectory: string;
+  attachmentCollector: AttachmentCollector;
   toolResolution: RuntimeToolResolutionDetails;
 }
 
@@ -52,6 +55,11 @@ export async function resolveToolsStage(
     createBuiltInToolRegistry: (
       workingDirectory: string | WorkingDirectoryState,
       agent?: AgentDefinition,
+      attachmentCollector?: AttachmentCollector,
+      context?: {
+        dataRoot?: string;
+        conversation?: ConversationContext;
+      },
     ) => ToolRegistry;
     mcpToolCache: McpToolCache;
     agentRegistry?: AgentRegistry;
@@ -85,6 +93,11 @@ export async function resolveRuntimeTools(
     createBuiltInToolRegistry: (
       workingDirectory: string | WorkingDirectoryState,
       agent?: AgentDefinition,
+      attachmentCollector?: AttachmentCollector,
+      registryContext?: {
+        dataRoot?: string;
+        conversation?: ConversationContext;
+      },
     ) => ToolRegistry;
     mcpToolCache: McpToolCache;
     agentRegistry?: AgentRegistry;
@@ -93,9 +106,13 @@ export async function resolveRuntimeTools(
 ): Promise<ResolvedRuntimeTools> {
   const initialWorkingDirectory = resolveConversationWorkingDirectory(context.agent, context.conversation);
   const workingDirectoryState = createWorkingDirectoryState(initialWorkingDirectory);
+  const attachmentCollector = createAttachmentCollector();
   const baseToolRegistry =
     dependencies.toolRegistry
-    ?? dependencies.createBuiltInToolRegistry(workingDirectoryState, context.agent);
+    ?? dependencies.createBuiltInToolRegistry(workingDirectoryState, context.agent, attachmentCollector, {
+      ...(context.runtime?.dataRoot ? { dataRoot: context.runtime.dataRoot } : {}),
+      conversation: context.conversation,
+    });
   const agentHomePlugins = await loadAgentHomePluginTools(context.agent);
   const toolRegistry = mergeToolRegistries(baseToolRegistry, agentHomePlugins.tools);
   const configuredBuiltInTools = [...context.agent.tools];
@@ -143,6 +160,7 @@ export async function resolveRuntimeTools(
   return {
     initialWorkingDirectory,
     workingDirectoryState,
+    attachmentCollector,
     toolResolution: {
       configuredBuiltInTools,
       resolvedBuiltInTools,

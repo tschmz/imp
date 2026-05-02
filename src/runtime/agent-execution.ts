@@ -5,7 +5,7 @@ import {
   type AgentOptions,
 } from "@mariozechner/pi-agent-core";
 import type { Api as AiApi, AssistantMessage, Model } from "@mariozechner/pi-ai";
-import type { IncomingMessage } from "../domain/message.js";
+import type { IncomingMessage, OutgoingMessageAttachment } from "../domain/message.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationEvent } from "../domain/conversation.js";
 import {
@@ -58,6 +58,7 @@ export interface ExecuteAgentOptions {
   readBinaryFile?: (path: string) => Promise<Uint8Array>;
   midRunMessages?: MidRunMessageSource;
   onMidRunMessageInjected?: (message: IncomingMessage) => Promise<void> | void;
+  getAttachments?: () => OutgoingMessageAttachment[];
 }
 
 export interface ExecuteAgentResult {
@@ -67,6 +68,7 @@ export interface ExecuteAgentResult {
       externalId: string;
     };
     text: string;
+    attachments?: OutgoingMessageAttachment[];
   };
   conversationEvents: ConversationEvent[];
   workingDirectory?: string;
@@ -201,7 +203,8 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
   }
 
   const responseText = getAssistantText(assistantMessage);
-  if (!responseText.trim() && options.replyChannel?.delivery !== "none") {
+  const attachments = options.getAttachments?.() ?? [];
+  if (!responseText.trim() && attachments.length === 0 && options.replyChannel?.delivery !== "none") {
     throw new Error(`Agent "${options.agent.id}" produced an assistant message without text content.`);
   }
 
@@ -209,6 +212,9 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
     message: {
       conversation: options.conversation,
       text: responseText,
+      ...(attachments.length > 0
+        ? { attachments }
+        : {}),
     },
     conversationEvents,
     ...(options.workingDirectoryState.get() !== options.initialWorkingDirectory
