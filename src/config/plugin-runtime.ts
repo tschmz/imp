@@ -173,6 +173,8 @@ function resolvePluginAgents(
   dataRoot: string,
   localToolNames: Set<string>,
 ): AgentConfig[] {
+  const localAgentIds = new Set((manifest.agents ?? []).map((agent) => agent.id));
+
   return (manifest.agents ?? []).map((agent) => {
     const agentId = namespacePluginId(manifest.id, agent.id);
     return {
@@ -187,7 +189,7 @@ function resolvePluginAgents(
         ? { workspace: { ...agent.workspace, cwd: resolveConfigPath(agent.workspace.cwd, pluginRoot) } }
         : {}),
       ...(agent.skills ? { skills: { paths: agent.skills.paths.map((path) => resolveConfigPath(path, pluginRoot)) } } : {}),
-      ...(agent.tools ? { tools: resolvePluginAgentTools(manifest, agent.tools, localToolNames) } : {}),
+      ...(agent.tools ? { tools: resolvePluginAgentTools(manifest, agent.tools, localToolNames, localAgentIds) } : {}),
     };
   });
 }
@@ -241,6 +243,7 @@ function resolvePluginAgentTools(
   manifest: PluginManifest,
   tools: NonNullable<AgentConfig["tools"]>,
   localToolNames: Set<string>,
+  localAgentIds: Set<string>,
 ): NonNullable<AgentConfig["tools"]> {
   const localMcpServerIds = new Set((manifest.mcpServers ?? []).map((server) => server.id));
 
@@ -256,7 +259,14 @@ function resolvePluginAgentTools(
       ? { mcp: { servers: tools.mcp.servers.map((serverId) => namespacePluginMcpReference(manifest.id, serverId, localMcpServerIds)) } }
       : {}),
     ...(tools.phone ? { phone: tools.phone } : {}),
-    ...(tools.agents ? { agents: tools.agents } : {}),
+    ...(tools.agents
+      ? {
+          agents: tools.agents.map((delegation) => ({
+            ...delegation,
+            agentId: namespacePluginAgentReference(manifest.id, delegation.agentId, localAgentIds),
+          })),
+        }
+      : {}),
   };
 }
 
@@ -293,6 +303,10 @@ function namespacePluginToolId(pluginId: string, id: string): string {
 }
 
 function namespacePluginMcpReference(pluginId: string, id: string, localIds: Set<string>): string {
+  return !id.includes(".") && localIds.has(id) ? namespacePluginId(pluginId, id) : id;
+}
+
+function namespacePluginAgentReference(pluginId: string, id: string, localIds: Set<string>): string {
   return !id.includes(".") && localIds.has(id) ? namespacePluginId(pluginId, id) : id;
 }
 

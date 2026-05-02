@@ -97,4 +97,47 @@ describe("pluginManifestSchema", () => {
       }),
     );
   });
+
+  it("accepts delegated agent tools for plugin agents", () => {
+    const result = pluginManifestSchema.safeParse({
+      schemaVersion: 1,
+      id: "trading-agents",
+      name: "Trading Agents",
+      version: "0.1.0",
+      agents: [
+        {
+          id: "trading-forex",
+          prompt: { base: { text: "Desk" } },
+          tools: {
+            agents: [
+              {
+                agentId: "forex-risk-manager",
+                toolName: "consult_risk_manager",
+                description: "Ask the Forex risk manager.",
+              },
+            ],
+          },
+        },
+        {
+          id: "forex-risk-manager",
+          prompt: { base: { text: "Risk" } },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error("Expected schema validation to pass.");
+    }
+
+    expect(result.data.agents?.[0]?.tools).toEqual({
+      agents: [
+        {
+          agentId: "forex-risk-manager",
+          toolName: "consult_risk_manager",
+          description: "Ask the Forex risk manager.",
+        },
+      ],
+    });
+  });
 });

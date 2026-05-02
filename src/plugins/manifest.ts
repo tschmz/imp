@@ -156,6 +156,16 @@ const pluginAgentSchema: z.ZodType<PluginAgentManifest> = z.object({
     z.object({
       builtIn: z.string().min(1).array().optional(),
       mcp: z.object({ servers: z.string().min(1).array().min(1) }).optional(),
+      agents: z
+        .object({
+          agentId: z.string().min(1),
+          toolName: z.string().min(1).optional(),
+          description: z.string().min(1).optional(),
+        })
+        .strict()
+        .array()
+        .min(1)
+        .optional(),
     }),
   ]).optional(),
 }).strict();

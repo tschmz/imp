@@ -647,8 +647,19 @@ describe("resolveRuntimeConfig", () => {
           tools: {
             builtIn: ["search", "read"],
             mcp: { servers: ["vault"] },
+            agents: [
+              {
+                agentId: "helper",
+                toolName: "ask_helper",
+              },
+            ],
           },
           skills: { paths: ["./agent-skills"] },
+        },
+        {
+          id: "helper",
+          model: { provider: "openai", modelId: "gpt-5.4" },
+          prompt: { base: { text: "Helper" } },
         },
       ],
     }, null, 2));
@@ -684,7 +695,7 @@ describe("resolveRuntimeConfig", () => {
       pluginRoot,
       manifest: { name: "search" },
     });
-    expect(result.agents.map((agent) => agent.id)).toEqual(["default", "notes.assistant"]);
+    expect(result.agents.map((agent) => agent.id)).toEqual(["default", "notes.assistant", "notes.helper"]);
     expect(result.agents[0]?.tools).toEqual(["notes__search"]);
     expect(result.agents[0]?.skills?.paths).toEqual([]);
     expect(result.agents[0]?.skillCatalog).toBeUndefined();
@@ -703,6 +714,12 @@ describe("resolveRuntimeConfig", () => {
         ],
       },
       skills: { paths: [join(pluginRoot, "agent-skills")] },
+      delegations: [
+        {
+          agentId: "notes.helper",
+          toolName: "ask_helper",
+        },
+      ],
     });
   });
 

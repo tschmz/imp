@@ -111,6 +111,7 @@ function renderAgentToolNames(tools: NonNullable<DiscoveredPluginManifest["manif
   return [
     ...(tools.builtIn ?? []),
     ...(tools.mcp?.servers.map((server) => `mcp:${server}`) ?? []),
+    ...(tools.agents?.map((delegation) => `agent:${delegation.agentId}`) ?? []),
   ];
 }
 
