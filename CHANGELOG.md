@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.22.0 - 2026-05-02
+
+### Added
+
+- Persist CLI prompt history per agent.
+- Show the runtime-resolved agent surface, including effective tools and skills, in agent command output.
+- Support delegated agent tools that target plugin-provided agents.
+
+### Changed
+
+- Reorganize the data root layout by splitting session data and chat-to-agent bindings, with matching backup scopes for `sessions` and `bindings`.
+- Make chat command responses more compact and action-oriented.
+- Track known repositories in the bundled Cody agent memory guidance.
+- Bump the bundled `imp-agents` plugin package to `0.1.5`.
+
+### Fixed
+
+- Correct cron day-of-month/day-of-week matching semantics.
+- Accept namespaced plugin agent references in configuration validation.
+- Preserve Cody's startup guidance for using remembered repositories from agent-home memory.
+
 ## 0.21.1 - 2026-05-01
 
 ### Fixed

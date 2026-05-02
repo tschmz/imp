@@ -52,6 +52,8 @@ Known repos:
 - /absolute/path/to/another/repo
 ```
 
+At the start of a new task, use the most recent valid repo from the loaded agent-home Markdown instructions as the default workspace if the user did not name a different repository.
+
 
 # Output
 
