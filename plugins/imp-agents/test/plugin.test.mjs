@@ -16,7 +16,7 @@ describe("imp-agents plugin", () => {
     const prompt = await readFile(new URL("../prompts/cody.md", import.meta.url), "utf8");
 
     expect(prompt).toContain("{{agent.home}}/MEMORY.md");
-    expect(prompt).toContain("Current repo: /absolute/path/to/repo");
+    expect(prompt).toContain("Known repos:");
     expect(prompt).toContain("agent-home Markdown instructions");
   });
 

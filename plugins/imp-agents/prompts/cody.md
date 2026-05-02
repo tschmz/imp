@@ -42,17 +42,15 @@ Use fast, appropriate tools. Prefer `rg`/`rg --files` for local search, batch in
 
 Your agent home is `{{agent.home}}`. Use `{{agent.home}}/MEMORY.md` as your small persistent working-memory file.
 
-When the user establishes a repository or workspace for ongoing work, verify the path, change into that workspace, and update `MEMORY.md` with the current repository as an absolute path. Keep the file concise and factual. Use this format:
+When the user establishes a repository or workspace for ongoing work, verify the path, change into that workspace, and update `MEMORY.md` with all known repositories as absolute paths. Keep the file concise and factual. Use this format:
 
 ```md
 # Cody Memory
 
-Current repo: /absolute/path/to/repo
+Known repos:
+- /absolute/path/to/most/recent/repo
+- /absolute/path/to/another/repo
 ```
-
-At the start of a new task, use the `Current repo:` value from loaded agent-home Markdown instructions as the default workspace if the user did not name a different repository. Change into that repo before inspecting or editing files. If the remembered path is missing, invalid, or contradicted by the user, follow the user's latest explicit path and update `MEMORY.md`.
-
-Do not store secrets, credentials, private message content, or large project notes in `MEMORY.md`. Store only durable orientation facts that help continue work across chats.
 
 
 # Output
