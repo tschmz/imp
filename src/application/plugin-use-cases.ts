@@ -165,50 +165,16 @@ export function createPluginUseCases(dependencies: PluginUseCaseDependencies = {
     },
 
     async doctorPlugin(options: { configPath?: string; id: string }): Promise<void> {
-      const { configPath, config } = await configInstaller.readValidatedConfig({
-        configPath: options.configPath,
-      });
-      let plugin;
-      let manifestError: unknown;
-      try {
-        plugin = await findConfiguredPluginManifest({
-          config,
-          configPath,
-          pluginId: options.id,
-        });
-      } catch (error) {
-        manifestError = error;
-      }
-      writeOutput(renderPluginDiagnostic(await diagnoseConfiguredPlugin({
-        config,
-        configPath,
-        pluginId: options.id,
-        plugin,
-        manifestError,
+      writeOutput(renderPluginDiagnostic(await loadConfiguredPluginDiagnostic({
+        configInstaller,
+        options,
       })));
     },
 
     async statusPlugin(options: { configPath?: string; id: string }): Promise<void> {
-      const { configPath, config } = await configInstaller.readValidatedConfig({
-        configPath: options.configPath,
-      });
-      let plugin;
-      let manifestError: unknown;
-      try {
-        plugin = await findConfiguredPluginManifest({
-          config,
-          configPath,
-          pluginId: options.id,
-        });
-      } catch (error) {
-        manifestError = error;
-      }
-      const result = await diagnoseConfiguredPlugin({
-        config,
-        configPath,
-        pluginId: options.id,
-        plugin,
-        manifestError,
+      const result = await loadConfiguredPluginDiagnostic({
+        configInstaller,
+        options,
       });
       writeOutput(`Plugin ${result.pluginId}: ${result.ok ? "ok" : "issues found"}`);
     },
@@ -296,13 +262,12 @@ async function resolveInstallablePlugin(options: {
   packageInstaller: ReturnType<typeof createPluginPackageInstaller>;
   writeOutput: (text: string) => void;
 }) {
-  if (options.options.root) {
-    return options.discovery.findPluginOrThrow(options.options);
-  }
-
-  const localPlugin = await options.discovery.findPlugin(options.options);
-  if (localPlugin) {
-    return localPlugin;
+  const directPlugin = await resolveDirectPlugin({
+    discovery: options.discovery,
+    options: options.options,
+  });
+  if (directPlugin) {
+    return directPlugin;
   }
 
   return options.packageInstaller.installFromPackageSpec({
@@ -337,29 +302,23 @@ async function resolveUpdatePlugin(options: {
         config: options.config,
         configPath: options.configPath,
         writeOutput: options.writeOutput,
-      });
+        });
     }
-
-    const packageSpec = await inferConfiguredPackageUpdateSpec({
+    return resolveConfiguredPluginUpdate({
       config: options.config,
       configPath: options.configPath,
-      plugin: options.previousPlugin.plugin,
-    });
-    if (!packageSpec) {
-      return options.previousPlugin.plugin;
-    }
-
-    return options.packageInstaller.installFromPackageSpec({
-      packageSpec,
-      config: options.config,
-      configPath: options.configPath,
+      previousPlugin: options.previousPlugin,
+      packageInstaller: options.packageInstaller,
       writeOutput: options.writeOutput,
     });
   }
 
-  const localPlugin = await options.discovery.findPlugin(options.options);
-  if (localPlugin) {
-    return localPlugin;
+  const directPlugin = await resolveDirectPlugin({
+    discovery: options.discovery,
+    options: options.options,
+  });
+  if (directPlugin) {
+    return directPlugin;
   }
 
   return options.packageInstaller.installFromPackageSpec({
@@ -375,13 +334,12 @@ async function resolveInspectablePlugin(options: {
   configInstaller: ReturnType<typeof createPluginConfigInstaller>;
   discovery: ReturnType<typeof createPluginDiscoveryService>;
 }): Promise<DiscoveredPluginManifest> {
-  if (options.options.root) {
-    return options.discovery.findPluginOrThrow(options.options);
-  }
-
-  const localPlugin = await options.discovery.findPlugin(options.options);
-  if (localPlugin) {
-    return localPlugin;
+  const directPlugin = await resolveDirectPlugin({
+    discovery: options.discovery,
+    options: options.options,
+  });
+  if (directPlugin) {
+    return directPlugin;
   }
 
   const configured = await readOptionalValidatedConfig(options.configInstaller, options.options.configPath);
@@ -394,6 +352,63 @@ async function resolveInspectablePlugin(options: {
   }
 
   return options.discovery.findPluginOrThrow(options.options);
+}
+
+async function loadConfiguredPluginDiagnostic(options: {
+  configInstaller: ReturnType<typeof createPluginConfigInstaller>;
+  options: { configPath?: string; id: string };
+}) {
+  const { configPath, config } = await options.configInstaller.readValidatedConfig({
+    configPath: options.options.configPath,
+  });
+  const { plugin, manifestError } = await readConfiguredPluginManifestResult({
+    config,
+    configPath,
+    pluginId: options.options.id,
+  });
+
+  return diagnoseConfiguredPlugin({
+    config,
+    configPath,
+    pluginId: options.options.id,
+    plugin,
+    manifestError,
+  });
+}
+
+async function resolveDirectPlugin(options: {
+  discovery: ReturnType<typeof createPluginDiscoveryService>;
+  options: InspectPluginOptions;
+}): Promise<DiscoveredPluginManifest | undefined> {
+  if (options.options.root) {
+    return options.discovery.findPluginOrThrow(options.options);
+  }
+
+  return options.discovery.findPlugin(options.options);
+}
+
+async function resolveConfiguredPluginUpdate(options: {
+  config: AppConfig;
+  configPath: string;
+  previousPlugin: PreviousPluginMatch;
+  packageInstaller: ReturnType<typeof createPluginPackageInstaller>;
+  writeOutput: (text: string) => void;
+}): Promise<DiscoveredPluginManifest> {
+  const packageSpec = await inferConfiguredPackageUpdateSpec({
+    config: options.config,
+    configPath: options.configPath,
+    plugin: options.previousPlugin.plugin,
+  });
+  if (!packageSpec) {
+    return options.previousPlugin.plugin;
+  }
+
+  return options.packageInstaller.installFromPackageSpec({
+    packageSpec,
+    config: options.config,
+    configPath: options.configPath,
+    writeOutput: options.writeOutput,
+  });
 }
 
 async function discoverConfiguredPluginsForList(
@@ -435,6 +450,24 @@ async function discoverConfiguredPluginsForList(
   }
 
   return { plugins, issues };
+}
+
+async function readConfiguredPluginManifestResult(options: {
+  config: AppConfig;
+  configPath: string;
+  pluginId: string;
+}): Promise<{ plugin: DiscoveredPluginManifest | undefined; manifestError: unknown }> {
+  try {
+    return {
+      plugin: await findConfiguredPluginManifest(options),
+      manifestError: undefined,
+    };
+  } catch (error) {
+    return {
+      plugin: undefined,
+      manifestError: error,
+    };
+  }
 }
 
 async function readOptionalValidatedConfig(
@@ -529,11 +562,7 @@ async function tryFindConfiguredPluginManifest(options: {
   configPath: string;
   pluginId: string;
 }): Promise<DiscoveredPluginManifest | undefined> {
-  try {
-    return await findConfiguredPluginManifest(options);
-  } catch {
-    return undefined;
-  }
+  return (await readConfiguredPluginManifestResult(options)).plugin;
 }
 
 async function readConfiguredPackageName(plugin: DiscoveredPluginManifest): Promise<string | undefined> {
