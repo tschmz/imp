@@ -47,16 +47,17 @@ export function getCliPromptHistoryPath(dataRoot: string, agentId: string): stri
 
 export function addCliPromptHistoryEntry(entries: readonly string[], text: string): string[] {
   const trimmed = text.trim();
+  const current = normalizeCliPromptHistoryEntries(entries);
 
   if (!trimmed) {
-    return entries.slice();
+    return current;
   }
 
-  if (entries[0] === trimmed) {
-    return entries.slice();
+  if (current[0] === trimmed) {
+    return current;
   }
 
-  return [trimmed, ...entries].slice(0, maxPromptHistoryEntries);
+  return [trimmed, ...current.filter((entry) => entry !== trimmed)].slice(0, maxPromptHistoryEntries);
 }
 
 async function readCliPromptHistory(path: string): Promise<string[]> {
@@ -83,9 +84,32 @@ async function readCliPromptHistory(path: string): Promise<string[]> {
     return [];
   }
 
-  return parsed.entries
-    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
-    .slice(0, maxPromptHistoryEntries);
+  return normalizeCliPromptHistoryEntries(parsed.entries);
+}
+
+function normalizeCliPromptHistoryEntries(entries: readonly unknown[]): string[] {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of entries) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+
+    const trimmed = entry.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+
+    seen.add(trimmed);
+    normalized.push(trimmed);
+
+    if (normalized.length >= maxPromptHistoryEntries) {
+      break;
+    }
+  }
+
+  return normalized;
 }
 
 async function writeCliPromptHistory(

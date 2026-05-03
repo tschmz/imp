@@ -34,15 +34,35 @@ describe("CLI prompt history", () => {
     );
   });
 
-  it("keeps newest prompts first and skips consecutive duplicates", async () => {
+  it("keeps newest prompts first and moves repeated prompts to the front", async () => {
     const root = await createTempDir();
     const store = createCliPromptHistoryStore(root);
 
     await store.add("default", "first");
     await store.add("default", "second");
-    await store.add("default", "second");
+    await store.add("default", "first");
 
-    expect(await store.read("default")).toEqual(["second", "first"]);
+    expect(await store.read("default")).toEqual(["first", "second"]);
+  });
+
+  it("deduplicates prompts loaded from existing history files", async () => {
+    const root = await createTempDir();
+    const store = createCliPromptHistoryStore(root);
+    const path = getCliPromptHistoryPath(root, "default");
+
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(
+      path,
+      JSON.stringify({
+        version: 1,
+        agentId: "default",
+        entries: ["first", " second ", "first", "", 42, "second", "third"],
+      }),
+      "utf8",
+    );
+
+    await expect(store.read("default")).resolves.toEqual(["first", "second", "third"]);
+    await expect(store.add("default", "second")).resolves.toEqual(["second", "first", "third"]);
   });
 
   it("limits stored prompt history", () => {

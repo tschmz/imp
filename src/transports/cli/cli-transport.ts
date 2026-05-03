@@ -24,6 +24,7 @@ import type { IncomingMessageCommand, OutgoingMessageAttachment, OutgoingMessage
 import type { Logger } from "../../logging/types.js";
 import type { Transport, TransportHandler, TransportInboundEvent } from "../types.js";
 import {
+  addCliPromptHistoryEntry,
   createCliPromptHistoryStore,
   type CliPromptHistoryStore,
 } from "./prompt-history.js";
@@ -109,7 +110,8 @@ export function createCliTransport(
         autocompleteMaxVisible: 8,
       });
       editor.setAutocompleteProvider(createCliAutocompleteProvider());
-      await loadCliPromptHistoryIntoEditor(editor, promptHistory, activeAgentId, logger);
+      const promptHistoryController = createCliPromptHistoryController(editor, promptHistory, activeAgentId, logger);
+      await promptHistoryController.loadActiveAgentHistory();
 
       terminalUi.addChild(new TruncatedText(bold(`imp chat: ${config.id}`), 0, 0));
       terminalUi.addChild(
@@ -142,6 +144,7 @@ export function createCliTransport(
           chatContainer,
           processingStatus,
           promptHistory,
+          promptHistoryController,
           getActiveAgentId: () => activeAgentId,
           setActiveAgentId: (agentId) => {
             activeAgentId = agentId;
@@ -172,6 +175,7 @@ async function submitInput(
     chatContainer: Container;
     processingStatus: CliProcessingStatus;
     promptHistory: CliPromptHistoryStore;
+    promptHistoryController: CliPromptHistoryController;
     getActiveAgentId: () => string;
     setActiveAgentId: (agentId: string) => void;
     ui: TUI;
@@ -191,7 +195,7 @@ async function submitInput(
     return;
   }
 
-  options.editor.addToHistory(text);
+  options.promptHistoryController.addSubmittedPrompt(text);
   persistCliPromptHistory(options.promptHistory, options.getActiveAgentId(), text, options.logger);
   options.editor.setText("");
   options.chatContainer.addChild(new Text(green("You"), 0, 0));
@@ -202,7 +206,10 @@ async function submitInput(
   const event = createCliInboundEvent(options.config, text, {
     chatContainer: options.chatContainer,
     processingStatus: options.processingStatus,
-    onAgentResolved: options.setActiveAgentId,
+    onAgentResolved: async (agentId) => {
+      options.setActiveAgentId(agentId);
+      await options.promptHistoryController.switchAgent(agentId);
+    },
     ui: options.ui,
     logger: options.logger,
   });
@@ -222,7 +229,7 @@ function createCliInboundEvent(
   options: {
     chatContainer: Container;
     processingStatus: CliProcessingStatus;
-    onAgentResolved: (agentId: string) => void;
+    onAgentResolved: (agentId: string) => void | Promise<void>;
     ui: TUI;
     logger?: Logger;
   },
@@ -262,7 +269,7 @@ function createCliInboundEvent(
     },
     async deliver(message): Promise<void> {
       if (message.conversation.agentId) {
-        options.onAgentResolved(message.conversation.agentId);
+        await options.onAgentResolved(message.conversation.agentId);
       }
       options.chatContainer.addChild(new Text(cyan("imp"), 0, 0));
       if (message.text.length > 0) {
@@ -311,25 +318,69 @@ function renderCliAttachments(
   }
 }
 
-async function loadCliPromptHistoryIntoEditor(
+interface CliPromptHistoryController {
+  addSubmittedPrompt(text: string): void;
+  loadActiveAgentHistory(): Promise<void>;
+  switchAgent(agentId: string): Promise<void>;
+}
+
+function createCliPromptHistoryController(
   editor: Editor,
   promptHistory: CliPromptHistoryStore,
-  agentId: string,
+  initialAgentId: string,
   logger: Logger | undefined,
-): Promise<void> {
-  try {
-    const entries = await promptHistory.read(agentId);
+): CliPromptHistoryController {
+  let activeAgentId = initialAgentId;
+  let loadVersion = 0;
 
-    for (const entry of [...entries].reverse()) {
-      editor.addToHistory(entry);
+  async function loadActiveAgentHistory(): Promise<void> {
+    const agentId = activeAgentId;
+    const version = ++loadVersion;
+
+    try {
+      const entries = await promptHistory.read(agentId);
+      if (version !== loadVersion || agentId !== activeAgentId) {
+        return;
+      }
+
+      setEditorPromptHistory(editor, entries);
+    } catch (error) {
+      await logger?.debug("failed to load cli prompt history", {
+        agentId,
+        errorType: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
     }
-  } catch (error) {
-    await logger?.debug("failed to load cli prompt history", {
-      agentId,
-      errorType: error instanceof Error ? error.name : typeof error,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
   }
+
+  return {
+    addSubmittedPrompt(text) {
+      loadVersion += 1;
+      setEditorPromptHistory(editor, addCliPromptHistoryEntry(getEditorPromptHistory(editor), text));
+    },
+    loadActiveAgentHistory,
+    async switchAgent(agentId) {
+      if (agentId === activeAgentId) {
+        return;
+      }
+
+      activeAgentId = agentId;
+      setEditorPromptHistory(editor, []);
+      await loadActiveAgentHistory();
+    },
+  };
+}
+
+function getEditorPromptHistory(editor: Editor): readonly string[] {
+  const state = editor as unknown as { history?: unknown };
+  return Array.isArray(state.history) ? state.history.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function setEditorPromptHistory(editor: Editor, entries: readonly string[]): void {
+  const state = editor as unknown as { history: string[]; historyIndex: number };
+  state.history = [...entries];
+  state.historyIndex = -1;
+  editor.invalidate();
 }
 
 function persistCliPromptHistory(
