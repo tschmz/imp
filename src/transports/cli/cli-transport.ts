@@ -100,6 +100,7 @@ export function createCliTransport(
       const terminalUi = new TUI(new ProcessTerminal(), true);
       ui = terminalUi;
       let activeAgentId = config.initialAgentId ?? config.defaultAgentId;
+      let activeAgentRevision = 0;
 
       const chatContainer = new Container();
       const statusContainer = new Container();
@@ -149,6 +150,10 @@ export function createCliTransport(
           setActiveAgentId: (agentId) => {
             activeAgentId = agentId;
           },
+          getActiveAgentRevision: () => activeAgentRevision,
+          bumpActiveAgentRevision: () => {
+            activeAgentRevision += 1;
+          },
           ui: terminalUi,
           handler,
           logger,
@@ -178,6 +183,8 @@ async function submitInput(
     promptHistoryController: CliPromptHistoryController;
     getActiveAgentId: () => string;
     setActiveAgentId: (agentId: string) => void;
+    getActiveAgentRevision: () => number;
+    bumpActiveAgentRevision: () => void;
     ui: TUI;
     handler: TransportHandler;
     logger?: Logger;
@@ -202,11 +209,29 @@ async function submitInput(
   options.chatContainer.addChild(new Text(text, 1, 0));
   options.chatContainer.addChild(new Spacer(1));
   options.ui.requestRender();
+  const parsedCommand = parseInboundCommand(text, {
+    allowedCommands: inboundCommandNames,
+  });
+  const activeAgentRevisionAtSubmit = options.getActiveAgentRevision();
 
   const event = createCliInboundEvent(options.config, text, {
     chatContainer: options.chatContainer,
     processingStatus: options.processingStatus,
     onAgentResolved: async (agentId) => {
+      if (
+        !shouldApplyCliAgentResolution({
+          command: parsedCommand?.command,
+          activeAgentRevisionAtSubmit,
+          currentActiveAgentRevision: options.getActiveAgentRevision(),
+        })
+      ) {
+        return;
+      }
+
+      if (agentId !== options.getActiveAgentId()) {
+        options.bumpActiveAgentRevision();
+      }
+
       options.setActiveAgentId(agentId);
       await options.promptHistoryController.switchAgent(agentId);
     },
@@ -221,6 +246,14 @@ async function submitInput(
     messageId: event.message.messageId,
     correlationId: event.message.correlationId,
   });
+}
+
+export function shouldApplyCliAgentResolution(options: {
+  command?: IncomingMessageCommand;
+  activeAgentRevisionAtSubmit: number;
+  currentActiveAgentRevision: number;
+}): boolean {
+  return options.command === "agent" || options.currentActiveAgentRevision === options.activeAgentRevisionAtSubmit;
 }
 
 function createCliInboundEvent(
