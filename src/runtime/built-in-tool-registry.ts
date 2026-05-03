@@ -1,6 +1,7 @@
 import { createFindTool, createGrepTool, createLsTool, createCodingTools } from "@mariozechner/pi-coding-agent";
 import { createBashTool } from "./bash-tool.js";
 import { createReadTool } from "./tools/read-tool.js";
+import { createWriteTool } from "./tools/write-tool.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
@@ -87,8 +88,9 @@ function createBaseBuiltInTools(
 ): ToolDefinition[] {
   const toolOptions = resolveBuiltInToolOptions(agent);
   return [
-    ...createCodingTools(workingDirectory).filter((tool) => tool.name !== "bash" && tool.name !== "read"),
+    ...createCodingTools(workingDirectory).filter((tool) => !["bash", "read", "write"].includes(tool.name)),
     createReadTool(workingDirectory),
+    createWriteTool(workingDirectory),
     createBashTool(workingDirectory, toolOptions?.bash),
     createGrepTool(workingDirectory),
     createFindTool(workingDirectory),
