@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { ToolDefinition } from "../../tools/types.js";
-import { requireRecord, requireString, resolveToolPath, textResult } from "./common.js";
+import { requireRecord, requireString, requireStringValue, resolveToolPath, textResult } from "./common.js";
 
 interface WriteToolDetails {
   path: string;
@@ -45,6 +45,6 @@ function parseWriteParams(params: unknown): { path: string; content: string } {
   const record = requireRecord(params, "write");
   return {
     path: requireString(record.path, "path", "write"),
-    content: requireString(record.content, "content", "write"),
+    content: requireStringValue(record.content, "content", "write"),
   };
 }

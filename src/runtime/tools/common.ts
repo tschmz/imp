@@ -39,6 +39,16 @@ export function requireString(value: unknown, name: string, toolName: string): s
   return value;
 }
 
+export function requireStringValue(value: unknown, name: string, toolName: string): string {
+  if (typeof value !== "string") {
+    throw createUserVisibleToolError(
+      "tool_command_execution",
+      `${toolName} ${name} must be a string.`,
+    );
+  }
+  return value;
+}
+
 export function optionalString(value: unknown, name: string, toolName: string): string | undefined {
   if (value === undefined) {
     return undefined;
