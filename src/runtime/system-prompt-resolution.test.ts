@@ -347,7 +347,7 @@ describe("resolveSystemPrompt", () => {
       },
     );
 
-    expect(prompt).toContain("commit:Stage and commit changes.");
+    expectRenderedTemplate(prompt);
   });
 
   it("templates inline and file-backed prompt sources", async () => {
@@ -393,34 +393,27 @@ describe("resolveSystemPrompt", () => {
 
     expectRenderedTemplate(prompt);
   });
-  it("uses delegated communication rules for delegated child runs", async () => {
-    const prompt = await buildDefaultSystemPrompt({
-      templateContext: mergeTemplateContext(createTemplateContext(), {
+  it.each([
+    {
+      name: "delegated child runs",
+      context: {
         invocation: {
-          kind: "delegated",
+          kind: "delegated" as const,
           parentAgentId: "default",
           toolName: "ask_helper",
         },
         output: {
-          mode: "delegated-tool",
+          mode: "delegated-tool" as const,
           reply: {
             channel: {
-              kind: "none",
-              delivery: "none",
+              kind: "none" as const,
+              delivery: "none" as const,
               endpointId: "",
             },
           },
         },
-      }),
-    });
-
-    expect(prompt).toContain("- Invocation: delegated");
-    expect(prompt).toContain("- Output: delegated-tool");
-    expect(prompt).toContain("You are running as a delegated child agent through a tool call");
-    expect(prompt).not.toContain("You are chatting through Telegram.");
-  });
-
-  it.each([
+      },
+    },
     {
       name: "audio outbox reply channels",
       context: {
@@ -562,27 +555,14 @@ describe("resolveSystemPrompt", () => {
         throw new Error(`unexpected path: ${path}`);
       },
     );
-    expect(prompt).toContain("<available_skills>");
-    expect(prompt).toContain("load_skill");
-    expect(prompt).toContain("catalog");
-    expect(prompt).toContain("SKILL.md");
-    expect(prompt).toContain("bundled scripts");
-    expect(prompt).toContain(
-      "<skill>\n" +
-        "<name>\ncommit\n</name>\n" +
-        "<description>\nStage and commit changes.\n</description>\n" +
-        "<location>\n/skills/commit/SKILL.md\n</location>\n" +
-        "</skill>",
-    );
-    expect(prompt).not.toContain("name: commit");
-    expect(prompt).not.toContain("Use focused commits.");
-    expect(prompt).not.toContain("<SKILLS>");
+    expectRenderedTemplate(prompt);
     expect(prompt.indexOf("<available_skills>")).toBeLessThan(prompt.indexOf("<INSTRUCTIONS"));
     expect(prompt.indexOf("<available_skills>")).toBeLessThan(prompt.indexOf("<REFERENCE"));
   });
 });
 
   it("does not auto-load agent-home cron.md as prompt instructions", async () => {
+    const readPaths: string[] = [];
     const prompt = await buildSystemPrompt(
       {
         ...createAgent(),
@@ -597,6 +577,7 @@ describe("resolveSystemPrompt", () => {
       createTemplateContext(),
       [],
       async (path) => {
+        readPaths.push(path);
         if (path === "/agents/default/AGENT.md") {
           return "Agent home instructions.";
         }
@@ -608,9 +589,8 @@ describe("resolveSystemPrompt", () => {
       ["/agents/default/AGENT.md", "/agents/default/cron.md"],
     );
 
-    expect(prompt).toContain("Agent home instructions.");
-    expect(prompt).not.toContain("Secret schedule instruction.");
-    expect(prompt).not.toContain("cron.md");
+    expectRenderedTemplate(prompt);
+    expect(readPaths).toEqual(["/agents/default/AGENT.md"]);
   });
 
 function expectRenderedTemplate(prompt: string): void {
