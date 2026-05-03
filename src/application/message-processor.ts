@@ -4,6 +4,8 @@ import type { MidRunMessageSource } from "../runtime/context.js";
 import type { OutgoingMessageDeliveryAction } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
 import type { TransportHandler, TransportInboundEvent } from "../transports/types.js";
+import { inboundCommandNames } from "./commands/registry.js";
+import { isUnknownInboundSlashCommand } from "./commands/parse-inbound-command.js";
 import { priorityInboundCommands } from "./commands/priority-inbound-commands.js";
 
 export interface MessageProcessorDependencies {
@@ -41,6 +43,17 @@ export function createMessageProcessor(
   return {
     async handle(event: TransportInboundEvent): Promise<void> {
       const preparedEvent = await dependencies.prepareEvent?.(event) ?? event;
+      if (shouldDiscardUnknownSlashCommand(preparedEvent.message)) {
+        await dependencies.logger?.debug("ignored unknown inbound slash command", {
+          endpointId: preparedEvent.message.endpointId,
+          transport: preparedEvent.message.conversation.transport,
+          conversationId: preparedEvent.message.conversation.externalId,
+          messageId: preparedEvent.message.messageId,
+          correlationId: preparedEvent.message.correlationId,
+        });
+        return;
+      }
+
       const conversationKey = getConversationQueueKey(preparedEvent.message);
       const activeSink = activeMidRunSinks.get(conversationKey);
       if (activeSink && !preparedEvent.message.command) {
@@ -144,6 +157,12 @@ function createMidRunMessageSink(hooks: {
 
 function shouldBypassConversationQueue(message: IncomingMessage): boolean {
   return Boolean(message.command && priorityInboundCommands.has(message.command));
+}
+
+function shouldDiscardUnknownSlashCommand(message: IncomingMessage): boolean {
+  return !message.command && isUnknownInboundSlashCommand(message.text, {
+    allowedCommands: inboundCommandNames,
+  });
 }
 
 async function processEvent(

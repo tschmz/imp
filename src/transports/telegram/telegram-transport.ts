@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join } from "node:path";
 import { Bot, GrammyError, InputFile } from "grammy";
-import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
+import {
+  isUnknownInboundSlashCommand,
+  parseInboundCommand,
+} from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import { renderUserFacingError } from "../../application/render-user-facing-error.js";
 import type { TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
@@ -171,6 +174,16 @@ export function createTelegramTransport(
         const text = textMessage.text.trim();
         if (!text) {
           await logger?.debug("ignored empty telegram message", {
+            endpointId: config.id,
+            transport: "telegram",
+            conversationId: String(safeContext.chat.id),
+            messageId: String(textMessage.message_id),
+          });
+          return;
+        }
+
+        if (isUnknownTelegramSlashCommand(textMessage, profile.username)) {
+          await logger?.debug("ignored unknown telegram slash command", {
             endpointId: config.id,
             transport: "telegram",
             conversationId: String(safeContext.chat.id),
@@ -1436,6 +1449,18 @@ function parseTelegramCommand(
   }
 
   return parseInboundCommand(message.text, {
+    botUsername,
+    entities: message.entities,
+    allowedCommands: inboundCommandNames,
+  });
+}
+
+function isUnknownTelegramSlashCommand(message: TelegramMessage, botUsername?: string): boolean {
+  if (typeof message.text !== "string") {
+    return false;
+  }
+
+  return isUnknownInboundSlashCommand(message.text, {
     botUsername,
     entities: message.entities,
     allowedCommands: inboundCommandNames,

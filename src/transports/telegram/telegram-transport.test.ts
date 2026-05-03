@@ -172,9 +172,11 @@ describe("createTelegramTransport", () => {
     expect(capturedMessage?.command).toBe("new");
   });
 
-  it("treats /start as an alias for /new", async () => {
+  it("ignores unknown slash commands without dispatching a chat message", async () => {
     const bot = createFakeBot();
-    let capturedMessage: IncomingMessage | undefined;
+    const handler = {
+      handle: vi.fn(async () => {}),
+    };
     const transport = createTelegramTransport(
       {
         id: "private-telegram",
@@ -185,18 +187,19 @@ describe("createTelegramTransport", () => {
       bot,
     );
 
-    await transport.start({
-      handle: vi.fn(async (event) => {
-        capturedMessage = event.message;
-      }),
-    });
+    await transport.start(handler);
     await bot.emitTextMessage({
       chat: { id: 42, type: "private" },
       from: { id: 7 },
       message: { message_id: 99, text: "/start" },
     });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 100, text: "/does_not_exist" },
+    });
 
-    expect(capturedMessage?.command).toBe("new");
+    expect(handler.handle).not.toHaveBeenCalled();
   });
 
   it("captures command arguments for /resume", async () => {
@@ -311,7 +314,9 @@ describe("createTelegramTransport", () => {
 
   it("ignores commands addressed to a different Telegram bot username", async () => {
     const bot = createFakeBot();
-    let capturedMessage: IncomingMessage | undefined;
+    const handler = {
+      handle: vi.fn(async () => {}),
+    };
     const transport = createTelegramTransport(
       {
         id: "private-telegram",
@@ -322,18 +327,14 @@ describe("createTelegramTransport", () => {
       bot,
     );
 
-    await transport.start({
-      handle: vi.fn(async (event) => {
-        capturedMessage = event.message;
-      }),
-    });
+    await transport.start(handler);
     await bot.emitTextMessage({
       chat: { id: 42, type: "private" },
       from: { id: 7 },
       message: { message_id: 99, text: "/new@other_bot" },
     });
 
-    expect(capturedMessage?.command).toBeUndefined();
+    expect(handler.handle).not.toHaveBeenCalled();
   });
 
   it("ignores a private text message from a disallowed user", async () => {

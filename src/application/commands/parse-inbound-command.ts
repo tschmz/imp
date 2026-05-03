@@ -22,8 +22,7 @@ export function parseInboundCommand(
     return undefined;
   }
 
-  const parsedCommand = match.groups.command.toLowerCase();
-  const command = (parsedCommand === "start" ? "new" : parsedCommand) as IncomingMessageCommand;
+  const command = match.groups.command.toLowerCase() as IncomingMessageCommand;
   const allowedCommands = options.allowedCommands ?? inboundCommandNames;
   if (!allowedCommands.has(command)) {
     return undefined;
@@ -39,6 +38,14 @@ export function parseInboundCommand(
     command,
     commandArgs: text.slice(match[0].length).trim() || undefined,
   };
+}
+
+export function isUnknownInboundSlashCommand(
+  text: string,
+  options: ParseInboundCommandOptions = {},
+): boolean {
+  const trimmed = text.trim();
+  return trimmed.startsWith("/") && parseInboundCommand(trimmed, options) === undefined;
 }
 
 function parseCommandToken(

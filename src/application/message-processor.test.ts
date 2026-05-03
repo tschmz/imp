@@ -948,6 +948,48 @@ describe("createMessageProcessor", () => {
 
     expect(deliver).not.toHaveBeenCalled();
   });
+
+  it("drops unknown slash commands before invoking the handler", async () => {
+    const deliver = vi.fn(async () => {});
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => ({
+        conversation: message.conversation,
+        text: "reply",
+      })),
+    };
+    const processor = createMessageProcessor({ handler });
+
+    await processor.handle(
+      createEvent({
+        ...createIncomingMessage("1", "42"),
+        text: "/does_not_exist",
+      }, {
+        deliver,
+      }),
+    );
+
+    expect(handler.handle).not.toHaveBeenCalled();
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it("keeps known slash commands even when command metadata is missing", async () => {
+    const handler = {
+      handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => ({
+        conversation: message.conversation,
+        text: `reply:${message.text}`,
+      })),
+    };
+    const processor = createMessageProcessor({ handler });
+
+    await processor.handle(
+      createEvent({
+        ...createIncomingMessage("1", "42"),
+        text: "/help",
+      }),
+    );
+
+    expect(handler.handle).toHaveBeenCalledOnce();
+  });
 });
 
 function createEvent(
