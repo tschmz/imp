@@ -1,5 +1,5 @@
-import type { ToolDefinition } from "../tools/types.js";
-import { createUserVisibleToolError } from "./user-visible-tool-error.js";
+import type { ToolDefinition } from "../../tools/types.js";
+import { createUserVisibleToolError } from "../user-visible-tool-error.js";
 
 const updatePlanStatuses = ["pending", "in_progress", "completed"] as const;
 

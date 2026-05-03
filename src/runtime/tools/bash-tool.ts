@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { execa } from "execa";
-import type { ToolDefinition } from "../tools/types.js";
+import type { ToolDefinition } from "../../tools/types.js";
 
 const DEFAULT_MAX_BYTES = 50 * 1024;
 const DEFAULT_MAX_LINES = 2000;

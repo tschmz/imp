@@ -1,4 +1,4 @@
-import { createBashTool } from "./bash-tool.js";
+import { createBashTool } from "./tools/bash-tool.js";
 import { createEditTool } from "./tools/edit-tool.js";
 import { createFindTool } from "./tools/find-tool.js";
 import { createGrepTool } from "./tools/grep-tool.js";
@@ -10,16 +10,16 @@ import type { AgentDefinition } from "../domain/agent.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { resolveBuiltInToolOptions } from "./shell-path.js";
-import { createConfiguredSkillTools } from "./skill-tool.js";
-import { createUpdatePlanTool } from "./update-plan-tool.js";
-import { createCronTool } from "./cron-tool.js";
-import { createAttachFileTool, createAttachmentCollector, type AttachmentCollector } from "./attach-file-tool.js";
+import { createConfiguredSkillTools } from "./tools/skill-tool.js";
+import { createUpdatePlanTool } from "./tools/update-plan-tool.js";
+import { createCronTool } from "./tools/cron-tool.js";
+import { createAttachFileTool, createAttachmentCollector, type AttachmentCollector } from "./tools/attach-file-tool.js";
 import { toUserVisibleToolError } from "./user-visible-tool-error.js";
 import {
   createWorkingDirectoryState,
   createWorkingDirectoryTools,
   type WorkingDirectoryState,
-} from "./working-directory-tools.js";
+} from "./tools/working-directory-tools.js";
 
 const sequentialDynamicToolNames = new Set(["bash", "edit", "write"]);
 

@@ -1,6 +1,6 @@
 import { delimiter as pathDelimiter } from "node:path";
 import type { AgentDefinition } from "../domain/agent.js";
-import type { BashToolOptions } from "./bash-tool.js";
+import type { BashToolOptions } from "./tools/bash-tool.js";
 
 export function resolveBuiltInToolOptions(agent?: AgentDefinition): { bash?: BashToolOptions } | undefined {
   const shellPath = agent?.workspace?.shellPath;

@@ -1,8 +1,8 @@
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { AgentDefinition } from "../domain/agent.js";
-import type { ToolDefinition } from "../tools/types.js";
-import { createUserVisibleToolError, toUserVisibleToolError } from "./user-visible-tool-error.js";
+import type { AgentDefinition } from "../../domain/agent.js";
+import type { ToolDefinition } from "../../tools/types.js";
+import { createUserVisibleToolError, toUserVisibleToolError } from "../user-visible-tool-error.js";
 
 export interface WorkingDirectoryState {
   get(): string;

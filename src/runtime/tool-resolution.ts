@@ -3,14 +3,14 @@ import type { AgentDefinition } from "../domain/agent.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
 export { createBuiltInToolRegistry } from "./built-in-tool-registry.js";
-export type { AttachmentCollector } from "./attach-file-tool.js";
-export { createLoadSkillTool } from "./skill-tool.js";
+export type { AttachmentCollector } from "./tools/attach-file-tool.js";
+export { createLoadSkillTool } from "./tools/skill-tool.js";
 export { mergeShellPathEntries } from "./shell-path.js";
 export {
   createWorkingDirectoryState,
   resolveWorkingDirectory,
   type WorkingDirectoryState,
-} from "./working-directory-tools.js";
+} from "./tools/working-directory-tools.js";
 
 export function resolveAgentTools(
   agent: AgentDefinition,

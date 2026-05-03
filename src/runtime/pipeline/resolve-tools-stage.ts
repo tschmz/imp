@@ -18,7 +18,7 @@ import {
 } from "../tool-resolution.js";
 import type { AgentEngine, AgentRunContext } from "../types.js";
 import type { AgentRunRuntimeContext } from "../context.js";
-import { createAttachmentCollector, type AttachmentCollector } from "../attach-file-tool.js";
+import { createAttachmentCollector, type AttachmentCollector } from "../tools/attach-file-tool.js";
 import type { ResolvePromptStageContext } from "./resolve-prompt-stage.js";
 
 export interface RuntimeToolResolutionDetails {

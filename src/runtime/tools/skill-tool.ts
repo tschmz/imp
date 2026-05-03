@@ -1,8 +1,8 @@
-import { loadSkillFromDirectory } from "../skills/discovery.js";
-import type { SkillDefinition } from "../skills/types.js";
-import type { ToolDefinition } from "../tools/types.js";
-import { renderPromptTemplate, type PromptTemplateContext } from "./prompt-template.js";
-import { createUserVisibleToolError, toUserVisibleToolError } from "./user-visible-tool-error.js";
+import { loadSkillFromDirectory } from "../../skills/discovery.js";
+import type { SkillDefinition } from "../../skills/types.js";
+import type { ToolDefinition } from "../../tools/types.js";
+import { renderPromptTemplate, type PromptTemplateContext } from "../prompt-template.js";
+import { createUserVisibleToolError, toUserVisibleToolError } from "../user-visible-tool-error.js";
 
 export function createConfiguredSkillTools(
   skills: SkillDefinition[],

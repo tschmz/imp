@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentDefinition } from "../domain/agent.js";
+import type { AgentDefinition } from "../../domain/agent.js";
 import { resolveWorkingDirectory } from "./working-directory-tools.js";
 
 describe("resolveWorkingDirectory", () => {

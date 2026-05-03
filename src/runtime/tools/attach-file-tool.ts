@@ -1,9 +1,9 @@
 import { copyFile, mkdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
-import type { ConversationContext } from "../domain/conversation.js";
-import type { OutgoingMessageAttachment } from "../domain/message.js";
-import type { ToolDefinition } from "../tools/types.js";
-import { createUserVisibleToolError } from "./user-visible-tool-error.js";
+import type { ConversationContext } from "../../domain/conversation.js";
+import type { OutgoingMessageAttachment } from "../../domain/message.js";
+import type { ToolDefinition } from "../../tools/types.js";
+import { createUserVisibleToolError } from "../user-visible-tool-error.js";
 
 export interface AttachmentCollector {
   add(attachment: OutgoingMessageAttachment): void;
