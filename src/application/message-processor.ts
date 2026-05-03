@@ -168,7 +168,9 @@ async function processEvent(
               }
             : undefined,
         );
-        await event.deliver(response);
+        if (!response.suppressDelivery) {
+          await event.deliver(response);
+        }
         if (response.deliveryAction) {
           await dependencies.afterDeliveryAction?.(response.deliveryAction, event);
         }

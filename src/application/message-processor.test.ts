@@ -927,6 +927,27 @@ describe("createMessageProcessor", () => {
       }),
     );
   });
+
+  it("skips transport delivery for suppressed responses", async () => {
+    const deliver = vi.fn(async () => {});
+    const processor = createMessageProcessor({
+      handler: {
+        handle: vi.fn(async (message: IncomingMessage): Promise<OutgoingMessage> => ({
+          conversation: message.conversation,
+          text: "reply",
+          suppressDelivery: true,
+        })),
+      },
+    });
+
+    await processor.handle(
+      createEvent(createIncomingMessage("1", "42"), {
+        deliver,
+      }),
+    );
+
+    expect(deliver).not.toHaveBeenCalled();
+  });
 });
 
 function createEvent(

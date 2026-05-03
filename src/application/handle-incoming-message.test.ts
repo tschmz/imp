@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
-import type { ConversationEvent } from "../domain/conversation.js";
+import type { ConversationContext, ConversationEvent } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { AgentEngine } from "../runtime/types.js";
 import type { ConversationStore } from "../storage/types.js";
@@ -1060,6 +1060,73 @@ describe("createHandleIncomingMessage", () => {
     });
   });
 
+  it("suppresses progress and final delivery when the selected agent changes during a run", async () => {
+    const agent = createDefaultAgent();
+    const opsAgent: AgentDefinition = { ...createDefaultAgent(), id: "ops", name: "ops" };
+    const deliverProgress = vi.fn(async () => {});
+    const store = createSelectableConversationStore();
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message, onConversationEvents }) => {
+        store.selectedAgentId = "ops";
+        await onConversationEvents?.([
+          createAssistantEvent(message, "I'll inspect the repo.", "commentary"),
+        ]);
+        return createAgentRunResult(message, "old agent reply");
+      }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent, opsAgent]),
+      conversationStore: store.store,
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    const response = await service.handle(createIncomingMessage("8b", "inspect it"), {
+      deliverProgress,
+    });
+
+    expect(response.text).toBe("old agent reply");
+    expect(response.suppressDelivery).toBe(true);
+    expect(deliverProgress).not.toHaveBeenCalled();
+    expect(store.persisted?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "assistant", content: [{ type: "text", text: "old agent reply" }] }),
+      ]),
+    );
+  });
+
+  it("suppresses final delivery when a new active session replaces the run session", async () => {
+    const agent = createDefaultAgent();
+    const store = createSelectableConversationStore();
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message }) => {
+        store.activeSessionId = "session-2";
+        return createAgentRunResult(message, "old session reply");
+      }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: store.store,
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    const response = await service.handle(createIncomingMessage("8c", "keep working"));
+
+    expect(response.text).toBe("old session reply");
+    expect(response.suppressDelivery).toBe(true);
+    expect(store.persisted?.state.conversation.sessionId).toBe("session-1");
+    expect(store.persisted?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "assistant", content: [{ type: "text", text: "old session reply" }] }),
+      ]),
+    );
+  });
+
   it("runs inbound message hooks around agent processing", async () => {
     const agent = createDefaultAgent();
     const calls: string[] = [];
@@ -1244,6 +1311,120 @@ function createConversationStore(): ConversationStore {
       },
       messages: [],
     })),
+  };
+}
+
+function createSelectableConversationStore(): {
+  store: ConversationStore;
+  selectedAgentId: string;
+  activeSessionId: string;
+  persisted?: ConversationContext;
+} {
+  const state = {
+    selectedAgentId: "default",
+    activeSessionId: "session-1",
+    persisted: undefined as ConversationContext | undefined,
+  };
+  const createContext = (sessionId: string, agentId: string, now = "2026-04-05T00:00:00.000Z"): ConversationContext => ({
+    state: {
+      conversation: {
+        transport: "telegram",
+        externalId: "42",
+        sessionId,
+      },
+      agentId,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    },
+    messages: [],
+  });
+
+  return {
+    get selectedAgentId() {
+      return state.selectedAgentId;
+    },
+    set selectedAgentId(agentId: string) {
+      state.selectedAgentId = agentId;
+    },
+    get activeSessionId() {
+      return state.activeSessionId;
+    },
+    set activeSessionId(sessionId: string) {
+      state.activeSessionId = sessionId;
+    },
+    get persisted() {
+      return state.persisted;
+    },
+    store: {
+      get: vi.fn(async () => createContext(state.activeSessionId, state.selectedAgentId)),
+      put: vi.fn(async (context) => {
+        state.persisted = context;
+      }),
+      appendEvents: vi.fn(async (context, events) => ({
+        ...context,
+        messages: [...context.messages, ...events],
+      })),
+      updateState: vi.fn(async (context, patch) => ({
+        ...context,
+        state: {
+          ...context.state,
+          ...patch,
+        },
+      })),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      ensureActive: vi.fn(async (ref, options) => createContext(state.activeSessionId, options.agentId, options.now)),
+      create: vi.fn(async (ref, options) => createContext(state.activeSessionId, options.agentId, options.now)),
+      getSelectedAgent: vi.fn(async () => state.selectedAgentId),
+      setSelectedAgent: vi.fn(async (_ref, agentId) => {
+        state.selectedAgentId = agentId;
+      }),
+      getActiveForAgent: vi.fn(async (agentId) => createContext(state.activeSessionId, agentId)),
+      ensureActiveForAgent: vi.fn(async (_ref, options) => {
+        state.selectedAgentId = options.agentId;
+        return createContext(state.activeSessionId, options.agentId, options.now);
+      }),
+      createForAgent: vi.fn(async (_ref, options) => {
+        state.selectedAgentId = options.agentId;
+        state.activeSessionId = "session-2";
+        return createContext(state.activeSessionId, options.agentId, options.now);
+      }),
+    },
+  };
+}
+
+function createAssistantEvent(
+  message: IncomingMessage,
+  text: string,
+  phase: "commentary" | "final_answer" = "final_answer",
+): ConversationEvent {
+  return {
+    kind: "message",
+    id: `${message.messageId}:assistant:${phase}`,
+    role: "assistant",
+    createdAt: "2026-04-05T00:00:01.000Z",
+    correlationId: message.correlationId,
+    timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+    api: "openai-responses",
+    provider: "openai",
+    model: "gpt-5-mini",
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: phase === "commentary" ? "toolUse" : "stop",
+    content: [
+      {
+        type: "text",
+        text,
+        textSignature: JSON.stringify({ v: 1, id: `${message.messageId}:${phase}`, phase }),
+      },
+    ],
   };
 }
 

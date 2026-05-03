@@ -86,6 +86,7 @@ export interface OutgoingMessage {
   attachments?: OutgoingMessageAttachment[];
   replay?: OutgoingMessageReplayItem[];
   deliveryAction?: OutgoingMessageDeliveryAction;
+  suppressDelivery?: boolean;
 }
 
 export interface OutgoingMessageAttachment {

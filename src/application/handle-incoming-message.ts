@@ -9,6 +9,7 @@ import { dispatchCommand } from "./inbound/dispatch-command.js";
 import { executeAgent } from "./inbound/execute-agent.js";
 import { compactConversationIfNeeded } from "./inbound/compact-conversation.js";
 import { persistConversation } from "./inbound/persist-conversation.js";
+import { markResponseSuppressedWhenStale } from "./inbound/response-delivery.js";
 import { resolveConversation } from "./inbound/resolve-conversation.js";
 import { resolveSkills } from "./inbound/resolve-skills.js";
 import { runHooksStart } from "./inbound/run-hooks-start.js";
@@ -87,9 +88,15 @@ export function createHandleIncomingMessage(
         activeContext = responseContext;
         const persistedContext = await persistConversation(responseContext);
         activeContext = persistedContext;
+        const deliveryResponse = await markResponseSuppressedWhenStale(persistedContext.response, {
+          store: dependencies.conversationStore,
+          ref: message.conversation,
+          conversation: persistedContext.conversation,
+          defaultAgentId: defaultAgent.id,
+        });
         await runHooksSuccess(persistedContext);
 
-        return persistedContext.response;
+        return deliveryResponse;
       } catch (error) {
         await runHooksError(activeContext, error);
         throw error;

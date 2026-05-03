@@ -1,6 +1,7 @@
 import type { ConversationEvent } from "../../domain/conversation.js";
 import { getAssistantCommentaryText } from "../../runtime/message-mapping.js";
 import { toUserConversationMessage } from "./incoming-message-event.js";
+import { isConversationStillSelected } from "./response-delivery.js";
 import {
   type ResolvedHandledInboundProcessingContext,
   type ResolvedInboundProcessingContext,
@@ -154,6 +155,16 @@ async function deliverProgressUpdates(
   replyChannel: ReturnType<typeof resolveMessageReplyChannel>,
 ): Promise<void> {
   if (!context.deliverProgress || replyChannel?.delivery === "none") {
+    return;
+  }
+
+  const shouldDeliver = await isConversationStillSelected(
+    context.dependencies.conversationStore,
+    context.message.conversation,
+    context.conversation,
+    context.defaultAgent.id,
+  );
+  if (!shouldDeliver) {
     return;
   }
 
