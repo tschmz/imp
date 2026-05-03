@@ -14,6 +14,7 @@ This documentation is written for people using Imp, not for people extending its
 
 - [Telegram](./telegram.md): chat with an agent from a private Telegram bot.
 - [Agent Context](./agent-context.md): give an agent instructions, reference files, workspace context, and skills.
+- [Template Variables](./template-variables.md): use prompt and skill template variables safely.
 - [Agent Tools](./agent-tools.md): choose what an agent may do, from read-only file access to shell commands and MCP tools.
 - [Backups](./backups.md): create and restore backup archives.
 - [Troubleshooting](./troubleshooting.md): diagnose common config, service, credential, and endpoint problems.

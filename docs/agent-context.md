@@ -139,6 +139,8 @@ Reply channel: {{reply.channel.kind}}
 
 If you omit `{{promptSections "INSTRUCTIONS" prompt.instructions}}`, configured instructions are not included by that custom base prompt. The same applies to references.
 
+See [Template Variables](./template-variables.md) for the full list of prompt and skill template variables.
+
 The built-in default prompt is stored in [`assets/agents/default-system-prompt.md`](../assets/agents/default-system-prompt.md) if you want to copy and adapt it.
 
 ## Context Loading Order
