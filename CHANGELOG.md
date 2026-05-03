@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.23.0 - 2026-05-03
+
+### Added
+
+- Add agent file attachments so agents can return local files as CLI attachments or Telegram documents.
+- Add built-in local filesystem tools for agents: `read`, `write`, `edit`, `grep`, `find`, and `ls`.
+
+### Changed
+
+- Centralize inbound pipeline state, backup agent asset handling, plugin resolution, runtime recovery, runtime startup logging, and runtime message preparation.
+- Share async queue primitives across storage and message processing.
+- Remove the unused `@mariozechner/pi-coding-agent` dependency.
+- Move built-in runtime tools into a dedicated tools directory.
+
 ## 0.22.0 - 2026-05-02
 
 ### Added
