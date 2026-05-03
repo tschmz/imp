@@ -811,7 +811,7 @@ describe("plugin use cases", () => {
         paths: { dataRoot },
         defaults: {
           agentId: "default",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
         },
         endpoints: [
           {
@@ -1814,7 +1814,7 @@ function createConfig(): AppConfig {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       },
     ],

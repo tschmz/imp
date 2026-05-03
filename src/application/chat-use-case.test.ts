@@ -304,7 +304,7 @@ function createAppConfig(overrides: Partial<AppConfig> = {}): AppConfig {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       },
     ],

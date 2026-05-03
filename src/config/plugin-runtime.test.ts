@@ -122,7 +122,7 @@ function createAppConfig(dataRoot: string): AppConfig {
     paths: { dataRoot },
     defaults: {
       agentId: "default",
-      model: { provider: "openai", modelId: "gpt-5.4" },
+      model: { provider: "openai", modelId: "gpt-5.5" },
     },
     agents: [
       {

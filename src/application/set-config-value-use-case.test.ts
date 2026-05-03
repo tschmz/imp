@@ -99,7 +99,7 @@ describe("createSetConfigValueUseCase", () => {
     const pluginRoot = join(dataRoot, "plugins", "imp-agents");
     const writeOutput = vi.fn();
     const config = createConfig(dataRoot);
-    config.defaults.model = { provider: "openai", modelId: "gpt-5.4" };
+    config.defaults.model = { provider: "openai", modelId: "gpt-5.5" };
 
     await writeRawFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
     await writePluginManifest(pluginRoot, {
@@ -156,7 +156,7 @@ describe("createSetConfigValueUseCase", () => {
     const dataRoot = join(root, "state-home", "imp");
     const pluginRoot = join(dataRoot, "plugins", "imp-agents");
     const config = createConfig(dataRoot);
-    config.defaults.model = { provider: "openai", modelId: "gpt-5.4" };
+    config.defaults.model = { provider: "openai", modelId: "gpt-5.5" };
 
     await writeRawFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
     await writePluginManifest(pluginRoot, {
@@ -428,7 +428,7 @@ function createConfig(dataRoot: string): {
     agents: [
       {
         id: "default",
-        model: { provider: "openai", modelId: "gpt-5.4" },
+        model: { provider: "openai", modelId: "gpt-5.5" },
         prompt: {
           base: {
             text: "prompt",

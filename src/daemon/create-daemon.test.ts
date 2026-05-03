@@ -126,7 +126,7 @@ describe("createDaemon", () => {
             },
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
             tools: ["read"],
           },
@@ -154,7 +154,7 @@ describe("createDaemon", () => {
       },
       model: {
         provider: "openai",
-        modelId: "gpt-5.4",
+        modelId: "gpt-5.5",
       },
       tools: ["read"],
     });
@@ -184,7 +184,7 @@ describe("createDaemon", () => {
             },
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
             tools: ["read"],
           },
@@ -212,7 +212,7 @@ describe("createDaemon", () => {
       },
       model: {
         provider: "openai",
-        modelId: "gpt-5.4",
+        modelId: "gpt-5.5",
       },
       tools: ["read"],
     });
@@ -240,7 +240,7 @@ describe("createDaemon", () => {
             },
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
             tools: ["bashh"],
           },
@@ -349,7 +349,7 @@ describe("createDaemon", () => {
             },
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
             delegations: [
               {
@@ -394,7 +394,7 @@ describe("createDaemon", () => {
             },
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
             tools: ["bash"],
             delegations: [
@@ -413,7 +413,7 @@ describe("createDaemon", () => {
             },
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
           },
         ],
@@ -448,7 +448,7 @@ describe("createDaemon", () => {
             },
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
           },
         ],

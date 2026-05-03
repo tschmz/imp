@@ -22,15 +22,15 @@ describe("resolveModelOrThrow", () => {
     const resolved = resolveConfiguredModel(
       {
         provider: "openai",
-        modelId: "gpt-5.4",
+        modelId: "gpt-5.5",
         baseUrl: "http://pc:1234/v1",
         contextWindow: 262144,
         maxTokens: 32768,
       },
       () =>
         ({
-          id: "gpt-5.4",
-          name: "GPT-5.4",
+          id: "gpt-5.5",
+          name: "GPT-5.5",
           api: "openai-responses",
           provider: "openai",
           baseUrl: "https://api.openai.com/v1",
@@ -48,7 +48,7 @@ describe("resolveModelOrThrow", () => {
     );
 
     expect(resolved).toMatchObject({
-      id: "gpt-5.4",
+      id: "gpt-5.5",
       baseUrl: "http://pc:1234/v1",
       contextWindow: 262144,
       maxTokens: 32768,

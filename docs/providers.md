@@ -10,13 +10,13 @@ Set provider and model ID:
 
 ```sh
 imp config set defaults.model.provider openai
-imp config set defaults.model.modelId gpt-5.4
+imp config set defaults.model.modelId gpt-5.5
 ```
 
 Or set both at once:
 
 ```sh
-imp config set defaults.model '{"provider":"openai","modelId":"gpt-5.4"}'
+imp config set defaults.model '{"provider":"openai","modelId":"gpt-5.5"}'
 ```
 
 Validate after changing a model:

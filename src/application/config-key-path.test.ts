@@ -7,7 +7,7 @@ describe("getValueAtKeyPath", () => {
       getValueAtKeyPath(
         {
           agents: [
-            { id: "default", model: { modelId: "gpt-5.4" } },
+            { id: "default", model: { modelId: "gpt-5.5" } },
             { id: "ops", model: { modelId: "gpt-5.4-mini" } },
           ],
         },
@@ -21,7 +21,7 @@ describe("getValueAtKeyPath", () => {
       getValueAtKeyPath(
         {
           agents: [
-            { id: "default", model: { modelId: "gpt-5.4" } },
+            { id: "default", model: { modelId: "gpt-5.5" } },
             { id: "ops", model: { modelId: "gpt-5.4-mini" } },
           ],
         },

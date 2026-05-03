@@ -30,12 +30,12 @@ describe("default app config helpers", () => {
       instanceName: "default",
       dataRoot: "/tmp/imp",
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
     });
 
     expect(config.defaults.model).toEqual({
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       inference: {
         metadata: {
           app: "imp",
@@ -54,7 +54,7 @@ describe("default app config helpers", () => {
       instanceName: "default",
       dataRoot: "/tmp/imp",
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       telegramToken: "123:abc",
       allowedUserIds: ["1"],
     });
@@ -77,7 +77,7 @@ describe("default app config helpers", () => {
       instanceName: "default",
       dataRoot: "/tmp/imp",
       provider: "openai-codex",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       telegramToken: "replace-me",
       allowedUserIds: [],
     });
@@ -91,7 +91,7 @@ describe("default app config helpers", () => {
       instanceName: "default",
       dataRoot: "/tmp/imp",
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       telegramToken: "replace-me",
       allowedUserIds: [],
     });
@@ -104,7 +104,7 @@ describe("default app config helpers", () => {
       instanceName: "home",
       dataRoot: "/tmp/imp",
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       telegramToken: "replace-me",
       allowedUserIds: ["1"],
       workingDirectory: "/workspace",
@@ -130,7 +130,7 @@ describe("default app config helpers", () => {
       instanceName: "home",
       dataRoot: "/tmp/imp",
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       telegramToken: "replace-me",
       allowedUserIds: ["1"],
       instructionFiles: [join("/workspace", "AGENTS.md")],
@@ -148,7 +148,7 @@ describe("default app config helpers", () => {
       instanceName: "home",
       dataRoot: "/tmp/imp",
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       telegramToken: "replace-me",
       allowedUserIds: ["1"],
       workingDirectory: "/workspace",

@@ -12,7 +12,7 @@ describe("createConfigGetView", () => {
     expect(getValueAtKeyPath(view, "agents.jarvis.name")).toBe("jarvis");
     expect(getValueAtKeyPath(view, "agents.jarvis.model")).toEqual({
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
     });
     expect(getValueAtKeyPath(view, "agents.jarvis.home")).toBe("/var/lib/imp/agents/jarvis");
     expect(getValueAtKeyPath(view, "agents.jarvis.prompt.base")).toEqual({ builtIn: "default" });
@@ -67,7 +67,7 @@ function createConfig(): AppConfig {
       agentId: "jarvis",
       model: {
         provider: "openai",
-        modelId: "gpt-5.4",
+        modelId: "gpt-5.5",
       },
     },
     agents: [

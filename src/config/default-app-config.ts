@@ -29,7 +29,7 @@ export function createDefaultAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     instanceName: "default",
     dataRoot,
     provider: "openai",
-    modelId: "gpt-5.4",
+    modelId: "gpt-5.5",
   });
 }
 
@@ -102,12 +102,12 @@ export function getSuggestedModelId(provider: string): string {
       return "claude-sonnet-4-5";
     case "openai":
     case "openai-codex":
-      return "gpt-5.4";
+      return "gpt-5.5";
     case "google-gemini-cli":
     case "google-antigravity":
       return "gemini-2.5-pro";
     case "github-copilot":
-      return "gpt-5.4";
+      return "gpt-5.5";
     default:
       return "replace-me";
   }

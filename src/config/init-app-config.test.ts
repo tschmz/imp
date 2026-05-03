@@ -66,7 +66,7 @@ describe("initAppConfig", () => {
     expect(config.defaults.agentId).toBe("default");
     expect(config.defaults.model).toEqual({
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       inference: {
         metadata: {
           app: "imp",
@@ -249,7 +249,7 @@ describe("initAppConfig", () => {
       instanceName: "default",
       dataRoot: root,
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       telegramToken: "replace-me",
       allowedUserIds: [],
       promptBaseFile: promptPath,
@@ -277,7 +277,7 @@ describe("initAppConfig", () => {
       instanceName: "home",
       dataRoot: join(root, "custom-state"),
       provider: "openai-codex",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       telegramToken: "123:abc",
       allowedUserIds: ["1", "2"],
       workingDirectory: join(root, "workspace"),

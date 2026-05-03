@@ -48,7 +48,7 @@ Set simple values directly:
 ```sh
 imp config set logging.level debug
 imp config set defaults.model.provider openai
-imp config set defaults.model.modelId gpt-5.4
+imp config set defaults.model.modelId gpt-5.5
 ```
 
 Set arrays or objects as JSON:

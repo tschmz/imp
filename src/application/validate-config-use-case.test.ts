@@ -49,7 +49,7 @@ describe("createValidateConfigUseCase", () => {
       agents: [
         {
           id: "default",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           prompt: {
             base: {
               file: "prompt.md",
@@ -73,7 +73,7 @@ describe("createValidateConfigUseCase", () => {
       agents: [
         {
           id: "default",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           prompt: {
             base: {
               file: "missing.md",
@@ -96,7 +96,7 @@ describe("createValidateConfigUseCase", () => {
       agents: [
         {
           id: "default",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           prompt: {
             base: {
               text: "prompt",
@@ -180,7 +180,7 @@ async function writeConfig(configPath: string, overrides: Record<string, unknown
         agents: [
           {
             id: "default",
-            model: { provider: "openai", modelId: "gpt-5.4" },
+            model: { provider: "openai", modelId: "gpt-5.5" },
             prompt: {
               base: {
                 text: "prompt",

@@ -11,7 +11,7 @@ describe("promptForInitialAppConfig", () => {
       .fn()
       .mockResolvedValueOnce("default")
       .mockResolvedValueOnce("/tmp/state-home/imp")
-      .mockResolvedValueOnce("gpt-5.4")
+      .mockResolvedValueOnce("gpt-5.5")
       .mockResolvedValueOnce("/workspace")
       .mockResolvedValueOnce("123:abc")
       .mockResolvedValueOnce("1, 2")
@@ -83,7 +83,7 @@ describe("promptForInitialAppConfig", () => {
       .fn()
       .mockResolvedValueOnce("default")
       .mockResolvedValueOnce("/tmp/state-home/imp")
-      .mockResolvedValueOnce("gpt-5.4")
+      .mockResolvedValueOnce("gpt-5.5")
       .mockResolvedValueOnce("")
       .mockResolvedValueOnce("");
     const confirm = vi.fn();

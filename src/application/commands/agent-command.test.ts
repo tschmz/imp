@@ -178,7 +178,7 @@ async function createPluginAgentConfig(): Promise<{ appConfig: AppConfig; config
     agents: [
       {
         id: "cody",
-        model: { provider: "openai", modelId: "gpt-5.4" },
+        model: { provider: "openai", modelId: "gpt-5.5" },
         prompt: { base: { text: "Cody" } },
       },
     ],
@@ -210,7 +210,7 @@ function createAppConfig(dataRoot: string): AppConfig {
     agents: [
       {
         id: "default",
-        model: { provider: "openai", modelId: "gpt-5.4" },
+        model: { provider: "openai", modelId: "gpt-5.5" },
         prompt: { base: { text: "Default" } },
         tools: [],
       },

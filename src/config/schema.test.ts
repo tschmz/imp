@@ -9,7 +9,7 @@ describe("appConfigSchema", () => {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       logging: {
@@ -27,7 +27,7 @@ describe("appConfigSchema", () => {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       logging: {
@@ -59,7 +59,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           authFile: "/tmp/auth.json",
         },
       }),
@@ -89,7 +89,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai-codex",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           authFile: "/tmp/auth.json",
         },
       }),
@@ -108,7 +108,7 @@ describe("appConfigSchema", () => {
         agentId: "default",
         model: {
           provider: "openai-codex",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           authFile: "/tmp/auth.json",
         },
       },
@@ -123,7 +123,7 @@ describe("appConfigSchema", () => {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
     );
@@ -160,7 +160,7 @@ describe("appConfigSchema", () => {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       endpoints: [],
@@ -175,7 +175,7 @@ describe("appConfigSchema", () => {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       plugins: [
@@ -228,7 +228,7 @@ describe("appConfigSchema", () => {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       plugins: [
@@ -262,7 +262,7 @@ describe("appConfigSchema", () => {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       plugins: [
@@ -303,7 +303,7 @@ describe("appConfigSchema", () => {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       plugins: [],
@@ -363,7 +363,7 @@ describe("appConfigSchema", () => {
         agentId: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       },
     });
@@ -382,7 +382,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
         workspace: {
           cwd: "/workspace",
@@ -405,7 +405,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
         skills: {
           paths: ["./skills", "/opt/imp/skills"],
@@ -428,7 +428,7 @@ describe("appConfigSchema", () => {
           },
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           tools: {
             builtIn: ["read"],
@@ -471,7 +471,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
         tools: {
           agents: [
@@ -496,7 +496,7 @@ describe("appConfigSchema", () => {
           },
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           tools: {
             agents: [
@@ -520,7 +520,7 @@ describe("appConfigSchema", () => {
           },
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
         },
         {
@@ -532,7 +532,7 @@ describe("appConfigSchema", () => {
           },
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
         },
       ],
@@ -552,7 +552,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
         tools: {
           agents: [
@@ -596,7 +596,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
         tools: {
           agents: [
@@ -632,7 +632,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
         tools: {
           agents: [
@@ -669,7 +669,7 @@ describe("appConfigSchema", () => {
           },
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           tools: {
             mcp: {
@@ -715,7 +715,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
         tools: {
           phone: {
@@ -761,7 +761,7 @@ describe("appConfigSchema", () => {
           },
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
         }),
         tools: {
@@ -805,7 +805,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
         tools: {
           mcp: {
@@ -839,7 +839,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       endpoints: [
@@ -877,7 +877,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       endpoints: [
@@ -910,7 +910,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       endpoints: [
@@ -943,7 +943,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       endpoints: [
@@ -983,7 +983,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       endpoints: [
@@ -1015,7 +1015,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       endpoints: [
@@ -1047,7 +1047,7 @@ describe("appConfigSchema", () => {
         },
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       }),
       endpoints: [

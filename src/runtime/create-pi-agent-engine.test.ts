@@ -944,7 +944,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -960,7 +960,7 @@ describe("createPiAgentEngine", () => {
         ...createAgent(),
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           inference: {
             maxOutputTokens: 2000,
             metadata: {
@@ -982,7 +982,7 @@ describe("createPiAgentEngine", () => {
     expect(
       await capturedOnPayload?.(
         {
-          model: "gpt-5.4",
+          model: "gpt-5.5",
           store: false,
           max_output_tokens: 4000,
           metadata: {
@@ -992,7 +992,7 @@ describe("createPiAgentEngine", () => {
         { api: "openai-responses" },
       ),
     ).toEqual({
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       store: true,
       max_output_tokens: 2000,
       metadata: {
@@ -1015,7 +1015,7 @@ describe("createPiAgentEngine", () => {
       logger,
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
           baseUrl: "https://api.openai.com/v1",
@@ -1033,7 +1033,7 @@ describe("createPiAgentEngine", () => {
         ...createAgent(),
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
         },
       },
       conversation: {
@@ -1065,7 +1065,7 @@ describe("createPiAgentEngine", () => {
             createdAt: "2026-04-05T00:00:01.000Z",
             api: "openai-responses",
             provider: "openai",
-            model: "gpt-5.4",
+            model: "gpt-5.5",
             responseId: "resp_123",
             usage: {
               input: 0,
@@ -1106,14 +1106,14 @@ describe("createPiAgentEngine", () => {
     expect(
       await capturedOnPayload?.(
         {
-          model: "gpt-5.4",
+          model: "gpt-5.5",
           input: [{ role: "user", content: [{ type: "input_text", text: "next turn" }] }],
           store: false,
         },
         { api: "openai-responses" },
       ),
     ).toEqual({
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       input: [{ role: "user", content: [{ type: "input_text", text: "next turn" }] }],
       store: false,
       previous_response_id: "resp_123",
@@ -1127,7 +1127,7 @@ describe("createPiAgentEngine", () => {
       messageId: "2",
       correlationId: "corr-2",
       agentId: "default",
-      requestModel: "gpt-5.4",
+      requestModel: "gpt-5.5",
       requestStore: false,
       requestPreviousResponseId: "resp_123",
       requestInputCount: 1,
@@ -1153,7 +1153,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -1648,7 +1648,7 @@ describe("createPiAgentEngine", () => {
       agentRegistry: createAgentRegistry([agent]),
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -1697,7 +1697,7 @@ describe("createPiAgentEngine", () => {
       agentRegistry: createAgentRegistry([childAgent, helperAgent]),
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -1764,7 +1764,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -1823,7 +1823,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -1935,7 +1935,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2008,7 +2008,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2052,7 +2052,7 @@ describe("createPiAgentEngine", () => {
       logger,
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2146,7 +2146,7 @@ describe("createPiAgentEngine", () => {
       logger,
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2204,7 +2204,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2258,7 +2258,7 @@ describe("createPiAgentEngine", () => {
           : undefined,
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2274,7 +2274,7 @@ describe("createPiAgentEngine", () => {
         ...createAgent(),
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           authFile: "/workspace/auth.json",
         },
       },
@@ -2292,7 +2292,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2383,7 +2383,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2438,7 +2438,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2503,7 +2503,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -2980,7 +2980,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -3008,7 +3008,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -3353,7 +3353,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -3390,7 +3390,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -3431,7 +3431,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -3477,7 +3477,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -3544,7 +3544,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,
@@ -3585,7 +3585,7 @@ describe("createPiAgentEngine", () => {
     const engine = createPiAgentEngine({
       resolveModel: () =>
         ({
-          id: "gpt-5.4",
+          id: "gpt-5.5",
           provider: "openai",
           api: "openai-responses",
         }) as never,

@@ -173,7 +173,7 @@ function createConfig(dataRoot: string) {
     agents: [
       {
         id: "default",
-        model: { provider: "openai", modelId: "gpt-5.4" },
+        model: { provider: "openai", modelId: "gpt-5.5" },
         prompt: {
           base: {
             text: "prompt",

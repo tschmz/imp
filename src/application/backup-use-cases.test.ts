@@ -424,7 +424,7 @@ describe("backup use cases", () => {
           agents: [
             {
               id: "default",
-              model: { provider: "openai-codex", modelId: "gpt-5.4" },
+              model: { provider: "openai-codex", modelId: "gpt-5.5" },
               prompt: {
                 base: { file: sourcePromptPath },
               },
@@ -482,7 +482,7 @@ describe("backup use cases", () => {
           agents: [
             {
               id: "default",
-              model: { provider: "openai-codex", modelId: "gpt-5.4" },
+              model: { provider: "openai-codex", modelId: "gpt-5.5" },
               prompt: {
                 base: { file: sourcePromptPath },
               },
@@ -554,7 +554,7 @@ describe("backup use cases", () => {
             {
               id: "default",
               home: sourceAgentHome,
-              model: { provider: "openai-codex", modelId: "gpt-5.4", authFile: "./oauth.json" },
+              model: { provider: "openai-codex", modelId: "gpt-5.5", authFile: "./oauth.json" },
               prompt: {
                 base: { file: sourceBasePromptPath },
                 instructions: [{ file: sourceInstructionPath }],
@@ -875,7 +875,7 @@ async function writeConfig(configPath: string, dataRoot: string): Promise<void> 
         agents: [
           {
             id: "default",
-            model: { provider: "openai-codex", modelId: "gpt-5.4", authFile: "./oauth.json" },
+            model: { provider: "openai-codex", modelId: "gpt-5.5", authFile: "./oauth.json" },
             prompt: {
               base: {
                 file: "./prompts/SYSTEM.md",

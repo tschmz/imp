@@ -34,7 +34,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default-agent",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
             inference: {
               metadata: {
                 app: "imp",
@@ -92,7 +92,7 @@ describe("resolveRuntimeConfig", () => {
         home: "/var/lib/imp/agents/default-agent",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           inference: {
             metadata: {
               app: "imp",
@@ -175,7 +175,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
             inference: {
               metadata: {
                 app: "imp",
@@ -230,7 +230,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           tools: [],
         },
@@ -264,7 +264,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           tools: {
             builtIn: ["read"],
@@ -289,7 +289,7 @@ describe("resolveRuntimeConfig", () => {
           id: "helper.agent",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           tools: [],
           prompt: {
@@ -302,7 +302,7 @@ describe("resolveRuntimeConfig", () => {
           id: "writer",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           tools: [],
           prompt: {
@@ -347,7 +347,7 @@ describe("resolveRuntimeConfig", () => {
         agentId: "default",
         model: {
           provider: "openai-codex",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           authFile: "./auth.json",
           inference: {
             request: {
@@ -383,7 +383,7 @@ describe("resolveRuntimeConfig", () => {
 
     expect(result.agents[0]?.model).toEqual({
       provider: "openai-codex",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
       authFile: "/etc/imp/auth.json",
       inference: {
         request: {
@@ -399,7 +399,7 @@ describe("resolveRuntimeConfig", () => {
         agentId: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           apiKey: {
             env: "OPENAI_API_KEY",
           },
@@ -443,7 +443,7 @@ describe("resolveRuntimeConfig", () => {
         agentId: "default",
         model: {
           provider: "openai-codex",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           authFile: "./auth.json",
           inference: {
             maxOutputTokens: 1000,
@@ -455,7 +455,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           prompt: {
             base: {
@@ -481,7 +481,7 @@ describe("resolveRuntimeConfig", () => {
 
     expect(result.agents[0]?.model).toEqual({
       provider: "openai",
-      modelId: "gpt-5.4",
+      modelId: "gpt-5.5",
     });
   });
 
@@ -560,7 +560,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           prompt: {
             base: {
@@ -642,7 +642,7 @@ describe("resolveRuntimeConfig", () => {
       agents: [
         {
           id: "assistant",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           prompt: { base: { file: "./prompts/assistant.md" } },
           tools: {
             builtIn: ["search", "read"],
@@ -658,7 +658,7 @@ describe("resolveRuntimeConfig", () => {
         },
         {
           id: "helper",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           prompt: { base: { text: "Helper" } },
         },
       ],
@@ -670,7 +670,7 @@ describe("resolveRuntimeConfig", () => {
         agents: [
           {
             id: "default",
-            model: { provider: "openai", modelId: "gpt-5.4" },
+            model: { provider: "openai", modelId: "gpt-5.5" },
             prompt: { base: { text: "Default" } },
             tools: ["notes.search"],
             skills: { paths: [] },
@@ -751,7 +751,7 @@ describe("resolveRuntimeConfig", () => {
       agents: [
         {
           id: "cody",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           prompt: { base: { text: "Plugin Cody" } },
         },
       ],
@@ -763,7 +763,7 @@ describe("resolveRuntimeConfig", () => {
         agents: [
           {
             id: "default",
-            model: { provider: "openai", modelId: "gpt-5.4" },
+            model: { provider: "openai", modelId: "gpt-5.5" },
             prompt: { base: { text: "Default" } },
           },
           {
@@ -821,7 +821,7 @@ describe("resolveRuntimeConfig", () => {
       agents: [
         {
           id: "assistant",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           prompt: { base: { text: "Assistant" } },
           tools: {
             builtIn: ["load_skill"],
@@ -926,7 +926,7 @@ describe("resolveRuntimeConfig", () => {
             id: "default",
             home: agentHome,
             workspace: { cwd: workspaceRoot },
-            model: { provider: "openai", modelId: "gpt-5.4" },
+            model: { provider: "openai", modelId: "gpt-5.5" },
             prompt: { base: { text: "Default" } },
             tools: ["echo.say"],
           },
@@ -990,7 +990,7 @@ describe("resolveRuntimeConfig", () => {
       agents: [
         {
           id: "assistant",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           tools: ["add"],
         },
       ],
@@ -1025,7 +1025,7 @@ describe("resolveRuntimeConfig", () => {
       agents: [
         {
           id: "default",
-          model: { provider: "openai", modelId: "gpt-5.4" },
+          model: { provider: "openai", modelId: "gpt-5.5" },
           prompt: { base: { text: "Default" } },
           tools: { mcp: { servers: ["notes.vault"] } },
         },
@@ -1083,7 +1083,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           home: "./agents/custom",
           prompt: {
@@ -1132,7 +1132,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           prompt: {
             base: {
@@ -1197,7 +1197,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           prompt: {
             base: {
@@ -1268,7 +1268,7 @@ describe("resolveRuntimeConfig", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
             authFile: "./auth.json",
           },
           prompt: {
@@ -1666,7 +1666,7 @@ describe("resolveRuntimeConfig", () => {
             id: "default",
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
             prompt: {
               base: {
@@ -1678,7 +1678,7 @@ describe("resolveRuntimeConfig", () => {
             id: "default",
             model: {
               provider: "openai",
-              modelId: "gpt-5.4",
+              modelId: "gpt-5.5",
             },
             prompt: {
               base: {
@@ -1762,7 +1762,7 @@ function createAppConfig(overrides: Partial<AppConfig>): AppConfig {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           inference: {
             metadata: {
               app: "imp",

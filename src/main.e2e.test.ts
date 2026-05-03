@@ -114,7 +114,7 @@ describe("imp CLI e2e", () => {
           id: "default",
           model: {
             provider: "openai-codex",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
             authFile: authPath,
           },
           prompt: {
@@ -163,7 +163,7 @@ describe("imp CLI e2e", () => {
           id: "default",
           model: {
             provider: "openai-codex",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           prompt: {
             base: {
@@ -221,7 +221,7 @@ describe("imp CLI e2e", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
         },
       ],
@@ -300,7 +300,7 @@ describe("imp CLI e2e", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           prompt: {
             base: {
@@ -371,7 +371,7 @@ describe("imp CLI e2e", () => {
           id: "default",
           model: {
             provider: "openai",
-            modelId: "gpt-5.4",
+            modelId: "gpt-5.5",
           },
           prompt: {
             base: {
@@ -477,7 +477,7 @@ async function writeDefaultConfig(root: string): Promise<void> {
         id: "default",
         model: {
           provider: "openai",
-          modelId: "gpt-5.4",
+          modelId: "gpt-5.5",
           inference: {
             metadata: {
               app: "imp",
