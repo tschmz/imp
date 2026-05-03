@@ -1,8 +1,8 @@
-import { createLsTool, createCodingTools } from "@mariozechner/pi-coding-agent";
 import { createBashTool } from "./bash-tool.js";
 import { createEditTool } from "./tools/edit-tool.js";
 import { createFindTool } from "./tools/find-tool.js";
 import { createGrepTool } from "./tools/grep-tool.js";
+import { createLsTool } from "./tools/ls-tool.js";
 import { createReadTool } from "./tools/read-tool.js";
 import { createWriteTool } from "./tools/write-tool.js";
 import type { ConversationContext } from "../domain/conversation.js";
@@ -91,7 +91,6 @@ function createBaseBuiltInTools(
 ): ToolDefinition[] {
   const toolOptions = resolveBuiltInToolOptions(agent);
   return [
-    ...createCodingTools(workingDirectory).filter((tool) => !["bash", "edit", "read", "write"].includes(tool.name)),
     createEditTool(workingDirectory),
     createReadTool(workingDirectory),
     createWriteTool(workingDirectory),
