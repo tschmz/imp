@@ -1,6 +1,7 @@
-import { createFindTool, createLsTool, createCodingTools } from "@mariozechner/pi-coding-agent";
+import { createLsTool, createCodingTools } from "@mariozechner/pi-coding-agent";
 import { createBashTool } from "./bash-tool.js";
 import { createEditTool } from "./tools/edit-tool.js";
+import { createFindTool } from "./tools/find-tool.js";
 import { createGrepTool } from "./tools/grep-tool.js";
 import { createReadTool } from "./tools/read-tool.js";
 import { createWriteTool } from "./tools/write-tool.js";
