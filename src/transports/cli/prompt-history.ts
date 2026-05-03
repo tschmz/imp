@@ -22,7 +22,8 @@ interface StoredCliPromptHistory {
 export function createCliPromptHistoryStore(dataRoot: string): CliPromptHistoryStore {
   return {
     async read(agentId) {
-      return readCliPromptHistory(getCliPromptHistoryPath(dataRoot, agentId));
+      const path = getCliPromptHistoryPath(dataRoot, agentId);
+      return await promptHistoryWriteQueue.run(path, () => readCliPromptHistory(path));
     },
     async add(agentId, text) {
       const path = getCliPromptHistoryPath(dataRoot, agentId);

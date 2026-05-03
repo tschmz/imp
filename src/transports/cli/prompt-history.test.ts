@@ -94,6 +94,18 @@ describe("CLI prompt history", () => {
     expect(new Set(await store.read("default"))).toEqual(new Set(prompts));
   });
 
+  it("waits for pending writes before reading prompt history", async () => {
+    const root = await createTempDir();
+    const store = createCliPromptHistoryStore(root);
+    const prompts = Array.from({ length: 20 }, (_, index) => `prompt ${index}`);
+
+    const writes = Promise.all(prompts.map((prompt) => store.add("default", prompt)));
+    const readAfterPendingWrites = store.read("default");
+
+    await writes;
+    await expect(readAfterPendingWrites).resolves.toHaveLength(prompts.length);
+  });
+
   it("recovers from invalid history files", async () => {
     const root = await createTempDir();
     const store = createCliPromptHistoryStore(root);
