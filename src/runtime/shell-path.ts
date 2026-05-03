@@ -1,8 +1,8 @@
 import { delimiter as pathDelimiter } from "node:path";
-import type { ToolsOptions } from "@mariozechner/pi-coding-agent";
 import type { AgentDefinition } from "../domain/agent.js";
+import type { BashToolOptions } from "./bash-tool.js";
 
-export function resolveBuiltInToolOptions(agent?: AgentDefinition): ToolsOptions | undefined {
+export function resolveBuiltInToolOptions(agent?: AgentDefinition): { bash?: BashToolOptions } | undefined {
   const shellPath = agent?.workspace?.shellPath;
   if (!shellPath || shellPath.length === 0) {
     return undefined;

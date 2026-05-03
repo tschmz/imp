@@ -33,7 +33,6 @@
     "@inquirer/prompts": "^8.3.2",
     "@mariozechner/pi-agent-core": "0.70.2",
     "@mariozechner/pi-ai": "0.70.2",
-    "@mariozechner/pi-coding-agent": "0.70.2",
     "@mariozechner/pi-tui": "0.70.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^14.0.3",
