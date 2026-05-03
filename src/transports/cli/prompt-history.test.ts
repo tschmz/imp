@@ -83,6 +83,17 @@ describe("CLI prompt history", () => {
     await expect(readFile(path, "utf8")).resolves.toContain('"entries"');
   });
 
+  it("serializes concurrent prompt history writes per agent", async () => {
+    const root = await createTempDir();
+    const store = createCliPromptHistoryStore(root);
+    const prompts = Array.from({ length: 20 }, (_, index) => `prompt ${index}`);
+
+    await Promise.all(prompts.map((prompt) => store.add("default", prompt)));
+
+    await expect(store.read("default")).resolves.toHaveLength(prompts.length);
+    expect(new Set(await store.read("default"))).toEqual(new Set(prompts));
+  });
+
   it("recovers from invalid history files", async () => {
     const root = await createTempDir();
     const store = createCliPromptHistoryStore(root);

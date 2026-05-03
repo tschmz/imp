@@ -1,10 +1,12 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import writeFileAtomic from "write-file-atomic";
+import { createKeyedSerialTaskQueue } from "../../concurrency/async-primitives.js";
 import { isMissingFileError } from "../../files/node-error.js";
 
 const promptHistoryVersion = 1;
 const maxPromptHistoryEntries = 100;
+const promptHistoryWriteQueue = createKeyedSerialTaskQueue<string>();
 
 export interface CliPromptHistoryStore {
   read(agentId: string): Promise<string[]>;
@@ -24,19 +26,21 @@ export function createCliPromptHistoryStore(dataRoot: string): CliPromptHistoryS
     },
     async add(agentId, text) {
       const path = getCliPromptHistoryPath(dataRoot, agentId);
-      const current = await readCliPromptHistory(path);
-      const next = addCliPromptHistoryEntry(current, text);
+      return await promptHistoryWriteQueue.run(path, async () => {
+        const current = await readCliPromptHistory(path);
+        const next = addCliPromptHistoryEntry(current, text);
 
-      if (next.length === current.length && next.every((entry, index) => entry === current[index])) {
-        return current;
-      }
+        if (next.length === current.length && next.every((entry, index) => entry === current[index])) {
+          return current;
+        }
 
-      await writeCliPromptHistory(path, {
-        version: promptHistoryVersion,
-        agentId,
-        entries: next,
+        await writeCliPromptHistory(path, {
+          version: promptHistoryVersion,
+          agentId,
+          entries: next,
+        });
+        return next;
       });
-      return next;
     },
   };
 }
