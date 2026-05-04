@@ -8,6 +8,7 @@ export type IncomingMessageCommand =
   | "resume"
   | "whoami"
   | "rename"
+  | "delete"
   | "reset"
   | "compact"
   | "export"

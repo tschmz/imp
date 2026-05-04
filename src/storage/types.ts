@@ -36,6 +36,7 @@ export interface ConversationStore {
   getSelectedAgent?(ref: ChatRef): Promise<string | undefined>;
   setSelectedAgent?(ref: ChatRef, agentId: string): Promise<void>;
   getActiveForAgent?(agentId: string): Promise<ConversationContext | undefined>;
+  deleteActiveForAgent?(agentId: string): Promise<ConversationContext | undefined>;
   listBackupsForAgent?(agentId: string): Promise<ConversationBackupSummary[]>;
   restoreForAgent?(agentId: string, backupId: string, options?: { now?: Date }): Promise<boolean>;
   ensureActiveForAgent?(ref: ChatRef, options: { agentId: string; now: string; title?: string }): Promise<ConversationContext>;

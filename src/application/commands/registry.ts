@@ -1,5 +1,6 @@
 import { agentCommandHandler } from "./agent-command.js";
 import { compactCommandHandler } from "./compact-command.js";
+import { deleteCommandHandler } from "./delete-command.js";
 import { resetCommandHandler } from "./reset-command.js";
 import { configCommandHandler } from "./config-command.js";
 import { exportCommandHandler } from "./export-command.js";
@@ -23,6 +24,7 @@ export const inboundCommandHandlers: InboundCommandHandler[] = [
   whoamiCommandHandler,
   statusCommandHandler,
   renameCommandHandler,
+  deleteCommandHandler,
   resetCommandHandler,
   compactCommandHandler,
   historyCommandHandler,

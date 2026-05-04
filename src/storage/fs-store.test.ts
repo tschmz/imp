@@ -1039,6 +1039,34 @@ describe("createFsConversationStore", () => {
     await expect(store.listBackupsForAgent!("ops")).resolves.toEqual([]);
   });
 
+  it("deletes the active session for an agent", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const chat = createChatRef();
+
+    const deleted = await store.createForAgent!(chat, {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+      title: "Delete me",
+    });
+    const preserved = await store.createForAgent!(chat, {
+      agentId: "ops",
+      now: "2026-04-05T00:01:00.000Z",
+      title: "Keep me",
+    });
+
+    await expect(store.deleteActiveForAgent!("default")).resolves.toEqual(deleted);
+
+    await expect(store.getActiveForAgent!("default")).resolves.toBeUndefined();
+    await expect(store.getActiveForAgent!("ops")).resolves.toEqual(preserved);
+    await expect(
+      readdir(join(root, "sessions", "default", "entries", deleted.state.conversation.sessionId!)),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(
+      readFile(join(root, "sessions", "default", "active.json"), "utf8"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
 });
 
 function createChatRef(): ChatRef {

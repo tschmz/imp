@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { appendFile, mkdir, readFile, readdir, rename } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import type {
   ToolResultMessage,
@@ -173,6 +173,9 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     },
     async getActiveForAgent(agentId) {
       return readActiveAgentConversation(paths.sessionsDir, agentId);
+    },
+    async deleteActiveForAgent(agentId) {
+      return deleteActiveAgentSession(paths.sessionsDir, agentId);
     },
     async listBackupsForAgent(agentId) {
       return readAgentInactiveSessions(paths.sessionsDir, agentId);
@@ -418,6 +421,33 @@ async function restoreAgentSession(
         sessionId: selected.sessionId,
       });
       return true;
+    }),
+  );
+}
+
+async function deleteActiveAgentSession(
+  sessionsDir: string,
+  agentId: string,
+): Promise<ConversationContext | undefined> {
+  return withAgentWriteQueue(agentId, async () =>
+    withAgentLock(sessionsDir, agentId, async () => {
+      const activeRef = await readActiveAgentConversationRef(sessionsDir, agentId);
+      if (!activeRef) {
+        return undefined;
+      }
+
+      const active = await readSession(agentId, activeRef, sessionsDir);
+      if (!active) {
+        await rm(getAgentActiveSessionPath(sessionsDir, agentId), { force: true });
+        return undefined;
+      }
+
+      await rm(getSessionDir(sessionsDir, active.state.conversation, active.state.agentId), {
+        force: true,
+        recursive: true,
+      });
+      await rm(getAgentActiveSessionPath(sessionsDir, agentId), { force: true });
+      return active;
     }),
   );
 }

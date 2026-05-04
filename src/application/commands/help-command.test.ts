@@ -20,6 +20,7 @@ describe("helpCommandHandler", () => {
     expect(response?.text).toContain(
       "`/reset` - Reset messages in the current session while preserving its title and agent.",
     );
+    expect(response?.text).toContain("`/delete` - Delete the current session permanently.");
     expect(response?.text).toContain("Context:");
     expect(response?.text).toContain("`/agent [id]` - Show or change the session agent.");
     expect(response?.text).toContain("Diagnostics:");

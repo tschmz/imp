@@ -218,6 +218,15 @@ export function createMutableConversationStore(
       };
     },
     getActiveForAgent: async (agentId) => current?.state.agentId === agentId ? current : undefined,
+    deleteActiveForAgent: async (agentId) => {
+      if (current?.state.agentId !== agentId) {
+        return undefined;
+      }
+
+      const deleted = current;
+      current = undefined;
+      return deleted;
+    },
     listBackupsForAgent: async () => [],
     restoreForAgent: async () => false,
     ensureActiveForAgent: async (ref, options) => {
