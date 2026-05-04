@@ -1,4 +1,4 @@
-import { toVisibleReplayItems } from "../conversation-replay.js";
+import { toLastVisibleTurnReplayItems } from "../conversation-replay.js";
 import { formatTimestamp, renderResumeUsage } from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 import { pickResumeBackup } from "./utils.js";
@@ -66,7 +66,7 @@ export const resumeCommandHandler: InboundCommandHandler = {
         ...(resumedConversation ? ["Replay follows."] : []),
       ].join("\n"),
       ...(resumedConversation
-        ? { replay: toVisibleReplayItems(resumedConversation) }
+        ? { replay: toLastVisibleTurnReplayItems(resumedConversation) }
         : {}),
     };
   },

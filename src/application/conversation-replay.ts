@@ -7,6 +7,17 @@ export function toVisibleReplayItems(conversation: ConversationContext): Outgoin
     .filter((item): item is OutgoingMessageReplayItem => item !== undefined);
 }
 
+export function toLastVisibleTurnReplayItems(conversation: ConversationContext): OutgoingMessageReplayItem[] {
+  const visibleItems = toVisibleReplayItems(conversation);
+  const lastUserIndex = findLastIndex(visibleItems, (item) => item.role === "user");
+  const lastAssistantIndex = findLastIndex(visibleItems, (item) => item.role === "assistant");
+
+  return [lastUserIndex, lastAssistantIndex]
+    .filter((index) => index >= 0)
+    .sort((left, right) => left - right)
+    .map((index) => visibleItems[index]!);
+}
+
 function toVisibleReplayItem(message: ConversationEvent): OutgoingMessageReplayItem | undefined {
   if (message.role === "toolResult") {
     return undefined;
@@ -36,4 +47,14 @@ function renderVisibleUserText(content: ConversationEvent["content"]): string {
     .map((item) => item.text)
     .join("\n")
     .trim();
+}
+
+function findLastIndex<T>(items: T[], predicate: (item: T) => boolean): number {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index]!)) {
+      return index;
+    }
+  }
+
+  return -1;
 }

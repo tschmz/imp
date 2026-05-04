@@ -4,7 +4,7 @@ import { resumeCommandHandler } from "./resume-command.js";
 import { createCommandContext, createDependencies, createIncomingMessage } from "./test-helpers.js";
 
 describe("resumeCommandHandler", () => {
-  it("resumes a session from history and includes visible replay messages", async () => {
+  it("resumes a session from history and replays only the last visible user and assistant messages", async () => {
     const resume = vi.fn(async () => true);
     const context = createCommandContext({
       message: createIncomingMessage("resume", "1"),
@@ -42,8 +42,8 @@ describe("resumeCommandHandler", () => {
     expect(response?.text).not.toContain("backed up");
     expect(response?.text).toContain("Agent: `ops`");
     expect(response?.replay).toEqual([
-      { role: "user", text: "old question", createdAt: "2026-04-05T00:00:10.000Z" },
-      { role: "assistant", text: "old answer", createdAt: "2026-04-05T00:00:20.000Z" },
+      { role: "user", text: "latest question", createdAt: "2026-04-05T00:00:40.000Z" },
+      { role: "assistant", text: "latest answer", createdAt: "2026-04-05T00:00:50.000Z" },
     ]);
   });
 
@@ -180,6 +180,32 @@ function createResumedConversation(): ConversationContext {
         content: [{ type: "text", text: "tool output" }],
         timestamp: Date.parse("2026-04-05T00:00:30.000Z"),
         createdAt: "2026-04-05T00:00:30.000Z",
+      },
+      {
+        id: "msg-4",
+        role: "user",
+        content: "latest question",
+        timestamp: Date.parse("2026-04-05T00:00:40.000Z"),
+        createdAt: "2026-04-05T00:00:40.000Z",
+      },
+      {
+        id: "msg-5",
+        role: "assistant",
+        content: [{ type: "text", text: "latest answer" }],
+        timestamp: Date.parse("2026-04-05T00:00:50.000Z"),
+        createdAt: "2026-04-05T00:00:50.000Z",
+        api: "test",
+        provider: "test",
+        model: "stub",
+        stopReason: "stop",
+        usage: {
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 2,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
       },
     ],
   };
