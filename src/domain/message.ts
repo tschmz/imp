@@ -6,6 +6,7 @@ export type IncomingMessageCommand =
   | "status"
   | "history"
   | "resume"
+  | "previous"
   | "whoami"
   | "rename"
   | "delete"

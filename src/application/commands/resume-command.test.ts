@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConversationContext } from "../../domain/conversation.js";
-import { resumeCommandHandler } from "./resume-command.js";
+import { previousCommandHandler, resumeCommandHandler } from "./resume-command.js";
 import { createCommandContext, createDependencies, createIncomingMessage } from "./test-helpers.js";
 
 describe("resumeCommandHandler", () => {
@@ -46,6 +46,53 @@ describe("resumeCommandHandler", () => {
       { role: "assistant", text: "latest answer", createdAt: "2026-04-05T00:00:50.000Z" },
     ]);
   });
+
+  it("/previous resumes the most recent previous session", async () => {
+    const resume = vi.fn(async () => true);
+    const context = createCommandContext({
+      message: createIncomingMessage("previous"),
+      dependencies: createDependencies({
+        conversationStore: {
+          get: async () => createResumedConversation(),
+          put: async () => {},
+          listBackups: async () => [
+            {
+              id: "session-1",
+              sessionId: "session-1",
+              title: "latest",
+              createdAt: "2026-04-05T00:00:00.000Z",
+              updatedAt: "2026-04-05T00:03:00.000Z",
+              agentId: "ops",
+              messageCount: 2,
+            },
+            {
+              id: "session-2",
+              sessionId: "session-2",
+              title: "older",
+              createdAt: "2026-04-04T00:00:00.000Z",
+              updatedAt: "2026-04-04T00:03:00.000Z",
+              agentId: "ops",
+              messageCount: 2,
+            },
+          ],
+          restore: resume,
+          ensureActive: async () => {
+            throw new Error("not used");
+          },
+          create: async () => {
+            throw new Error("not used");
+          },
+        },
+      }),
+    });
+
+    const response = await previousCommandHandler.handle(context);
+
+    expect(previousCommandHandler.canHandle("previous")).toBe(true);
+    expect(resume).toHaveBeenCalledWith(context.message.conversation, "session-1");
+    expect(response?.text).toContain("Session: latest (#1)");
+  });
+
 
   it("falls back to untitled when the resumed session has no title", async () => {
     const resume = vi.fn(async () => true);
