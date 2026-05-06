@@ -545,7 +545,7 @@ function detectRuntimeUsageInText(content: string): PromptTemplateRuntimeUsage {
   return {
     exactNow: /\bruntime\.now\.(iso|time|local)\b/.test(content),
     minuteNow: /\bruntime\.now\.(timeMinute|localMinute)\b/.test(content),
-    dateNow: /\bruntime\.now\.date\b/.test(content),
+    dateNow: /\bruntime\.now\.(date|weekday)\b/.test(content),
   };
 }
 

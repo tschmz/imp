@@ -23,6 +23,7 @@ export interface PromptTemplateSystemContext {
 export interface PromptTemplateRuntimeNowContext {
   iso: string;
   date: string;
+  weekday: string;
   time: string;
   timeMinute: string;
   local: string;
@@ -142,6 +143,7 @@ export function createEmptyPromptTemplateContext(): PromptTemplateContext {
       now: {
         iso: "",
         date: "",
+        weekday: "",
         time: "",
         timeMinute: "",
         local: "",
@@ -430,12 +432,14 @@ function createPromptTemplateRuntimeContext(
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
 ): PromptTemplateContext["runtime"] {
   const date = formatDatePart(now, timezone);
+  const weekday = formatWeekdayPart(now, timezone);
   const time = formatTimePart(now, timezone);
   const timeMinute = time.slice(0, 5);
   return {
     now: {
       iso: now.toISOString(),
       date,
+      weekday,
       time,
       timeMinute,
       local: `${date} ${time} ${timezone}`,
@@ -453,6 +457,14 @@ function formatDatePart(date: Date, timeZone: string): string {
     day: "2-digit",
   }).formatToParts(date);
   return `${getDateTimePart(parts, "year")}-${getDateTimePart(parts, "month")}-${getDateTimePart(parts, "day")}`;
+}
+
+function formatWeekdayPart(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone,
+    weekday: "long",
+  }).formatToParts(date);
+  return getDateTimePart(parts, "weekday");
 }
 
 function formatTimePart(date: Date, timeZone: string): string {

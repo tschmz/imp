@@ -130,6 +130,57 @@ describe("resolveSystemPrompt", () => {
     expect(reads).toBe(2);
   });
 
+  it("caches prompts that render weekday runtime clock values for the current day", async () => {
+    let reads = 0;
+    const readTextFile = async () => {
+      reads += 1;
+      return "Current weekday: {{runtime.now.weekday}}.";
+    };
+    const cache = new SystemPromptCache({
+      getContextFileFingerprint: async () => "1:1",
+      readTextFile,
+    });
+    const agent = {
+      ...createAgent(),
+      prompt: {
+        ...createAgent().prompt,
+        instructions: [{ file: "/workspace/AGENTS.md" }],
+      },
+    };
+
+    const first = await resolveSystemPrompt({
+      agent,
+      promptWorkingDirectory: "/workspace",
+      templateContext: createTemplateContext(),
+      readTextFile,
+      cache,
+    });
+
+    const second = await resolveSystemPrompt({
+      agent,
+      promptWorkingDirectory: "/workspace",
+      templateContext: createTemplateContext(),
+      readTextFile,
+      cache,
+    });
+
+    const nextDay = await resolveSystemPrompt({
+      agent,
+      promptWorkingDirectory: "/workspace",
+      templateContext: createTemplateContext({
+        date: "2026-04-20",
+        weekday: "Monday",
+      }),
+      readTextFile,
+      cache,
+    });
+
+    expect(first.cacheHit).toBe(false);
+    expect(second.cacheHit).toBe(true);
+    expect(nextDay.cacheHit).toBe(false);
+    expect(reads).toBe(2);
+  });
+
   it("renders curated template variables for file-backed instructions and references", async () => {
     const prompt = await buildSystemPrompt(
       {

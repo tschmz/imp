@@ -89,6 +89,7 @@ export function createPromptTestContext(
       now: {
         iso: "2026-04-19T12:34:56.000Z",
         date: "2026-04-19",
+        weekday: "Sunday",
         time: "14:34:56",
         timeMinute: "14:34",
         local: "2026-04-19 14:34:56 Europe/Berlin",

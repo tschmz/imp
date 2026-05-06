@@ -128,12 +128,14 @@ function createCacheTemplateContext(
   } else if (runtimeUsage?.minuteNow) {
     cacheRuntime.now = {
       date: runtime.now.date,
+      weekday: runtime.now.weekday,
       timeMinute: runtime.now.timeMinute,
       localMinute: runtime.now.localMinute,
     };
   } else if (runtimeUsage?.dateNow) {
     cacheRuntime.now = {
       date: runtime.now.date,
+      weekday: runtime.now.weekday,
     };
   }
   return {
