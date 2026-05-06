@@ -1853,12 +1853,34 @@ describe("createPiAgentEngine", () => {
     } satisfies Partial<UserVisibleProcessingError>);
   });
 
-  it("rejects nested delegated agent calls after depth one", async () => {
-    let capturedTools: ToolDefinition[] | undefined;
+  it("allows nested delegated agent calls while preserving delegation runtime context", async () => {
+    let parentTools: ToolDefinition[] | undefined;
+    let childNestedResult: Awaited<ReturnType<ToolDefinition["execute"]>> | undefined;
+    let helperPromptInput: AgentMessage | AgentMessage[] | string | undefined;
+    let helperSystemPrompt: string | undefined;
+    const parentAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "parent",
+      name: "Parent",
+      model: {
+        provider: "openai",
+        modelId: "parent-model",
+      },
+      delegations: [
+        {
+          agentId: "child",
+          toolName: "ask_child",
+        },
+      ],
+    };
     const childAgent: AgentDefinition = {
       ...createAgent(),
       id: "child",
       name: "Child",
+      model: {
+        provider: "openai",
+        modelId: "child-model",
+      },
       delegations: [
         {
           agentId: "helper",
@@ -1870,38 +1892,164 @@ describe("createPiAgentEngine", () => {
       ...createAgent(),
       id: "helper",
       name: "Helper",
+      prompt: {
+        base: {
+          text: createInlineBasePrompt("Helper {{invocation.kind}} {{invocation.parentAgentId}} {{invocation.toolName}}."),
+        },
+      },
+      model: {
+        provider: "openai",
+        modelId: "helper-model",
+      },
       delegations: [],
     };
 
     const engine = createPiAgentEngine({
-      agentRegistry: createAgentRegistry([childAgent, helperAgent]),
-      resolveModel: () =>
+      agentRegistry: createAgentRegistry([parentAgent, childAgent, helperAgent]),
+      resolveModel: (provider, modelId) =>
         ({
-          id: "gpt-5.5",
-          provider: "openai",
+          id: modelId,
+          provider,
           api: "openai-responses",
         }) as never,
       readTextFile: async () => "unused context",
       createAgent: (options) => {
-        capturedTools = options.initialState?.tools as ToolDefinition[];
-        return createAgentDouble({ messages: [fauxAssistantMessage("child ready")] });
+        const modelId = (options.initialState?.model as { id: string }).id;
+        const tools = options.initialState?.tools as ToolDefinition[];
+
+        if (modelId === "parent-model") {
+          parentTools = tools;
+          return createAgentDouble({ messages: [fauxAssistantMessage("parent ready")] });
+        }
+
+        if (modelId === "child-model") {
+          return createAgentDouble({
+            messages: [fauxAssistantMessage("child final text")],
+            onPrompt: async () => {
+              childNestedResult = await tools.find((tool) => tool.name === "ask_helper")!.execute(
+                "tool-child-1",
+                { input: "nested request" },
+              );
+            },
+          });
+        }
+
+        helperSystemPrompt = options.initialState?.systemPrompt;
+        return createAgentDouble({
+          messages: [fauxAssistantMessage("helper final text")],
+          onPrompt: async (input) => {
+            helperPromptInput = input;
+          },
+        });
       },
     });
 
     await engine.run({
-      agent: childAgent,
+      agent: parentAgent,
       conversation: createConversation(),
       message: createIncomingMessage(),
-      runtime: {
-        delegationDepth: 1,
+    });
+
+    const result = await parentTools!.find((tool) => tool.name === "ask_child")!.execute(
+      "tool-parent-1",
+      { input: "start nested work" },
+    );
+
+    expect(result).toMatchObject({
+      content: [{ type: "text", text: "child final text" }],
+      details: {
+        delegatedAgentId: "child",
+        toolName: "ask_child",
+      },
+    });
+    expect(childNestedResult).toMatchObject({
+      content: [{ type: "text", text: "helper final text" }],
+      details: {
+        delegatedAgentId: "helper",
+        toolName: "ask_helper",
+      },
+    });
+    expect(helperPromptInput).toBe("nested request");
+    expect(helperSystemPrompt).toContain("Helper delegated child ask_helper.");
+  });
+
+  it("rejects delegated agent cycles across nested tool calls", async () => {
+    let parentTools: ToolDefinition[] | undefined;
+    const parentAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "parent",
+      name: "Parent",
+      model: {
+        provider: "openai",
+        modelId: "parent-model",
+      },
+      delegations: [
+        {
+          agentId: "child",
+          toolName: "ask_child",
+        },
+      ],
+    };
+    const childAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "child",
+      name: "Child",
+      model: {
+        provider: "openai",
+        modelId: "child-model",
+      },
+      delegations: [
+        {
+          agentId: "parent",
+          toolName: "ask_parent",
+        },
+      ],
+    };
+
+    const engine = createPiAgentEngine({
+      agentRegistry: createAgentRegistry([parentAgent, childAgent]),
+      resolveModel: (provider, modelId) =>
+        ({
+          id: modelId,
+          provider,
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        const modelId = (options.initialState?.model as { id: string }).id;
+        const tools = options.initialState?.tools as ToolDefinition[];
+
+        if (modelId === "parent-model") {
+          parentTools = tools;
+          return createAgentDouble({ messages: [fauxAssistantMessage("parent ready")] });
+        }
+
+        return createAgentDouble({
+          messages: [fauxAssistantMessage("child final text")],
+          onPrompt: async () => {
+            await tools.find((tool) => tool.name === "ask_parent")!.execute(
+              "tool-child-1",
+              { input: "cycle back" },
+            );
+          },
+        });
       },
     });
 
+    await engine.run({
+      agent: parentAgent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
     await expect(
-      capturedTools!.find((tool) => tool.name === "ask_helper")!.execute("tool-1", { input: "hello" }),
+      parentTools!.find((tool) => tool.name === "ask_child")!.execute(
+        "tool-parent-1",
+        { input: "start cycle" },
+      ),
     ).rejects.toMatchObject({
       kind: "tool_command_execution",
-      message: 'Delegated agent calls may only nest one level. Agent "child" cannot delegate again from this run.',
+      message: "Delegated agent cycle detected: parent -> child -> parent.",
     } satisfies Partial<UserVisibleProcessingError>);
   });
 

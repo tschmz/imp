@@ -32,6 +32,7 @@ export interface AgentRunRuntimeContext {
   output?: AgentOutputContext;
   replyChannel?: ReplyChannelContext;
   delegationDepth?: number;
+  delegationPath?: string[];
 }
 
 export interface ReplyChannelContext {

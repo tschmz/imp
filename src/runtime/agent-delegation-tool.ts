@@ -11,7 +11,7 @@ import type { AgentRunRuntimeContext } from "./context.js";
 import type { AgentEngine } from "./types.js";
 import { createUserVisibleToolError, toUserVisibleToolError } from "./user-visible-tool-error.js";
 
-const maxDelegationDepth = 1;
+const maxDelegationDepth = 8;
 
 export function createAgentDelegationTools(
   parentAgent: AgentDefinition,
@@ -72,10 +72,11 @@ function createAgentDelegationTool(
     async execute(toolCallId, params) {
       const childInput = parseDelegationParams(delegation.toolName, params);
       const currentDepth = runtime?.delegationDepth ?? 0;
+      const delegationPath = resolveDelegationPath(runtime, parentAgent.id);
       if (currentDepth >= maxDelegationDepth) {
         throw createUserVisibleToolError(
           "tool_command_execution",
-          `Delegated agent calls may only nest one level. Agent "${parentAgent.id}" cannot delegate again from this run.`,
+          `Delegated agent calls may nest at most ${maxDelegationDepth} levels. Agent "${parentAgent.id}" cannot delegate again from this run.`,
         );
       }
 
@@ -83,6 +84,13 @@ function createAgentDelegationTool(
         throw createUserVisibleToolError(
           "tool_command_execution",
           `Agent "${parentAgent.id}" cannot delegate to itself.`,
+        );
+      }
+
+      if (delegationPath.includes(delegation.agentId)) {
+        throw createUserVisibleToolError(
+          "tool_command_execution",
+          `Delegated agent cycle detected: ${[...delegationPath, delegation.agentId].join(" -> ")}.`,
         );
       }
 
@@ -128,6 +136,7 @@ function createAgentDelegationTool(
         nestedMessage,
         runtime,
         currentDepth,
+        delegationPath: [...delegationPath, childAgent.id],
         parentMessage,
         childSkills,
         conversationStore: childInput.resume ? dependencies.conversationStore : undefined,
@@ -151,6 +160,14 @@ function createAgentDelegationTool(
       };
     },
   };
+}
+
+function resolveDelegationPath(
+  runtime: AgentRunRuntimeContext | undefined,
+  parentAgentId: string,
+): string[] {
+  const path = runtime?.delegationPath?.filter((agentId) => agentId.length > 0) ?? [];
+  return path.length > 0 ? path : [parentAgentId];
 }
 
 function parseDelegationParams(toolName: string, params: unknown): { input: string; resume?: string } {
@@ -223,6 +240,7 @@ async function runNestedAgent(input: {
   nestedMessage: IncomingMessage;
   runtime: AgentRunRuntimeContext | undefined;
   currentDepth: number;
+  delegationPath: string[];
   parentMessage: IncomingMessage;
   childSkills: Awaited<ReturnType<typeof resolveDelegatedAgentSkills>>;
   conversationStore?: ConversationStore;
@@ -297,6 +315,7 @@ async function runNestedAgent(input: {
           mode: "delegated-tool",
         },
         delegationDepth: input.currentDepth + 1,
+        delegationPath: input.delegationPath,
       },
     });
 
