@@ -5,6 +5,7 @@ import type { ConversationContext } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
 import { resolveEffectiveSkills } from "../skills/resolve-effective-skills.js";
+import type { ConversationStore } from "../storage/types.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { AgentRunRuntimeContext } from "./context.js";
 import type { AgentEngine } from "./types.js";
@@ -20,6 +21,7 @@ export function createAgentDelegationTools(
   dependencies: {
     agentRegistry: AgentRegistry;
     runDelegatedAgent: AgentEngine["run"];
+    conversationStore?: ConversationStore;
     logger?: Logger;
   },
 ): ToolDefinition[] {
@@ -37,6 +39,7 @@ function createAgentDelegationTool(
   dependencies: {
     agentRegistry: AgentRegistry;
     runDelegatedAgent: AgentEngine["run"];
+    conversationStore?: ConversationStore;
     logger?: Logger;
   },
 ): ToolDefinition {
@@ -47,6 +50,12 @@ function createAgentDelegationTool(
         type: "string",
         minLength: 1,
         description: `Input to send to delegated agent "${delegation.agentId}".`,
+      },
+      resume: {
+        type: "string",
+        minLength: 1,
+        description:
+          "Optional delegated agent session id to continue. When missing, the delegated run is stateless.",
       },
     },
     required: ["input"],
@@ -85,47 +94,49 @@ function createAgentDelegationTool(
         );
       }
 
-      const nestedMessage = createNestedMessage(parentMessage, toolCallId, childInput.input);
-      const nestedConversation = createNestedConversation(conversation, childAgent.id, nestedMessage.receivedAt);
+      const receivedAt = new Date().toISOString();
+      const nestedConversation = childInput.resume
+        ? await resolveResumableNestedConversation(
+            dependencies.conversationStore,
+            conversation,
+            childAgent.id,
+            childInput.resume,
+            receivedAt,
+            delegation.toolName,
+          )
+        : createNestedConversation(conversation, childAgent.id, receivedAt);
+      const nestedMessage = createNestedMessage(
+        parentMessage,
+        toolCallId,
+        childInput.input,
+        nestedConversation.state.conversation,
+      );
       const childSkills = await resolveDelegatedAgentSkills(childAgent, nestedConversation, runtime, dependencies.logger, nestedMessage);
 
       await dependencies.logger?.debug("starting delegated agent run", {
         agentId: childAgent.id,
+        ...(childInput.resume ? { sessionId: childInput.resume } : {}),
         messageId: nestedMessage.messageId,
         correlationId: nestedMessage.correlationId,
       });
 
-      const result = await dependencies.runDelegatedAgent({
-        agent: childAgent,
-        conversation: nestedConversation,
-        message: nestedMessage,
-        runtime: {
-          ...(runtime?.configPath ? { configPath: runtime.configPath } : {}),
-          ...(runtime?.dataRoot ? { dataRoot: runtime.dataRoot } : {}),
-          ...(childSkills.length > 0 ? { availableSkills: childSkills } : {}),
-          invocation: {
-            kind: "delegated",
-            parentAgentId: parentAgent.id,
-            toolName: delegation.toolName,
-          },
-          ingress: runtime?.ingress ?? {
-            endpointId: parentMessage.endpointId,
-            transportKind: parentMessage.conversation.transport,
-          },
-          output: {
-            mode: "delegated-tool",
-          },
-          delegationDepth: currentDepth + 1,
-        },
-      }).catch((error: unknown) => {
-        throw toUserVisibleToolError(error, {
-          fallbackMessage: `Delegated agent "${childAgent.id}" failed.`,
-          defaultKind: "tool_command_execution",
-        });
+      const result = await runNestedAgent({
+        parentAgent,
+        delegation,
+        childAgent,
+        nestedConversation,
+        nestedMessage,
+        runtime,
+        currentDepth,
+        parentMessage,
+        childSkills,
+        conversationStore: childInput.resume ? dependencies.conversationStore : undefined,
+        runDelegatedAgent: dependencies.runDelegatedAgent,
       });
 
       await dependencies.logger?.debug("completed delegated agent run", {
         agentId: childAgent.id,
+        ...(childInput.resume ? { sessionId: childInput.resume } : {}),
         messageId: nestedMessage.messageId,
         correlationId: nestedMessage.correlationId,
       });
@@ -135,13 +146,14 @@ function createAgentDelegationTool(
         details: {
           delegatedAgentId: childAgent.id,
           toolName: delegation.toolName,
+          ...(childInput.resume ? { sessionId: childInput.resume } : {}),
         },
       };
     },
   };
 }
 
-function parseDelegationParams(toolName: string, params: unknown): { input: string } {
+function parseDelegationParams(toolName: string, params: unknown): { input: string; resume?: string } {
   if (typeof params !== "object" || params === null) {
     throw createUserVisibleToolError(
       "tool_command_execution",
@@ -157,7 +169,225 @@ function parseDelegationParams(toolName: string, params: unknown): { input: stri
     );
   }
 
-  return { input };
+  const resume = "resume" in params ? params.resume : undefined;
+  if (resume !== undefined && (typeof resume !== "string" || resume.length === 0)) {
+    throw createUserVisibleToolError(
+      "tool_command_execution",
+      `${toolName} resume must be a non-empty string session id when provided.`,
+    );
+  }
+
+  return {
+    input,
+    ...(resume ? { resume } : {}),
+  };
+}
+
+async function resolveResumableNestedConversation(
+  conversationStore: ConversationStore | undefined,
+  parentConversation: ConversationContext,
+  childAgentId: string,
+  sessionId: string,
+  now: string,
+  toolName: string,
+): Promise<ConversationContext> {
+  if (!conversationStore?.ensureDetachedForAgent) {
+    throw createUserVisibleToolError(
+      "tool_command_execution",
+      `${toolName} cannot resume delegated agent sessions because the runtime store does not support detached sessions.`,
+    );
+  }
+
+  return conversationStore.ensureDetachedForAgent(
+    {
+      transport: parentConversation.state.conversation.transport,
+      externalId: parentConversation.state.conversation.externalId,
+      sessionId,
+    },
+    {
+      agentId: childAgentId,
+      now,
+      kind: "delegated",
+      metadata: {
+        toolName,
+      },
+    },
+  );
+}
+
+async function runNestedAgent(input: {
+  parentAgent: AgentDefinition;
+  delegation: AgentDelegationConfig;
+  childAgent: AgentDefinition;
+  nestedConversation: ConversationContext;
+  nestedMessage: IncomingMessage;
+  runtime: AgentRunRuntimeContext | undefined;
+  currentDepth: number;
+  parentMessage: IncomingMessage;
+  childSkills: Awaited<ReturnType<typeof resolveDelegatedAgentSkills>>;
+  conversationStore?: ConversationStore;
+  runDelegatedAgent: AgentEngine["run"];
+}) {
+  const startedAt = new Date().toISOString();
+  let persistedConversation = input.nestedConversation;
+  const persistedEventIds = new Set(persistedConversation.messages.map((event) => event.id));
+
+  if (input.conversationStore) {
+    persistedConversation = await updateDelegatedConversationState(
+      input.conversationStore,
+      persistedConversation,
+      {
+        updatedAt: startedAt,
+        run: {
+          status: "running",
+          messageId: input.nestedMessage.messageId,
+          correlationId: input.nestedMessage.correlationId,
+          startedAt,
+          updatedAt: startedAt,
+        },
+      },
+    );
+    persistedConversation = await appendDelegatedConversationEvents(
+      input.conversationStore,
+      persistedConversation,
+      [toUserConversationMessage(input.nestedMessage)],
+    );
+    persistedEventIds.add(input.nestedMessage.messageId);
+  }
+
+  try {
+    const result = await input.runDelegatedAgent({
+      agent: input.childAgent,
+      conversation: input.nestedConversation,
+      message: input.nestedMessage,
+      onConversationEvents: input.conversationStore
+        ? async (events) => {
+            persistedConversation = await appendDelegatedConversationEvents(
+              input.conversationStore!,
+              persistedConversation,
+              events,
+            );
+            for (const event of events) {
+              persistedEventIds.add(event.id);
+            }
+          }
+        : undefined,
+      onSystemPromptResolved: input.conversationStore?.writeSystemPromptSnapshot
+        ? async (snapshot) => {
+            await input.conversationStore!.writeSystemPromptSnapshot!(
+              persistedConversation,
+              snapshot,
+            );
+          }
+        : undefined,
+      runtime: {
+        ...(input.runtime?.configPath ? { configPath: input.runtime.configPath } : {}),
+        ...(input.runtime?.dataRoot ? { dataRoot: input.runtime.dataRoot } : {}),
+        ...(input.childSkills.length > 0 ? { availableSkills: input.childSkills } : {}),
+        invocation: {
+          kind: "delegated",
+          parentAgentId: input.parentAgent.id,
+          toolName: input.delegation.toolName,
+        },
+        ingress: input.runtime?.ingress ?? {
+          endpointId: input.parentMessage.endpointId,
+          transportKind: input.parentMessage.conversation.transport,
+        },
+        output: {
+          mode: "delegated-tool",
+        },
+        delegationDepth: input.currentDepth + 1,
+      },
+    });
+
+    if (input.conversationStore) {
+      const unpersistedEvents = result.conversationEvents.filter((event) => !persistedEventIds.has(event.id));
+      if (unpersistedEvents.length > 0) {
+        persistedConversation = await appendDelegatedConversationEvents(
+          input.conversationStore,
+          persistedConversation,
+          unpersistedEvents,
+        );
+        for (const event of unpersistedEvents) {
+          persistedEventIds.add(event.id);
+        }
+      }
+
+      const completedAt = new Date().toISOString();
+      await updateDelegatedConversationState(input.conversationStore, persistedConversation, {
+        ...(result.workingDirectory ? { workingDirectory: result.workingDirectory } : {}),
+        updatedAt: completedAt,
+        run: {
+          status: "idle",
+          updatedAt: completedAt,
+        },
+      });
+    }
+
+    return result;
+  } catch (error: unknown) {
+    if (input.conversationStore) {
+      const failedAt = new Date().toISOString();
+      await updateDelegatedConversationState(input.conversationStore, persistedConversation, {
+        updatedAt: failedAt,
+        run: {
+          status: "failed",
+          messageId: input.nestedMessage.messageId,
+          correlationId: input.nestedMessage.correlationId,
+          startedAt,
+          updatedAt: failedAt,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+
+    throw toUserVisibleToolError(error, {
+      fallbackMessage: `Delegated agent "${input.childAgent.id}" failed.`,
+      defaultKind: "tool_command_execution",
+    });
+  }
+}
+
+async function appendDelegatedConversationEvents(
+  conversationStore: ConversationStore,
+  conversation: ConversationContext,
+  events: ConversationContext["messages"],
+): Promise<ConversationContext> {
+  return conversationStore.appendEvents
+    ? conversationStore.appendEvents(conversation, events)
+    : {
+        ...conversation,
+        messages: [...conversation.messages, ...events],
+      };
+}
+
+async function updateDelegatedConversationState(
+  conversationStore: ConversationStore,
+  conversation: ConversationContext,
+  patch: Partial<ConversationContext["state"]>,
+): Promise<ConversationContext> {
+  return conversationStore.updateState
+    ? conversationStore.updateState(conversation, patch)
+    : {
+        ...conversation,
+        state: {
+          ...conversation.state,
+          ...patch,
+        },
+      };
+}
+
+function toUserConversationMessage(message: IncomingMessage): ConversationContext["messages"][number] {
+  return {
+    kind: "message",
+    id: message.messageId,
+    role: "user",
+    content: message.text,
+    timestamp: Date.parse(message.receivedAt),
+    createdAt: message.receivedAt,
+    correlationId: message.correlationId,
+    ...(message.source ? { source: message.source } : {}),
+  };
 }
 
 async function resolveDelegatedAgentSkills(
@@ -249,12 +479,13 @@ function createNestedMessage(
   parentMessage: IncomingMessage,
   toolCallId: string,
   text: string,
+  conversation: IncomingMessage["conversation"],
 ): IncomingMessage {
   const receivedAt = new Date().toISOString();
 
   return {
     endpointId: parentMessage.endpointId,
-    conversation: parentMessage.conversation,
+    conversation,
     messageId: `${parentMessage.messageId}:delegate:${toolCallId}:${randomUUID()}`,
     correlationId: `${parentMessage.correlationId}:delegate:${toolCallId}`,
     userId: parentMessage.userId,

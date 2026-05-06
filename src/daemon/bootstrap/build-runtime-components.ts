@@ -87,6 +87,7 @@ export function buildRuntimeComponents(
       logger,
       getApiKey,
       ...(dependencies.agentRegistry ? { agentRegistry: dependencies.agentRegistry } : {}),
+      conversationStore,
       ...(dependencies.toolRegistry ? { toolRegistry: dependencies.toolRegistry } : {}),
       createBuiltInToolRegistry: createBuiltInRegistry,
       mcpToolCache,

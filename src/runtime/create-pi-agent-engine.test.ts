@@ -11,6 +11,7 @@ import type { ConversationContext, ConversationEvent } from "../domain/conversat
 import type { IncomingMessage } from "../domain/message.js";
 import { UserVisibleProcessingError } from "../domain/processing-error.js";
 import type { Logger } from "../logging/types.js";
+import type { ConversationStore } from "../storage/types.js";
 import type { ToolDefinition } from "../tools/types.js";
 import {
   createBuiltInToolRegistry,
@@ -1413,6 +1414,185 @@ describe("createPiAgentEngine", () => {
     const pwdResult = await childTools!.find((tool) => tool.name === "pwd")!.execute("tool-2", {});
     expect(pwdResult).toMatchObject({
       content: [{ type: "text", text: "/tmp/child-workspace" }],
+    });
+  });
+
+  it("continues and persists delegated agent runs when the tool receives a resume session id", async () => {
+    let parentTools: ToolDefinition[] | undefined;
+    let childInitialMessages: AgentMessage[] | undefined;
+    let childPromptInput: AgentMessage | AgentMessage[] | string | undefined;
+    let storedConversation: ConversationContext = {
+      state: {
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+          sessionId: "helper-session",
+        },
+        agentId: "helper",
+        kind: "delegated",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:00:01.000Z",
+      },
+      messages: [
+        {
+          id: "helper-1",
+          role: "user",
+          content: "remember project alpha",
+          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
+          createdAt: "2026-04-05T00:00:00.000Z",
+        },
+        {
+          id: "helper-1:assistant:1",
+          role: "assistant",
+          content: [{ type: "text", text: "I will remember project alpha." }],
+          timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
+          api: "openai-responses",
+          provider: "openai",
+          model: "child-model",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: "stop",
+          createdAt: "2026-04-05T00:00:01.000Z",
+        },
+      ],
+    };
+    const conversationStore: Pick<
+      ConversationStore,
+      "ensureDetachedForAgent" | "appendEvents" | "updateState" | "writeSystemPromptSnapshot"
+    > = {
+      ensureDetachedForAgent: vi.fn(async () => storedConversation),
+      appendEvents: vi.fn(async (_context, events) => {
+        storedConversation = {
+          ...storedConversation,
+          messages: [...storedConversation.messages, ...events],
+        };
+        return storedConversation;
+      }),
+      updateState: vi.fn(async (_context, patch) => {
+        storedConversation = {
+          ...storedConversation,
+          state: {
+            ...storedConversation.state,
+            ...patch,
+          },
+        };
+        return storedConversation;
+      }),
+      writeSystemPromptSnapshot: vi.fn(async () => undefined),
+    };
+
+    const parentAgent: AgentDefinition = {
+      ...createAgent(),
+      model: {
+        provider: "openai",
+        modelId: "parent-model",
+      },
+      delegations: [
+        {
+          agentId: "helper",
+          toolName: "ask_helper",
+        },
+      ],
+    };
+    const childAgent: AgentDefinition = {
+      ...createAgent(),
+      id: "helper",
+      name: "Helper",
+      prompt: {
+        base: {
+          text: createInlineBasePrompt("Child."),
+        },
+      },
+      model: {
+        provider: "openai",
+        modelId: "child-model",
+      },
+      delegations: [],
+    };
+
+    const engine = createPiAgentEngine({
+      agentRegistry: createAgentRegistry([parentAgent, childAgent]),
+      conversationStore: conversationStore as ConversationStore,
+      resolveModel: (provider, modelId) =>
+        ({
+          id: modelId,
+          provider,
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      createAgent: (options) => {
+        const modelId = (options.initialState?.model as { id: string }).id;
+        const tools = options.initialState?.tools as ToolDefinition[];
+
+        if (modelId === "parent-model") {
+          parentTools = tools;
+          return createAgentDouble({ messages: [fauxAssistantMessage("parent ready")] });
+        }
+
+        childInitialMessages = options.initialState?.messages as AgentMessage[];
+        return createAgentDouble({
+          messages: [
+            ...(options.initialState?.messages as AgentMessage[]),
+            fauxAssistantMessage("project alpha is still in context"),
+          ],
+          onPrompt: async (input) => {
+            childPromptInput = input;
+          },
+        });
+      },
+    });
+
+    await engine.run({
+      agent: parentAgent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+
+    const result = await parentTools!.find((tool) => tool.name === "ask_helper")!.execute(
+      "tool-1",
+      {
+        input: "what project did I mention?",
+        resume: "helper-session",
+      },
+    );
+
+    expect(conversationStore.ensureDetachedForAgent).toHaveBeenCalledWith(
+      {
+        transport: "telegram",
+        externalId: "42",
+        sessionId: "helper-session",
+      },
+      expect.objectContaining({
+        agentId: "helper",
+        kind: "delegated",
+      }),
+    );
+    expect(childInitialMessages?.map((message) => message.role)).toEqual(["user", "assistant"]);
+    expect(childPromptInput).toBe("what project did I mention?");
+    expect(result).toMatchObject({
+      content: [{ type: "text", text: "project alpha is still in context" }],
+      details: {
+        delegatedAgentId: "helper",
+        toolName: "ask_helper",
+        sessionId: "helper-session",
+      },
+    });
+    expect(storedConversation.messages.at(-2)).toMatchObject({
+      role: "user",
+      content: "what project did I mention?",
+    });
+    expect(storedConversation.messages.at(-1)).toMatchObject({
+      role: "assistant",
+      content: [{ type: "text", text: "project alpha is still in context" }],
+    });
+    expect(storedConversation.state.run).toMatchObject({
+      status: "idle",
     });
   });
 

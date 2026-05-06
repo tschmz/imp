@@ -7,6 +7,7 @@ import type { Logger } from "../logging/types.js";
 import { createHookRunner } from "../extensions/hook-runner.js";
 import type { AgentEngineLifecycleHooks, HookRegistration } from "../extensions/types.js";
 import type { ToolRegistry } from "../tools/registry.js";
+import type { ConversationStore } from "../storage/types.js";
 import type { AgentHandle } from "./agent-execution.js";
 import { createMcpToolCache, type McpToolCache } from "./mcp-tool-cache.js";
 import { resolveMcpTools, type ResolvedMcpTools } from "./mcp-tool-runtime.js";
@@ -50,6 +51,7 @@ interface PiAgentEngineDependencies {
     },
   ) => ToolRegistry;
   agentRegistry?: AgentRegistry;
+  conversationStore?: ConversationStore;
   resolveMcpTools?: (
     agent: AgentDefinition,
     options: {
@@ -189,6 +191,7 @@ export function createPiAgentEngine(
         createBuiltInToolRegistry: buildToolRegistry,
         mcpToolCache,
         agentRegistry: dependencies.agentRegistry,
+        conversationStore: dependencies.conversationStore,
         runDelegatedAgent: runInternal,
       });
       await logPipelineEvent(logger, context, {

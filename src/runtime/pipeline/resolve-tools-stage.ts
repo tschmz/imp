@@ -3,6 +3,7 @@ import type { AgentDefinition } from "../../domain/agent.js";
 import type { ConversationContext } from "../../domain/conversation.js";
 import type { IncomingMessage } from "../../domain/message.js";
 import type { ToolRegistry } from "../../tools/registry.js";
+import type { ConversationStore } from "../../storage/types.js";
 import type { McpToolCache } from "../mcp-tool-cache.js";
 import { loadAgentHomePluginTools } from "../agent-home-plugin-tools.js";
 import { createAgentDelegationTools } from "../agent-delegation-tool.js";
@@ -64,6 +65,7 @@ export async function resolveToolsStage(
     mcpToolCache: McpToolCache;
     agentRegistry?: AgentRegistry;
     runDelegatedAgent?: AgentEngine["run"];
+    conversationStore?: ConversationStore;
   },
 ): Promise<ResolveToolsStageContext> {
   const resolvedTools = await resolveRuntimeTools({
@@ -102,6 +104,7 @@ export async function resolveRuntimeTools(
     mcpToolCache: McpToolCache;
     agentRegistry?: AgentRegistry;
     runDelegatedAgent?: AgentEngine["run"];
+    conversationStore?: ConversationStore;
   },
 ): Promise<ResolvedRuntimeTools> {
   const initialWorkingDirectory = resolveConversationWorkingDirectory(context.agent, context.conversation);
@@ -139,6 +142,7 @@ export async function resolveRuntimeTools(
           {
             agentRegistry: dependencies.agentRegistry,
             runDelegatedAgent: dependencies.runDelegatedAgent,
+            ...(dependencies.conversationStore ? { conversationStore: dependencies.conversationStore } : {}),
           },
         )
       : [];
