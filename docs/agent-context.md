@@ -159,7 +159,7 @@ For the default base prompt, Imp assembles context in this order:
 
 Agents can maintain scheduled jobs in `cron.md` in their agent home. Imp watches this file at runtime and reloads changes without a daemon restart. `cron.md` is intentionally excluded from automatic agent-home Markdown prompt loading, so scheduled instructions are only passed to the agent when the job fires.
 
-Each job is a Markdown section with a JSON fence tagged `json imp-cron`; the Markdown body after the fence is the instruction sent to the agent.
+Each job is a Markdown section with a JSON fence tagged `json imp-cron`; the Markdown body after the fence is the instruction sent to the agent. The Markdown instruction, `session.id`, and `session.title` support the same Handlebars template variables as prompt files, including `runtime.now.*`, `agent.*`, `conversation.metadata.*`, and `reply.channel.*`.
 
 ````md
 # Imp Cron
@@ -181,18 +181,18 @@ Each job is a Markdown section with a JSON fence tagged `json imp-cron`; the Mar
   },
   "session": {
     "mode": "detached",
-    "id": "wohnungssuche",
-    "title": "Wohnungssuche"
+    "id": "wohnungssuche-{{runtime.now.date}}",
+    "title": "Wohnungssuche {{runtime.now.date}}"
   }
 }
 ```
 
-Suche nach neuen Wohnungen und fasse relevante Änderungen zusammen.
+Suche nach neuen Wohnungen für {{runtime.now.date}} und fasse relevante Änderungen zusammen.
 ````
 
 Set `reply.type` to `none` to run a scheduled job without response delivery. Schedules use five-field cron syntax: `minute hour day-of-month month day-of-week`.
 
-Set `session.title` to control the visible title of the detached session created by the cron job. If omitted, Imp uses the cron job `id` as the session title.
+Set `session.title` to control the visible title of the detached session created by the cron job. If omitted, Imp uses the cron job `id` as the session title. Use a templated `session.id`, for example `report-{{runtime.now.date}}`, when a recurring job should rotate into a fresh detached session each day.
 
 ## Complete Example
 

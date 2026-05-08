@@ -15,7 +15,7 @@ export function createCronTool(agent?: AgentDefinition): ToolDefinition[] {
       action: { type: "string", enum: ["list", "upsert", "delete"] },
       job: {
         type: "object",
-        description: "Required for upsert. Cron job config plus instruction text. Set job.session.title to control the title of the detached session created by this job.",
+        description: "Required for upsert. Cron job config plus instruction text. job.instruction, job.session.id, and job.session.title support prompt template variables. Use {{runtime.now.date}} in session.id, for example report-{{runtime.now.date}}, to rotate into a new detached session each day.",
         properties: {
           id: {
             type: "string",
@@ -43,18 +43,18 @@ export function createCronTool(agent?: AgentDefinition): ToolDefinition[] {
           },
           session: {
             type: "object",
-            description: "Detached session settings. Use title to set the visible session title.",
+            description: "Detached session settings. Use title to set the visible session title. session.id and session.title can include template variables such as {{runtime.now.date}}.",
             properties: {
               mode: { type: "string", enum: ["detached"] },
               id: {
                 type: "string",
                 minLength: 1,
-                description: "Stable detached session id. Defaults to job.id if the session object is omitted.",
+                description: "Detached session id. Supports prompt template variables. Use report-{{runtime.now.date}} to rotate sessions daily.",
               },
               title: {
                 type: "string",
                 minLength: 1,
-                description: "Optional visible title for the detached session created by this cron job.",
+                description: "Optional visible title for the detached session created by this cron job. Supports template variables such as {{runtime.now.date}}.",
               },
               kind: { type: "string", minLength: 1 },
               metadata: { type: "object", additionalProperties: true },
@@ -65,7 +65,7 @@ export function createCronTool(agent?: AgentDefinition): ToolDefinition[] {
           instruction: {
             type: "string",
             minLength: 1,
-            description: "Instruction sent to the agent when the schedule fires.",
+            description: "Instruction sent to the agent when the schedule fires. Supports prompt template variables such as {{runtime.now.date}}.",
           },
         },
         required: ["id", "schedule", "reply", "instruction"],

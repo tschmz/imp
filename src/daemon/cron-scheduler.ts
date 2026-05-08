@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { watch } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import type { AgentRegistry } from "../agents/registry.js";
+import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationUserMessage } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
@@ -13,6 +14,11 @@ import type { AgentCronJob } from "../cron/types.js";
 import type { RuntimeEntry } from "./runtime-runner.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
 import type { ReplyChannelContext } from "../runtime/context.js";
+import {
+  createDefaultPromptTemplateSystemContext,
+  createPromptTemplateContext,
+  renderPromptTemplate,
+} from "../runtime/prompt-template.js";
 
 interface CronSchedulerDependencies {
   agentRegistry: AgentRegistry;
@@ -231,24 +237,34 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       throw new Error(`Unknown cron agent: ${job.agentId}`);
     }
     const receivedAt = now.toISOString();
-    const message = createCronIncomingMessage(job, receivedAt);
+    const replyTransportKind = job.reply.type === "endpoint"
+      ? getEndpointTransportKind(job.reply.endpointId)
+      : undefined;
+    const replyChannel = toReplyChannel(job, replyTransportKind);
+    const renderedJob = renderCronJobTemplates(job, {
+      agent,
+      runtime,
+      receivedAt,
+      replyChannel,
+    });
+    const message = createCronIncomingMessage(renderedJob, receivedAt);
     let conversation = await runtime.conversationStore.ensureDetachedForAgent?.(message.conversation, {
       agentId: agent.id,
       now: receivedAt,
-      title: job.session.title ?? job.id,
-      kind: job.session.kind ?? "scheduled",
+      title: renderedJob.session.title ?? renderedJob.id,
+      kind: renderedJob.session.kind ?? "scheduled",
       metadata: {
-        ...(job.session.metadata ?? {}),
-        cronJobId: job.id,
+        ...(renderedJob.session.metadata ?? {}),
+        cronJobId: renderedJob.id,
       },
     }) ?? await runtime.conversationStore.ensureActiveForAgent?.(message.conversation, {
       agentId: agent.id,
       now: receivedAt,
-      title: job.session.title ?? job.id,
+      title: renderedJob.session.title ?? renderedJob.id,
     }) ?? await runtime.conversationStore.ensureActive(message.conversation, {
       agentId: agent.id,
       now: receivedAt,
-      title: job.session.title ?? job.id,
+      title: renderedJob.session.title ?? renderedJob.id,
     });
 
     const userEvent = toCronUserEvent(message);
@@ -273,10 +289,6 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       dataRoot: runtime.endpointConfig.paths.dataRoot,
       conversation,
     });
-    const replyTransportKind = job.reply.type === "endpoint"
-      ? getEndpointTransportKind(job.reply.endpointId)
-      : undefined;
-    const replyChannel = toReplyChannel(job, replyTransportKind);
     const result = await runtime.engine.run({
       agent,
       conversation,
@@ -365,6 +377,89 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
   function getEndpointTransportKind(endpointId: string): string | undefined {
     return dependencies.runtimes.find((candidate) => candidate.endpointConfig.id === endpointId)?.endpointConfig.type;
   }
+}
+
+function renderCronJobTemplates(
+  job: AgentCronJob,
+  options: {
+    agent: AgentDefinition;
+    runtime: BootstrappedRuntime;
+    receivedAt: string;
+    replyChannel: ReplyChannelContext;
+  },
+): AgentCronJob {
+  const metadata = {
+    ...(job.session.metadata ?? {}),
+    cronJobId: job.id,
+  };
+  const context = createPromptTemplateContext({
+    system: createDefaultPromptTemplateSystemContext(),
+    agent: options.agent,
+    endpointId: "cron",
+    transportKind: "cron",
+    conversation: {
+      state: {
+        conversation: {
+          transport: "cron",
+          externalId: `cron:${job.agentId}:${job.id}`,
+          sessionId: job.session.id,
+          agentId: job.agentId,
+        },
+        agentId: options.agent.id,
+        kind: job.session.kind ?? "scheduled",
+        metadata,
+        createdAt: options.receivedAt,
+        updatedAt: options.receivedAt,
+        version: 1,
+      },
+      messages: [],
+    },
+    replyChannel: options.replyChannel,
+    invocation: { kind: "direct" },
+    ingress: { endpointId: "cron", transportKind: "cron" },
+    output: { mode: "reply-channel", replyChannel: options.replyChannel },
+    configPath: options.runtime.configPath,
+    dataRoot: options.runtime.endpointConfig.paths.dataRoot,
+    now: new Date(options.receivedAt),
+    timezone: job.timezone,
+  });
+  const sessionId = renderCronTemplate(job.session.id, job, "session.id", context).trim();
+  const title = job.session.title
+    ? renderCronTemplate(job.session.title, job, "session.title", context).trim()
+    : undefined;
+  const instruction = renderCronTemplate(job.instruction, job, "instruction", context).trim();
+
+  if (!sessionId) {
+    throw new Error(`Cron job ${job.id} rendered an empty session.id.`);
+  }
+  if (job.session.title && !title) {
+    throw new Error(`Cron job ${job.id} rendered an empty session.title.`);
+  }
+  if (!instruction) {
+    throw new Error(`Cron job ${job.id} rendered an empty instruction.`);
+  }
+
+  return {
+    ...job,
+    session: {
+      ...job.session,
+      id: sessionId,
+      ...(title ? { title } : {}),
+    },
+    instruction,
+  };
+}
+
+function renderCronTemplate(
+  template: string,
+  job: AgentCronJob,
+  field: "instruction" | "session.id" | "session.title",
+  context: Parameters<typeof renderPromptTemplate>[1]["context"],
+): string {
+  return renderPromptTemplate(template, {
+    filePath: `${job.sourceFile}#${job.id}.${field}`,
+    context,
+  });
 }
 
 function createCronIncomingMessage(job: AgentCronJob, receivedAt: string): IncomingMessage {

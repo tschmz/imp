@@ -1364,6 +1364,130 @@ describe("createRuntimeEntries", () => {
     }
   });
 
+  it("renders cron templates for session id, session title, and instruction", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-cron-template-"));
+    const agentHome = join(root, "agents", "default");
+    await mkdir(agentHome, { recursive: true });
+    await writeFile(
+      join(agentHome, "cron.md"),
+      [
+        "# Imp Cron",
+        "",
+        "## report",
+        "",
+        "```json imp-cron",
+        JSON.stringify({
+          id: "report",
+          enabled: true,
+          schedule: "* * * * *",
+          timezone: "UTC",
+          reply: { type: "none" },
+          session: {
+            mode: "detached",
+            id: "report-{{runtime.now.date}}",
+            title: "Report {{runtime.now.date}}",
+            metadata: {
+              source: "cron",
+            },
+          },
+        }, null, 2),
+        "```",
+        "",
+        "Create {{conversation.metadata.cronJobId}} for {{runtime.now.date}} at {{runtime.now.timeMinute}}.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const conversationStore = {
+      get: vi.fn(async () => undefined),
+      put: vi.fn(async () => undefined),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      ensureActive: vi.fn(),
+      create: vi.fn(),
+      ensureDetachedForAgent: vi.fn(async (ref: ChatRef, options: { agentId: string; now: string }) => ({
+        state: {
+          conversation: ref,
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+      updateState: vi.fn(async (context, patch) => ({
+        ...context,
+        state: {
+          ...context.state,
+          ...patch,
+        },
+      })),
+      appendEvents: vi.fn(async (context, events) => ({
+        ...context,
+        messages: [...context.messages, ...events],
+      })),
+    };
+    const engine = {
+      run: vi.fn(async ({ message }: { message: IncomingMessage }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "done",
+        },
+        conversationEvents: [],
+      })),
+      close: vi.fn(async () => undefined),
+    };
+    const runtime = createRuntime({ conversationStore, engine });
+    let nowCallCount = 0;
+    const entry = createCronSchedulerEntry({
+      agentRegistry: createAgentRegistry([{ ...createTestAgent("default"), home: agentHome }]),
+      runtimes: [runtime],
+      deliveryRouter: createDeliveryRouter(),
+      logger: runtime.logger,
+      now: () => {
+        nowCallCount += 1;
+        return nowCallCount <= 2 ? new Date("2026-04-07T12:34:00.000Z") : new Date();
+      },
+    });
+
+    try {
+      await entry.start();
+      await vi.waitFor(() => {
+        expect(engine.run).toHaveBeenCalled();
+      });
+
+      expect(conversationStore.ensureDetachedForAgent).toHaveBeenCalledWith(
+        {
+          transport: "cron",
+          externalId: "cron:default:report",
+          sessionId: "report-2026-04-07",
+          agentId: "default",
+        },
+        {
+          agentId: "default",
+          now: "2026-04-07T12:34:00.000Z",
+          title: "Report 2026-04-07",
+          kind: "scheduled",
+          metadata: {
+            source: "cron",
+            cronJobId: "report",
+          },
+        },
+      );
+      expect(engine.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.objectContaining({
+            text: "Create report for 2026-04-07 at 12:34.",
+          }),
+        }),
+      );
+    } finally {
+      await entry.stop();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("uses long cron timers as scheduling checkpoints instead of firing early", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-cron-long-delay-"));
     const agentHome = join(root, "agents", "default");
