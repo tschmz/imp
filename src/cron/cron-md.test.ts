@@ -1,5 +1,8 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseCronMarkdown, renderCronMarkdown } from "./cron-md.js";
+import { parseCronMarkdown, renderCronMarkdown, upsertAgentCronJob } from "./cron-md.js";
 
 const example = `# Imp Cron
 
@@ -88,5 +91,22 @@ Suche später nochmal.
 
     expect(result.jobs).toEqual([]);
     expect(result.issues[0]).toContain("Invalid cron JSON block");
+  });
+
+  it("rejects upserts that would render an unparsable cron file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-cron-invalid-upsert-"));
+
+    try {
+      await expect(upsertAgentCronJob(root, {
+        id: "bad id",
+        enabled: true,
+        schedule: "0 8 * * *",
+        reply: { type: "none" },
+        session: { mode: "detached", id: "daily" },
+        instruction: "Run daily.",
+      })).rejects.toThrow();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

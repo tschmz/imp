@@ -169,6 +169,14 @@ export function getAgentCronPath(agentHome: string): string {
 }
 
 function validateCronJob(job: CronJobDefinition): void {
+  cronConfigSchema.parse({
+    id: job.id,
+    enabled: job.enabled,
+    schedule: job.schedule,
+    ...(job.timezone !== undefined ? { timezone: job.timezone } : {}),
+    reply: job.reply,
+    session: job.session,
+  });
   parseCronExpression(job.schedule);
   if (job.timezone) {
     new Intl.DateTimeFormat("en", { timeZone: job.timezone }).format(new Date());

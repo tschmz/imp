@@ -1327,6 +1327,79 @@ describe("createRuntimeEntries", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("uses long cron timers as scheduling checkpoints instead of firing early", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-cron-long-delay-"));
+    const agentHome = join(root, "agents", "default");
+    await mkdir(agentHome, { recursive: true });
+    await writeFile(
+      join(agentHome, "cron.md"),
+      [
+        "# Imp Cron",
+        "",
+        "## distant",
+        "",
+        "```json imp-cron",
+        JSON.stringify({
+          id: "distant",
+          enabled: true,
+          schedule: "* * * * *",
+          timezone: "UTC",
+          reply: { type: "none" },
+          session: {
+            mode: "detached",
+            id: "distant-session",
+          },
+        }, null, 2),
+        "```",
+        "",
+        "Create distant report.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const engine = {
+      run: vi.fn(async ({ message }: { message: IncomingMessage }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "too early",
+        },
+        conversationEvents: [],
+      })),
+      close: vi.fn(async () => undefined),
+    };
+    const timeouts: Array<{ callback: () => void; delay: number | undefined }> = [];
+    const setTimeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((callback: (...args: unknown[]) => void, delay?: number, ...args: unknown[]) => {
+      timeouts.push({ callback: () => callback(...args), delay });
+      return timeouts.length as unknown as NodeJS.Timeout;
+    }) as typeof setTimeout);
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(new Date("2026-05-08T00:00:00.000Z").getTime());
+    const entry = createCronSchedulerEntry({
+      agentRegistry: createAgentRegistry([{ ...createTestAgent("default"), home: agentHome }]),
+      runtimes: [createRuntime({ engine })],
+      deliveryRouter: createDeliveryRouter(),
+      // Keep cron matching cheap while still making the computed delay exceed Node's timer limit.
+      now: () => new Date("2026-06-01T20:31:00.000Z"),
+    });
+
+    try {
+      await entry.start();
+
+      expect(timeouts[0]?.delay).toBe(2_147_483_647);
+      timeouts[0]?.callback();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(engine.run).not.toHaveBeenCalled();
+      expect(timeouts[1]?.delay).toBe(2_147_483_647);
+    } finally {
+      await entry.stop();
+      setTimeoutSpy.mockRestore();
+      dateNowSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 function createCapturingTransport(): {

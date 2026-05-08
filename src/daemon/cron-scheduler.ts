@@ -108,18 +108,30 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       if (current && JSON.stringify(current.job) === JSON.stringify(job)) {
         continue;
       }
-      if (current?.timer) {
-        clearTimeout(current.timer);
+      if (current) {
+        if (current.timer) {
+          clearTimeout(current.timer);
+          current.timer = undefined;
+        }
+        current.job = job;
+        if (!current.running) {
+          scheduleNext(current, dependencies.now?.() ?? new Date());
+        }
+        continue;
       }
-      const state: ScheduledJobState = { job, running: current?.running ?? false };
+      const state: ScheduledJobState = { job, running: false };
       jobStates.set(key, state);
       scheduleNext(state, dependencies.now?.() ?? new Date());
     }
   }
 
   function scheduleNext(state: ScheduledJobState, after: Date): void {
-    if (stopped) {
+    if (stopped || !isCurrentState(state)) {
       return;
+    }
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = undefined;
     }
     let nextRun;
     try {
@@ -133,14 +145,20 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       }, error);
       return;
     }
-    const delay = Math.max(0, Math.min(nextRun.getTime() - Date.now(), maxTimerDelayMs));
+    const delay = Math.max(0, nextRun.getTime() - Date.now());
+    if (delay > maxTimerDelayMs) {
+      state.timer = setTimeout(() => {
+        scheduleNext(state, dependencies.now?.() ?? new Date());
+      }, maxTimerDelayMs);
+      return;
+    }
     state.timer = setTimeout(() => {
       void runJob(state);
     }, delay);
   }
 
   async function runJob(state: ScheduledJobState): Promise<void> {
-    if (stopped) {
+    if (stopped || !isCurrentState(state)) {
       return;
     }
     if (state.running) {
@@ -174,7 +192,9 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       }, error);
     } finally {
       state.running = false;
-      scheduleNext(state, dependencies.now?.() ?? new Date());
+      if (isCurrentState(state)) {
+        scheduleNext(state, dependencies.now?.() ?? new Date());
+      }
     }
   }
 
@@ -309,6 +329,10 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
         });
       });
     }
+  }
+
+  function isCurrentState(state: ScheduledJobState): boolean {
+    return jobStates.get(jobKey(state.job)) === state;
   }
 }
 
