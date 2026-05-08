@@ -47,4 +47,15 @@ describe("cron schedule", () => {
 
     expect(next.toISOString()).toBe("2025-01-06T08:00:00.000Z");
   });
+
+  it("uses stable hash values when a hash seed is provided", () => {
+    const options = {
+      after: new Date("2026-05-08T00:00:00.000Z"),
+      timezone: "UTC",
+      hashSeed: "default:daily",
+    };
+    const runs = Array.from({ length: 10 }, () => getNextCronRun("H 8 * * *", options).toISOString());
+
+    expect(new Set(runs).size).toBe(1);
+  });
 });

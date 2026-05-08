@@ -135,7 +135,11 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
     }
     let nextRun;
     try {
-      nextRun = getNextCronRun(state.job.schedule, { after, timezone: state.job.timezone });
+      nextRun = getNextCronRun(state.job.schedule, {
+        after,
+        timezone: state.job.timezone,
+        hashSeed: jobKey(state.job),
+      });
     } catch (error) {
       void dependencies.logger?.error("failed to schedule cron job", {
         event: "cron.job.schedule_failed",
