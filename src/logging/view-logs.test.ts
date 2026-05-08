@@ -259,6 +259,48 @@ describe("viewDaemonLogs", () => {
     expect(chunks.join("")).toBe("one\ntwo\nthree\n");
   });
 
+  it("waits for a complete appended line before applying endpoint filtering", async () => {
+    const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram"]);
+    const stdout = new PassThrough();
+    const chunks: string[] = [];
+    const abortController = new AbortController();
+    const completedLine = JSON.stringify({ endpointId: "private-telegram", message: "ready" });
+    let readCount = 0;
+
+    stdout.on("data", (chunk) => {
+      chunks.push(String(chunk));
+    });
+
+    await viewDaemonLogs({
+      runtimeConfig,
+      endpointId: "private-telegram",
+      follow: true,
+      stdout,
+      signal: abortController.signal,
+      dependencies: {
+        async readFile() {
+          readCount += 1;
+          if (readCount === 1) {
+            return "";
+          }
+          if (readCount === 2) {
+            return "{";
+          }
+
+          return `${completedLine}\n`;
+        },
+        watch() {
+          return (async function* watchEvents() {
+            yield { eventType: "change" };
+            abortController.abort();
+          })();
+        },
+      },
+    });
+
+    expect(chunks.join("")).toBe(`${completedLine}\n`);
+  });
+
   it("returns cleanly after abort when a watcher only settles via return()", async () => {
     const runtimeConfig = createRuntimeConfig("/tmp/log-targets", ["private-telegram"]);
     const abortController = new AbortController();

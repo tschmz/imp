@@ -197,16 +197,30 @@ async function writeNewLogLines(
 ): Promise<void> {
   const content = await options.readFile(target.logFilePath, "utf8");
   const previousOffset = offsets.get(target.logFilePath) ?? 0;
-  const effectiveOffset = content.length < previousOffset ? 0 : previousOffset;
+  const logWasTruncated = content.length < previousOffset;
+  const effectiveOffset = logWasTruncated ? 0 : previousOffset;
   const nextChunk = content.slice(effectiveOffset);
+  const completeChunkLength = getCompleteLogChunkLength(nextChunk);
+  if (completeChunkLength === 0) {
+    if (logWasTruncated) {
+      offsets.set(target.logFilePath, 0);
+    }
+    return;
+  }
+  const completeChunk = nextChunk.slice(0, completeChunkLength);
 
-  const newLines = nextChunk
+  const newLines = completeChunk
     .split("\n")
     .map((line) => line.trimEnd())
     .filter((line) => shouldIncludeLogLine(line, target.filterEndpointId));
 
   writeLogLines(options.stdout, newLines);
-  offsets.set(target.logFilePath, content.length);
+  offsets.set(target.logFilePath, effectiveOffset + completeChunkLength);
+}
+
+function getCompleteLogChunkLength(chunk: string): number {
+  const lastLineBreak = chunk.lastIndexOf("\n");
+  return lastLineBreak < 0 ? 0 : lastLineBreak + 1;
 }
 
 function writeLogLines(stdout: NodeJS.WritableStream, lines: string[]): void {
