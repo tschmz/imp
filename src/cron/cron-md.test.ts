@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -105,6 +105,34 @@ Suche später nochmal.
         session: { mode: "detached", id: "daily" },
         instruction: "Run daily.",
       })).rejects.toThrow();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves concurrent cron job upserts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-cron-concurrent-upsert-"));
+
+    try {
+      await Promise.all(
+        Array.from({ length: 10 }, (_, index) =>
+          upsertAgentCronJob(root, {
+            id: `job-${index}`,
+            enabled: true,
+            schedule: "0 8 * * *",
+            reply: { type: "none" },
+            session: { mode: "detached", id: `job-${index}` },
+            instruction: `Run job ${index}.`,
+          })
+        ),
+      );
+
+      const result = parseCronMarkdown(await readFile(join(root, "cron.md"), "utf8"));
+
+      expect(result.issues).toEqual([]);
+      expect(result.jobs.map((job) => job.id).sort()).toEqual(
+        Array.from({ length: 10 }, (_, index) => `job-${index}`),
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }

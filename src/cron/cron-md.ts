@@ -1,10 +1,15 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { lock as lockFile } from "proper-lockfile";
+import writeFileAtomic from "write-file-atomic";
 import { z } from "zod";
 import type { AgentCronJob, CronJobDefinition } from "./types.js";
 import { parseCronExpression } from "./schedule.js";
 
 const cronFencePattern = /(^|\n)```([^\n`]*)\n([\s\S]*?)\n```/g;
+const lockTtlMs = 30_000;
+const lockRetryDelayMs = 25;
+const lockRetryCount = 400;
 const cronConfigSchema = z.object({
   id: z.string().min(1).regex(/^[A-Za-z0-9_-]+$/),
   enabled: z.boolean().optional(),
@@ -114,45 +119,49 @@ export function parseCronMarkdown(content: string): ParseCronMarkdownResult {
 
 export async function upsertAgentCronJob(agentHome: string, job: CronJobDefinition): Promise<void> {
   validateCronJob(job);
-  const path = getAgentCronPath(agentHome);
-  let existing = "# Imp Cron\n";
-  try {
-    existing = await readFile(path, "utf8");
-  } catch (error) {
-    if (!isMissingFileError(error)) {
-      throw error;
+  await withAgentCronLock(agentHome, async () => {
+    const path = getAgentCronPath(agentHome);
+    let existing = "# Imp Cron\n";
+    try {
+      existing = await readFile(path, "utf8");
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
     }
-  }
 
-  const parsed = parseCronMarkdown(existing);
-  if (parsed.issues.length > 0) {
-    throw new Error(parsed.issues.join("\n"));
-  }
-  const next = renderCronMarkdown(upsertJob(parsed.jobs, job));
-  await writeFile(path, next, "utf8");
+    const parsed = parseCronMarkdown(existing);
+    if (parsed.issues.length > 0) {
+      throw new Error(parsed.issues.join("\n"));
+    }
+    const next = renderCronMarkdown(upsertJob(parsed.jobs, job));
+    await writeFileAtomic(path, next, { encoding: "utf8" });
+  });
 }
 
 export async function deleteAgentCronJob(agentHome: string, jobId: string): Promise<boolean> {
-  const path = getAgentCronPath(agentHome);
-  let existing;
-  try {
-    existing = await readFile(path, "utf8");
-  } catch (error) {
-    if (isMissingFileError(error)) {
+  return withAgentCronLock(agentHome, async () => {
+    const path = getAgentCronPath(agentHome);
+    let existing;
+    try {
+      existing = await readFile(path, "utf8");
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        return false;
+      }
+      throw error;
+    }
+    const parsed = parseCronMarkdown(existing);
+    if (parsed.issues.length > 0) {
+      throw new Error(parsed.issues.join("\n"));
+    }
+    const nextJobs = parsed.jobs.filter((job) => job.id !== jobId);
+    if (nextJobs.length === parsed.jobs.length) {
       return false;
     }
-    throw error;
-  }
-  const parsed = parseCronMarkdown(existing);
-  if (parsed.issues.length > 0) {
-    throw new Error(parsed.issues.join("\n"));
-  }
-  const nextJobs = parsed.jobs.filter((job) => job.id !== jobId);
-  if (nextJobs.length === parsed.jobs.length) {
-    return false;
-  }
-  await writeFile(path, renderCronMarkdown(nextJobs), "utf8");
-  return true;
+    await writeFileAtomic(path, renderCronMarkdown(nextJobs), { encoding: "utf8" });
+    return true;
+  });
 }
 
 export function renderCronMarkdown(jobs: CronJobDefinition[]): string {
@@ -232,6 +241,52 @@ function upsertJob(jobs: CronJobDefinition[], job: CronJobDefinition): CronJobDe
 
 function isMissingFileError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
+}
+
+async function withAgentCronLock<T>(agentHome: string, action: () => Promise<T>): Promise<T> {
+  await mkdir(agentHome, { recursive: true });
+  const release = await acquireAgentCronLock(agentHome);
+
+  try {
+    return await action();
+  } finally {
+    await release();
+  }
+}
+
+async function acquireAgentCronLock(agentHome: string): Promise<() => Promise<void>> {
+  let compromisedError: Error | undefined;
+  try {
+    const release = await lockFile(agentHome, {
+      realpath: false,
+      stale: lockTtlMs,
+      update: Math.floor(lockTtlMs / 2),
+      retries: {
+        retries: lockRetryCount,
+        minTimeout: lockRetryDelayMs,
+        maxTimeout: lockRetryDelayMs,
+      },
+      onCompromised(error) {
+        compromisedError = error;
+      },
+    });
+
+    return async () => {
+      await release();
+      if (compromisedError) {
+        throw compromisedError;
+      }
+    };
+  } catch (error) {
+    if (isLockAcquisitionFailure(error)) {
+      throw new Error(`Cron file lock timed out: ${getAgentCronPath(agentHome)}`);
+    }
+    throw error;
+  }
+}
+
+function isLockAcquisitionFailure(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ELOCKED";
 }
 
 export function isAgentCronFile(path: string): boolean {
