@@ -1,9 +1,14 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ChatRef } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
+import { createDeliveryRouter } from "../transports/delivery-router.js";
 import type { TransportHandler } from "../transports/types.js";
+import { createCronSchedulerEntry } from "./cron-scheduler.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
 import { createRuntimeEntries } from "./runtime-runner.js";
 
@@ -1161,6 +1166,166 @@ describe("createRuntimeEntries", () => {
         }),
       }),
     );
+  });
+
+  it("delivers cron response attachments to endpoint reply targets", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-cron-attachments-"));
+    const agentHome = join(root, "agents", "default");
+    await mkdir(agentHome, { recursive: true });
+    await writeFile(
+      join(agentHome, "cron.md"),
+      [
+        "# Imp Cron",
+        "",
+        "## report",
+        "",
+        "```json imp-cron",
+        JSON.stringify({
+          id: "report",
+          enabled: true,
+          schedule: "* * * * *",
+          timezone: "UTC",
+          reply: {
+            type: "endpoint",
+            endpointId: "private-telegram",
+            target: {
+              conversationId: "42",
+            },
+          },
+          session: {
+            mode: "detached",
+            id: "report-session",
+            title: "Report",
+          },
+        }, null, 2),
+        "```",
+        "",
+        "Create report.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const conversation = {
+      state: {
+        conversation: {
+          transport: "cron",
+          externalId: "cron:default:report",
+          sessionId: "report-session",
+          agentId: "default",
+        },
+        agentId: "default",
+        createdAt: "2026-04-07T12:00:00.000Z",
+        updatedAt: "2026-04-07T12:00:00.000Z",
+        version: 1,
+      },
+      messages: [],
+    };
+    const conversationStore = {
+      get: vi.fn(async () => undefined),
+      put: vi.fn(async () => undefined),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      ensureActive: vi.fn(async () => conversation),
+      create: vi.fn(async () => conversation),
+      ensureDetachedForAgent: vi.fn(async () => conversation),
+      updateState: vi.fn(async (context, patch) => ({
+        ...context,
+        state: {
+          ...context.state,
+          ...patch,
+        },
+      })),
+      appendEvents: vi.fn(async (context, events) => ({
+        ...context,
+        messages: [...context.messages, ...events],
+      })),
+    };
+    const engine = {
+      run: vi.fn(async ({ message }: { message: IncomingMessage }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "Report is attached.",
+          attachments: [
+            {
+              kind: "file" as const,
+              path: join(root, "report.html"),
+              fileName: "report.html",
+              mimeType: "text/html",
+            },
+          ],
+        },
+        conversationEvents: [],
+      })),
+      close: vi.fn(async () => undefined),
+    };
+    const runtime = createRuntime({
+      endpointConfig: {
+        id: "private-telegram",
+        type: "telegram",
+        token: "123:abc",
+        allowedUserIds: ["7"],
+        defaultAgentId: "default",
+        paths: {
+          dataRoot: root,
+          sessionsDir: join(root, "sessions"),
+          bindingsDir: join(root, "bindings"),
+          logsDir: join(root, "logs"),
+          logFilePath: join(root, "logs", "endpoints.log"),
+          runtimeDir: join(root, "runtime", "endpoints"),
+          runtimeStatePath: join(root, "runtime", "endpoints", "private-telegram.json"),
+        },
+      },
+      conversationStore,
+      engine,
+    });
+    const deliveryRouter = createDeliveryRouter();
+    const deliver = vi.fn(async () => undefined);
+    deliveryRouter.register("private-telegram", { deliver });
+    let nowCallCount = 0;
+    const entry = createCronSchedulerEntry({
+      agentRegistry: createAgentRegistry([{ ...createTestAgent("default"), home: agentHome }]),
+      runtimes: [runtime],
+      deliveryRouter,
+      logger: runtime.logger,
+      now: () => {
+        nowCallCount += 1;
+        return nowCallCount === 1 ? new Date("2026-04-07T12:00:00.000Z") : new Date();
+      },
+    });
+
+    try {
+      await entry.start();
+      await vi.waitFor(() => {
+        expect(deliver).toHaveBeenCalled();
+      });
+
+      expect(deliver).toHaveBeenCalledWith({
+        endpointId: "private-telegram",
+        target: {
+          conversationId: "42",
+        },
+        message: {
+          conversation: {
+            transport: "private-telegram",
+            externalId: "42",
+            endpointId: "private-telegram",
+          },
+          text: "Report is attached.",
+          attachments: [
+            {
+              kind: "file",
+              path: join(root, "report.html"),
+              fileName: "report.html",
+              mimeType: "text/html",
+            },
+          ],
+        },
+      });
+    } finally {
+      await entry.stop();
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 

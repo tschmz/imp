@@ -278,6 +278,7 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
             endpointId: job.reply.endpointId,
           },
           text: result.message.text,
+          ...(result.message.attachments ? { attachments: result.message.attachments } : {}),
         },
       });
     }
