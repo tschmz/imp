@@ -148,7 +148,7 @@ describe("imp CLI e2e", () => {
     const inspectResult = await runCli(["backup", "inspect", backupPath], env);
 
     expect(inspectResult.stdout).toContain(`Backup: ${backupPath}`);
-    expect(inspectResult.stdout).toContain("Scopes: config, agents, sessions, bindings");
+    expect(inspectResult.stdout).toContain("Scopes: config, agents, plugins, sessions, bindings");
     expect(inspectResult.stdout).toContain("Agent files: 2");
     expect(inspectResult.stdout).toContain("Agent homes: 1");
     expect(inspectResult.stdout).toContain("Sessions: 1");

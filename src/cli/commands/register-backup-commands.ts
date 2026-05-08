@@ -10,7 +10,7 @@ export function registerBackupCommands(programOrSubcommand: Command, deps: CliDe
       .command("create")
       .description("Create a backup archive")
       .option("-o, --output <archive>", "Path to the backup archive")
-      .option("--only <scopes>", "Comma-separated scopes: config,agents,sessions,bindings")
+      .option("--only <scopes>", "Comma-separated scopes: config,agents,plugins,sessions,bindings")
       .option("-f, --force", "Overwrite an existing backup archive"),
   ).action(
     withAsyncAction(async (options: { config?: string; output?: string; only?: string; force?: boolean }) => {
@@ -43,7 +43,7 @@ export function registerBackupCommands(programOrSubcommand: Command, deps: CliDe
       .option("--data-root <path>", "Override paths.dataRoot when restoring sessions or config")
       .option(
         "--only <scopes>",
-        "Comma-separated scopes: config,agents,sessions,bindings. Agents-only restore requires a restored or existing target config.",
+        "Comma-separated scopes: config,agents,plugins,sessions,bindings. Agents-only restore requires a restored or existing target config.",
       )
       .option("-f, --force", "Overwrite existing files"),
   ).action(

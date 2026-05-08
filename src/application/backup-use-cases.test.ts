@@ -110,6 +110,62 @@ describe("backup use cases", () => {
     ).resolves.toContain("relative-root");
   });
 
+  it("creates plugin scoped archives with configured packages and plugin runtime data", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "config", "config.json");
+    const dataRoot = join(root, "state");
+    const packageRoot = join(dataRoot, "packages", "npm", "node_modules", "imp-voice");
+    const backupPath = join(root, "backup.tar");
+    const extractDir = join(root, "extract");
+
+    await writePluginConfig(configPath, dataRoot, packageRoot);
+    await writeTextFile(join(packageRoot, "imp-plugin.json"), "{\"id\":\"imp-voice\"}\n");
+    await writeTextFile(join(dataRoot, "plugins", "local-plugin", "imp-plugin.json"), "{\"id\":\"local-plugin\"}\n");
+    await writeTextFile(join(dataRoot, "plugin-state", "imp-voice", "state.json"), "{\"ready\":true}\n");
+    await writeTextFile(join(dataRoot, "runtime", "plugins", "imp-voice", "endpoints", "audio", "status.json"), "{\"ok\":true}\n");
+    await writeTextFile(join(dataRoot, "sessions", "default", "entries", "session-1", "meta.json"), "{\"ignored\":true}\n");
+
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+
+    await useCases.createBackup({
+      configPath,
+      outputPath: backupPath,
+      only: "plugins",
+      force: false,
+    });
+
+    await extractTarArchive(backupPath, extractDir);
+    const manifest = JSON.parse(await readFile(join(extractDir, "manifest.json"), "utf8")) as {
+      scopes: string[];
+      pluginPackages?: Array<{ archivePath: string; pluginId: string }>;
+      plugins?: Array<{ archivePath: string; relativeToDataRoot: string }>;
+      sessions?: unknown;
+    };
+
+    expect(manifest.scopes).toEqual(["plugins"]);
+    expect(manifest.pluginPackages).toEqual([
+      expect.objectContaining({ pluginId: "imp-voice" }),
+    ]);
+    expect(manifest.plugins?.map((entry) => entry.relativeToDataRoot).sort()).toEqual([
+      "plugin-state",
+      "plugins",
+      "runtime/plugins",
+    ]);
+    expect(manifest.sessions).toBeUndefined();
+    await expect(readFile(join(extractDir, manifest.pluginPackages![0]!.archivePath, "imp-plugin.json"), "utf8"))
+      .resolves.toContain("imp-voice");
+    await expect(readFile(join(extractDir, "plugins", "local-plugin", "imp-plugin.json"), "utf8"))
+      .resolves.toContain("local-plugin");
+    await expect(readFile(join(extractDir, "plugin-state", "imp-voice", "state.json"), "utf8"))
+      .resolves.toContain("ready");
+    await expect(readFile(join(extractDir, "runtime", "plugins", "imp-voice", "endpoints", "audio", "status.json"), "utf8"))
+      .resolves.toContain("ok");
+    await expect(readFile(join(extractDir, "sessions", "default", "entries", "session-1", "meta.json"), "utf8"))
+      .rejects.toThrow();
+  });
+
   it("inspects a backup archive manifest", async () => {
     const root = await createTempDir();
     const configPath = join(root, "config", "config.json");
@@ -147,7 +203,7 @@ describe("backup use cases", () => {
     const output = writeOutput.mock.calls[0]?.[0] ?? "";
     expect(writeOutput).toHaveBeenCalledTimes(1);
     expect(output).toContain(`Backup: ${backupPath}`);
-    expect(output).toContain("Scopes: config, agents, sessions, bindings");
+    expect(output).toContain("Scopes: config, agents, plugins, sessions, bindings");
     expect(output).toContain(`Source config: ${configPath}`);
     expect(output).toContain(`Source data root: ${dataRoot}`);
     expect(output).toContain("Config: config/config.json");
@@ -156,9 +212,64 @@ describe("backup use cases", () => {
     expect(output).toContain(`- default prompt.base.file: ${promptPath} -> agents/`);
     expect(output).toContain("Agent homes: 1");
     expect(output).toContain(`- default: ${agentHomePath} -> agent-homes/`);
+    expect(output).toContain("Plugin packages: 0");
+    expect(output).toContain("Plugin data: 0");
     expect(output).toContain("Sessions: 1");
     expect(output).toContain("- global: sessions -> sessions");
     expect(output).toContain("Bindings: 0");
+  });
+
+  it("restores plugin packages and plugin data with relocated config paths", async () => {
+    const sourceRoot = await createTempDir();
+    const sourceConfigPath = join(sourceRoot, "config", "config.json");
+    const sourceDataRoot = join(sourceRoot, "state");
+    const sourcePackageRoot = join(sourceDataRoot, "packages", "npm", "node_modules", "imp-voice");
+    const backupPath = join(sourceRoot, "backup.tar");
+
+    await writePluginConfig(sourceConfigPath, sourceDataRoot, sourcePackageRoot);
+    await writeTextFile(join(sourcePackageRoot, "imp-plugin.json"), "{\"id\":\"imp-voice\"}\n");
+    await writeTextFile(join(sourceDataRoot, "plugin-state", "imp-voice", "state.json"), "{\"source\":true}\n");
+    await writeTextFile(join(sourceDataRoot, "runtime", "plugins", "imp-voice", "recordings", "sample.txt"), "audio\n");
+
+    const useCases = createBackupUseCases({
+      writeOutput: vi.fn(),
+    });
+    await useCases.createBackup({
+      configPath: sourceConfigPath,
+      outputPath: backupPath,
+      only: "config,plugins",
+      force: false,
+    });
+
+    const targetRoot = await createTempDir();
+    const targetConfigPath = join(targetRoot, "config", "config.json");
+    const targetDataRoot = join(targetRoot, "state");
+    const restoreUseCases = createBackupUseCases({
+      discoverConfigPath: async () => {
+        throw new Error("No config found");
+      },
+      writeOutput: vi.fn(),
+    });
+
+    await restoreUseCases.restoreBackup({
+      inputPath: backupPath,
+      configPath: targetConfigPath,
+      dataRoot: targetDataRoot,
+      only: "config,plugins",
+      force: true,
+    });
+
+    const restoredConfig = JSON.parse(await readFile(targetConfigPath, "utf8")) as {
+      paths: { dataRoot: string };
+      plugins?: Array<{ package?: { path: string } }>;
+    };
+    const targetPackageRoot = join(targetDataRoot, "packages", "npm", "node_modules", "imp-voice");
+    expect(restoredConfig.paths.dataRoot).toBe(targetDataRoot);
+    expect(restoredConfig.plugins?.[0]?.package?.path).toBe(targetPackageRoot);
+    await expect(readFile(join(targetPackageRoot, "imp-plugin.json"), "utf8")).resolves.toContain("imp-voice");
+    await expect(readFile(join(targetDataRoot, "plugin-state", "imp-voice", "state.json"), "utf8")).resolves.toContain("source");
+    await expect(readFile(join(targetDataRoot, "runtime", "plugins", "imp-voice", "recordings", "sample.txt"), "utf8"))
+      .resolves.toBe("audio\n");
   });
 
   it("restores only the targeted sessions subtree and preserves unrelated data-root content", async () => {
@@ -888,6 +999,54 @@ async function writeConfig(configPath: string, dataRoot: string): Promise<void> 
             enabled: true,
             token: "test-token",
             access: { allowedUserIds: [] },
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+async function writePluginConfig(configPath: string, dataRoot: string, packagePath: string): Promise<void> {
+  await mkdir(dirname(configPath), { recursive: true });
+  await writeTextFile(
+    configPath,
+    `${JSON.stringify(
+      {
+        instance: { name: "default" },
+        paths: { dataRoot },
+        logging: { level: "info" },
+        defaults: { agentId: "default" },
+        agents: [
+          {
+            id: "default",
+            model: { provider: "openai-codex", modelId: "gpt-5.5" },
+            prompt: {
+              base: {
+                text: "prompt",
+              },
+            },
+          },
+        ],
+        plugins: [
+          {
+            id: "imp-voice",
+            enabled: true,
+            package: {
+              path: packagePath,
+              source: {
+                version: "0.1.0",
+                manifestHash: "sha256:test",
+              },
+            },
+          },
+        ],
+        endpoints: [
+          {
+            id: "cli",
+            type: "cli",
+            enabled: true,
           },
         ],
       },

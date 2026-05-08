@@ -11,6 +11,7 @@ import {
 } from "./backup-agent-assets.js";
 import { discoverConfigPath, getDefaultUserConfigPath } from "../config/discover-config-path.js";
 import { loadAppConfig } from "../config/load-app-config.js";
+import { resolveConfigPath } from "../config/secret-value.js";
 import type { AppConfig } from "../config/types.js";
 import { assertManagedFileCanBeWritten, writeManagedFile } from "../files/managed-file.js";
 import { createTarArchive, extractTarArchive } from "../files/tar-archive.js";
@@ -40,7 +41,7 @@ export interface BackupInspectOptions {
   inputPath: string;
 }
 
-export type BackupScope = "config" | "agents" | "sessions" | "bindings";
+export type BackupScope = "config" | "agents" | "plugins" | "sessions" | "bindings";
 
 interface BackupManifest {
   version: 1;
@@ -55,6 +56,8 @@ interface BackupManifest {
   };
   agentFiles?: BackupAgentFileEntry[];
   agentHomes?: BackupAgentHomeEntry[];
+  pluginPackages?: BackupPluginPackageEntry[];
+  plugins?: BackupDataRootTreeEntry[];
   sessions?: BackupDataRootTreeEntry[];
   bindings?: BackupDataRootTreeEntry[];
 }
@@ -63,6 +66,14 @@ interface BackupDataRootTreeEntry {
   archivePath: string;
   endpointId: string;
   relativeToDataRoot: string;
+}
+
+interface BackupPluginPackageEntry {
+  archivePath: string;
+  sourcePath: string;
+  configRelativePath?: string;
+  pluginId: string;
+  relativeToDataRoot?: string;
 }
 
 interface BackupDependencies {
@@ -190,15 +201,25 @@ export function createBackupUseCases(dependencies: Partial<BackupDependencies> =
           });
         }
 
-        if (selection.sessions || selection.bindings) {
+        if (selection.plugins || selection.sessions || selection.bindings) {
           if (!targetDataRoot) {
             throw new Error(
-              "Session or binding restore requires --data-root, a restorable config in the backup, or an existing discovered config path.",
+              "Plugin, session, or binding restore requires --data-root, a restorable config in the backup, or an existing discovered config path.",
             );
           }
         }
 
         const resolvedTargetDataRoot = targetDataRoot!;
+        if (selection.plugins) {
+          await restorePluginAssets({
+            stageRoot,
+            manifest,
+            targetConfigPath,
+            targetDataRoot: resolvedTargetDataRoot,
+            force,
+          });
+        }
+
         if (selection.sessions) {
           await restoreDataRootTrees({
             stageRoot,
@@ -291,6 +312,24 @@ async function stageBackup(options: {
     }
   }
 
+  if (selection.plugins) {
+    manifest.pluginPackages = [];
+    for (const [index, entry] of collectBackupPluginPackages(appConfig, configPath).entries()) {
+      await assertBackupPluginPackageIsReadable(entry);
+      const archivePath = `plugin-packages/${index.toString().padStart(3, "0")}-${sanitizeArchiveName(entry.pluginId)}`;
+      await copyDirectoryIntoArchive(entry.sourcePath, join(archiveRoot, archivePath));
+      manifest.pluginPackages.push({
+        ...entry,
+        archivePath,
+      });
+    }
+
+    manifest.plugins = [];
+    for (const relativeToDataRoot of ["plugins", "plugin-state", "runtime/plugins"]) {
+      manifest.plugins.push(...await stageDataRootTree(archiveRoot, appConfig.paths.dataRoot, relativeToDataRoot));
+    }
+  }
+
   if (selection.sessions) {
     manifest.sessions = await stageDataRootTree(archiveRoot, appConfig.paths.dataRoot, "sessions");
   }
@@ -305,7 +344,7 @@ async function stageBackup(options: {
 async function stageDataRootTree(
   archiveRoot: string,
   dataRoot: string,
-  relativeToDataRoot: "sessions" | "bindings",
+  relativeToDataRoot: string,
 ): Promise<BackupDataRootTreeEntry[]> {
   const sourcePath = join(dataRoot, relativeToDataRoot);
   if (!(await pathExists(sourcePath))) {
@@ -321,6 +360,55 @@ async function stageDataRootTree(
       relativeToDataRoot,
     },
   ];
+}
+
+function collectBackupPluginPackages(
+  appConfig: AppConfig,
+  configPath: string,
+): Array<Omit<BackupPluginPackageEntry, "archivePath">> {
+  const configDir = dirname(configPath);
+  const entries = new Map<string, Omit<BackupPluginPackageEntry, "archivePath">>();
+
+  for (const plugin of appConfig.plugins ?? []) {
+    const configuredPath = plugin.package?.path;
+    if (!configuredPath) {
+      continue;
+    }
+
+    const sourcePath = resolveConfigPath(configuredPath, configDir);
+    if (entries.has(sourcePath)) {
+      continue;
+    }
+
+    const relativeToDataRoot = relativeIfContainedOrSelf(appConfig.paths.dataRoot, sourcePath);
+    entries.set(sourcePath, {
+      pluginId: plugin.id,
+      sourcePath,
+      ...(isAbsolute(configuredPath) ? {} : { configRelativePath: toPortablePath(configuredPath) }),
+      ...(relativeToDataRoot !== undefined ? { relativeToDataRoot } : {}),
+    });
+  }
+
+  return [...entries.values()].sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
+}
+
+async function assertBackupPluginPackageIsReadable(
+  entry: Omit<BackupPluginPackageEntry, "archivePath">,
+): Promise<void> {
+  let packageStat;
+  try {
+    packageStat = await stat(entry.sourcePath);
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      throw new Error(`Configured plugin package not found for plugin "${entry.pluginId}": ${entry.sourcePath}`);
+    }
+
+    throw error;
+  }
+
+  if (!packageStat.isDirectory()) {
+    throw new Error(`Configured plugin package is not a directory for plugin "${entry.pluginId}": ${entry.sourcePath}`);
+  }
 }
 
 async function restoreAgentAssets(options: {
@@ -371,10 +459,73 @@ async function restoreAgentAssets(options: {
   }
 }
 
+async function restorePluginAssets(options: {
+  stageRoot: string;
+  manifest: BackupManifest;
+  targetConfigPath?: string;
+  targetDataRoot: string;
+  force: boolean;
+}): Promise<void> {
+  for (const entry of options.manifest.pluginPackages ?? []) {
+    const targetPath = relocateArchivedPluginPackage(entry, options);
+    const sourcePath = safeJoin(options.stageRoot, entry.archivePath, `manifest.pluginPackages[].archivePath (${entry.pluginId})`);
+
+    await assertDirectoryCanBeRestored({
+      path: targetPath,
+      resourceLabel: `Plugin package for plugin ${entry.pluginId}`,
+      force: options.force,
+    });
+
+    if (options.force) {
+      await rm(targetPath, { recursive: true, force: true });
+    }
+
+    await mkdir(dirname(targetPath), { recursive: true });
+    await cp(sourcePath, targetPath, { recursive: true });
+  }
+
+  await restoreDataRootTrees({
+    stageRoot: options.stageRoot,
+    entries: options.manifest.plugins ?? [],
+    manifestProperty: "plugins",
+    resourceLabel: "Plugin data",
+    targetDataRoot: options.targetDataRoot,
+    force: options.force,
+  });
+}
+
+function relocateArchivedPluginPackage(
+  entry: BackupPluginPackageEntry,
+  options: {
+    manifest: BackupManifest;
+    targetConfigPath?: string;
+    targetDataRoot?: string;
+  },
+): string {
+  if (entry.configRelativePath && options.targetConfigPath) {
+    return resolve(dirname(options.targetConfigPath), entry.configRelativePath);
+  }
+
+  if (entry.relativeToDataRoot && options.targetDataRoot) {
+    return resolve(options.targetDataRoot, entry.relativeToDataRoot);
+  }
+
+  const sourceDataRootRelativePath = relativeIfContainedOrSelf(options.manifest.source.dataRoot, entry.sourcePath);
+  if (sourceDataRootRelativePath !== undefined && options.targetDataRoot) {
+    return resolve(options.targetDataRoot, sourceDataRootRelativePath);
+  }
+
+  if (options.targetDataRoot) {
+    return resolve(options.targetDataRoot, "plugins", entry.pluginId);
+  }
+
+  return entry.sourcePath;
+}
+
 async function restoreDataRootTrees(options: {
   stageRoot: string;
   entries: BackupDataRootTreeEntry[];
-  manifestProperty: "sessions" | "bindings";
+  manifestProperty: "plugins" | "sessions" | "bindings";
   resourceLabel: string;
   targetDataRoot: string;
   force: boolean;
@@ -430,7 +581,13 @@ async function resolveTargetConfigPath(options: {
     return resolve(options.cliConfigPath);
   }
 
-  if (!options.selection.config && !options.selection.agents && !options.selection.sessions && !options.selection.bindings) {
+  if (
+    !options.selection.config &&
+    !options.selection.agents &&
+    !options.selection.plugins &&
+    !options.selection.sessions &&
+    !options.selection.bindings
+  ) {
     return undefined;
   }
 
@@ -453,7 +610,7 @@ function resolveTargetDataRoot(options: {
   archiveConfig?: AppConfig;
   selection: ScopeSelection;
 }): string | undefined {
-  if (!options.selection.agents && !options.selection.sessions && !options.selection.bindings) {
+  if (!options.selection.agents && !options.selection.plugins && !options.selection.sessions && !options.selection.bindings) {
     return undefined;
   }
 
@@ -566,7 +723,47 @@ function relocateConfigFileReferences(
           }
         : {}),
     })),
+    plugins: appConfig.plugins?.map((plugin) => ({
+      ...plugin,
+      ...(plugin.package
+        ? {
+            package: {
+              ...plugin.package,
+              path: relocatePluginPackagePath(plugin, sourceConfigDir, options),
+            },
+          }
+        : {}),
+    })),
   };
+}
+
+function relocatePluginPackagePath(
+  plugin: NonNullable<AppConfig["plugins"]>[number],
+  sourceConfigDir: string,
+  options: {
+    manifest: BackupManifest;
+    targetConfigPath?: string;
+    targetDataRoot?: string;
+  },
+): string {
+  const configuredPath = plugin.package?.path;
+  if (!configuredPath) {
+    return "";
+  }
+
+  const sourcePath = resolveConfigPath(configuredPath, sourceConfigDir);
+  const entry = options.manifest.pluginPackages?.find((candidate) => candidate.sourcePath === sourcePath);
+  if (entry) {
+    const relocated = relocateArchivedPluginPackage(entry, options);
+    return isAbsolute(configuredPath) ? relocated : configuredPath;
+  }
+
+  const relativeToDataRoot = relativeIfContainedOrSelf(options.manifest.source.dataRoot, sourcePath);
+  if (relativeToDataRoot !== undefined && options.targetDataRoot) {
+    return isAbsolute(configuredPath) ? resolve(options.targetDataRoot, relativeToDataRoot) : configuredPath;
+  }
+
+  return configuredPath;
 }
 
 function relocatePromptSource(
@@ -610,6 +807,21 @@ async function readBackupManifest(stageRoot: string): Promise<BackupManifest> {
     }
   }
 
+  for (const [index, entry] of (parsed.pluginPackages ?? []).entries()) {
+    assertSafeManifestRelativePath(entry.archivePath, `manifest.pluginPackages[${index}].archivePath`);
+    if (entry.configRelativePath) {
+      assertSafeConfigRelativePath(entry.configRelativePath, `manifest.pluginPackages[${index}].configRelativePath`);
+    }
+    if (entry.relativeToDataRoot) {
+      assertSafeManifestRelativePath(entry.relativeToDataRoot, `manifest.pluginPackages[${index}].relativeToDataRoot`);
+    }
+  }
+
+  for (const [index, entry] of (parsed.plugins ?? []).entries()) {
+    assertSafeManifestRelativePath(entry.archivePath, `manifest.plugins[${index}].archivePath`);
+    assertSafeManifestRelativePath(entry.relativeToDataRoot, `manifest.plugins[${index}].relativeToDataRoot`);
+  }
+
   for (const [index, entry] of (parsed.sessions ?? []).entries()) {
     assertSafeManifestRelativePath(entry.archivePath, `manifest.sessions[${index}].archivePath`);
     assertSafeManifestRelativePath(entry.relativeToDataRoot, `manifest.sessions[${index}].relativeToDataRoot`);
@@ -628,6 +840,8 @@ async function readBackupManifest(stageRoot: string): Promise<BackupManifest> {
     ...(parsed.config ? { config: parsed.config } : {}),
     ...(parsed.agentFiles ? { agentFiles: parsed.agentFiles } : {}),
     ...(parsed.agentHomes ? { agentHomes: parsed.agentHomes } : {}),
+    ...(parsed.pluginPackages ? { pluginPackages: parsed.pluginPackages } : {}),
+    ...(parsed.plugins ? { plugins: parsed.plugins } : {}),
     ...(parsed.sessions ? { sessions: parsed.sessions } : {}),
     ...(parsed.bindings ? { bindings: parsed.bindings } : {}),
   };
@@ -673,6 +887,8 @@ function assertSafeManifestRelativePath(path: string, label: string): void {
     label === "manifest.config.archivePath" ||
     label.startsWith("manifest.agentFiles[") ||
     label.startsWith("manifest.agentHomes[") ||
+    label.startsWith("manifest.pluginPackages[") ||
+    label.startsWith("manifest.plugins[") ||
     label.startsWith("manifest.sessions[") ||
     label.startsWith("manifest.bindings[");
   if (expectsFilePath && (portablePath.endsWith("/") || portablePath === ".")) {
@@ -727,6 +943,7 @@ function parseScopeSelection(only: string | undefined): ScopeSelection {
     return {
       config: true,
       agents: true,
+      plugins: true,
       sessions: true,
       bindings: true,
     };
@@ -738,19 +955,20 @@ function parseScopeSelection(only: string | undefined): ScopeSelection {
     .filter(Boolean);
 
   if (parsed.length === 0) {
-    throw new Error("Expected --only to include at least one scope: config, agents, sessions, bindings");
+    throw new Error("Expected --only to include at least one scope: config, agents, plugins, sessions, bindings");
   }
 
   const selection: ScopeSelection = {
     config: false,
     agents: false,
+    plugins: false,
     sessions: false,
     bindings: false,
   };
 
   for (const scope of parsed) {
-    if (scope !== "config" && scope !== "agents" && scope !== "sessions" && scope !== "bindings") {
-      throw new Error(`Unsupported backup scope "${scope}". Expected: config, agents, sessions, bindings`);
+    if (scope !== "config" && scope !== "agents" && scope !== "plugins" && scope !== "sessions" && scope !== "bindings") {
+      throw new Error(`Unsupported backup scope "${scope}". Expected: config, agents, plugins, sessions, bindings`);
     }
 
     selection[scope] = true;
@@ -760,7 +978,7 @@ function parseScopeSelection(only: string | undefined): ScopeSelection {
 }
 
 function selectedScopes(selection: ScopeSelection): BackupScope[] {
-  return (["config", "agents", "sessions", "bindings"] as const).filter((scope) => selection[scope]);
+  return (["config", "agents", "plugins", "sessions", "bindings"] as const).filter((scope) => selection[scope]);
 }
 
 function selectedManifestScopes(manifest: BackupManifest, selection: ScopeSelection): BackupScope[] {
@@ -790,6 +1008,20 @@ function renderBackupInspection(inputPath: string, manifest: BackupManifest): st
 
   for (const entry of manifest.agentHomes ?? []) {
     lines.push(`- ${entry.agentId}: ${entry.sourcePath} -> ${entry.archivePath}`);
+  }
+
+  lines.push("");
+  lines.push(`Plugin packages: ${manifest.pluginPackages?.length ?? 0}`);
+
+  for (const entry of manifest.pluginPackages ?? []) {
+    lines.push(`- ${entry.pluginId}: ${entry.sourcePath} -> ${entry.archivePath}`);
+  }
+
+  lines.push("");
+  lines.push(`Plugin data: ${manifest.plugins?.length ?? 0}`);
+
+  for (const entry of manifest.plugins ?? []) {
+    lines.push(`- ${entry.endpointId}: ${entry.relativeToDataRoot} -> ${entry.archivePath}`);
   }
 
   lines.push("");
@@ -854,6 +1086,22 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function relativeIfContainedOrSelf(root: string, candidate: string): string | undefined {
+  const relativePath = relative(resolve(root), resolve(candidate));
+  if (relativePath === "") {
+    return "";
+  }
+  if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
+    return undefined;
+  }
+
+  return relativePath;
+}
+
+function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function sanitizeArchiveName(value: string): string {
