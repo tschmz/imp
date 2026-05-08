@@ -253,7 +253,10 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       dataRoot: runtime.endpointConfig.paths.dataRoot,
       conversation,
     });
-    const replyChannel = toReplyChannel(job);
+    const replyTransportKind = job.reply.type === "endpoint"
+      ? getEndpointTransportKind(job.reply.endpointId)
+      : undefined;
+    const replyChannel = toReplyChannel(job, replyTransportKind);
     const result = await runtime.engine.run({
       agent,
       conversation,
@@ -297,7 +300,7 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
         target: job.reply.target,
         message: {
           conversation: {
-            transport: job.reply.endpointId,
+            transport: replyTransportKind ?? job.reply.endpointId,
             externalId: job.reply.target.conversationId,
             endpointId: job.reply.endpointId,
           },
@@ -338,6 +341,10 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
   function isCurrentState(state: ScheduledJobState): boolean {
     return jobStates.get(jobKey(state.job)) === state;
   }
+
+  function getEndpointTransportKind(endpointId: string): string | undefined {
+    return dependencies.runtimes.find((candidate) => candidate.endpointConfig.id === endpointId)?.endpointConfig.type;
+  }
 }
 
 function createCronIncomingMessage(job: AgentCronJob, receivedAt: string): IncomingMessage {
@@ -365,11 +372,11 @@ function createCronIncomingMessage(job: AgentCronJob, receivedAt: string): Incom
   };
 }
 
-function toReplyChannel(job: AgentCronJob): ReplyChannelContext {
+function toReplyChannel(job: AgentCronJob, transportKind?: string): ReplyChannelContext {
   if (job.reply.type === "none") {
     return { kind: "none", delivery: "none" };
   }
-  return { kind: job.reply.endpointId, delivery: "endpoint", endpointId: job.reply.endpointId };
+  return { kind: transportKind ?? job.reply.endpointId, delivery: "endpoint", endpointId: job.reply.endpointId };
 }
 
 function toCronUserEvent(message: IncomingMessage): ConversationUserMessage {

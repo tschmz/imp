@@ -1307,7 +1307,7 @@ describe("createRuntimeEntries", () => {
         },
         message: {
           conversation: {
-            transport: "private-telegram",
+            transport: "telegram",
             externalId: "42",
             endpointId: "private-telegram",
           },
@@ -1322,6 +1322,25 @@ describe("createRuntimeEntries", () => {
           ],
         },
       });
+      expect(engine.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          runtime: expect.objectContaining({
+            output: {
+              mode: "reply-channel",
+              replyChannel: {
+                kind: "telegram",
+                delivery: "endpoint",
+                endpointId: "private-telegram",
+              },
+            },
+            replyChannel: {
+              kind: "telegram",
+              delivery: "endpoint",
+              endpointId: "private-telegram",
+            },
+          }),
+        }),
+      );
     } finally {
       await entry.stop();
       await rm(root, { recursive: true, force: true });
