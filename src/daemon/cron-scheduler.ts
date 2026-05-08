@@ -152,7 +152,27 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
     const delay = Math.max(0, nextRun.getTime() - Date.now());
     if (delay > maxTimerDelayMs) {
       state.timer = setTimeout(() => {
-        scheduleNext(state, dependencies.now?.() ?? new Date());
+        scheduleRunAt(state, nextRun);
+      }, maxTimerDelayMs);
+      return;
+    }
+    state.timer = setTimeout(() => {
+      void runJob(state);
+    }, delay);
+  }
+
+  function scheduleRunAt(state: ScheduledJobState, nextRun: Date): void {
+    if (stopped || !isCurrentState(state)) {
+      return;
+    }
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = undefined;
+    }
+    const delay = Math.max(0, nextRun.getTime() - Date.now());
+    if (delay > maxTimerDelayMs) {
+      state.timer = setTimeout(() => {
+        scheduleRunAt(state, nextRun);
       }, maxTimerDelayMs);
       return;
     }
