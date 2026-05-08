@@ -62,20 +62,16 @@ describe("statusCommandHandler", () => {
             state: baseConversationState,
             messages: [
               {
-                kind: "message",
                 id: "msg-1",
                 role: "user",
                 content: "hello",
                 createdAt: "2026-04-05T00:00:10.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
               },
               {
-                kind: "message",
                 id: "msg-2",
                 role: "assistant",
                 content: [{ type: "text", text: "hi" }],
                 createdAt: "2026-04-05T00:00:20.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
                 api: "test",
                 provider: "test",
                 model: "stub",
@@ -90,12 +86,10 @@ describe("statusCommandHandler", () => {
                 },
               },
               {
-                kind: "message",
                 id: "msg-3",
                 role: "assistant",
                 content: [{ type: "text", text: "again" }],
                 createdAt: "2026-04-05T00:00:30.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:30.000Z"),
                 api: "test",
                 provider: "test",
                 model: "stub",
@@ -154,20 +148,16 @@ describe("statusCommandHandler", () => {
             state: baseConversationState,
             messages: [
               {
-                kind: "message",
                 id: "msg-0",
                 role: "user",
                 content: "x".repeat(8_000),
                 createdAt: "2026-04-05T00:00:10.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
               },
               {
-                kind: "message",
                 id: "msg-1",
                 role: "assistant",
                 content: [{ type: "text", text: "hi" }],
                 createdAt: "2026-04-05T00:00:20.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
                 api: "test",
                 provider: "test",
                 model: "stub",
@@ -225,12 +215,10 @@ describe("statusCommandHandler", () => {
             state: baseConversationState,
             messages: [
               {
-                kind: "message",
                 id: "msg-1",
                 role: "assistant",
                 content: [{ type: "text", text: "hi" }],
                 createdAt: "2026-04-05T00:00:20.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
                 api: "test",
                 provider: "test",
                 model: "stub",
@@ -274,12 +262,10 @@ describe("statusCommandHandler", () => {
             state: baseConversationState,
             messages: [
               {
-                kind: "message",
                 id: "msg-1",
                 role: "user",
                 content: "hello",
                 createdAt: "2026-04-05T00:00:10.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
               },
             ],
           }),
@@ -311,12 +297,10 @@ describe("statusCommandHandler", () => {
             state: baseConversationState,
             messages: [
               {
-                kind: "message",
                 id: "msg-1",
                 role: "assistant",
                 content: [{ type: "text", text: "hi" }],
                 createdAt: "2026-04-05T00:00:20.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
                 api: "test",
                 provider: "test",
                 model: "stub",
@@ -395,28 +379,22 @@ describe("statusCommandHandler", () => {
             },
             messages: [
               {
-                kind: "message",
                 id: "msg-1",
                 role: "user",
                 content: "x".repeat(20_000),
                 createdAt: "2026-04-05T00:00:10.000Z",
-                timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
               },
               {
-                kind: "message",
                 id: "msg-2",
                 role: "user",
                 content: "continue",
                 createdAt: "2026-04-05T00:01:10.000Z",
-                timestamp: Date.parse("2026-04-05T00:01:10.000Z"),
               },
               {
-                kind: "message",
                 id: "msg-3",
                 role: "assistant",
                 content: [{ type: "text", text: "ok" }],
                 createdAt: "2026-04-05T00:01:20.000Z",
-                timestamp: Date.parse("2026-04-05T00:01:20.000Z"),
                 api: "test",
                 provider: "test",
                 model: "stub",

@@ -51,15 +51,12 @@ describe("resolvePreviousResponseState", () => {
   it("uses the latest matching assistant response id and keeps only messages after it", () => {
     const messages = [
       {
-        kind: "message",
         id: "1:user",
         role: "user",
         content: "hello",
-        timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
         createdAt: "2026-04-05T00:00:00.000Z",
       },
       {
-        kind: "message",
         id: "1:assistant:1",
         role: "assistant",
         content: [{ type: "text", text: "Let me check." }],
@@ -76,18 +73,15 @@ describe("resolvePreviousResponseState", () => {
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
         },
         stopReason: "toolUse",
-        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
         createdAt: "2026-04-05T00:00:01.000Z",
       },
       {
-        kind: "message",
         id: "1:tool-result:1",
         role: "toolResult",
         toolCallId: "tool-1",
         toolName: "read_file",
         content: [{ type: "text", text: "README contents" }],
         isError: false,
-        timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
         createdAt: "2026-04-05T00:00:02.000Z",
       },
     ] satisfies ConversationEvent[];
@@ -103,15 +97,12 @@ describe("resolvePreviousResponseState", () => {
   it("falls back to full replay for OpenAI-compatible custom Responses providers", () => {
     const messages = [
       {
-        kind: "message",
         id: "1:user",
         role: "user",
         content: "hello",
-        timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
         createdAt: "2026-04-05T00:00:00.000Z",
       },
       {
-        kind: "message",
         id: "1:assistant:1",
         role: "assistant",
         content: [{ type: "text", text: "Hi" }],
@@ -128,7 +119,6 @@ describe("resolvePreviousResponseState", () => {
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
         },
         stopReason: "stop",
-        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
         createdAt: "2026-04-05T00:00:01.000Z",
       },
     ] satisfies ConversationEvent[];
@@ -147,15 +137,12 @@ describe("resolvePreviousResponseState", () => {
   it("falls back to full replay when the latest matching responses assistant ended in error", () => {
     const messages = [
       {
-        kind: "message",
         id: "1:user",
         role: "user",
         content: "hello",
-        timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
         createdAt: "2026-04-05T00:00:00.000Z",
       },
       {
-        kind: "message",
         id: "1:assistant:1",
         role: "assistant",
         content: [{ type: "text", text: "Let me check." }],
@@ -173,15 +160,12 @@ describe("resolvePreviousResponseState", () => {
         },
         stopReason: "error",
         errorMessage: "upstream failed",
-        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
         createdAt: "2026-04-05T00:00:01.000Z",
       },
       {
-        kind: "message",
         id: "2:user",
         role: "user",
         content: "retry",
-        timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
         createdAt: "2026-04-05T00:00:02.000Z",
       },
     ] satisfies ConversationEvent[];
@@ -196,15 +180,12 @@ describe("resolvePreviousResponseState", () => {
   it("falls back to full replay when the latest assistant is not a matching responses message", () => {
     const messages = [
       {
-        kind: "message",
         id: "1:user",
         role: "user",
         content: "hello",
-        timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
         createdAt: "2026-04-05T00:00:00.000Z",
       },
       {
-        kind: "message",
         id: "1:assistant:1",
         role: "assistant",
         content: [{ type: "text", text: "Hi" }],
@@ -221,19 +202,15 @@ describe("resolvePreviousResponseState", () => {
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
         },
         stopReason: "stop",
-        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
         createdAt: "2026-04-05T00:00:01.000Z",
       },
       {
-        kind: "message",
         id: "2:user",
         role: "user",
         content: "switch agent",
-        timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
         createdAt: "2026-04-05T00:00:02.000Z",
       },
       {
-        kind: "message",
         id: "2:assistant:1",
         role: "assistant",
         content: [{ type: "text", text: "Using a different provider now." }],
@@ -249,7 +226,6 @@ describe("resolvePreviousResponseState", () => {
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
         },
         stopReason: "stop",
-        timestamp: Date.parse("2026-04-05T00:00:03.000Z"),
         createdAt: "2026-04-05T00:00:03.000Z",
       },
     ] satisfies ConversationEvent[];

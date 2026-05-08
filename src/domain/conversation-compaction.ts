@@ -232,9 +232,7 @@ function findSafeSuffixStartAtOrBefore(
 
 function createCompactionSummaryMessage(conversation: ConversationContext): ConversationEvent {
   const compaction = conversation.state.compaction!;
-  const timestamp = Date.parse(compaction.createdAt);
   return {
-    kind: "message",
     id: `compaction:${compaction.sequence}:summary`,
     role: "user",
     content: [
@@ -244,7 +242,6 @@ function createCompactionSummaryMessage(conversation: ConversationContext): Conv
       compaction.summary.trim(),
       "</context_checkpoint>",
     ].join("\n"),
-    timestamp: Number.isNaN(timestamp) ? Date.now() : timestamp,
     createdAt: compaction.createdAt,
   };
 }
@@ -277,7 +274,7 @@ function estimateMessageTokens(message: ConversationEvent): number {
     return estimateContentTokens(message.content) + estimateTextTokens(message.toolName);
   }
 
-  let chars = message.model.length + message.provider.length + message.stopReason.length;
+  let chars = (message.model ?? "").length + (message.provider ?? "").length + message.stopReason.length;
   for (const block of message.content) {
     if (block.type === "text") {
       chars += block.text.length;

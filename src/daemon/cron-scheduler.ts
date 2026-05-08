@@ -401,11 +401,9 @@ function toReplyChannel(job: AgentCronJob, transportKind?: string): ReplyChannel
 
 function toCronUserEvent(message: IncomingMessage): ConversationUserMessage {
   return {
-    kind: "message",
     id: message.messageId,
     role: "user",
     content: message.text,
-    timestamp: Date.parse(message.receivedAt),
     createdAt: message.receivedAt,
     correlationId: message.correlationId,
     source: message.source,

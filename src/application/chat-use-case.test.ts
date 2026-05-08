@@ -356,7 +356,6 @@ function createActiveConversation(): ConversationContext {
         id: "msg-1",
         role: "user",
         content: "old question",
-        timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
         createdAt: "2026-04-05T00:00:10.000Z",
       },
       {
@@ -367,7 +366,6 @@ function createActiveConversation(): ConversationContext {
           { type: "text", text: "old answer" },
           { type: "toolCall", id: "call-1", name: "shell", arguments: { cmd: "npm test" } },
         ],
-        timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
         createdAt: "2026-04-05T00:00:20.000Z",
         api: "test",
         provider: "test",
@@ -389,7 +387,6 @@ function createActiveConversation(): ConversationContext {
         toolName: "shell",
         isError: false,
         content: [{ type: "text", text: "tool output" }],
-        timestamp: Date.parse("2026-04-05T00:00:30.000Z"),
         createdAt: "2026-04-05T00:00:30.000Z",
       },
     ],

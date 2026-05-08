@@ -57,20 +57,16 @@ describe("createDaemon", () => {
     expect(runInputs[0].conversation.messages).toEqual([]);
     expect(runInputs[1].conversation.messages).toEqual([
       {
-        kind: "message",
         id: "1",
         role: "user",
         content: "hello",
-        timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
         createdAt: "2026-04-05T00:00:00.000Z",
         correlationId: "corr-1",
       },
       {
-        kind: "message",
         id: "1:assistant:1",
         role: "assistant",
         content: [{ type: "text", text: "reply:1" }],
-        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
         api: "openai-responses",
         provider: "openai",
         model: "gpt-5-mini",
@@ -857,11 +853,9 @@ function createAgentRunResult(message: IncomingMessage, text: string) {
     },
     conversationEvents: [
       {
-        kind: "message" as const,
         id: `${message.messageId}:assistant:1`,
         role: "assistant" as const,
         content: [{ type: "text" as const, text }],
-        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
         api: "openai-responses",
         provider: "openai",
         model: "gpt-5-mini",

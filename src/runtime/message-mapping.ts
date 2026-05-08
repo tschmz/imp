@@ -88,12 +88,10 @@ export function toConversationEvents(
     if (message.role === "toolResult") {
       toolResultIndex += 1;
       return {
-        kind: "message",
         id: `${options.parentMessageId}:tool-result:${toolResultIndex}`,
         role: "toolResult",
         createdAt: new Date(message.timestamp).toISOString(),
         correlationId: options.correlationId,
-        timestamp: message.timestamp,
         toolCallId: message.toolCallId,
         toolName: message.toolName,
         content: message.content,
@@ -108,12 +106,10 @@ export function toConversationEvents(
 
     assistantIndex += 1;
     return {
-      kind: "message",
       id: `${options.parentMessageId}:assistant:${assistantIndex}`,
       role: "assistant",
       createdAt: new Date(message.timestamp).toISOString(),
       correlationId: options.correlationId,
-      timestamp: message.timestamp,
       content: message.content,
       api: message.api,
       provider: message.provider,
@@ -280,12 +276,8 @@ async function defaultReadBinaryFile(path: string): Promise<Uint8Array> {
 }
 
 function resolveMessageTimestamp(
-  message: Pick<ConversationEvent, "createdAt"> & Partial<Pick<ConversationAssistantMessage, "timestamp">>,
+  message: Pick<ConversationEvent, "createdAt">,
 ): number {
-  if (typeof message.timestamp === "number" && Number.isFinite(message.timestamp)) {
-    return message.timestamp;
-  }
-
   const parsed = Date.parse(message.createdAt);
   return Number.isNaN(parsed) ? Date.now() : parsed;
 }

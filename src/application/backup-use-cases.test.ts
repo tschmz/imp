@@ -259,11 +259,9 @@ describe("backup use cases", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "user",
           content: "Please inspect this report",
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
           source: {
             kind: "telegram-document",

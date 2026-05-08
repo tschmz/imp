@@ -713,7 +713,6 @@ describe("createHandleIncomingMessage", () => {
     });
 
     expect(storedContext?.messages[0]).toMatchObject({
-      kind: "message",
       role: "user",
       content: "transcribed text",
       source: {
@@ -725,7 +724,6 @@ describe("createHandleIncomingMessage", () => {
       },
     });
     expect(storedContext?.messages[1]).toMatchObject({
-      kind: "message",
       role: "assistant",
       content: [{ type: "text", text: "reply" }],
     });
@@ -798,12 +796,10 @@ describe("createHandleIncomingMessage", () => {
       run: vi.fn(async ({ message, onConversationEvents }) => {
         const conversationEvents = [
           {
-            kind: "message",
             id: `${message.messageId}:assistant:1`,
             role: "assistant",
             createdAt: "2026-04-05T00:00:01.000Z",
             correlationId: message.correlationId,
-            timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
             api: "openai-responses",
             provider: "openai",
             model: "gpt-5-mini",
@@ -829,12 +825,10 @@ describe("createHandleIncomingMessage", () => {
             ],
           },
           {
-            kind: "message",
             id: `${message.messageId}:tool-result:1`,
             role: "toolResult",
             createdAt: "2026-04-05T00:00:02.000Z",
             correlationId: message.correlationId,
-            timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
             toolCallId: "tool-1",
             toolName: "read_file",
             content: [{ type: "text", text: "README contents" }],
@@ -844,13 +838,11 @@ describe("createHandleIncomingMessage", () => {
             isError: false,
           },
           {
-            kind: "message",
             id: `${message.messageId}:assistant:2`,
             role: "assistant",
             content: [{ type: "text", text: "All set." }],
             createdAt: "2026-04-05T00:00:03.000Z",
             correlationId: message.correlationId,
-            timestamp: Date.parse("2026-04-05T00:00:03.000Z"),
             api: "openai-responses",
             provider: "openai",
             model: "gpt-5-mini",
@@ -925,13 +917,11 @@ describe("createHandleIncomingMessage", () => {
     });
     expect(storedContext?.messages).toMatchObject([
       {
-        kind: "message",
         id: "7",
         role: "user",
         content: "check the readme",
       },
       {
-        kind: "message",
         id: "7:assistant:1",
         role: "assistant",
         content: [
@@ -947,7 +937,6 @@ describe("createHandleIncomingMessage", () => {
         ],
       },
       {
-        kind: "message",
         id: "7:tool-result:1",
         role: "toolResult",
         toolCallId: "tool-1",
@@ -955,7 +944,6 @@ describe("createHandleIncomingMessage", () => {
         content: [{ type: "text", text: "README contents" }],
       },
       {
-        kind: "message",
         id: "7:assistant:2",
         role: "assistant",
         content: [{ type: "text", text: "All set." }],
@@ -970,12 +958,10 @@ describe("createHandleIncomingMessage", () => {
       run: vi.fn(async ({ message, onConversationEvents }) => {
         const conversationEvents = [
           {
-            kind: "message",
             id: `${message.messageId}:assistant:1`,
             role: "assistant",
             createdAt: "2026-04-05T00:00:01.000Z",
             correlationId: message.correlationId,
-            timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
             api: "openai-responses",
             provider: "openai",
             model: "gpt-5-mini",
@@ -997,12 +983,10 @@ describe("createHandleIncomingMessage", () => {
             ],
           },
           {
-            kind: "message",
             id: `${message.messageId}:assistant:2`,
             role: "assistant",
             createdAt: "2026-04-05T00:00:02.000Z",
             correlationId: message.correlationId,
-            timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
             api: "openai-responses",
             provider: "openai",
             model: "gpt-5-mini",
@@ -1400,12 +1384,10 @@ function createAssistantEvent(
   phase: "commentary" | "final_answer" = "final_answer",
 ): ConversationEvent {
   return {
-    kind: "message",
     id: `${message.messageId}:assistant:${phase}`,
     role: "assistant",
     createdAt: "2026-04-05T00:00:01.000Z",
     correlationId: message.correlationId,
-    timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
     api: "openai-responses",
     provider: "openai",
     model: "gpt-5-mini",
@@ -1436,11 +1418,9 @@ function createAgentRunResult(message: IncomingMessage, text: string) {
     },
     conversationEvents: [
       {
-        kind: "message" as const,
         id: `${message.messageId}:assistant:1`,
         role: "assistant" as const,
         content: [{ type: "text" as const, text }],
-        timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
         api: "openai-responses",
         provider: "openai",
         model: "gpt-5-mini",

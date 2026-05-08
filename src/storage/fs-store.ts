@@ -1044,7 +1044,6 @@ function normalizeConversationUserMessage(
 
   return {
     ...message,
-    kind: "message",
     content: normalizeUserContent(message.content),
     ...(source ? { source } : {}),
   };
@@ -1245,7 +1244,6 @@ function normalizeConversationAssistantMessage(
 ): ConversationAssistantMessage {
   return {
     ...message,
-    kind: "message",
     content: message.content.map((content) =>
       content.type === "toolCall"
         ? {
@@ -1255,7 +1253,6 @@ function normalizeConversationAssistantMessage(
         : content,
     ),
     stopReason: message.stopReason,
-    timestamp: normalizeTimestamp(message.timestamp, message.createdAt),
   };
 }
 
@@ -1264,9 +1261,7 @@ function normalizeConversationToolResultMessage(
 ): ConversationToolResultMessage {
   return {
     ...message,
-    kind: "message",
     content: normalizeToolResultContent(message.content),
-    timestamp: normalizeTimestamp(message.timestamp, message.createdAt),
     isError: message.isError ?? false,
   };
 }
@@ -1287,15 +1282,6 @@ function normalizeToolResultContent(
   }
 
   return content;
-}
-
-function normalizeTimestamp(timestamp: number | undefined, createdAt: string): number {
-  if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
-    return timestamp;
-  }
-
-  const parsed = Date.parse(createdAt);
-  return Number.isNaN(parsed) ? Date.now() : parsed;
 }
 
 function isConversationUserMessage(message: unknown): message is ConversationUserMessage {

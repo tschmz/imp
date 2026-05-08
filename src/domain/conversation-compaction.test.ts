@@ -146,11 +146,9 @@ function createConversation(
 
 function createUserMessage(id: string, content: string, createdAt: string) {
   return {
-    kind: "message" as const,
     id,
     role: "user" as const,
     content,
-    timestamp: Date.parse(createdAt),
     createdAt,
   };
 }
@@ -162,7 +160,6 @@ function createAssistantMessage(
   responseId?: string,
 ) {
   return {
-    kind: "message" as const,
     id,
     role: "assistant" as const,
     content: [{ type: "text" as const, text }],
@@ -179,20 +176,17 @@ function createAssistantMessage(
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
     stopReason: "stop" as const,
-    timestamp: Date.parse(createdAt),
     createdAt,
   };
 }
 
 function createToolResultMessage(id: string, text: string, createdAt: string) {
   return {
-    kind: "message" as const,
     id,
     role: "toolResult" as const,
     toolCallId: `call-${id}`,
     toolName: "bash",
     content: [{ type: "text" as const, text }],
-    timestamp: Date.parse(createdAt),
     createdAt,
     isError: false,
   };

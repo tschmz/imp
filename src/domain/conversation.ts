@@ -20,7 +20,6 @@ export interface ConversationRef extends ChatRef {
 }
 
 export interface ConversationEventBase {
-  kind?: "message";
   id: string;
   createdAt: string;
   correlationId?: string;
@@ -29,16 +28,17 @@ export interface ConversationEventBase {
 export interface ConversationUserMessage extends ConversationEventBase {
   role: "user";
   content: UserMessage["content"];
-  timestamp: number;
   source?: ConversationMessageSource;
 }
 
 export interface ConversationAssistantMessage
   extends ConversationEventBase,
-    Omit<AssistantMessage, "timestamp"> {
+    Omit<AssistantMessage, "timestamp" | "api" | "provider" | "model"> {
   role: "assistant";
   content: Array<TextContent | ThinkingContent | ToolCall>;
-  timestamp: number;
+  api?: AssistantMessage["api"];
+  provider?: string;
+  model?: string;
 }
 
 export interface ConversationToolResultMessage
@@ -46,7 +46,6 @@ export interface ConversationToolResultMessage
     Omit<ToolResultMessage, "timestamp"> {
   role: "toolResult";
   content: Array<TextContent | ImageContent>;
-  timestamp: number;
 }
 
 export type ConversationEvent =

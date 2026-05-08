@@ -118,11 +118,9 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "user",
           content: "hello",
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
         },
       ],
@@ -130,6 +128,10 @@ describe("createFsConversationStore", () => {
 
     await store.put(next);
 
+    const eventsPath = join(root, "sessions", "default", "entries", created.state.conversation.sessionId!, "events.jsonl");
+    const persistedEvent = JSON.parse((await readFile(eventsPath, "utf8")).trim()) as Record<string, unknown>;
+    expect(persistedEvent).not.toHaveProperty("kind");
+    expect(persistedEvent).not.toHaveProperty("timestamp");
     await expect(store.get(created.state.conversation)).resolves.toEqual({
       ...next,
       state: {
@@ -165,19 +167,15 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "user",
           content: "older",
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
         },
         {
-          kind: "message",
           id: "msg-2",
           role: "user",
           content: "recent",
-          timestamp: Date.parse("2026-04-05T00:02:00.000Z"),
           createdAt: "2026-04-05T00:02:00.000Z",
         },
       ],
@@ -305,11 +303,9 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "user",
           content: "Please inspect this report",
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
           source: {
             kind: "telegram-document",
@@ -384,11 +380,9 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "user",
           content: "Describe this image",
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
           source: {
             kind: "telegram-image",
@@ -472,11 +466,9 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "user",
           content: "Please inspect this report",
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
           source: {
             kind: "telegram-document",
@@ -533,19 +525,15 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "user",
           content: "hello",
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           createdAt: "2026-04-05T00:01:00.000Z",
         },
         {
-          kind: "message",
           id: "msg-1:assistant:1",
           role: "assistant",
           createdAt: "2026-04-05T00:01:01.000Z",
-          timestamp: Date.parse("2026-04-05T00:01:01.000Z"),
           api: "openai-responses",
           provider: "openai",
           model: "gpt-5-mini",
@@ -571,11 +559,9 @@ describe("createFsConversationStore", () => {
           ],
         },
         {
-          kind: "message",
           id: "msg-1:tool-result:1",
           role: "toolResult",
           createdAt: "2026-04-05T00:01:02.000Z",
-          timestamp: Date.parse("2026-04-05T00:01:02.000Z"),
           toolCallId: "tool-1",
           toolName: "read_file",
           content: [{ type: "text", text: "{\"ok\":true}" }],
@@ -585,11 +571,9 @@ describe("createFsConversationStore", () => {
           isError: false,
         },
         {
-          kind: "message",
           id: "msg-1:assistant:2",
           role: "assistant",
           content: [{ type: "text", text: "The config looks valid." }],
-          timestamp: Date.parse("2026-04-05T00:01:03.000Z"),
           api: "openai-responses",
           provider: "openai",
           model: "gpt-5-mini",
@@ -694,7 +678,6 @@ describe("createFsConversationStore", () => {
           id: "msg-1",
           role: "assistant",
           content: [{ type: "text", text: "finished" }],
-          timestamp: Date.parse("2026-04-05T00:02:00.000Z"),
           api: "openai-responses",
           provider: "openai",
           model: "gpt-5-mini",
@@ -752,11 +735,9 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "assistant",
           content: [{ type: "text", text: "older" }],
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           api: "openai-responses",
           provider: "openai",
           model: "gpt-5-mini",
@@ -789,7 +770,6 @@ describe("createFsConversationStore", () => {
           id: "msg-current",
           role: "assistant",
           content: [{ type: "text", text: "newer" }],
-          timestamp: Date.parse("2026-04-05T00:05:00.000Z"),
           api: "openai-responses",
           provider: "openai",
           model: "gpt-5-mini",
@@ -822,11 +802,9 @@ describe("createFsConversationStore", () => {
       },
       messages: [
         {
-          kind: "message",
           id: "msg-1",
           role: "assistant",
           content: [{ type: "text", text: "older" }],
-          timestamp: Date.parse("2026-04-05T00:01:00.000Z"),
           api: "openai-responses",
           provider: "openai",
           model: "gpt-5-mini",

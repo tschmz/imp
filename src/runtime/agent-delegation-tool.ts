@@ -398,11 +398,9 @@ async function updateDelegatedConversationState(
 
 function toUserConversationMessage(message: IncomingMessage): ConversationContext["messages"][number] {
   return {
-    kind: "message",
     id: message.messageId,
     role: "user",
     content: message.text,
-    timestamp: Date.parse(message.receivedAt),
     createdAt: message.receivedAt,
     correlationId: message.correlationId,
     ...(message.source ? { source: message.source } : {}),

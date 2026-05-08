@@ -132,11 +132,13 @@ function renderLastLlmTurnSummary(
     };
   }
 
-  const model = resolveModel(lastAssistantMessage.provider, lastAssistantMessage.model);
+  const provider = lastAssistantMessage.provider ?? "unknown";
+  const modelId = lastAssistantMessage.model ?? "unknown";
+  const model = resolveModel(provider, modelId);
   return {
     contextUsage: `${formatContextUsage(contextTokens, model?.contextWindow)} estimated`,
     lastTurn: [
-      `\`${lastAssistantMessage.provider}/${lastAssistantMessage.model}\``,
+      `\`${provider}/${modelId}\``,
       `${formatCount(lastAssistantMessage.usage.totalTokens)} tokens`,
       `max ${formatCount(model?.maxTokens)}`,
     ].join(" · "),

@@ -48,11 +48,9 @@ describe("toAgentMessages", () => {
     const messages = await toAgentMessages(
       [
         {
-          kind: "message",
           id: "1:user",
           role: "user",
           content: "Please inspect this report",
-          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
           createdAt: "2026-04-05T00:00:00.000Z",
           source: {
             kind: "telegram-document",
@@ -85,11 +83,9 @@ describe("toAgentMessages", () => {
     const messages = await toAgentMessages(
       [
         {
-          kind: "message",
           id: "1:user",
           role: "user",
           content: "What is shown here?",
-          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
           createdAt: "2026-04-05T00:00:00.000Z",
           source: {
             kind: "telegram-image",
@@ -131,11 +127,9 @@ describe("toAgentMessages", () => {
     const messages = await toAgentMessages(
       [
         {
-          kind: "message",
           id: "1:user",
           role: "user",
           content: "What is shown here?",
-          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
           createdAt: "2026-04-05T00:00:00.000Z",
           source: {
             kind: "telegram-image",
@@ -166,15 +160,12 @@ describe("toAgentMessages", () => {
     const messages = await toAgentMessages(
       [
         {
-          kind: "message",
           id: "1:user",
           role: "user",
           content: "hello",
-          timestamp: Date.parse("2026-04-05T00:00:00.000Z"),
           createdAt: "2026-04-05T00:00:00.000Z",
         },
         {
-          kind: "message",
           id: "1:assistant:1",
           role: "assistant",
           content: [
@@ -215,11 +206,9 @@ describe("toAgentMessages", () => {
             cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
           },
           stopReason: "toolUse",
-          timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
           createdAt: "2026-04-05T00:00:01.000Z",
         },
         {
-          kind: "message",
           id: "1:tool-result:1",
           role: "toolResult",
           toolCallId: "call_123|fc_123",
@@ -227,7 +216,6 @@ describe("toAgentMessages", () => {
           content: [{ type: "text", text: "README contents" }],
           details: { path: "README.md" },
           isError: false,
-          timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
           createdAt: "2026-04-05T00:00:02.000Z",
         },
       ] satisfies ConversationEvent[],
@@ -275,7 +263,6 @@ describe("toAgentMessages", () => {
     const messages = await toAgentMessages(
       [
         {
-          kind: "message",
           id: "1:assistant:1",
           role: "assistant",
           content: [
@@ -316,18 +303,15 @@ describe("toAgentMessages", () => {
             cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
           },
           stopReason: "toolUse",
-          timestamp: Date.parse("2026-04-05T00:00:01.000Z"),
           createdAt: "2026-04-05T00:00:01.000Z",
         },
         {
-          kind: "message",
           id: "1:tool-result:1",
           role: "toolResult",
           toolCallId: "call_123|fc_123",
           toolName: "read_file",
           content: [{ type: "text", text: "README contents" }],
           isError: false,
-          timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
           createdAt: "2026-04-05T00:00:02.000Z",
         },
       ] satisfies ConversationEvent[],
@@ -374,15 +358,13 @@ describe("toAgentMessages", () => {
     const messages = await toAgentMessages(
       [
         {
-          kind: "message",
           id: "1:tool-result:1",
           role: "toolResult",
           toolCallId: "call_123",
           toolName: "read_file",
           content: [{ type: "text", text: "README contents" }],
-          timestamp: Date.parse("2026-04-05T00:00:02.000Z"),
           createdAt: "2026-04-05T00:00:02.000Z",
-        } as ConversationEvent,
+        } as unknown as ConversationEvent,
       ],
       reasoningResponsesModel,
     );

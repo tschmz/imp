@@ -119,7 +119,6 @@ function createConversation(): ConversationContext {
         id: "msg-1",
         role: "user",
         content: "Hello <team>",
-        timestamp: Date.parse("2026-04-05T00:00:10.000Z"),
         createdAt: "2026-04-05T00:00:10.000Z",
       },
       {
@@ -135,7 +134,6 @@ function createConversation(): ConversationContext {
             arguments: { cmd: "npm test" },
           },
         ],
-        timestamp: Date.parse("2026-04-05T00:00:20.000Z"),
         createdAt: "2026-04-05T00:00:20.000Z",
         api: "test",
         provider: "test",
@@ -158,7 +156,6 @@ function createConversation(): ConversationContext {
         isError: false,
         content: [{ type: "text", text: "all tests passed" }],
         details: { workingDirectory: "/workspace" },
-        timestamp: Date.parse("2026-04-05T00:00:30.000Z"),
         createdAt: "2026-04-05T00:00:30.000Z",
       },
     ],
