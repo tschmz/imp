@@ -15,8 +15,61 @@ export function createCronTool(agent?: AgentDefinition): ToolDefinition[] {
       action: { type: "string", enum: ["list", "upsert", "delete"] },
       job: {
         type: "object",
-        description: "Required for upsert. Cron job config plus instruction text.",
-        additionalProperties: true,
+        description: "Required for upsert. Cron job config plus instruction text. Set job.session.title to control the title of the detached session created by this job.",
+        properties: {
+          id: {
+            type: "string",
+            minLength: 1,
+            description: "Stable cron job id. Used as the fallback session title when job.session.title is not set.",
+          },
+          enabled: {
+            type: "boolean",
+            description: "Whether the job should run. Defaults to true.",
+          },
+          schedule: {
+            type: "string",
+            minLength: 1,
+            description: "Five-field cron schedule: minute hour day-of-month month day-of-week.",
+          },
+          timezone: {
+            type: "string",
+            minLength: 1,
+            description: "Optional IANA timezone such as Europe/Berlin.",
+          },
+          reply: {
+            type: "object",
+            description: "Where to deliver the final response.",
+            additionalProperties: true,
+          },
+          session: {
+            type: "object",
+            description: "Detached session settings. Use title to set the visible session title.",
+            properties: {
+              mode: { type: "string", enum: ["detached"] },
+              id: {
+                type: "string",
+                minLength: 1,
+                description: "Stable detached session id. Defaults to job.id if the session object is omitted.",
+              },
+              title: {
+                type: "string",
+                minLength: 1,
+                description: "Optional visible title for the detached session created by this cron job.",
+              },
+              kind: { type: "string", minLength: 1 },
+              metadata: { type: "object", additionalProperties: true },
+            },
+            required: ["mode", "id"],
+            additionalProperties: false,
+          },
+          instruction: {
+            type: "string",
+            minLength: 1,
+            description: "Instruction sent to the agent when the schedule fires.",
+          },
+        },
+        required: ["id", "schedule", "reply", "instruction"],
+        additionalProperties: false,
       },
       id: { type: "string", description: "Required for delete." },
     },

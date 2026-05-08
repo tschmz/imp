@@ -1290,7 +1290,7 @@ describe("createRuntimeEntries", () => {
       logger: runtime.logger,
       now: () => {
         nowCallCount += 1;
-        return nowCallCount === 1 ? new Date("2026-04-07T12:00:00.000Z") : new Date();
+        return nowCallCount <= 2 ? new Date("2026-04-07T12:00:00.000Z") : new Date();
       },
     });
 
@@ -1322,6 +1322,23 @@ describe("createRuntimeEntries", () => {
           ],
         },
       });
+      expect(conversationStore.ensureDetachedForAgent).toHaveBeenCalledWith(
+        {
+          transport: "cron",
+          externalId: "cron:default:report",
+          sessionId: "report-session",
+          agentId: "default",
+        },
+        {
+          agentId: "default",
+          now: "2026-04-07T12:00:00.000Z",
+          title: "Report",
+          kind: "scheduled",
+          metadata: {
+            cronJobId: "report",
+          },
+        },
+      );
       expect(engine.run).toHaveBeenCalledWith(
         expect.objectContaining({
           runtime: expect.objectContaining({

@@ -192,6 +192,8 @@ Suche nach neuen Wohnungen und fasse relevante Änderungen zusammen.
 
 Set `reply.type` to `none` to run a scheduled job without response delivery. Schedules use five-field cron syntax: `minute hour day-of-month month day-of-week`.
 
+Set `session.title` to control the visible title of the detached session created by the cron job. If omitted, Imp uses the cron job `id` as the session title.
+
 ## Complete Example
 
 ```sh
