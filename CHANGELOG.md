@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.24.0 - 2026-05-08
+
+### Added
+
+- Add `/delete` session command support.
+- Add previous-session resume support, delegated agent session resume support, and nested agent delegation.
+- Add a bundled current-time skill.
+- Add a weekday prompt-template variable and template variable reference documentation.
+
+### Changed
+
+- Limit replay size when resuming conversations.
+- Refresh the default system prompt.
+- Update the default model to `gpt-5.5`.
+
+### Fixed
+
+- Stabilize CLI prompt history reads and writes, including serialization and queued reads.
+- Ignore stale CLI agent resolutions and suppress stale agent replies.
+- Ignore unknown slash commands instead of treating them as messages.
+- Deliver attachments produced by cron jobs.
+
 ## 0.23.0 - 2026-05-03
 
 ### Added
