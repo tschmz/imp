@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
-import type { AgentToolResult } from "@mariozechner/pi-agent-core";
+import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { PluginToolManifest } from "../plugins/manifest.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { createUserVisibleToolError, toUserVisibleToolError } from "./user-visible-tool-error.js";

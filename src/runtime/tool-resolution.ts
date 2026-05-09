@@ -1,4 +1,4 @@
-import type { StreamOptions } from "@mariozechner/pi-ai";
+import type { StreamOptions } from "@earendil-works/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";

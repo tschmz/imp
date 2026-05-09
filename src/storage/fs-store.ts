@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, relative } from "node:path";
 import type {
   ToolResultMessage,
   UserMessage,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import { lock as lockFile } from "proper-lockfile";
 import writeFileAtomic from "write-file-atomic";
 import { createKeyedSerialTaskQueue } from "../concurrency/async-primitives.js";

@@ -3,8 +3,8 @@ import {
   type AgentEvent,
   type AgentMessage,
   type AgentOptions,
-} from "@mariozechner/pi-agent-core";
-import type { Api as AiApi, AssistantMessage, Model } from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-agent-core";
+import type { Api as AiApi, AssistantMessage, Model } from "@earendil-works/pi-ai";
 import type { IncomingMessage, OutgoingMessageAttachment } from "../domain/message.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationEvent } from "../domain/conversation.js";

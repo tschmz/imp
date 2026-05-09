@@ -1,7 +1,7 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { getOAuthApiKey, getOAuthProvider } from "@mariozechner/pi-ai/oauth";
+import { getOAuthApiKey, getOAuthProvider } from "@earendil-works/pi-ai/oauth";
 import writeFileAtomic from "write-file-atomic";
 import type { Logger } from "../logging/types.js";
 

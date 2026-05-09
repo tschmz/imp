@@ -1,4 +1,4 @@
-import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
+import { getOAuthProvider } from "@earendil-works/pi-ai/oauth";
 import { join } from "node:path";
 import { DEFAULT_LOG_ROTATION_SIZE } from "../logging/file-logger.js";
 import { getDefaultUserDataRoot } from "./discover-config-path.js";

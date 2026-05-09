@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
+import { getOAuthProvider } from "@earendil-works/pi-ai/oauth";
 import type {
   AgentToolsConfig,
   AppConfig,

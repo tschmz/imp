@@ -1,4 +1,4 @@
-import { getModel, type Api as AiApi, type Model } from "@mariozechner/pi-ai";
+import { getModel, type Api as AiApi, type Model } from "@earendil-works/pi-ai";
 import type { AgentDefinition, ModelRef } from "../domain/agent.js";
 
 export type ModelResolver = (provider: string, modelId: string) => Model<AiApi> | undefined;

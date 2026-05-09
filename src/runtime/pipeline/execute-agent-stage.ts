@@ -1,4 +1,4 @@
-import type { AgentOptions } from "@mariozechner/pi-agent-core";
+import type { AgentOptions } from "@earendil-works/pi-agent-core";
 import type { AgentDefinition } from "../../domain/agent.js";
 import type { Logger } from "../../logging/types.js";
 import { buildCompactedConversationMessages } from "../../domain/conversation-compaction.js";

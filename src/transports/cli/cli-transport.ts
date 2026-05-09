@@ -15,7 +15,7 @@ import {
   truncateToWidth,
   type EditorTheme,
   type MarkdownTheme,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { parseInboundCommand } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
 import { renderUserFacingError } from "../../application/render-user-facing-error.js";

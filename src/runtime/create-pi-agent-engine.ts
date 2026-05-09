@@ -1,5 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
-import type { AgentOptions } from "@mariozechner/pi-agent-core";
+import type { AgentOptions } from "@earendil-works/pi-agent-core";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";

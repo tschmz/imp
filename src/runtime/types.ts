@@ -1,4 +1,4 @@
-import type { Api as AiApi, Model } from "@mariozechner/pi-ai";
+import type { Api as AiApi, Model } from "@earendil-works/pi-ai";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { ToolDefinition } from "../tools/types.js";
