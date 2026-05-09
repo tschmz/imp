@@ -24,6 +24,8 @@ export interface LogFields {
   sourceFile?: string;
   backupId?: string;
   durationMs?: number;
+  attempt?: number;
+  maxAttempts?: number;
   cacheHit?: boolean;
   error?: LogErrorFields;
   errorType?: string;

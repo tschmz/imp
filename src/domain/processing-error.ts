@@ -63,7 +63,7 @@ export function classifyModelProviderFailure(detail: string | undefined): ModelP
   }
 
   if (matchesAny(detail, [
-    /\b(?:timeout|timed out|etimedout|abort(?:ed)?)\b/i,
+    /\b(?:timeout|timed out|etimedout|abort(?:ed)?|terminated)\b/i,
   ])) {
     return "timeout";
   }

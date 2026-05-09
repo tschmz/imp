@@ -6,6 +6,8 @@ import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationEvent } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
+import type { Logger } from "../logging/types.js";
+import { AgentExecutionError } from "../runtime/agent-execution.js";
 import type { AgentEngine } from "../runtime/types.js";
 import type { ConversationStore } from "../storage/types.js";
 import type { InboundCommandHandler } from "./commands/types.js";
@@ -949,6 +951,188 @@ describe("createHandleIncomingMessage", () => {
         content: [{ type: "text", text: "All set." }],
       },
     ]);
+  });
+
+  it("retries terminated provider runs and rewinds partial streamed events", async () => {
+    const agent = createDefaultAgent();
+    const putCalls: ConversationContext[] = [];
+    const appendCalls: ConversationEvent[][] = [];
+    const conversationStore: ConversationStore = {
+      get: vi.fn(async () => undefined),
+      put: vi.fn(async (context) => {
+        putCalls.push(context);
+      }),
+      appendEvents: vi.fn(async (context, events) => {
+        appendCalls.push([...events]);
+        return {
+          ...context,
+          messages: [...context.messages, ...events],
+        };
+      }),
+      updateState: vi.fn(async (context, patch) => ({
+        ...context,
+        state: {
+          ...context.state,
+          ...patch,
+        },
+      })),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      ensureActive: vi.fn(async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+      create: vi.fn(async (ref, options) => ({
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: "session-1",
+          },
+          agentId: options.agentId,
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: [],
+      })),
+    };
+    const logger: Logger = {
+      debug: vi.fn(async () => {}),
+      info: vi.fn(async () => {}),
+      error: vi.fn(async () => {}),
+    };
+    let attempt = 0;
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message, onConversationEvents }) => {
+        attempt += 1;
+        if (attempt === 1) {
+          const partialEvent: ConversationEvent = {
+            id: `${message.messageId}:assistant:partial`,
+            role: "assistant",
+            createdAt: "2026-04-05T00:00:01.000Z",
+            correlationId: message.correlationId,
+            api: "openai-responses",
+            provider: "openai",
+            model: "gpt-5-mini",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "error",
+            content: [
+              {
+                type: "toolCall",
+                id: "tool-1",
+                name: "update_plan",
+                arguments: {
+                  plan: [{ step: "partial tool args" }],
+                },
+              },
+            ],
+          };
+          await onConversationEvents?.([partialEvent]);
+          throw new AgentExecutionError({
+            agentId: agent.id,
+            stopReason: "error",
+            upstreamErrorMessage: "terminated",
+            upstreamProvider: "openai-codex",
+            upstreamModel: "gpt-5.5",
+            upstreamApi: "openai-codex-responses",
+            upstreamResponseId: "resp_terminated",
+            upstreamFailureKind: "unknown",
+            assistantContentTypes: ["thinking", "toolCall"],
+            assistantTextLength: 0,
+            assistantToolCallNames: ["update_plan"],
+            assistantHasThinking: true,
+          });
+        }
+
+        const result = createAgentRunResult(message, "Done.");
+        await onConversationEvents?.(result.conversationEvents);
+        return result;
+      }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore,
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+      logger,
+    });
+
+    const response = await service.handle(createIncomingMessage("8", "retry this run"));
+
+    expect(response.text).toBe("Done.");
+    expect(engine.run).toHaveBeenCalledTimes(2);
+    expect(appendCalls).toMatchObject([
+      [
+        {
+          id: "8",
+          role: "user",
+        },
+      ],
+      [
+        {
+          id: "8:assistant:partial",
+          role: "assistant",
+        },
+      ],
+      [
+        {
+          id: "8:assistant:1",
+          role: "assistant",
+        },
+      ],
+    ]);
+    expect(putCalls).toHaveLength(2);
+    expect(putCalls[0].messages).toMatchObject([
+      {
+        id: "8",
+        role: "user",
+      },
+    ]);
+    expect(putCalls[0].messages).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "8:assistant:partial" })]),
+    );
+    expect(putCalls[1].messages).toMatchObject([
+      {
+        id: "8",
+        role: "user",
+      },
+      {
+        id: "8:assistant:1",
+        role: "assistant",
+        content: [{ type: "text", text: "Done." }],
+      },
+    ]);
+    expect(putCalls[1].messages).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "8:assistant:partial" })]),
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      "retrying agent run after transient provider failure",
+      expect.objectContaining({
+        event: "agent.run.retrying",
+        attempt: 1,
+        maxAttempts: 2,
+        upstreamErrorMessage: "terminated",
+        upstreamResponseId: "resp_terminated",
+      }),
+    );
   });
 
   it("delivers assistant commentary phase messages during the turn", async () => {

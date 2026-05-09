@@ -1,5 +1,7 @@
 import type { ConversationEvent } from "../../domain/conversation.js";
 import { getAssistantCommentaryText } from "../../runtime/message-mapping.js";
+import { AgentExecutionError } from "../../runtime/agent-execution.js";
+import type { AgentRunResult } from "../../runtime/context.js";
 import { toUserConversationMessage } from "./incoming-message-event.js";
 import { isConversationStillSelected } from "./response-delivery.js";
 import {
@@ -8,6 +10,8 @@ import {
   withConversation,
   withResponse,
 } from "./types.js";
+
+const maxAgentRunAttempts = 2;
 
 export async function executeAgent(
   context: ResolvedInboundProcessingContext,
@@ -39,77 +43,114 @@ export async function executeAgent(
       [userConversationMessage],
     );
   }
+  const conversationWithUserMessage = persistedConversation;
 
-  let result;
-  try {
-    const replyChannel = resolveMessageReplyChannel(context);
-    result = await context.dependencies.engine.run({
-      agent: context.agent,
-      conversation: conversationBeforeRun,
-      message: context.message,
-      onConversationEvents: async (events) => {
-        if (context.dependencies.conversationStore.appendEvents) {
-          persistedConversation = await context.dependencies.conversationStore.appendEvents(
-            persistedConversation,
-            events,
-          );
-        }
+  let result: AgentRunResult | undefined;
+  for (let attempt = 1; attempt <= maxAgentRunAttempts; attempt++) {
+    try {
+      const replyChannel = resolveMessageReplyChannel(context);
+      result = await context.dependencies.engine.run({
+        agent: context.agent,
+        conversation: conversationBeforeRun,
+        message: context.message,
+        onConversationEvents: async (events) => {
+          if (context.dependencies.conversationStore.appendEvents) {
+            persistedConversation = await context.dependencies.conversationStore.appendEvents(
+              persistedConversation,
+              events,
+            );
+          }
 
-        await deliverProgressUpdates(context, events, replyChannel);
-      },
-      midRunMessages: context.midRunMessages,
-      onMidRunMessageInjected: async (message) => {
-        const event = toUserConversationMessage(message);
-        if (context.dependencies.conversationStore.appendEvents) {
-          persistedConversation = await context.dependencies.conversationStore.appendEvents(
-            persistedConversation,
-            [event],
-          );
-        }
-        midRunUserMessages.push(event);
-      },
-      onSystemPromptResolved: context.dependencies.conversationStore.writeSystemPromptSnapshot
-        ? async (snapshot) => {
+          await deliverProgressUpdates(context, events, replyChannel);
+        },
+        midRunMessages: context.midRunMessages,
+        onMidRunMessageInjected: async (message) => {
+          const event = toUserConversationMessage(message);
+          if (context.dependencies.conversationStore.appendEvents) {
+            persistedConversation = await context.dependencies.conversationStore.appendEvents(
+              persistedConversation,
+              [event],
+            );
+          }
+          midRunUserMessages.push(event);
+        },
+        onSystemPromptResolved: context.dependencies.conversationStore.writeSystemPromptSnapshot
+          ? async (snapshot) => {
             await context.dependencies.conversationStore.writeSystemPromptSnapshot!(
               persistedConversation,
               snapshot,
             );
           }
-        : undefined,
-      runtime: {
-        configPath: context.dependencies.runtimeInfo.configPath,
-        dataRoot: context.dependencies.runtimeInfo.dataRoot,
-        invocation: {
-          kind: "direct",
-        },
-        ingress: {
-          endpointId: context.message.endpointId,
-          transportKind: context.message.conversation.transport,
-        },
-        output: {
-          mode: "reply-channel",
+          : undefined,
+        runtime: {
+          configPath: context.dependencies.runtimeInfo.configPath,
+          dataRoot: context.dependencies.runtimeInfo.dataRoot,
+          invocation: {
+            kind: "direct",
+          },
+          ingress: {
+            endpointId: context.message.endpointId,
+            transportKind: context.message.conversation.transport,
+          },
+          output: {
+            mode: "reply-channel",
+            ...(replyChannel ? { replyChannel } : {}),
+          },
           ...(replyChannel ? { replyChannel } : {}),
-        },
-        ...(replyChannel ? { replyChannel } : {}),
-        ...(context.availableSkills.length > 0 ? { availableSkills: [...context.availableSkills] } : {}),
-      },
-    });
-  } catch (error) {
-    const failedAt = new Date().toISOString();
-    if (context.dependencies.conversationStore.updateState) {
-      await context.dependencies.conversationStore.updateState(persistedConversation, {
-        updatedAt: failedAt,
-        run: {
-          status: "failed",
-          messageId: context.message.messageId,
-          correlationId: context.message.correlationId,
-          startedAt,
-          updatedAt: failedAt,
-          error: error instanceof Error ? error.message : String(error),
+          ...(context.availableSkills.length > 0 ? { availableSkills: [...context.availableSkills] } : {}),
         },
       });
+      break;
+    } catch (error) {
+      if (shouldRetryAgentRun(error, attempt)) {
+        await context.dependencies.logger?.info("retrying agent run after transient provider failure", {
+          event: "agent.run.retrying",
+          endpointId: context.message.endpointId,
+          transport: context.message.conversation.transport,
+          conversationId: context.message.conversation.externalId,
+          messageId: context.message.messageId,
+          correlationId: context.message.correlationId,
+          agentId: context.agent.id,
+          attempt,
+          maxAttempts: maxAgentRunAttempts,
+          errorType: error instanceof Error ? error.name : typeof error,
+          ...(error instanceof AgentExecutionError
+            ? {
+                agentStopReason: error.details.stopReason,
+                upstreamErrorMessage: error.details.upstreamErrorMessage,
+                upstreamProvider: error.details.upstreamProvider,
+                upstreamModel: error.details.upstreamModel,
+                upstreamApi: error.details.upstreamApi,
+                upstreamResponseId: error.details.upstreamResponseId,
+              }
+            : {}),
+        });
+        persistedConversation = conversationWithUserMessage;
+        midRunUserMessages.length = 0;
+        await context.dependencies.conversationStore.put(conversationWithUserMessage);
+        continue;
+      }
+
+      const failedAt = new Date().toISOString();
+      if (context.dependencies.conversationStore.updateState) {
+        await context.dependencies.conversationStore.updateState(persistedConversation, {
+          updatedAt: failedAt,
+          run: {
+            status: "failed",
+            messageId: context.message.messageId,
+            correlationId: context.message.correlationId,
+            startedAt,
+            updatedAt: failedAt,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+      throw error;
     }
-    throw error;
+  }
+
+  if (!result) {
+    throw new Error(`Agent "${context.agent.id}" did not produce a result.`);
   }
 
   const completedAt = new Date().toISOString();
@@ -131,6 +172,20 @@ export async function executeAgent(
       ...result.conversationEvents,
     ],
   });
+}
+
+function shouldRetryAgentRun(error: unknown, attempt: number): boolean {
+  if (attempt >= maxAgentRunAttempts || !(error instanceof AgentExecutionError)) {
+    return false;
+  }
+
+  return error.details.upstreamFailureKind === "temporary_availability"
+    || error.details.upstreamFailureKind === "timeout"
+    || isTerminatedProviderFailure(error);
+}
+
+function isTerminatedProviderFailure(error: AgentExecutionError): boolean {
+  return /\bterminated\b/i.test(error.details.upstreamErrorMessage ?? error.message);
 }
 
 function resolveMessageReplyChannel(context: ResolvedInboundProcessingContext) {
