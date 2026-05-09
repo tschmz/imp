@@ -38,7 +38,7 @@ export function renderHelpMessage(handlers: ReadonlyArray<InboundCommandHandler>
 function renderHelpCommandLine(handler: InboundCommandHandler): string {
   const commandLabel = handler.metadata.usage ?? `/${handler.metadata.name}`;
   const description = handler.metadata.helpDescription ?? handler.metadata.description;
-  return `\`${commandLabel}\` - ${description}.`;
+  return `\`${commandLabel}\` - ${description}`;
 }
 
 export const helpCommandHandler: InboundCommandHandler = {

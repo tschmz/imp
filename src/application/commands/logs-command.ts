@@ -6,7 +6,7 @@ export const logsCommandHandler: InboundCommandHandler = {
     name: "logs",
     description: "Show recent endpoint logs",
     usage: "/logs [lines]",
-    helpDescription: "Show recent daemon log lines for this endpoint",
+    helpDescription: "Show recent endpoint logs",
     helpGroup: "Diagnostics",
   },
   canHandle(command) {
@@ -35,9 +35,6 @@ export const logsCommandHandler: InboundCommandHandler = {
           lines.length > 0
             ? [
                 "**Logs**",
-                `Endpoint: \`${dependencies.runtimeInfo.endpointId}\``,
-                `Lines: ${lines.length}`,
-                "",
                 "```jsonl",
                 ...lines,
                 "```",

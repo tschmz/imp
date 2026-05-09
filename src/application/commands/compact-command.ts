@@ -8,7 +8,7 @@ export const compactCommandHandler: InboundCommandHandler = {
     name: "compact",
     description: "Compact old context in the current session",
     usage: "/compact [focus]",
-    helpDescription: "Summarize old context in the current session while keeping recent messages",
+    helpDescription: "Compact old context",
     helpGroup: "Context",
   },
   canHandle(command) {
@@ -70,7 +70,7 @@ export const compactCommandHandler: InboundCommandHandler = {
       conversation: message.conversation,
       text: [
         "**Compact**",
-        `Context compacted: ${formatCount(result.compaction.messageCountSummarized)} summarized, ${formatCount(result.compaction.messageCountKept)} kept`,
+        `Messages: ${formatCount(result.compaction.messageCountSummarized)} summarized, ${formatCount(result.compaction.messageCountKept)} kept`,
         `Tokens: ${formatCount(result.compaction.tokensBefore)} -> ${formatCount(result.compaction.tokensAfter)}`,
       ].join("\n"),
     };

@@ -4,7 +4,7 @@ export const resetCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "reset",
     description: "Reset messages in the current session",
-    helpDescription: "Reset messages in the current session while preserving its title and agent",
+    helpDescription: "Reset current session messages",
     helpGroup: "Sessions",
   },
   canHandle(command) {
@@ -40,8 +40,6 @@ export const resetCommandHandler: InboundCommandHandler = {
       text: [
         "**Reset**",
         "Messages: 0",
-        `Agent: \`${existing.state.agentId}\``,
-        `Title: ${existing.state.title ?? "untitled"}`,
       ].join("\n"),
     };
   },

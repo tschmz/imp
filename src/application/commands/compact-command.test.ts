@@ -51,7 +51,7 @@ describe("compactCommandHandler", () => {
 
     expect(compactCommandHandler.canHandle("compact")).toBe(true);
     expect(response?.text).toContain("**Compact**");
-    expect(response?.text).toContain("Context compacted:");
+    expect(response?.text).toContain("Messages:");
     expect(run).toHaveBeenCalledOnce();
     expect(run.mock.calls[0]?.[0].message.text).toContain("focus on release state");
     expect(updated?.messages).toHaveLength(4);
@@ -179,7 +179,7 @@ describe("compactCommandHandler", () => {
 
     const response = await compactCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Context compacted:");
+    expect(response?.text).toContain("Messages:");
     expect(run.mock.calls[0]?.[0].message.text).toContain("Target session plan");
     expect(run.mock.calls[0]?.[0].message.text).not.toContain("Active session plan");
     expect(sessions.get("target-session")?.state.compaction).toMatchObject({

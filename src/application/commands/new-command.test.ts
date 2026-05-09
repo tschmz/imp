@@ -40,9 +40,11 @@ describe("newCommandHandler", () => {
       agentId: context.dependencies.defaultAgentId,
       now: context.message.receivedAt,
     });
-    expect(response?.text).toContain("**New session**");
+    expect(response?.text).toContain("**New**");
     expect(response?.text).toContain("Session: untitled");
-    expect(response?.text).toContain("Previous sessions: `/history`");
+    expect(response?.text).not.toContain("Agent:");
+    expect(response?.text).not.toContain("ID:");
+    expect(response?.text).not.toContain("/history");
   });
 
   it("creates a fresh session with a title when command args are provided", async () => {

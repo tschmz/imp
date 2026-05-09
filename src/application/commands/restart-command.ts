@@ -4,7 +4,7 @@ export const restartCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "restart",
     description: "Restart after this reply",
-    helpDescription: "Exit after this reply so a supervisor can restart the daemon",
+    helpDescription: "Restart daemon",
     helpGroup: "Diagnostics",
   },
   canHandle(command) {
@@ -15,8 +15,7 @@ export const restartCommandHandler: InboundCommandHandler = {
       conversation: message.conversation,
       text: [
         "**Restart**",
-        "Scheduled after this reply.",
-        "If imp is not running under a service manager yet, start it again manually.",
+        "Scheduled.",
       ].join("\n"),
       deliveryAction: "restart",
     };

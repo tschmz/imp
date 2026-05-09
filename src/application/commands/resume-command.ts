@@ -1,5 +1,5 @@
 import { toLastVisibleTurnReplayItems } from "../conversation-replay.js";
-import { formatTimestamp, renderResumeUsage } from "./renderers.js";
+import { renderResumeUsage } from "./renderers.js";
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
 import { pickResumeBackup } from "./utils.js";
 
@@ -8,7 +8,7 @@ export const resumeCommandHandler: InboundCommandHandler = {
     name: "resume",
     description: "Resume a session from history",
     usage: "/resume <n>",
-    helpDescription: "Resume a session from /history. 1 is the most recent previous session",
+    helpDescription: "Resume a previous session",
     helpGroup: "Sessions",
   },
   canHandle(command) {
@@ -23,7 +23,7 @@ export const previousCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "previous",
     description: "Resume the most recent previous session",
-    helpDescription: "Resume the most recent previous session",
+    helpDescription: "Resume the previous session",
     helpGroup: "Sessions",
   },
   canHandle(command) {
@@ -58,7 +58,7 @@ async function handleResumeCommand(
   if (!restored) {
     return {
       conversation: message.conversation,
-      text: ["**Resume**", "That session is no longer available.", "", "Next: `/history`"].join("\n"),
+      text: ["**Resume**", "That session is no longer available."].join("\n"),
     };
   }
 
@@ -83,10 +83,6 @@ async function handleResumeCommand(
     text: [
       "**Resume**",
       `Session: ${title && title.length > 0 ? title : "untitled"} (#${backups.indexOf(selectedBackup) + 1})`,
-      `Agent: \`${selectedBackup.agentId}\``,
-      `Messages: ${selectedBackup.messageCount}`,
-      `Updated: ${formatTimestamp(selectedBackup.updatedAt)}`,
-      ...(resumedConversation ? ["Replay follows."] : []),
     ].join("\n"),
     ...(resumedConversation
       ? { replay: toLastVisibleTurnReplayItems(resumedConversation) }

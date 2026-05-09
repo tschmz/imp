@@ -20,11 +20,10 @@ export const historyCommandHandler: InboundCommandHandler = {
       dependencies.conversationStore.listBackupsForAgent?.(agentId) ??
         dependencies.conversationStore.listBackups(message.conversation),
     ]);
-    const agent = conversation ? dependencies.agentRegistry.get(conversation.state.agentId) : undefined;
 
     return {
       conversation: message.conversation,
-      text: renderHistoryMessage(conversation, backups, agent),
+      text: renderHistoryMessage(conversation, backups),
     };
   },
 };

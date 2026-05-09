@@ -40,7 +40,7 @@ describe("resumeCommandHandler", () => {
     expect(response?.text).toContain("**Resume**");
     expect(response?.text).toContain("Session: deploy prep (#1)");
     expect(response?.text).not.toContain("backed up");
-    expect(response?.text).toContain("Agent: `ops`");
+    expect(response?.text).not.toContain("Agent:");
     expect(response?.replay).toEqual([
       { role: "user", text: "latest question", createdAt: "2026-04-05T00:00:40.000Z" },
       { role: "assistant", text: "latest answer", createdAt: "2026-04-05T00:00:50.000Z" },
@@ -172,8 +172,8 @@ describe("resumeCommandHandler", () => {
 
     const response = await resumeCommandHandler.handle(context);
 
-    expect(response?.text).toContain("No previous sessions are available yet.");
-    expect(response?.text).toContain("Next: `/new [title]`");
+    expect(response?.text).toContain("No previous sessions.");
+    expect(response?.text).not.toContain("Next:");
   });
 });
 

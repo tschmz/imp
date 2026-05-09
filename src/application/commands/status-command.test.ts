@@ -50,6 +50,9 @@ describe("statusCommandHandler", () => {
     expect(response?.text).toContain("**Status**");
     expect(response?.text).toContain("Session: untitled");
     expect(response?.text).toContain("Turns/events: 0 / 0");
+    expect(response?.text).not.toContain("Agent:");
+    expect(response?.text).not.toContain("Updated:");
+    expect(response?.text).not.toContain("Next:");
     expect(response?.text).not.toContain("Sessions in history");
   });
 
@@ -134,7 +137,7 @@ describe("statusCommandHandler", () => {
     const response = await statusCommandHandler.handle(context);
 
     expect(response?.text).toContain("Tokens: 198 total · 111 in · 32 out");
-    expect(response?.text).toContain("Cache: 43 read · 12 write");
+    expect(response?.text).toContain("43 cache read · 12 cache write");
     expect(response?.text).toContain("Context: 0.0% · 11 used · 127,989 available · of 128,000 estimated");
     expect(response?.text).toContain("Last turn: `test/stub` · 23 tokens · max 8,192");
   });
@@ -473,7 +476,7 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Working dir: `/workspace/project`");
+    expect(response?.text).not.toContain("Working dir:");
   });
 
   it("falls back to the agent home for the working directory", async () => {
@@ -507,6 +510,6 @@ describe("statusCommandHandler", () => {
 
     const response = await statusCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Working dir: `/agents/default`");
+    expect(response?.text).not.toContain("Working dir:");
   });
 });

@@ -1,11 +1,10 @@
 import type { InboundCommandContext, InboundCommandHandler } from "./types.js";
-import { renderInlineCode } from "./renderers.js";
 
 export const deleteCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "delete",
     description: "Delete the current session",
-    helpDescription: "Delete the current session permanently",
+    helpDescription: "Delete the current session",
     helpGroup: "Sessions",
   },
   canHandle(command) {
@@ -38,11 +37,7 @@ export const deleteCommandHandler: InboundCommandHandler = {
       conversation: message.conversation,
       text: [
         "**Delete**",
-        `Deleted session: ${renderInlineCode(deleted.state.conversation.sessionId ?? "unknown")}`,
-        `Agent: \`${deleted.state.agentId}\``,
-        `Title: ${deleted.state.title ?? "untitled"}`,
-        "",
-        "Start a new session: `/new`",
+        `Deleted: ${deleted.state.title ?? "untitled"}`,
       ].join("\n"),
     };
   },

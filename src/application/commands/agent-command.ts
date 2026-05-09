@@ -1,12 +1,9 @@
-import type { AgentDefinition } from "../../domain/agent.js";
-import type { ConversationContext } from "../../domain/conversation.js";
 import {
   renderAgentMessage,
   renderAgentSwitchMessage,
   renderUnknownAgentMessage,
 } from "./renderers.js";
 import type {
-  AgentRuntimeCommandSurface,
   InboundCommandContext,
   InboundCommandHandler,
 } from "./types.js";
@@ -15,7 +12,7 @@ import { normalizeCommandArgument } from "./utils.js";
 export const agentCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "agent",
-    description: "Show or change the session agent",
+    description: "Show or change the agent",
     usage: "/agent [id]",
     helpGroup: "Context",
   },
@@ -38,25 +35,15 @@ export const agentCommandHandler: InboundCommandHandler = {
       const activeAgent =
         dependencies.agentRegistry.get(selectedAgentId) ??
         dependencies.agentRegistry.get(dependencies.defaultAgentId)!;
-      const conversation =
-        await dependencies.conversationStore.getActiveForAgent?.(activeAgent.id)
-        ?? await dependencies.conversationStore.get(message.conversation);
-      const runtimeSurface = await resolveAgentRuntimeSurface({
-        agent: activeAgent,
-        conversation,
-        context: { message, dependencies, logger },
-      });
 
       return {
         conversation: {
           ...message.conversation,
           agentId: activeAgent.id,
         },
-        text: renderAgentMessage(activeAgent, {
+        text: renderAgentMessage({
           currentAgentId: activeAgent.id,
           availableAgentIds,
-          runtimeTools: runtimeSurface?.tools,
-          runtimeSkills: runtimeSurface?.skills,
         }),
       };
     }
@@ -77,12 +64,7 @@ export const agentCommandHandler: InboundCommandHandler = {
       agentId: requestedAgent.id,
       now: message.receivedAt,
     });
-    const runtimeSurface = await resolveAgentRuntimeSurface({
-      agent: requestedAgent,
-      conversation,
-      context: { message, dependencies, logger },
-    });
-    await logger?.debug("selected agent for surface", {
+    await logger?.debug("selected agent via inbound command", {
       endpointId: message.endpointId,
       transport: message.conversation.transport,
       conversationId: message.conversation.externalId,
@@ -99,46 +81,10 @@ export const agentCommandHandler: InboundCommandHandler = {
           : {}),
         agentId: requestedAgent.id,
       },
-      text: renderAgentSwitchMessage(requestedAgent, {
-        runtimeTools: runtimeSurface?.tools,
-        runtimeSkills: runtimeSurface?.skills,
-      }),
+      text: renderAgentSwitchMessage(requestedAgent),
     };
   },
 };
-
-async function resolveAgentRuntimeSurface(options: {
-  agent: AgentDefinition;
-  conversation?: ConversationContext;
-  context: Pick<InboundCommandContext, "message" | "dependencies" | "logger">;
-}): Promise<AgentRuntimeCommandSurface | undefined> {
-  const resolver = options.context.dependencies.resolveAgentRuntimeSurface;
-  if (!resolver) {
-    return undefined;
-  }
-
-  try {
-    return await resolver({
-      agent: options.agent,
-      conversation: options.conversation,
-      message: options.context.message,
-      runtimeInfo: options.context.dependencies.runtimeInfo,
-    });
-  } catch (error) {
-    await options.context.logger?.debug("failed to resolve runtime surface for /agent", {
-      endpointId: options.context.message.endpointId,
-      transport: options.context.message.conversation.transport,
-      conversationId: options.context.message.conversation.externalId,
-      messageId: options.context.message.messageId,
-      correlationId: options.context.message.correlationId,
-      agentId: options.agent.id,
-      errorType: error instanceof Error ? error.name : typeof error,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-    return undefined;
-  }
-}
-
 
 async function resolveAvailableAgentIds(options: {
   runtimeAgentIds: string[];

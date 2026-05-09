@@ -24,13 +24,6 @@ export function formatTimestamp(value: string): string {
   }).format(date);
 }
 
-function resolveDisplayedWorkingDirectory(
-  conversation: ConversationContext | undefined,
-  agent: AgentDefinition | undefined,
-): string {
-  return conversation?.state.workingDirectory ?? agent?.workspace?.cwd ?? agent?.home ?? "not set";
-}
-
 function renderHistoryEntryLabel(title: string | undefined): string {
   return title ?? "untitled";
 }
@@ -154,8 +147,6 @@ export function renderStatusMessage(
     return [
       "**Status**",
       "No active session.",
-      "",
-      "Next: `/new [title]`, `/history`",
     ].join("\n");
   }
 
@@ -166,110 +157,70 @@ export function renderStatusMessage(
   return [
     "**Status**",
     `Session: ${renderSessionLabel(conversation.state.title)}`,
-    `Agent: \`${conversation.state.agentId}\``,
     `State: ${runStatus}`,
     `Turns/events: ${formatCount(countUserTurns(conversation))} / ${formatCount(conversation.messages.length)}`,
-    `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
-    `Working dir: ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
     ...(conversation.state.run?.error ? [`Error: ${conversation.state.run.error}`] : []),
-    "",
     `Context: ${llmTurn.contextUsage}`,
-    `Tokens: ${formatCount(llmUsage.totalTokens)} total · ${formatCount(llmUsage.input)} in · ${formatCount(llmUsage.output)} out`,
-    `Cache: ${formatCount(llmUsage.cacheRead)} read · ${formatCount(llmUsage.cacheWrite)} write`,
+    `Tokens: ${formatCount(llmUsage.totalTokens)} total · ${formatCount(llmUsage.input)} in · ${formatCount(llmUsage.output)} out · ${formatCount(llmUsage.cacheRead)} cache read · ${formatCount(llmUsage.cacheWrite)} cache write`,
     `Last turn: ${llmTurn.lastTurn}`,
-    "",
-    "Next: `/history`, `/agent`, `/export`",
   ].join("\n");
 }
 
 export function renderHistoryMessage(
   conversation: ConversationContext | undefined,
   backups: ConversationBackupSummary[],
-  agent: AgentDefinition | undefined,
 ): string {
   const lines = ["**History**"];
 
   if (conversation) {
     lines.push(
-      `Current: ${renderHistoryEntryLabel(conversation.state.title)} · \`${conversation.state.agentId}\` · ${formatCountLabel(countUserTurns(conversation), "turn")} · ${formatCountLabel(conversation.messages.length, "event")}`,
-      `Updated: ${formatTimestamp(conversation.state.updatedAt)}`,
-      `Working dir: ${renderInlineCode(resolveDisplayedWorkingDirectory(conversation, agent))}`,
+      `Current: ${renderHistoryEntryLabel(conversation.state.title)} (${formatCountLabel(countUserTurns(conversation), "turn")}, ${formatCountLabel(conversation.messages.length, "event")})`,
     );
   } else {
     lines.push("Current: none");
   }
 
-  lines.push("", "Previous:");
-
   if (backups.length === 0) {
+    lines.push("");
     lines.push("No previous sessions.");
     return lines.join("\n");
   }
 
+  lines.push("");
   for (const [index, backup] of backups.entries()) {
     lines.push(
-      `${index + 1}. ${renderHistoryEntryLabel(backup.title)} · \`${backup.agentId}\` · ${formatCountLabel(backup.messageCount, "event")} · updated ${formatTimestamp(backup.updatedAt)}`,
+      `${index + 1}. ${renderHistoryEntryLabel(backup.title)} (${formatCountLabel(backup.messageCount, "event")})`,
     );
   }
 
-  lines.push("", "Next: `/resume <n>`, `/new [title]`");
   return lines.join("\n");
 }
 
 export function renderResumeUsage(backupCount: number): string {
   if (backupCount === 0) {
-    return ["**Resume**", "No previous sessions are available yet.", "", "Next: `/new [title]`"].join("\n");
+    return ["**Resume**", "No previous sessions."].join("\n");
   }
 
-  return ["**Resume**", "Usage: `/resume <n>`", "Choose a numbered session from `/history`.", "Example: `/resume 1`"].join(
-    "\n",
-  );
+  return ["**Resume**", "Usage: `/resume <n>`"].join("\n");
 }
 
-export function renderAgentMessage(
-  agent: AgentDefinition,
-  options: {
-    currentAgentId: string;
-    availableAgentIds: string[];
-    runtimeTools?: string[];
-    runtimeSkills?: string[];
-  },
-): string {
-  const tools = options.runtimeTools ?? agent.tools;
-  const skills = options.runtimeSkills ?? agent.skills?.paths ?? [];
-
+export function renderAgentMessage(options: {
+  currentAgentId: string;
+  availableAgentIds: string[];
+}): string {
   return [
     "**Agent**",
-    `Selected: \`${options.currentAgentId}\` (${agent.name})`,
-    `Model: \`${agent.model.provider}/${agent.model.modelId}\``,
-    `Workspace: ${renderInlineCode(agent.workspace?.cwd ?? agent.home)}`,
-    `Tools: ${renderCodeCsv(tools)}`,
-    `Skills: ${renderCodeCsv(skills)}`,
+    `Selected: \`${options.currentAgentId}\``,
     `Available: ${renderCodeCsv(options.availableAgentIds)}`,
-    "",
-    "Switch: `/agent <id>`",
   ].join("\n");
 }
 
 export function renderAgentSwitchMessage(
   agent: AgentDefinition,
-  options: {
-    runtimeTools?: string[];
-    runtimeSkills?: string[];
-  } = {},
 ): string {
-  const tools = options.runtimeTools ?? agent.tools;
-  const skills = options.runtimeSkills ?? agent.skills?.paths ?? [];
-
   return [
     "**Agent**",
-    `Switched to \`${agent.id}\` (${agent.name}).`,
-    `Model: \`${agent.model.provider}/${agent.model.modelId}\``,
-    `Workspace: ${renderInlineCode(agent.workspace?.cwd ?? agent.home)}`,
-    `Tools: ${renderCodeCsv(tools)}`,
-    `Skills: ${renderCodeCsv(skills)}`,
-    "",
-    "Next: `/status`, `/new [title]`",
+    `Selected: \`${agent.id}\``,
   ].join("\n");
 }
 
@@ -281,18 +232,14 @@ export function renderUnknownAgentMessage(
   if (options.configuredButNotLoaded) {
     return [
       "**Agent**",
-      `\`${requestedAgentId}\` is configured but this daemon has not loaded it yet.`,
+      `\`${requestedAgentId}\` is configured but not loaded.`,
       `Available: ${renderCodeCsv(availableAgentIds)}`,
-      "",
-      "Next: `/reload`",
     ].join("\n");
   }
 
   return [
     "**Agent**",
-    `Unknown agent: \`${requestedAgentId}\``,
+    `Unknown: \`${requestedAgentId}\``,
     `Available: ${renderCodeCsv(availableAgentIds)}`,
-    "",
-    "Switch: `/agent <id>`",
   ].join("\n");
 }

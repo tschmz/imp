@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 describe("agentCommandHandler", () => {
-  it("shows tools and skills resolved for runtime instead of only configured values", async () => {
+  it("shows selected and available agents without runtime details", async () => {
     const defaultAgent = {
       ...createDefaultAgent(),
       tools: ["configured_tool"],
@@ -30,21 +30,20 @@ describe("agentCommandHandler", () => {
       message: createIncomingMessage("agent"),
       dependencies: createDependencies({
         agentRegistry: createAgentRegistry([defaultAgent]),
-        resolveAgentRuntimeSurface: async ({ agent, runtimeInfo }) => {
-          expect(agent.id).toBe("default");
-          expect(runtimeInfo.dataRoot).toBe("/tmp/data");
-          return {
-            tools: ["runtime_tool", "mcp__search"],
-            skills: ["runtime-skill"],
-          };
+        resolveAgentRuntimeSurface: async () => {
+          throw new Error("runtime details should not be resolved for minimal /agent output");
         },
       }),
     });
 
     const response = await agentCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Tools: `runtime_tool`, `mcp__search`");
-    expect(response?.text).toContain("Skills: `runtime-skill`");
+    expect(response?.text).toContain("Selected: `default`");
+    expect(response?.text).toContain("Available: `default`");
+    expect(response?.text).not.toContain("Tools:");
+    expect(response?.text).not.toContain("Skills:");
+    expect(response?.text).not.toContain("Model:");
+    expect(response?.text).not.toContain("Workspace:");
     expect(response?.text).not.toContain("configured_tool");
     expect(response?.text).not.toContain("/configured/skills");
   });
@@ -113,7 +112,7 @@ describe("agentCommandHandler", () => {
     const response = await agentCommandHandler.handle(context);
 
     expect(agentCommandHandler.canHandle("agent")).toBe(true);
-    expect(response?.text).toContain("Switched to `ops` (ops).");
+    expect(response?.text).toContain("Selected: `ops`");
     expect(sessions.get("default")?.state.agentId).toBe("default");
     expect(await store.getSelectedAgent!(context.message.conversation)).toBe("ops");
     expect((await store.get(context.message.conversation))?.state.conversation.sessionId).toBe("session-2");
@@ -160,8 +159,8 @@ describe("agentCommandHandler", () => {
 
     const response = await agentCommandHandler.handle(context);
 
-    expect(response?.text).toContain("`imp-agents.cody` is configured but this daemon has not loaded it yet.");
-    expect(response?.text).toContain("Next: `/reload`");
+    expect(response?.text).toContain("`imp-agents.cody` is configured but not loaded.");
+    expect(response?.text).not.toContain("Next:");
     expect(response?.text).toContain("`default`, `ops`, `imp-agents.cody`");
   });
 });

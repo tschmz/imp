@@ -47,9 +47,10 @@ describe("historyCommandHandler", () => {
 
     expect(historyCommandHandler.canHandle("history")).toBe(true);
     expect(response?.text).toContain("**History**");
-    expect(response?.text).toContain("Current: Current work · `default` · 1 turn · 1 event");
-    expect(response?.text).toContain("Working dir: not set");
-    expect(response?.text).toContain("1. Earlier investigation · `ops` · 2 events · updated ");
+    expect(response?.text).toContain("Current: Current work (1 turn, 1 event)");
+    expect(response?.text).toContain("1. Earlier investigation (2 events)");
+    expect(response?.text).not.toContain("Working dir:");
+    expect(response?.text).not.toContain("`ops`");
   });
 
   it("falls back to an untitled label for previous sessions without a title", async () => {
@@ -83,7 +84,7 @@ describe("historyCommandHandler", () => {
     const response = await historyCommandHandler.handle(context);
 
     expect(response?.text).toContain(["**History**", "Current: none"].join("\n"));
-    expect(response?.text).toContain("1. untitled · `ops` · 2 events · updated ");
+    expect(response?.text).toContain("1. untitled (2 events)");
   });
 
   it("falls back to the agent workspace for the active session working directory", async () => {
@@ -124,8 +125,7 @@ describe("historyCommandHandler", () => {
 
     const response = await historyCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Working dir: `/workspace/project`");
-    expect(response?.text).toContain("Previous:");
+    expect(response?.text).not.toContain("Working dir:");
     expect(response?.text).toContain("No previous sessions.");
   });
 
@@ -167,8 +167,7 @@ describe("historyCommandHandler", () => {
 
     const response = await historyCommandHandler.handle(context);
 
-    expect(response?.text).toContain("Working dir: `/agents/default`");
-    expect(response?.text).toContain("Previous:");
+    expect(response?.text).not.toContain("Working dir:");
     expect(response?.text).toContain("No previous sessions.");
   });
 });

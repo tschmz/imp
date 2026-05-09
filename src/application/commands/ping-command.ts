@@ -10,14 +10,12 @@ export const pingCommandHandler: InboundCommandHandler = {
   canHandle(command) {
     return command === "ping";
   },
-  async handle({ message, dependencies }: InboundCommandContext) {
+  async handle({ message }: InboundCommandContext) {
     return {
       conversation: message.conversation,
       text: [
         "**Ping**",
-        "Status: pong",
-        `Endpoint: \`${dependencies.runtimeInfo.endpointId}\``,
-        `Time: ${message.receivedAt}`,
+        "pong",
       ].join("\n"),
     };
   },

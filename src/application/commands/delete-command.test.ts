@@ -36,9 +36,9 @@ describe("deleteCommandHandler", () => {
 
     expect(deleteCommandHandler.canHandle("delete")).toBe(true);
     expect(response?.text).toContain("**Delete**");
-    expect(response?.text).toContain("Deleted session: `session-1`");
-    expect(response?.text).toContain("Agent: `ops`");
-    expect(response?.text).toContain("Title: Sprint planning");
+    expect(response?.text).toContain("Deleted: Sprint planning");
+    expect(response?.text).not.toContain("session-1");
+    expect(response?.text).not.toContain("Agent:");
     expect(deleted).toBeUndefined();
   });
 

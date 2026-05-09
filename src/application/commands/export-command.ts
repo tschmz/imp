@@ -10,7 +10,7 @@ export const exportCommandHandler: InboundCommandHandler = {
     name: "export",
     description: "Export the current session transcript to HTML",
     usage: "/export [readable|full] [html]",
-    helpDescription: "Export the current session transcript to an HTML file. Defaults to readable mode",
+    helpDescription: "Export the current session to HTML",
     helpGroup: "Sessions",
   },
   canHandle(command) {
@@ -55,10 +55,7 @@ export const exportCommandHandler: InboundCommandHandler = {
       conversation: message.conversation,
       text: [
         "**Export**",
-        `${result.format.toUpperCase()} export created.`,
-        `Mode: \`${result.mode}\``,
         `Path: ${renderInlineCode(result.path)}`,
-        `Link: ${result.fileUrl}`,
       ].join("\n"),
       attachments: [
         {

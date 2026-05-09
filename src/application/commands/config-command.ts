@@ -19,7 +19,7 @@ export const configCommandHandler: InboundCommandHandler = {
   metadata: {
     name: "config",
     description: "Show runtime config",
-    helpDescription: "Show runtime and config details for this endpoint",
+    helpDescription: "Show runtime config",
     helpGroup: "Diagnostics",
   },
   canHandle(command) {
@@ -34,12 +34,11 @@ export const configCommandHandler: InboundCommandHandler = {
         "**Config**",
         ...(appConfigSummary.instanceName ? [`Instance: ${appConfigSummary.instanceName}`] : []),
         `Endpoint: \`${dependencies.runtimeInfo.endpointId}\``,
-        `Default agent: \`${dependencies.defaultAgentId}\``,
         `Logging: \`${dependencies.runtimeInfo.loggingLevel}\``,
         `Config: ${renderInlineCode(dependencies.runtimeInfo.configPath)}`,
         `Data: ${renderInlineCode(dependencies.runtimeInfo.dataRoot)}`,
-        `Log file: ${renderInlineCode(dependencies.runtimeInfo.logFilePath)}`,
-        `Enabled endpoints: ${renderCodeCsv(dependencies.runtimeInfo.activeEndpointIds)}`,
+        `Log: ${renderInlineCode(dependencies.runtimeInfo.logFilePath)}`,
+        `Endpoints: ${renderCodeCsv(dependencies.runtimeInfo.activeEndpointIds)}`,
       ].join("\n"),
     };
   },
