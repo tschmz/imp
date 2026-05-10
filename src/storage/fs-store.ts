@@ -198,6 +198,9 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     async ensureDetachedForAgent(ref, options) {
       return ensureDetachedAgentSession(paths.sessionsDir, ref, options);
     },
+    async ensureActivatedForAgent(ref, options) {
+      return ensureActivatedAgentSession(paths.sessionsDir, ref, options);
+    },
   };
 }
 
@@ -563,6 +566,35 @@ async function ensureDetachedAgentSession(
       });
       await writeConversationLog(sessionsDir, created);
       return created;
+    }),
+  );
+}
+
+async function ensureActivatedAgentSession(
+  sessionsDir: string,
+  ref: ConversationRef,
+  options: {
+    agentId: string;
+    now: string;
+    title?: string;
+    kind?: string;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<ConversationContext> {
+  return withAgentWriteQueue(options.agentId, async () =>
+    withAgentLock(sessionsDir, options.agentId, async () => {
+      const sessionId = requireSessionId(ref);
+      const existing = await readSession(options.agentId, ref, sessionsDir);
+      const conversation = existing ?? createEmptyConversationContext(ref, {
+        ...options,
+        sessionId,
+      });
+
+      if (!existing) {
+        await writeConversationLog(sessionsDir, conversation);
+      }
+      await writeActiveAgentConversationRef(sessionsDir, options.agentId, conversation.state.conversation);
+      return conversation;
     }),
   );
 }

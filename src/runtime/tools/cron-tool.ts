@@ -43,18 +43,18 @@ export function createCronTool(agent?: AgentDefinition): ToolDefinition[] {
           },
           session: {
             type: "object",
-            description: "Detached session settings. Use title to set the visible session title. session.id and session.title can include template variables such as {{runtime.now.date}}.",
+            description: "Session settings. `detached` keeps the cron session separate; `activate` creates/reuses the named session and makes it the current interactive session for the agent. Use title to set the visible session title. session.id and session.title can include template variables such as {{runtime.now.date}}.",
             properties: {
-              mode: { type: "string", enum: ["detached"] },
+              mode: { type: "string", enum: ["detached", "activate"] },
               id: {
                 type: "string",
                 minLength: 1,
-                description: "Detached session id. Supports prompt template variables. Use report-{{runtime.now.date}} to rotate sessions daily.",
+                description: "Session id. Supports prompt template variables. Use report-{{runtime.now.date}} to rotate sessions daily.",
               },
               title: {
                 type: "string",
                 minLength: 1,
-                description: "Optional visible title for the detached session created by this cron job. Supports template variables such as {{runtime.now.date}}.",
+                description: "Optional visible title for the session created by this cron job. Supports template variables such as {{runtime.now.date}}.",
               },
               kind: { type: "string", minLength: 1 },
               metadata: { type: "object", additionalProperties: true },
@@ -183,11 +183,11 @@ function parseSession(value: unknown, fallbackId: string): CronJobDefinition["se
   if (value === undefined) {
     return { mode: "detached", id: fallbackId };
   }
-  if (!isRecord(value) || value.mode !== "detached") {
-    throw createUserVisibleToolError("tool_command_execution", "job.session.mode must be detached.");
+  if (!isRecord(value) || (value.mode !== "detached" && value.mode !== "activate")) {
+    throw createUserVisibleToolError("tool_command_execution", "job.session.mode must be detached or activate.");
   }
   return {
-    mode: "detached",
+    mode: value.mode,
     id: requireString(value.id, "job.session.id"),
     ...(typeof value.title === "string" && value.title.trim() ? { title: value.title.trim() } : {}),
     ...(typeof value.kind === "string" && value.kind.trim() ? { kind: value.kind.trim() } : {}),

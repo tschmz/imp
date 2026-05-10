@@ -77,6 +77,14 @@ Suche später nochmal.
     expect(result.jobs[1]?.instruction).toBe("Suche später nochmal.");
   });
 
+
+  it("accepts cron jobs that activate their session", () => {
+    const result = parseCronMarkdown(example.replace('"mode": "detached"', '"mode": "activate"'));
+
+    expect(result.issues).toEqual([]);
+    expect(result.jobs[0]?.session.mode).toBe("activate");
+  });
+
   it("renders jobs back as json config in markdown", () => {
     const parsed = parseCronMarkdown(example);
     const rendered = renderCronMarkdown(parsed.jobs);

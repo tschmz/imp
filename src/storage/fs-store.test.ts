@@ -944,6 +944,55 @@ describe("createFsConversationStore", () => {
     await expect(store.get(detachedRef)).resolves.toEqual(detachedSession);
   });
 
+
+  it("activates a named session without deleting the previous active session", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const chat = createChatRef();
+
+    const previousActive = await store.ensureActiveForAgent!(chat, {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+      title: "Previous",
+    });
+    const activatedRef = {
+      transport: "cron",
+      externalId: "cron:default:report",
+      sessionId: "report-session",
+      agentId: "default",
+    };
+    const activated = await store.ensureActivatedForAgent!(activatedRef, {
+      agentId: "default",
+      now: "2026-04-05T00:01:00.000Z",
+      kind: "scheduled",
+      title: "Report",
+      metadata: { cronJobId: "report" },
+    });
+    const secondRead = await store.ensureActivatedForAgent!(activatedRef, {
+      agentId: "default",
+      now: "2026-04-05T00:02:00.000Z",
+      title: "Ignored",
+    });
+
+    expect(activated.state).toMatchObject({
+      agentId: "default",
+      kind: "scheduled",
+      title: "Report",
+      metadata: { cronJobId: "report" },
+      conversation: {
+        transport: "cron",
+        externalId: "cron:default:report",
+        sessionId: "report-session",
+      },
+    });
+    expect(secondRead.state.title).toBe("Report");
+    await expect(store.getActiveForAgent!("default")).resolves.toEqual(activated);
+    await expect(store.get({
+      ...previousActive.state.conversation,
+      agentId: "default",
+    })).resolves.toEqual(previousActive);
+  });
+
   it("tracks selected agents per chat without mutating existing sessions", async () => {
     const root = await createTempDir();
     const store = createFsConversationStore(createRuntimePaths(root));

@@ -52,4 +52,14 @@ export interface ConversationStore {
       metadata?: Record<string, unknown>;
     },
   ): Promise<ConversationContext>;
+  ensureActivatedForAgent?(
+    ref: ConversationRef,
+    options: {
+      agentId: string;
+      now: string;
+      title?: string;
+      kind?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<ConversationContext>;
 }

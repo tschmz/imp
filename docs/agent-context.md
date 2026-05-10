@@ -192,7 +192,7 @@ Suche nach neuen Wohnungen für {{runtime.now.date}} und fasse relevante Änderu
 
 Set `reply.type` to `none` to run a scheduled job without response delivery. Schedules use five-field cron syntax: `minute hour day-of-month month day-of-week`.
 
-Set `session.title` to control the visible title of the detached session created by the cron job. If omitted, Imp uses the cron job `id` as the session title. Use a templated `session.id`, for example `report-{{runtime.now.date}}`, when a recurring job should rotate into a fresh detached session each day.
+Set `session.title` to control the visible title of the session created by the cron job. If omitted, Imp uses the cron job `id` as the session title. Use `session.mode: "detached"` to keep the cron session separate, or `session.mode: "activate"` to create/reuse the named cron session and make it the current interactive session for the agent. The previous active session remains stored; only the active pointer moves. Use a templated `session.id`, for example `report-{{runtime.now.date}}`, when a recurring job should rotate into a fresh session each day.
 
 ## Complete Example
 

@@ -248,7 +248,7 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       replyChannel,
     });
     const message = createCronIncomingMessage(renderedJob, receivedAt);
-    let conversation = await runtime.conversationStore.ensureDetachedForAgent?.(message.conversation, {
+    const sessionOptions = {
       agentId: agent.id,
       now: receivedAt,
       title: renderedJob.session.title ?? renderedJob.id,
@@ -257,19 +257,34 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
         ...(renderedJob.session.metadata ?? {}),
         cronJobId: renderedJob.id,
       },
-    }) ?? await runtime.conversationStore.ensureActiveForAgent?.(message.conversation, {
-      agentId: agent.id,
-      now: receivedAt,
-      title: renderedJob.session.title ?? renderedJob.id,
-    }) ?? await runtime.conversationStore.ensureActive(message.conversation, {
+    };
+    let conversation: ConversationContext | undefined;
+    if (renderedJob.session.mode === "activate") {
+      if (!runtime.conversationStore.ensureActivatedForAgent) {
+        throw new Error("Cron session mode activate requires an activatable conversation store.");
+      }
+      conversation = await runtime.conversationStore.ensureActivatedForAgent(message.conversation, sessionOptions);
+    } else {
+      conversation = await runtime.conversationStore.ensureDetachedForAgent?.(message.conversation, sessionOptions);
+    }
+    conversation ??= await runtime.conversationStore.ensureActiveForAgent?.(message.conversation, {
       agentId: agent.id,
       now: receivedAt,
       title: renderedJob.session.title ?? renderedJob.id,
     });
+    conversation ??= await runtime.conversationStore.ensureActive(message.conversation, {
+      agentId: agent.id,
+      now: receivedAt,
+      title: renderedJob.session.title ?? renderedJob.id,
+    });
+    if (!conversation) {
+      throw new Error(`Unable to create cron session for job ${renderedJob.id}.`);
+    }
+    let activeConversation = conversation;
 
     const userEvent = toCronUserEvent(message);
     if (runtime.conversationStore.updateState) {
-      conversation = await runtime.conversationStore.updateState(conversation, {
+      activeConversation = await runtime.conversationStore.updateState(activeConversation, {
         updatedAt: receivedAt,
         run: {
           status: "running",
@@ -281,26 +296,26 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       });
     }
     if (runtime.conversationStore.appendEvents) {
-      conversation = await runtime.conversationStore.appendEvents(conversation, [userEvent]);
+      activeConversation = await runtime.conversationStore.appendEvents(activeConversation, [userEvent]);
     }
 
     const skills = await resolveEffectiveSkills({
       agent,
       dataRoot: runtime.endpointConfig.paths.dataRoot,
-      conversation,
+      conversation: activeConversation,
     });
     const result = await runtime.engine.run({
       agent,
-      conversation,
+      conversation: activeConversation,
       message,
       onConversationEvents: runtime.conversationStore.appendEvents
         ? async (events) => {
-            conversation = await runtime.conversationStore.appendEvents!(conversation, events);
+            activeConversation = await runtime.conversationStore.appendEvents!(activeConversation, events);
           }
         : undefined,
       onSystemPromptResolved: runtime.conversationStore.writeSystemPromptSnapshot
         ? async (snapshot) => {
-            await runtime.conversationStore.writeSystemPromptSnapshot!(conversation, snapshot);
+            await runtime.conversationStore.writeSystemPromptSnapshot!(activeConversation, snapshot);
           }
         : undefined,
       runtime: {
@@ -317,12 +332,12 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
     const completedAt = (dependencies.now?.() ?? new Date()).toISOString();
     const finalConversation: ConversationContext = {
       state: {
-        ...conversation.state,
+        ...activeConversation.state,
         ...(result.workingDirectory ? { workingDirectory: result.workingDirectory } : {}),
         updatedAt: completedAt,
         run: { status: "idle", updatedAt: completedAt },
       },
-      messages: conversation.messages,
+      messages: activeConversation.messages,
     };
     await runtime.conversationStore.put(finalConversation);
 

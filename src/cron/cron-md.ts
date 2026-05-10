@@ -27,7 +27,7 @@ const cronConfigSchema = z.object({
     }),
   ]),
   session: z.object({
-    mode: z.literal("detached"),
+    mode: z.enum(["detached", "activate"]),
     id: z.string().min(1),
     title: z.string().min(1).optional(),
     kind: z.string().min(1).optional(),

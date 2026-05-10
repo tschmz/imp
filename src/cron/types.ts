@@ -10,7 +10,7 @@ export type CronReplyConfig =
     };
 
 export interface CronSessionConfig {
-  mode: "detached";
+  mode: "detached" | "activate";
   id: string;
   title?: string;
   kind?: string;
