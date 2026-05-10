@@ -69,7 +69,45 @@ describe("createTelegramTransport", () => {
         command: "jarvis",
         description: "Switch to agent jarvis",
       },
+      {
+        command: "cody",
+        description: "Switch to agent imp-agents.cody",
+      },
     ]);
+  });
+
+  it("maps Telegram agent suffix alias commands to /agent <namespaced-id>", async () => {
+    const bot = createFakeBot();
+    let capturedMessage: IncomingMessage | undefined;
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      undefined,
+      {},
+      {
+        deliveryRouter: createDeliveryRouter(),
+        agentRegistry: createAgentRegistry([createTestAgent("imp-agents.cody")]),
+      },
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedMessage = event.message;
+      }),
+    });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "/cody" },
+    });
+
+    expect(capturedMessage?.command).toBe("agent");
+    expect(capturedMessage?.commandArgs).toBe("imp-agents.cody");
   });
 
   it("maps Telegram agent alias commands to /agent <id>", async () => {

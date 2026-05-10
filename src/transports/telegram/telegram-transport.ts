@@ -1501,9 +1501,11 @@ function buildTelegramAgentCommandAliases(
     return aliases;
   }
 
+  const candidateAgentIdsByAlias = new Map<string, string[]>();
   for (const agent of agentRegistry.list()) {
-    if (!telegramCommandPattern.test(agent.id)) {
-      void logger?.debug("skipped telegram agent command alias because agent id is not a valid Telegram command", {
+    const alias = getTelegramAgentCommandAlias(agent.id);
+    if (!alias) {
+      void logger?.debug("skipped telegram agent command alias because agent id does not yield a valid Telegram command", {
         endpointId,
         transport: "telegram",
         agentId: agent.id,
@@ -1511,19 +1513,57 @@ function buildTelegramAgentCommandAliases(
       continue;
     }
 
-    if (inboundCommandNames.has(agent.id as IncomingMessageCommand)) {
+    const existing = candidateAgentIdsByAlias.get(alias) ?? [];
+    existing.push(agent.id);
+    candidateAgentIdsByAlias.set(alias, existing);
+  }
+
+  for (const [alias, agentIds] of candidateAgentIdsByAlias.entries()) {
+    if (inboundCommandNames.has(alias as IncomingMessageCommand)) {
       void logger?.debug("skipped telegram agent command alias because it conflicts with a built-in command", {
         endpointId,
         transport: "telegram",
-        agentId: agent.id,
+        command: alias,
+        errorMessage: `Conflicting agent ids: ${agentIds.join(", ")}`,
       });
       continue;
     }
 
-    aliases.set(agent.id, agent.id);
+    const exactAgentIds = agentIds.filter((agentId) => agentId === alias);
+    const selectedAgentId = exactAgentIds.length === 1
+      ? exactAgentIds[0]
+      : agentIds.length === 1
+        ? agentIds[0]
+        : undefined;
+
+    if (!selectedAgentId) {
+      void logger?.debug("skipped telegram agent command alias because it is ambiguous", {
+        endpointId,
+        transport: "telegram",
+        command: alias,
+        errorMessage: `Conflicting agent ids: ${agentIds.join(", ")}`,
+      });
+      continue;
+    }
+
+    aliases.set(alias, selectedAgentId);
   }
 
   return aliases;
+}
+
+function getTelegramAgentCommandAlias(agentId: string): string | undefined {
+  if (telegramCommandPattern.test(agentId)) {
+    return agentId;
+  }
+
+  const namespaceSeparatorIndex = agentId.lastIndexOf(".");
+  if (namespaceSeparatorIndex < 0 || namespaceSeparatorIndex === agentId.length - 1) {
+    return undefined;
+  }
+
+  const suffix = agentId.slice(namespaceSeparatorIndex + 1);
+  return telegramCommandPattern.test(suffix) ? suffix : undefined;
 }
 
 function buildTelegramCommandMenu(

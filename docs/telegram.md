@@ -82,7 +82,7 @@ Common commands:
 
 A chat starts with the endpoint's default agent. Switching agents does not rewrite another agent's session; it points the chat at the selected agent's own active session.
 
-At daemon startup, Telegram also registers direct aliases for loaded agents whose IDs are valid Telegram commands. For example, an agent with ID `jarvis` can be selected with `/jarvis`, equivalent to `/agent jarvis`. Agent IDs that are not valid Telegram command names, such as IDs containing dots or hyphens, still use `/agent <id>`.
+At daemon startup, Telegram also registers direct aliases for loaded agents. For example, an agent with ID `jarvis` can be selected with `/jarvis`, equivalent to `/agent jarvis`. Namespaced agent IDs can use their final dot-separated segment when it is unambiguous and valid as a Telegram command: `imp-agents.cody` becomes `/cody`, equivalent to `/agent imp-agents.cody`. Other agent IDs still use `/agent <id>`.
 
 ## Voice Messages
 
