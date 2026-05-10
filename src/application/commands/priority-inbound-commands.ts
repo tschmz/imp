@@ -2,6 +2,7 @@ import type { IncomingMessageCommand } from "../../domain/message.js";
 
 export const priorityInboundCommands = new Set<IncomingMessageCommand>([
   "new",
+  "fork",
   "resume",
   "previous",
   "status",

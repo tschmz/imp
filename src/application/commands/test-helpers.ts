@@ -114,6 +114,7 @@ export function createDependencies(
         },
         messages: [],
       }),
+      forkActiveForAgent: async () => undefined,
     },
     engine: {
       run: async () => ({
@@ -156,7 +157,7 @@ export function createMutableConversationStore(
   initial?: Awaited<ReturnType<ConversationStore["get"]>>,
 ): ConversationStore {
   let current = initial;
-  let counter = 0;
+  let counter = initial?.state.conversation.sessionId ? 1 : 0;
 
   return {
     get: async () => current,
@@ -266,6 +267,30 @@ export function createMutableConversationStore(
         },
         messages: [],
       } satisfies ConversationContext;
+      return current;
+    },
+    forkActiveForAgent: async (ref, options) => {
+      if (current?.state.agentId !== options.agentId) {
+        return undefined;
+      }
+
+      counter += 1;
+      current = {
+        state: {
+          conversation: {
+            ...ref,
+            sessionId: `session-${counter}`,
+          },
+          agentId: current.state.agentId,
+          ...(current.state.title || options.title ? { title: options.title ?? current.state.title } : {}),
+          ...(current.state.workingDirectory ? { workingDirectory: current.state.workingDirectory } : {}),
+          ...(current.state.compaction ? { compaction: current.state.compaction } : {}),
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: current.messages,
+      };
       return current;
     },
   };

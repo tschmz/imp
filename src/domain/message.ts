@@ -2,6 +2,7 @@ import type { ConversationRef } from "./conversation.js";
 
 export type IncomingMessageCommand =
   | "new"
+  | "fork"
   | "help"
   | "status"
   | "history"

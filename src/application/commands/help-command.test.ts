@@ -15,6 +15,7 @@ describe("helpCommandHandler", () => {
     expect(response?.text).toContain("**Commands**");
     expect(response?.text).toContain("Common:");
     expect(response?.text).toContain("`/new [title]` - Start a new session");
+    expect(response?.text).toContain("`/fork [title]` - Fork the current session");
     expect(response?.text).toContain("`/reset` - Reset current session messages");
     expect(response?.text).toContain("`/delete` - Delete the current session");
     expect(response?.text).toContain("`/previous` - Resume the previous session");

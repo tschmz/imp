@@ -41,6 +41,7 @@ export interface ConversationStore {
   restoreForAgent?(agentId: string, backupId: string, options?: { now?: Date }): Promise<boolean>;
   ensureActiveForAgent?(ref: ChatRef, options: { agentId: string; now: string; title?: string }): Promise<ConversationContext>;
   createForAgent?(ref: ChatRef, options: { agentId: string; now: string; title?: string }): Promise<ConversationContext>;
+  forkActiveForAgent?(ref: ChatRef, options: { agentId: string; now: string; title?: string }): Promise<ConversationContext | undefined>;
   ensureDetachedForAgent?(
     ref: ConversationRef,
     options: {

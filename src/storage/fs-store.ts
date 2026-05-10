@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { appendFile, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
+import { appendFile, cp, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import type {
   ToolResultMessage,
@@ -186,6 +186,10 @@ export function createFsConversationStore(paths: RuntimePaths): ConversationStor
     async createForAgent(ref, options) {
       await writeSelectedAgentId(paths.bindingsDir, ref, options.agentId);
       return createAgentSession(paths.sessionsDir, ref, options);
+    },
+    async forkActiveForAgent(ref, options) {
+      await writeSelectedAgentId(paths.bindingsDir, ref, options.agentId);
+      return forkActiveAgentSession(paths.sessionsDir, ref, options);
     },
     async ensureActiveForAgent(ref, options) {
       await writeSelectedAgentId(paths.bindingsDir, ref, options.agentId);
@@ -421,6 +425,56 @@ async function restoreAgentSession(
         sessionId: selected.sessionId,
       });
       return true;
+    }),
+  );
+}
+
+async function forkActiveAgentSession(
+  sessionsDir: string,
+  ref: ChatRef,
+  options: { agentId: string; now: string; title?: string },
+): Promise<ConversationContext | undefined> {
+  return withAgentWriteQueue(options.agentId, async () =>
+    withAgentLock(sessionsDir, options.agentId, async () => {
+      const activeRef = await readActiveAgentConversationRef(sessionsDir, options.agentId);
+      if (!activeRef) {
+        return undefined;
+      }
+
+      const active = await readSession(options.agentId, activeRef, sessionsDir);
+      if (!active) {
+        return undefined;
+      }
+
+      const created = createEmptyConversationContext(ref, {
+        agentId: options.agentId,
+        now: options.now,
+        title: options.title ?? active.state.title,
+      });
+      const forked: ConversationContext = {
+        state: {
+          conversation: created.state.conversation,
+          agentId: active.state.agentId,
+          ...(active.state.kind ? { kind: active.state.kind } : {}),
+          ...(active.state.metadata ? { metadata: active.state.metadata } : {}),
+          ...(created.state.title ? { title: created.state.title } : {}),
+          ...(active.state.workingDirectory ? { workingDirectory: active.state.workingDirectory } : {}),
+          ...(active.state.compaction ? { compaction: active.state.compaction } : {}),
+          createdAt: options.now,
+          updatedAt: options.now,
+          version: 1,
+        },
+        messages: active.messages,
+      };
+
+      await cp(
+        getSessionDir(sessionsDir, active.state.conversation, active.state.agentId),
+        getSessionDir(sessionsDir, forked.state.conversation, forked.state.agentId),
+        { recursive: true, errorOnExist: true, force: false },
+      );
+      await writeConversationLog(sessionsDir, forked);
+      await writeActiveAgentConversationRef(sessionsDir, forked.state.agentId, forked.state.conversation);
+      return forked;
     }),
   );
 }

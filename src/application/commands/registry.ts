@@ -4,6 +4,7 @@ import { deleteCommandHandler } from "./delete-command.js";
 import { resetCommandHandler } from "./reset-command.js";
 import { configCommandHandler } from "./config-command.js";
 import { exportCommandHandler } from "./export-command.js";
+import { forkCommandHandler } from "./fork-command.js";
 import { helpCommandHandler } from "./help-command.js";
 import { historyCommandHandler } from "./history-command.js";
 import { logsCommandHandler } from "./logs-command.js";
@@ -19,6 +20,7 @@ import { whoamiCommandHandler } from "./whoami-command.js";
 
 export const inboundCommandHandlers: InboundCommandHandler[] = [
   newCommandHandler,
+  forkCommandHandler,
   helpCommandHandler,
   pingCommandHandler,
   whoamiCommandHandler,

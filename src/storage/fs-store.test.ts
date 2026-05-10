@@ -1045,6 +1045,66 @@ describe("createFsConversationStore", () => {
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("forks the active session for an agent and copies session files", async () => {
+    const root = await createTempDir();
+    const store = createFsConversationStore(createRuntimePaths(root));
+    const chat = createChatRef();
+
+    const active = await store.createForAgent!(chat, {
+      agentId: "default",
+      now: "2026-04-05T00:00:00.000Z",
+      title: "Original",
+    });
+    const activeSessionId = active.state.conversation.sessionId!;
+    const attachmentPath = join(root, "sessions", "default", "entries", activeSessionId, "attachments", "note.txt");
+    await mkdir(dirname(attachmentPath), { recursive: true });
+    await writeFile(attachmentPath, "attachment", "utf8");
+    await store.put({
+      state: {
+        ...active.state,
+        workingDirectory: "/work/project",
+        updatedAt: "2026-04-05T00:01:00.000Z",
+      },
+      messages: [
+        {
+          id: "m-1",
+          role: "user",
+          content: "see attachment",
+          createdAt: "2026-04-05T00:01:00.000Z",
+          source: {
+            kind: "telegram-document",
+            document: {
+              fileId: "file-1",
+              relativePath: "attachments/note.txt",
+            },
+          },
+        },
+      ],
+    });
+
+    const forked = await store.forkActiveForAgent!(chat, {
+      agentId: "default",
+      now: "2026-04-05T00:02:00.000Z",
+      title: "Forked",
+    });
+
+    expect(forked?.state.conversation.sessionId).toBeTruthy();
+    expect(forked?.state.conversation.sessionId).not.toBe(activeSessionId);
+    expect(forked?.state.title).toBe("Forked");
+    expect(forked?.state.workingDirectory).toBe("/work/project");
+    expect(forked?.messages).toHaveLength(1);
+    await expect(store.getActiveForAgent!("default")).resolves.toMatchObject({
+      state: {
+        conversation: {
+          sessionId: forked?.state.conversation.sessionId,
+        },
+      },
+    });
+    await expect(
+      readFile(join(root, "sessions", "default", "entries", forked!.state.conversation.sessionId!, "attachments", "note.txt"), "utf8"),
+    ).resolves.toBe("attachment");
+  });
+
 });
 
 function createChatRef(): ChatRef {

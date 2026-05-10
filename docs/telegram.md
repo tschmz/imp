@@ -62,6 +62,7 @@ Common commands:
 | Command | Purpose |
 | --- | --- |
 | `/new [title]` | Start a fresh session for the selected agent |
+| `/fork [title]` | Fork the current session into a new active session |
 | `/status` | Show the current session details |
 | `/history` | List previous sessions for the selected agent |
 | `/resume <n>` | Resume a session from `/history` |
