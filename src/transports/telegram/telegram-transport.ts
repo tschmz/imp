@@ -7,6 +7,7 @@ import {
   parseInboundCommand,
 } from "../../application/commands/parse-inbound-command.js";
 import { inboundCommandMenu, inboundCommandNames } from "../../application/commands/registry.js";
+import type { AgentRegistry } from "../../agents/registry.js";
 import { renderUserFacingError } from "../../application/render-user-facing-error.js";
 import type { TelegramEndpointRuntimeConfig } from "../../daemon/types.js";
 import type {
@@ -25,6 +26,8 @@ import {
 import { renderTelegramMessages } from "./render-telegram-message.js";
 
 const defaultTelegramDocumentMaxDownloadBytes = 20 * 1024 * 1024;
+const telegramCommandLimit = 100;
+const telegramCommandPattern = /^[a-z0-9_]{1,32}$/;
 
 type TelegramTransportRuntimeConfig = TelegramEndpointRuntimeConfig & {
   paths?: {
@@ -154,7 +157,9 @@ export function createTelegramTransport(
         transport: "telegram",
       });
 
-      await registerTelegramCommands(bot, config);
+      const agentCommandAliases = buildTelegramAgentCommandAliases(context?.agentRegistry, logger, config.id);
+
+      await registerTelegramCommands(bot, config, agentCommandAliases, logger);
       await logger?.debug("registered telegram bot commands", {
         endpointId: config.id,
         transport: "telegram",
@@ -182,7 +187,7 @@ export function createTelegramTransport(
           return;
         }
 
-        if (isUnknownTelegramSlashCommand(textMessage, profile.username)) {
+        if (isUnknownTelegramSlashCommand(textMessage, profile.username, agentCommandAliases)) {
           await logger?.debug("ignored unknown telegram slash command", {
             endpointId: config.id,
             transport: "telegram",
@@ -204,7 +209,7 @@ export function createTelegramTransport(
               source: {
                 kind: "text",
               },
-              options: parseTelegramCommand(textMessage, profile.username),
+              options: parseTelegramCommand(textMessage, profile.username, agentCommandAliases),
             },
             logger,
           ),
@@ -1426,9 +1431,11 @@ async function getTelegramBotProfile(
 async function registerTelegramCommands(
   bot: TelegramBotAdapter,
   config: TelegramEndpointRuntimeConfig,
+  agentCommandAliases: ReadonlyMap<string, string>,
+  logger?: Logger,
 ): Promise<void> {
   try {
-    await bot.api.setMyCommands(inboundCommandMenu);
+    await bot.api.setMyCommands(buildTelegramCommandMenu(agentCommandAliases, logger, config.id));
   } catch (error) {
     if (error instanceof GrammyError) {
       throw new Error(
@@ -1443,9 +1450,22 @@ async function registerTelegramCommands(
 function parseTelegramCommand(
   message: TelegramMessage,
   botUsername?: string,
+  agentCommandAliases: ReadonlyMap<string, string> = new Map(),
 ): { command: IncomingMessageCommand; commandArgs?: string } | undefined {
   if (typeof message.text !== "string") {
     return undefined;
+  }
+
+  const agentAliasCommand = parseInboundCommand(message.text, {
+    botUsername,
+    entities: message.entities,
+    allowedCommands: new Set(agentCommandAliases.keys()) as ReadonlySet<IncomingMessageCommand>,
+  });
+  if (agentAliasCommand) {
+    return {
+      command: "agent",
+      commandArgs: agentCommandAliases.get(agentAliasCommand.command),
+    };
   }
 
   return parseInboundCommand(message.text, {
@@ -1455,7 +1475,11 @@ function parseTelegramCommand(
   });
 }
 
-function isUnknownTelegramSlashCommand(message: TelegramMessage, botUsername?: string): boolean {
+function isUnknownTelegramSlashCommand(
+  message: TelegramMessage,
+  botUsername?: string,
+  agentCommandAliases: ReadonlyMap<string, string> = new Map(),
+): boolean {
   if (typeof message.text !== "string") {
     return false;
   }
@@ -1463,8 +1487,66 @@ function isUnknownTelegramSlashCommand(message: TelegramMessage, botUsername?: s
   return isUnknownInboundSlashCommand(message.text, {
     botUsername,
     entities: message.entities,
-    allowedCommands: inboundCommandNames,
+    allowedCommands: new Set([...inboundCommandNames, ...agentCommandAliases.keys()]) as ReadonlySet<IncomingMessageCommand>,
   });
+}
+
+function buildTelegramAgentCommandAliases(
+  agentRegistry: AgentRegistry | undefined,
+  logger: Logger | undefined,
+  endpointId: string,
+): Map<string, string> {
+  const aliases = new Map<string, string>();
+  if (!agentRegistry) {
+    return aliases;
+  }
+
+  for (const agent of agentRegistry.list()) {
+    if (!telegramCommandPattern.test(agent.id)) {
+      void logger?.debug("skipped telegram agent command alias because agent id is not a valid Telegram command", {
+        endpointId,
+        transport: "telegram",
+        agentId: agent.id,
+      });
+      continue;
+    }
+
+    if (inboundCommandNames.has(agent.id as IncomingMessageCommand)) {
+      void logger?.debug("skipped telegram agent command alias because it conflicts with a built-in command", {
+        endpointId,
+        transport: "telegram",
+        agentId: agent.id,
+      });
+      continue;
+    }
+
+    aliases.set(agent.id, agent.id);
+  }
+
+  return aliases;
+}
+
+function buildTelegramCommandMenu(
+  agentCommandAliases: ReadonlyMap<string, string>,
+  logger: Logger | undefined,
+  endpointId: string,
+): ReadonlyArray<{ command: string; description: string }> {
+  const agentCommands = [...agentCommandAliases.entries()].map(([command, agentId]) => ({
+    command,
+    description: `Switch to agent ${agentId}`,
+  }));
+  const availableAgentSlots = Math.max(telegramCommandLimit - inboundCommandMenu.length, 0);
+  const selectedAgentCommands = agentCommands.slice(0, availableAgentSlots);
+
+  if (selectedAgentCommands.length < agentCommands.length) {
+    void logger?.debug("skipped telegram agent command aliases because Telegram command menu limit was reached", {
+      endpointId,
+      transport: "telegram",
+      errorMessage: `${agentCommands.length - selectedAgentCommands.length} agent aliases skipped`,
+    });
+  }
+
+  return [...inboundCommandMenu, ...selectedAgentCommands];
 }
 
 function startTypingStatus(bot: TelegramBotAdapter, chatId: number): () => void {

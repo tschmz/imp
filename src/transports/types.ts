@@ -1,3 +1,4 @@
+import type { AgentRegistry } from "../agents/registry.js";
 import type { IncomingMessage, OutgoingMessage } from "../domain/message.js";
 import type { DeliveryRouter } from "./delivery-router.js";
 
@@ -9,6 +10,7 @@ export type TransportFactory<TConfig = unknown, TLogger = unknown> = (
 
 export interface TransportContext {
   deliveryRouter: DeliveryRouter;
+  agentRegistry?: AgentRegistry;
   endpointTransportById?: ReadonlyMap<string, string>;
 }
 

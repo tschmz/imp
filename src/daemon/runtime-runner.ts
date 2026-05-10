@@ -34,6 +34,7 @@ export function createRuntimeEntries(
   const endpointTransportById = new Map(runtimes.map((runtime) => [runtime.endpointConfig.id, runtime.endpointConfig.type]));
   const transportContext: TransportContext = {
     deliveryRouter,
+    agentRegistry: dependencies.agentRegistry,
     endpointTransportById,
   };
 

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { inboundCommandMenu } from "../../application/commands/registry.js";
+import { createAgentRegistry } from "../../agents/registry.js";
 import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
 import { UserVisibleProcessingError } from "../../domain/processing-error.js";
 import type { Logger } from "../../logging/types.js";
@@ -34,6 +35,75 @@ describe("createTelegramTransport", () => {
     });
 
     expect(bot.api.setMyCommands).toHaveBeenCalledWith(inboundCommandMenu);
+  });
+
+  it("registers valid agent ids as Telegram command aliases", async () => {
+    const bot = createFakeBot();
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      undefined,
+      {},
+      {
+        deliveryRouter: createDeliveryRouter(),
+        agentRegistry: createAgentRegistry([
+          createTestAgent("jarvis"),
+          createTestAgent("imp-agents.cody"),
+          createTestAgent("agent"),
+        ]),
+      },
+    );
+
+    await transport.start({
+      handle: vi.fn(async () => {}),
+    });
+
+    expect(bot.api.setMyCommands).toHaveBeenCalledWith([
+      ...inboundCommandMenu,
+      {
+        command: "jarvis",
+        description: "Switch to agent jarvis",
+      },
+    ]);
+  });
+
+  it("maps Telegram agent alias commands to /agent <id>", async () => {
+    const bot = createFakeBot();
+    let capturedMessage: IncomingMessage | undefined;
+    const transport = createTelegramTransport(
+      {
+        id: "private-telegram",
+        type: "telegram",
+        token: "telegram-token",
+        allowedUserIds: ["7"],
+      },
+      bot,
+      undefined,
+      {},
+      {
+        deliveryRouter: createDeliveryRouter(),
+        agentRegistry: createAgentRegistry([createTestAgent("jarvis")]),
+      },
+    );
+
+    await transport.start({
+      handle: vi.fn(async (event) => {
+        capturedMessage = event.message;
+      }),
+    });
+    await bot.emitTextMessage({
+      chat: { id: 42, type: "private" },
+      from: { id: 7 },
+      message: { message_id: 99, text: "/jarvis" },
+    });
+
+    expect(capturedMessage?.command).toBe("agent");
+    expect(capturedMessage?.commandArgs).toBe("jarvis");
   });
 
   it("forwards a validated inbound event from an allowed private text message", async () => {
@@ -1558,6 +1628,17 @@ async function waitForAsync(predicate: () => boolean, attempts = 20): Promise<vo
   }
 
   throw new Error("condition was not met in time");
+}
+
+function createTestAgent(id: string) {
+  return {
+    id,
+    name: id,
+    prompt: { base: { text: "prompt" } },
+    model: { provider: "test", modelId: "test" },
+    tools: [],
+    extensions: [],
+  };
 }
 
 function createFakeBot(): {
