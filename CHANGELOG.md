@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.25.0 - 2026-05-10
+
+### Added
+
+- Add a `/fork` session command to create a new session from the current conversation.
+- Back up plugin data alongside core Imp data.
+- Add cron session title exposure and cron session templating.
+
+### Changed
+
+- Minimize command feedback and slim stored session messages.
+- Use `cron-parser` for cron schedule evaluation.
+- Migrate PI runtime packages to the `@earendil-works` namespace at version `0.74.0`.
+
+### Fixed
+
+- Harden cron scheduling, including hashed schedules, reply channels, cron file writes, and overdue checkpoint execution.
+- Harden log following.
+- Retry agent runs that terminate unexpectedly.
+
 ## 0.24.0 - 2026-05-08
 
 ### Added
