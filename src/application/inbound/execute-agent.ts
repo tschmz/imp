@@ -3,7 +3,7 @@ import { getAssistantCommentaryText } from "../../runtime/message-mapping.js";
 import { AgentExecutionError } from "../../runtime/agent-execution.js";
 import type { AgentRunResult } from "../../runtime/context.js";
 import { toUserConversationMessage } from "./incoming-message-event.js";
-import { isConversationStillSelected } from "./response-delivery.js";
+import { getResponseDeliverySelectionRef, isConversationStillSelected } from "./response-delivery.js";
 import {
   type ResolvedHandledInboundProcessingContext,
   type ResolvedInboundProcessingContext,
@@ -215,7 +215,7 @@ async function deliverProgressUpdates(
 
   const shouldDeliver = await isConversationStillSelected(
     context.dependencies.conversationStore,
-    context.message.conversation,
+    getResponseDeliverySelectionRef(context.message),
     context.conversation,
     context.defaultAgent.id,
   );

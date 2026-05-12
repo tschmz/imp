@@ -1,6 +1,18 @@
 import type { ChatRef, ConversationContext } from "../../domain/conversation.js";
-import type { OutgoingMessage } from "../../domain/message.js";
+import type { IncomingMessage, OutgoingMessage } from "../../domain/message.js";
 import type { ConversationStore } from "../../storage/types.js";
+
+export function getResponseDeliverySelectionRef(message: IncomingMessage): ChatRef {
+  if (isDetachedSessionMessage(message)) {
+    return message.conversation;
+  }
+
+  return {
+    transport: message.conversation.transport,
+    externalId: message.conversation.externalId,
+    ...(message.conversation.endpointId ? { endpointId: message.conversation.endpointId } : {}),
+  };
+}
 
 export async function isConversationStillSelected(
   store: ConversationStore,
@@ -26,6 +38,11 @@ export async function isConversationStillSelected(
   const activeSessionId = activeConversation?.state.conversation.sessionId;
   const runSessionId = conversation.state.conversation.sessionId;
   return Boolean(activeSessionId && runSessionId && activeSessionId === runSessionId);
+}
+
+function isDetachedSessionMessage(message: IncomingMessage): boolean {
+  const session = message.source?.plugin?.metadata?.session;
+  return typeof session === "object" && session !== null && "mode" in session && session.mode === "detached";
 }
 
 export async function markResponseSuppressedWhenStale<TMessage extends OutgoingMessage>(

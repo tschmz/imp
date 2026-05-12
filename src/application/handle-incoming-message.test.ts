@@ -1295,6 +1295,42 @@ describe("createHandleIncomingMessage", () => {
     );
   });
 
+  it("suppresses progress and final delivery for a stale prepared active session", async () => {
+    const agent = createDefaultAgent();
+    const store = createSelectableConversationStore();
+    const deliverProgress = vi.fn(async () => {});
+    const engine: AgentEngine = {
+      run: vi.fn(async ({ message, onConversationEvents }) => {
+        store.activeSessionId = "session-2";
+        await onConversationEvents?.([
+          createAssistantEvent(message, "Still working on the old session.", "commentary"),
+        ]);
+        return createAgentRunResult(message, "old prepared session reply");
+      }),
+    };
+
+    const service = createHandleIncomingMessage({
+      agentRegistry: createAgentRegistry([agent]),
+      conversationStore: store.store,
+      engine,
+      defaultAgentId: "default",
+      runtimeInfo: createRuntimeInfo(),
+    });
+
+    const message = createIncomingMessage("8d", "keep working");
+    message.conversation = {
+      ...message.conversation,
+      sessionId: "session-1",
+      agentId: "default",
+    };
+
+    const response = await service.handle(message, { deliverProgress });
+
+    expect(response.text).toBe("old prepared session reply");
+    expect(response.suppressDelivery).toBe(true);
+    expect(deliverProgress).not.toHaveBeenCalled();
+  });
+
   it("runs inbound message hooks around agent processing", async () => {
     const agent = createDefaultAgent();
     const calls: string[] = [];
