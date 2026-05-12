@@ -2,6 +2,7 @@ import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext, ConversationEvent } from "../domain/conversation.js";
 import type { IncomingMessage } from "../domain/message.js";
+import { getResponseDeliverySelectionRef, isConversationStillSelected } from "../application/inbound/response-delivery.js";
 import type { ReplyChannelContext } from "../runtime/context.js";
 import type { DeliveryRouter } from "../transports/delivery-router.js";
 import type { BootstrappedRuntime } from "./runtime-bootstrap.js";
@@ -131,14 +132,32 @@ async function continueInterruptedRun(
   };
 
   await runtime.conversationStore.put(finalConversation);
-  await deliverRecoveredMessage(runtime, dependencies.deliveryRouter, result.message);
+  await deliverRecoveredMessage(runtime, dependencies.deliveryRouter, message, finalConversation, result.message);
 }
 
 async function deliverRecoveredMessage(
   runtime: BootstrappedRuntime,
   deliveryRouter: DeliveryRouter,
+  recoveryMessage: IncomingMessage,
+  conversation: ConversationContext,
   message: Awaited<ReturnType<BootstrappedRuntime["engine"]["run"]>>["message"],
 ): Promise<void> {
+  const shouldDeliver = await isConversationStillSelected(
+    runtime.conversationStore,
+    getResponseDeliverySelectionRef(recoveryMessage),
+    conversation,
+    runtime.endpointConfig.defaultAgentId,
+  );
+  if (!shouldDeliver) {
+    await runtime.logger.debug("skipped stale recovered response delivery", {
+      endpointId: runtime.endpointConfig.id,
+      conversationId: message.conversation.externalId,
+      messageId: recoveryMessage.messageId,
+      agentId: conversation.state.agentId,
+    });
+    return;
+  }
+
   try {
     await deliveryRouter.deliver({
       endpointId: runtime.endpointConfig.id,
