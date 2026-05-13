@@ -118,7 +118,7 @@ describe("createPromptTemplateContext", () => {
     expect(rendered).toBe("audio outbox spoken");
   });
 
-  it("renders conversation kind and metadata in prompt templates", () => {
+  it("renders conversation identifiers, kind, and metadata in prompt templates", () => {
     const context = createPromptTemplateContext({
       system: createSystemContext(),
       agent: createAgent(),
@@ -146,14 +146,14 @@ describe("createPromptTemplateContext", () => {
     });
 
     const rendered = renderPromptTemplate(
-      '{{conversation.kind}} {{conversation.metadata.contact_name}} {{conversation.metadata.contact_uri}}',
+      '{{conversation.id}} {{conversation.externalId}} {{conversation.sessionId}} {{conversation.kind}} {{conversation.metadata.contact_name}} {{conversation.metadata.contact_uri}}',
       {
         filePath: "/workspace/SYSTEM.md",
         context,
       },
     );
 
-    expect(rendered).toBe("phone-call Thomas +10000000000");
+    expect(rendered).toBe("imp-phone-call-1 imp-phone-call-1 imp-phone-call-1 phone-call Thomas +10000000000");
   });
 
   it("renders runtime date and time in prompt templates", () => {

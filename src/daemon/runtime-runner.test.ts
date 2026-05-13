@@ -1547,7 +1547,7 @@ describe("createRuntimeEntries", () => {
         }, null, 2),
         "```",
         "",
-        "Create {{conversation.metadata.cronJobId}} for {{runtime.now.date}} at {{runtime.now.timeMinute}}.",
+        "Create {{conversation.metadata.cronJobId}} in {{conversation.sessionId}} for {{runtime.now.date}} at {{runtime.now.timeMinute}}.",
         "",
       ].join("\n"),
       "utf8",
@@ -1632,7 +1632,7 @@ describe("createRuntimeEntries", () => {
       expect(engine.run).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.objectContaining({
-            text: "Create report for 2026-04-07 at 12:34.",
+            text: "Create report in report-2026-04-07 for 2026-04-07 at 12:34.",
           }),
         }),
       );

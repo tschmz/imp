@@ -403,11 +403,52 @@ function renderCronJobTemplates(
     replyChannel: ReplyChannelContext;
   },
 ): AgentCronJob {
+  const initialContext = createCronPromptTemplateContext(job, options);
+  const sessionId = renderCronTemplate(job.session.id, job, "session.id", initialContext).trim();
+
+  if (!sessionId) {
+    throw new Error(`Cron job ${job.id} rendered an empty session.id.`);
+  }
+
+  const context = createCronPromptTemplateContext(job, options, sessionId);
+  const title = job.session.title
+    ? renderCronTemplate(job.session.title, job, "session.title", context).trim()
+    : undefined;
+  const instruction = renderCronTemplate(job.instruction, job, "instruction", context).trim();
+
+  if (job.session.title && !title) {
+    throw new Error(`Cron job ${job.id} rendered an empty session.title.`);
+  }
+  if (!instruction) {
+    throw new Error(`Cron job ${job.id} rendered an empty instruction.`);
+  }
+
+  return {
+    ...job,
+    session: {
+      ...job.session,
+      id: sessionId,
+      ...(title ? { title } : {}),
+    },
+    instruction,
+  };
+}
+
+function createCronPromptTemplateContext(
+  job: AgentCronJob,
+  options: {
+    agent: AgentDefinition;
+    runtime: BootstrappedRuntime;
+    receivedAt: string;
+    replyChannel: ReplyChannelContext;
+  },
+  sessionId = job.session.id,
+): Parameters<typeof renderPromptTemplate>[1]["context"] {
   const metadata = {
     ...(job.session.metadata ?? {}),
     cronJobId: job.id,
   };
-  const context = createPromptTemplateContext({
+  return createPromptTemplateContext({
     system: createDefaultPromptTemplateSystemContext(),
     agent: options.agent,
     endpointId: "cron",
@@ -417,7 +458,7 @@ function renderCronJobTemplates(
         conversation: {
           transport: "cron",
           externalId: `cron:${job.agentId}:${job.id}`,
-          sessionId: job.session.id,
+          sessionId,
           agentId: job.agentId,
         },
         agentId: options.agent.id,
@@ -438,31 +479,6 @@ function renderCronJobTemplates(
     now: new Date(options.receivedAt),
     timezone: job.timezone,
   });
-  const sessionId = renderCronTemplate(job.session.id, job, "session.id", context).trim();
-  const title = job.session.title
-    ? renderCronTemplate(job.session.title, job, "session.title", context).trim()
-    : undefined;
-  const instruction = renderCronTemplate(job.instruction, job, "instruction", context).trim();
-
-  if (!sessionId) {
-    throw new Error(`Cron job ${job.id} rendered an empty session.id.`);
-  }
-  if (job.session.title && !title) {
-    throw new Error(`Cron job ${job.id} rendered an empty session.title.`);
-  }
-  if (!instruction) {
-    throw new Error(`Cron job ${job.id} rendered an empty instruction.`);
-  }
-
-  return {
-    ...job,
-    session: {
-      ...job.session,
-      id: sessionId,
-      ...(title ? { title } : {}),
-    },
-    instruction,
-  };
 }
 
 function renderCronTemplate(

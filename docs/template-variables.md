@@ -161,6 +161,9 @@ Current conversation metadata.
 
 | Variable | Description | Example |
 | --- | --- | --- |
+| `conversation.id` | Conversation ID used by the transport; alias for `conversation.externalId`. | `42` |
+| `conversation.externalId` | External conversation ID from the transport. | `42` |
+| `conversation.sessionId` | Detached/session ID when available, or empty. | `wohnungssuche-2026-05-03` |
 | `conversation.kind` | Optional conversation kind from stored state, or empty. | `chat` |
 | `conversation.metadata` | Metadata object from stored conversation state. | `{"customerId":"acme"}` |
 
@@ -170,6 +173,7 @@ Use `with` for metadata objects when you know their shape:
 {{#with conversation.metadata}}
 Customer: {{customerId}}
 {{/with}}
+Session: {{conversation.sessionId}}
 ```
 
 ### `imp`

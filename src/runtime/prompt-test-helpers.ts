@@ -140,6 +140,9 @@ export function createPromptTestContext(
       kind: "telegram",
     },
     conversation: {
+      id: "42",
+      externalId: "42",
+      sessionId: "",
       kind: "",
       metadata: {},
     },

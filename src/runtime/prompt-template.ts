@@ -75,6 +75,9 @@ export interface PromptTemplateContext {
     kind: string;
   };
   conversation: {
+    id: string;
+    externalId: string;
+    sessionId: string;
     kind: string;
     metadata: Record<string, unknown>;
   };
@@ -194,6 +197,9 @@ export function createEmptyPromptTemplateContext(): PromptTemplateContext {
       kind: "",
     },
     conversation: {
+      id: "",
+      externalId: "",
+      sessionId: "",
       kind: "",
       metadata: {},
     },
@@ -347,6 +353,9 @@ export function createPromptTemplateContext(options: {
       kind: ingress.transportKind,
     },
     conversation: {
+      id: options.conversation?.state.conversation.externalId ?? "",
+      externalId: options.conversation?.state.conversation.externalId ?? "",
+      sessionId: options.conversation?.state.conversation.sessionId ?? "",
       kind: options.conversation?.state.kind ?? "",
       metadata: options.conversation?.state.metadata ?? {},
     },
