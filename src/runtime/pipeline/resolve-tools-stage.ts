@@ -60,6 +60,7 @@ export async function resolveToolsStage(
       context?: {
         dataRoot?: string;
         conversation?: ConversationContext;
+        message?: IncomingMessage;
       },
     ) => ToolRegistry;
     mcpToolCache: McpToolCache;
@@ -99,6 +100,7 @@ export async function resolveRuntimeTools(
       registryContext?: {
         dataRoot?: string;
         conversation?: ConversationContext;
+        message?: IncomingMessage;
       },
     ) => ToolRegistry;
     mcpToolCache: McpToolCache;
@@ -115,6 +117,7 @@ export async function resolveRuntimeTools(
     ?? dependencies.createBuiltInToolRegistry(workingDirectoryState, context.agent, attachmentCollector, {
       ...(context.runtime?.dataRoot ? { dataRoot: context.runtime.dataRoot } : {}),
       conversation: context.conversation,
+      message: context.message,
     });
   const agentHomePlugins = await loadAgentHomePluginTools(context.agent);
   const toolRegistry = mergeToolRegistries(baseToolRegistry, agentHomePlugins.tools);

@@ -2679,6 +2679,7 @@ describe("createPiAgentEngine", () => {
   it("registers built-in tools in the default runtime path", async () => {
     let capturedTools: Array<{ name: string }> | undefined;
     let capturedWorkingDirectory: string | undefined;
+    let capturedContextEndpointId: string | undefined;
 
     const engine = createPiAgentEngine({
       resolveModel: () =>
@@ -2688,9 +2689,10 @@ describe("createPiAgentEngine", () => {
           api: "openai-responses",
         }) as never,
       readTextFile: async () => "unused context",
-      createBuiltInToolRegistry: (workingDirectory) => {
+      createBuiltInToolRegistry: (workingDirectory, _agent, _attachmentCollector, context) => {
         capturedWorkingDirectory =
           typeof workingDirectory === "string" ? workingDirectory : workingDirectory.get();
+        capturedContextEndpointId = context?.message?.endpointId;
         return {
           list: () => [],
           get: () => undefined,
@@ -2729,6 +2731,7 @@ describe("createPiAgentEngine", () => {
     });
 
     expect(capturedWorkingDirectory).toBe("/workspace/project");
+    expect(capturedContextEndpointId).toBe("private-telegram");
     expect(capturedTools?.map((tool) => tool.name)).toEqual(["read", "bash"]);
   });
 

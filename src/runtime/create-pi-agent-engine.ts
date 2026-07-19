@@ -3,6 +3,7 @@ import type { AgentOptions } from "@earendil-works/pi-agent-core";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentDefinition } from "../domain/agent.js";
 import type { ConversationContext } from "../domain/conversation.js";
+import type { IncomingMessage } from "../domain/message.js";
 import type { Logger } from "../logging/types.js";
 import { createHookRunner } from "../extensions/hook-runner.js";
 import type { AgentEngineLifecycleHooks, HookRegistration } from "../extensions/types.js";
@@ -48,6 +49,7 @@ interface PiAgentEngineDependencies {
     context?: {
       dataRoot?: string;
       conversation?: ConversationContext;
+      message?: IncomingMessage;
     },
   ) => ToolRegistry;
   agentRegistry?: AgentRegistry;

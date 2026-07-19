@@ -7,6 +7,7 @@ import { createReadTool } from "./tools/read-tool.js";
 import { createWriteTool } from "./tools/write-tool.js";
 import type { ConversationContext } from "../domain/conversation.js";
 import type { AgentDefinition } from "../domain/agent.js";
+import type { IncomingMessage } from "../domain/message.js";
 import { createToolRegistry, type ToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { resolveBuiltInToolOptions } from "./shell-path.js";
@@ -23,14 +24,17 @@ import {
 
 const sequentialDynamicToolNames = new Set(["bash", "edit", "write"]);
 
+export interface BuiltInToolRegistryContext {
+  dataRoot?: string;
+  conversation?: ConversationContext;
+  message?: IncomingMessage;
+}
+
 export function createBuiltInToolRegistry(
   workingDirectory: string | WorkingDirectoryState,
   agent?: AgentDefinition,
   attachmentCollector?: AttachmentCollector,
-  context?: {
-    dataRoot?: string;
-    conversation?: ConversationContext;
-  },
+  context?: BuiltInToolRegistryContext,
 ): ToolRegistry {
   const workingDirectoryState = getWorkingDirectoryState(workingDirectory);
   const activeAttachmentCollector = attachmentCollector ?? createAttachmentCollector();
@@ -38,7 +42,7 @@ export function createBuiltInToolRegistry(
   return createToolRegistry([
     ...createDynamicBuiltInTools(workingDirectoryState, agent, activeAttachmentCollector, context),
     ...createConfiguredSkillTools(agent?.skillCatalog ?? []),
-    ...createCronTool(agent),
+    ...createCronTool(agent, context?.message),
     createUpdatePlanTool(),
     ...createWorkingDirectoryTools(workingDirectoryState),
   ]);
@@ -54,10 +58,7 @@ function createDynamicBuiltInTools(
   workingDirectoryState: WorkingDirectoryState,
   agent?: AgentDefinition,
   attachmentCollector?: AttachmentCollector,
-  context?: {
-    dataRoot?: string;
-    conversation?: ConversationContext;
-  },
+  context?: BuiltInToolRegistryContext,
 ): ToolDefinition[] {
   return createBaseBuiltInTools(workingDirectoryState.get(), agent, attachmentCollector, context).map((tool) => ({
     ...tool,
@@ -84,10 +85,7 @@ function createBaseBuiltInTools(
   workingDirectory: string,
   agent?: AgentDefinition,
   attachmentCollector?: AttachmentCollector,
-  context?: {
-    dataRoot?: string;
-    conversation?: ConversationContext;
-  },
+  context?: BuiltInToolRegistryContext,
 ): ToolDefinition[] {
   const toolOptions = resolveBuiltInToolOptions(agent);
   return [

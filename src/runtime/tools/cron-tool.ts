@@ -1,10 +1,11 @@
 import type { AgentDefinition } from "../../domain/agent.js";
+import type { IncomingMessage } from "../../domain/message.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { deleteAgentCronJob, getAgentCronPath, readAgentCronFile, upsertAgentCronJob } from "../../cron/cron-md.js";
 import type { CronJobDefinition } from "../../cron/types.js";
 import { createUserVisibleToolError } from "../user-visible-tool-error.js";
 
-export function createCronTool(agent?: AgentDefinition): ToolDefinition[] {
+export function createCronTool(agent?: AgentDefinition, currentMessage?: IncomingMessage): ToolDefinition[] {
   if (!agent?.home) {
     return [];
   }
@@ -38,8 +39,30 @@ export function createCronTool(agent?: AgentDefinition): ToolDefinition[] {
           },
           reply: {
             type: "object",
-            description: "Where to deliver the final response.",
-            additionalProperties: true,
+            description: "Where to deliver the final response. Use {\"type\":\"current\"} to send the result back to the current inbound endpoint and conversation; the tool resolves it before saving cron.md. Use {\"type\":\"none\"} for no reply. Use {\"type\":\"endpoint\",\"endpointId\":\"trader-telegram\",\"target\":{\"conversationId\":\"<external conversation id>\"}} for an explicit endpoint reply.",
+            properties: {
+              type: { type: "string", enum: ["current", "none", "endpoint"] },
+              endpointId: {
+                type: "string",
+                minLength: 1,
+                description: "Exact endpoint id, for example trader-telegram. This is not the transport type.",
+              },
+              target: {
+                type: "object",
+                properties: {
+                  conversationId: {
+                    type: "string",
+                    minLength: 1,
+                    description: "External conversation id for the endpoint, for example the Telegram chat id.",
+                  },
+                  userId: { type: "string", minLength: 1 },
+                },
+                required: ["conversationId"],
+                additionalProperties: false,
+              },
+            },
+            required: ["type"],
+            additionalProperties: false,
           },
           session: {
             type: "object",
@@ -85,7 +108,7 @@ export function createCronTool(agent?: AgentDefinition): ToolDefinition[] {
     parameters,
     executionMode: "sequential",
     async execute(_toolCallId, params) {
-      const input = parseCronToolParams(params);
+      const input = parseCronToolParams(params, currentMessage);
       if (input.action === "list") {
         const jobs = await readAgentCronFile(agent);
         return {
@@ -116,7 +139,7 @@ type CronToolInput =
   | { action: "delete"; id: string }
   | { action: "upsert"; job: CronJobDefinition };
 
-function parseCronToolParams(params: unknown): CronToolInput {
+function parseCronToolParams(params: unknown, currentMessage?: IncomingMessage): CronToolInput {
   if (!isRecord(params)) {
     throw createUserVisibleToolError("tool_command_execution", "cron requires an object parameter.");
   }
@@ -130,19 +153,19 @@ function parseCronToolParams(params: unknown): CronToolInput {
     return { action: "delete", id: params.id.trim() };
   }
   if (params.action === "upsert") {
-    return { action: "upsert", job: parseJob(params.job) };
+    return { action: "upsert", job: parseJob(params.job, currentMessage) };
   }
   throw createUserVisibleToolError("tool_command_execution", "cron action must be list, upsert, or delete.");
 }
 
-function parseJob(value: unknown): CronJobDefinition {
+function parseJob(value: unknown, currentMessage?: IncomingMessage): CronJobDefinition {
   if (!isRecord(value)) {
     throw createUserVisibleToolError("tool_command_execution", "cron upsert requires a job object.");
   }
   const id = requireString(value.id, "job.id");
   const schedule = requireString(value.schedule, "job.schedule");
   const instruction = requireString(value.instruction, "job.instruction");
-  const reply = parseReply(value.reply);
+  const reply = parseReply(value.reply, currentMessage);
   const session = parseSession(value.session, id);
   return {
     id,
@@ -155,17 +178,36 @@ function parseJob(value: unknown): CronJobDefinition {
   };
 }
 
-function parseReply(value: unknown): CronJobDefinition["reply"] {
+function parseReply(value: unknown, currentMessage?: IncomingMessage): CronJobDefinition["reply"] {
   if (!isRecord(value)) {
     throw createUserVisibleToolError("tool_command_execution", "job.reply must be an object.");
   }
   if (value.type === "none") {
     return { type: "none" };
   }
+  if (value.type === "current") {
+    if (!currentMessage || currentMessage.endpointId === "cron" || currentMessage.conversation.transport === "cron") {
+      throw createUserVisibleToolError(
+        "tool_command_execution",
+        "job.reply.type current requires a current endpoint conversation. Use an explicit endpoint reply instead.",
+      );
+    }
+    return {
+      type: "endpoint",
+      endpointId: requireString(currentMessage.endpointId, "current message endpointId"),
+      target: {
+        conversationId: requireString(currentMessage.conversation.externalId, "current message conversationId"),
+        ...(currentMessage.userId.trim() ? { userId: currentMessage.userId.trim() } : {}),
+      },
+    };
+  }
   if (value.type === "endpoint") {
     const target = isRecord(value.target) ? value.target : undefined;
     if (!target) {
-      throw createUserVisibleToolError("tool_command_execution", "endpoint reply requires target.");
+      throw createUserVisibleToolError(
+        "tool_command_execution",
+        "endpoint reply requires target object with conversationId.",
+      );
     }
     return {
       type: "endpoint",
@@ -176,7 +218,7 @@ function parseReply(value: unknown): CronJobDefinition["reply"] {
       },
     };
   }
-  throw createUserVisibleToolError("tool_command_execution", "job.reply.type must be none or endpoint.");
+  throw createUserVisibleToolError("tool_command_execution", "job.reply.type must be current, none, or endpoint.");
 }
 
 function parseSession(value: unknown, fallbackId: string): CronJobDefinition["session"] {
