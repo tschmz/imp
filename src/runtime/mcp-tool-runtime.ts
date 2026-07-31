@@ -1,7 +1,12 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport, type StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ToolDefinition } from "../tools/types.js";
-import type { AgentDefinition } from "../domain/agent.js";
+import type {
+  AgentDefinition,
+  AgentMcpHttpServerConfig,
+  AgentMcpStdioServerConfig,
+} from "../domain/agent.js";
 import { UserVisibleProcessingError } from "../domain/processing-error.js";
 import type { Logger } from "../logging/types.js";
 
@@ -58,8 +63,21 @@ interface McpClientLike {
 
 interface McpToolRuntimeDependencies {
   createClient?: () => McpClientLike;
-  createTransport?: (server: StdioServerParameters) => unknown;
+  createTransport?: (config: McpClientTransportConfig) => unknown;
 }
+
+type McpClientTransportConfig =
+  | {
+      transport: "stdio";
+      server: StdioServerParameters;
+    }
+  | {
+      transport: "http";
+      url: string;
+      requestInit?: {
+        headers?: Record<string, string>;
+      };
+    };
 
 export interface ResolvedMcpTools {
   tools: ToolDefinition[];
@@ -94,13 +112,7 @@ export async function resolveMcpTools(
 
   for (const server of servers) {
     const client = createClient();
-    const transport = createTransport({
-      command: server.command,
-      ...(server.args ? { args: server.args } : {}),
-      ...resolveMcpServerEnvironment(server, options.env ?? process.env),
-      ...(server.cwd ? { cwd: server.cwd } : {}),
-      stderr: "pipe",
-    });
+    const transport = createTransport(createMcpClientTransportConfig(server, options.env ?? process.env));
 
     try {
       await client.connect(transport);
@@ -136,8 +148,43 @@ export async function resolveMcpTools(
   };
 }
 
-function resolveMcpServerEnvironment(
+function createMcpClientTransportConfig(
   server: NonNullable<AgentDefinition["mcp"]>["servers"][number],
+  sourceEnv: NodeJS.ProcessEnv,
+): McpClientTransportConfig {
+  if (server.transport === "http") {
+    const headers = createHttpMcpHeaders(server);
+
+    return {
+      transport: "http",
+      url: server.url,
+      ...(Object.keys(headers).length > 0 ? { requestInit: { headers } } : {}),
+    };
+  }
+
+  return {
+    transport: "stdio",
+    server: {
+      command: server.command,
+      ...(server.args ? { args: server.args } : {}),
+      ...resolveMcpServerEnvironment(server, sourceEnv),
+      ...(server.cwd ? { cwd: server.cwd } : {}),
+      stderr: "pipe",
+    },
+  };
+}
+
+function createHttpMcpHeaders(server: AgentMcpHttpServerConfig): Record<string, string> {
+  const headers = { ...(server.headers ?? {}) };
+  if (server.bearerToken) {
+    headers.Authorization = `Bearer ${server.bearerToken}`;
+  }
+
+  return headers;
+}
+
+function resolveMcpServerEnvironment(
+  server: AgentMcpStdioServerConfig,
   sourceEnv: NodeJS.ProcessEnv,
 ): { env?: Record<string, string> } {
   const env: Record<string, string> = {};
@@ -160,8 +207,15 @@ function createDefaultClient(): McpClientLike {
   return new Client(MCP_CLIENT_INFO);
 }
 
-function createDefaultTransport(server: StdioServerParameters): unknown {
-  return new StdioClientTransport(server);
+function createDefaultTransport(config: McpClientTransportConfig): unknown {
+  if (config.transport === "http") {
+    return new StreamableHTTPClientTransport(
+      new URL(config.url),
+      config.requestInit ? { requestInit: config.requestInit } : undefined,
+    );
+  }
+
+  return new StdioClientTransport(config.server);
 }
 
 function createEmptyResolution(): ResolvedMcpTools {

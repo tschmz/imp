@@ -41,6 +41,15 @@
             "OPENAI_API_KEY"
           ],
           "cwd": "/var/lib/imp/tools"
+        },
+        {
+          "id": "remote-docs",
+          "transport": "http",
+          "url": "https://mcp.example.com/mcp",
+          "headers": {
+            "X-Workspace": "home"
+          },
+          "bearerToken": "replace-me"
         }
       ]
     }

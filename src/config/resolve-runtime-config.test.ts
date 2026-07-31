@@ -1176,6 +1176,79 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
+  it("resolves HTTP MCP bearer token references and agent templates", async () => {
+    const appConfig = createAppConfig({
+      tools: {
+        mcp: {
+          inheritEnv: ["OPENAI_API_KEY"],
+          servers: [
+            {
+              id: "remote",
+              transport: "http",
+              url: "https://mcp.example.test/{{agent.id}}/mcp",
+              headers: {
+                "X-Agent": "{{agent.id}}",
+              },
+              bearerToken: {
+                env: "IMP_REMOTE_MCP_TOKEN",
+              },
+            },
+          ],
+        },
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.5",
+          },
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          tools: {
+            mcp: {
+              servers: ["remote"],
+            },
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json", {
+      env: {
+        IMP_REMOTE_MCP_TOKEN: "remote-token",
+      },
+    });
+
+    expect(result.agents[0]?.mcp).toEqual({
+      servers: [
+        {
+          id: "remote",
+          transport: "http",
+          url: "https://mcp.example.test/default/mcp",
+          headers: {
+            "X-Agent": "default",
+          },
+          bearerToken: "remote-token",
+        },
+      ],
+    });
+  });
+
   it("preserves phone contact config for plugin tools", async () => {
     const appConfig = createAppConfig({
       tools: {

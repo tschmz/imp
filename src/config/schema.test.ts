@@ -460,6 +460,100 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts global MCP HTTP server config with bearer token references", () => {
+    const result = appConfigSchema.safeParse(
+      {
+        ...createConfig({
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.5",
+          },
+          tools: {
+            builtIn: ["read"],
+            mcp: {
+              servers: ["remote"],
+            },
+          },
+        }),
+        tools: {
+          mcp: {
+            servers: [
+              {
+                id: "remote",
+                transport: "http",
+                url: "https://mcp.example.test/mcp",
+                headers: {
+                  "X-Tenant": "imp",
+                },
+                bearerToken: {
+                  env: "IMP_REMOTE_MCP_TOKEN",
+                },
+              },
+            ],
+          },
+        },
+      },
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects HTTP MCP headers managed by the transport", () => {
+    const result = appConfigSchema.safeParse(
+      {
+        ...createConfig({
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.5",
+          },
+          tools: {
+            mcp: {
+              servers: ["remote"],
+            },
+          },
+        }),
+        tools: {
+          mcp: {
+            servers: [
+              {
+                id: "remote",
+                transport: "http",
+                url: "https://mcp.example.test/mcp",
+                headers: {
+                  Authorization: "Bearer token",
+                },
+              },
+            ],
+          },
+        },
+      },
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["tools", "mcp", "servers", 0, "headers", "Authorization"],
+        message: 'HTTP MCP header "Authorization" is managed by the MCP transport. Use bearerToken instead.',
+      }),
+    );
+  });
+
   it("accepts explicit delegated agent tools under agents.tools.agents", () => {
     const result = appConfigSchema.safeParse({
       ...createConfig({

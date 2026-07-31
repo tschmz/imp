@@ -159,6 +159,48 @@ describe("createValidateConfigUseCase", () => {
       "endpoints.0.token references environment variable IMP_TELEGRAM_BOT_TOKEN, but it is not set.",
     );
   });
+
+  it("fails validation when a referenced HTTP MCP bearer token env var is missing", async () => {
+    const root = await createTempDir();
+    const configPath = join(root, "custom", "imp.json");
+
+    await writeConfig(configPath, {
+      tools: {
+        mcp: {
+          servers: [
+            {
+              id: "remote",
+              transport: "http",
+              url: "https://mcp.example.test/mcp",
+              bearerToken: {
+                env: "IMP_REMOTE_MCP_TOKEN",
+              },
+            },
+          ],
+        },
+      },
+      agents: [
+        {
+          id: "default",
+          model: { provider: "openai", modelId: "gpt-5.5" },
+          prompt: {
+            base: {
+              text: "prompt",
+            },
+          },
+          tools: {
+            mcp: {
+              servers: ["remote"],
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(createValidateConfigUseCase()({ configPath })).rejects.toThrow(
+      "tools.mcp.servers.0.bearerToken references environment variable IMP_REMOTE_MCP_TOKEN, but it is not set.",
+    );
+  });
 });
 
 async function createTempDir(): Promise<string> {

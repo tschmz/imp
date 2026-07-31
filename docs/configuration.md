@@ -89,7 +89,7 @@ See [`config.example.json`](../config.example.json) for a complete example.
 
 ## Secrets
 
-Telegram tokens and model API keys can be stored as:
+Telegram tokens, model API keys, and HTTP MCP Bearer tokens can be stored as:
 
 - Inline strings
 - Environment variable references, such as `{"env":"IMP_TELEGRAM_BOT_TOKEN"}`
@@ -100,6 +100,7 @@ Prefer environment variables or secret files over inline secrets:
 ```sh
 imp config set endpoints.private-telegram.token '{"env":"IMP_TELEGRAM_BOT_TOKEN"}'
 imp config set defaults.model.apiKey '{"env":"OPENAI_API_KEY"}'
+imp config set tools.mcp.servers.remote.bearerToken '{"env":"REMOTE_MCP_TOKEN"}'
 ```
 
 Secret file paths are resolved relative to the config file directory unless they are absolute.

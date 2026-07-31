@@ -87,14 +87,52 @@ const mcpServerReferenceSchema = z
     "MCP server references may only contain letters, numbers, hyphens, underscores, and one plugin namespace dot.",
   );
 
-const mcpServerConfigSchema = z.object({
+const mcpHttpReservedHeaderNames = new Set([
+  "authorization",
+  "content-type",
+  "mcp-method",
+  "mcp-name",
+  "mcp-protocol-version",
+  "mcp-session-id",
+]);
+
+const mcpHttpHeadersSchema = z.record(z.string().min(1), z.string()).superRefine((headers, ctx) => {
+  for (const name of Object.keys(headers)) {
+    if (mcpHttpReservedHeaderNames.has(name.toLowerCase())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [name],
+        message: getMcpHttpReservedHeaderMessage(name),
+      });
+    }
+  }
+});
+
+function getMcpHttpReservedHeaderMessage(name: string): string {
+  return name.toLowerCase() === "authorization"
+    ? `HTTP MCP header "${name}" is managed by the MCP transport. Use bearerToken instead.`
+    : `HTTP MCP header "${name}" is managed by the MCP transport and cannot be configured manually.`;
+}
+
+const mcpStdioServerConfigSchema = z.object({
   id: mcpServerIdSchema,
+  transport: z.literal("stdio").optional(),
   command: z.string().min(1),
   args: z.string().min(1).array().optional(),
   inheritEnv: z.string().min(1).array().optional(),
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().min(1).optional(),
 });
+
+const mcpHttpServerConfigSchema = z.object({
+  id: mcpServerIdSchema,
+  transport: z.literal("http"),
+  url: z.string().url(),
+  headers: mcpHttpHeadersSchema.optional(),
+  bearerToken: secretValueConfigSchema.optional(),
+});
+
+const mcpServerConfigSchema = z.union([mcpHttpServerConfigSchema, mcpStdioServerConfigSchema]);
 
 const toolsConfigSchema = z.object({
   mcp: z

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { AgentDefinition, AgentMcpServerConfig } from "../domain/agent.js";
 import type { Logger } from "../logging/types.js";
 import type { ResolvedMcpTools } from "./mcp-tool-runtime.js";
@@ -96,8 +97,19 @@ export function createMcpToolCache(options: {
 }
 
 function createServerCacheKey(server: AgentMcpServerConfig): string {
+  if (server.transport === "http") {
+    return JSON.stringify({
+      id: server.id,
+      transport: "http",
+      url: server.url,
+      headers: fingerprintRecord(server.headers ?? {}),
+      bearerToken: fingerprintOptionalString(server.bearerToken),
+    });
+  }
+
   return JSON.stringify({
     id: server.id,
+    transport: server.transport ?? "stdio",
     command: server.command,
     args: server.args ?? [],
     cwd: server.cwd,
@@ -108,4 +120,20 @@ function createServerCacheKey(server: AgentMcpServerConfig): string {
 
 function sortRecord(record: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function fingerprintRecord(record: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(record)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => [key, fingerprintString(value)]),
+  );
+}
+
+function fingerprintOptionalString(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : fingerprintString(value);
+}
+
+function fingerprintString(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }

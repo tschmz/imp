@@ -63,6 +63,61 @@ describe("pluginManifestSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts HTTP MCP server plugin manifests", () => {
+    const result = pluginManifestSchema.safeParse({
+      schemaVersion: 1,
+      id: "remote-tools",
+      name: "Remote Tools",
+      version: "0.1.0",
+      mcpServers: [
+        {
+          id: "search",
+          transport: "http",
+          url: "https://mcp.example.test/mcp",
+          headers: {
+            "X-Tenant": "imp",
+          },
+          bearerToken: {
+            env: "REMOTE_MCP_TOKEN",
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects HTTP MCP plugin headers managed by the transport", () => {
+    const result = pluginManifestSchema.safeParse({
+      schemaVersion: 1,
+      id: "remote-tools",
+      name: "Remote Tools",
+      version: "0.1.0",
+      mcpServers: [
+        {
+          id: "search",
+          transport: "http",
+          url: "https://mcp.example.test/mcp",
+          headers: {
+            Authorization: "Bearer token",
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["mcpServers", 0, "headers", "Authorization"],
+        message: 'HTTP MCP header "Authorization" is managed by the MCP transport. Use bearerToken instead.',
+      }),
+    );
+  });
+
   it("rejects duplicate endpoint ids", () => {
     const result = pluginManifestSchema.safeParse({
       schemaVersion: 1,

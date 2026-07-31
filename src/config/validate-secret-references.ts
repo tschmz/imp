@@ -15,17 +15,31 @@ export async function validateAppConfigSecretReferences(
   const configDir = dirname(configPath);
 
   await Promise.all(
-    appConfig.endpoints.map(async (endpoint, index) => {
-      if (endpoint.type !== "telegram") {
-        return;
-      }
+    [
+      ...appConfig.endpoints.map(async (endpoint, index) => {
+        if (endpoint.type !== "telegram") {
+          return;
+        }
 
-      await resolveSecretValue(endpoint.token, {
-        configDir,
-        env: options.env,
-        readTextFile: options.readTextFile,
-        fieldLabel: `endpoints.${index}.token`,
-      });
-    }),
+        await resolveSecretValue(endpoint.token, {
+          configDir,
+          env: options.env,
+          readTextFile: options.readTextFile,
+          fieldLabel: `endpoints.${index}.token`,
+        });
+      }),
+      ...(appConfig.tools?.mcp?.servers ?? []).map(async (server, index) => {
+        if (server.transport !== "http" || !server.bearerToken) {
+          return;
+        }
+
+        await resolveSecretValue(server.bearerToken, {
+          configDir,
+          env: options.env,
+          readTextFile: options.readTextFile,
+          fieldLabel: `tools.mcp.servers.${index}.bearerToken`,
+        });
+      }),
+    ],
   );
 }

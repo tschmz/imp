@@ -99,6 +99,11 @@ describe("plugin use cases", () => {
           command: "node",
           args: ["dist/mcp-server.js"],
         },
+        {
+          id: "remote-tools",
+          transport: "http",
+          url: "https://mcp.example.test/mcp",
+        },
       ],
     });
     const writeOutput = vi.fn();
@@ -122,6 +127,7 @@ describe("plugin use cases", () => {
         "",
         "MCP servers:",
         "- voice-tools: node dist/mcp-server.js",
+        "- remote-tools: https://mcp.example.test/mcp",
       ].join("\n"),
     );
   });
@@ -306,6 +312,17 @@ describe("plugin use cases", () => {
             IMP_AGENT_ID: "{{agent.id}}",
           },
         },
+        {
+          id: "remote-search",
+          transport: "http",
+          url: "https://mcp.example.test/{{plugin.id}}/mcp",
+          headers: {
+            "X-Plugin": "{{plugin.id}}",
+          },
+          bearerToken: {
+            file: "secrets/remote-search.token",
+          },
+        },
       ],
     });
     await writeFile(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`, "utf8");
@@ -346,6 +363,17 @@ describe("plugin use cases", () => {
               IMP_AGENT_ID: "{{agent.id}}",
             },
           },
+          {
+            id: "remote-search",
+            transport: "http",
+            url: "https://mcp.example.test/imp-voice/mcp",
+            headers: {
+              "X-Plugin": "imp-voice",
+            },
+            bearerToken: {
+              file: join(root, "imp-voice", "secrets", "remote-search.token"),
+            },
+          },
         ],
       },
     });
@@ -368,7 +396,7 @@ describe("plugin use cases", () => {
     ]);
     expect(writeOutput).toHaveBeenCalledWith(`Installed plugin "imp-voice" into ${configPath}`);
     expect(writeOutput).toHaveBeenCalledWith("Added endpoints: audio-ingress");
-    expect(writeOutput).toHaveBeenCalledWith("Added MCP servers: voice-control");
+    expect(writeOutput).toHaveBeenCalledWith("Added MCP servers: voice-control, remote-search");
   });
 
   it("checks configured plugin health", async () => {

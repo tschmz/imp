@@ -3,11 +3,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { parseConfigJson } from "../config/config-json.js";
 import { discoverConfigPath } from "../config/discover-config-path.js";
 import { appConfigSchema } from "../config/schema.js";
-import { resolveConfigPath as resolvePathRelativeToConfig } from "../config/secret-value.js";
+import { resolveConfigPath as resolvePathRelativeToConfig, type SecretValueConfig } from "../config/secret-value.js";
 import type { AppConfig, EndpointConfig, PluginConfig, FileEndpointConfig } from "../config/types.js";
 import type { DiscoveredPluginManifest } from "../plugins/discovery.js";
 import { readPluginManifest } from "../plugins/discovery.js";
-import { PLUGIN_MANIFEST_FILE } from "../plugins/manifest.js";
+import { PLUGIN_MANIFEST_FILE, type PluginMcpServerManifest } from "../plugins/manifest.js";
 
 export interface PluginConfigInstallerDependencies {
   discoverConfigPath?: typeof discoverConfigPath;
@@ -204,16 +204,9 @@ function createPluginConfigContributions(
       ...(endpoint.ingress ? { ingress: endpoint.ingress } : {}),
       response: endpoint.response,
     })),
-    mcpServers: (plugin.manifest.mcpServers ?? []).map((server) => ({
-      id: server.id,
-      command: resolvePluginMcpCommand(renderPluginConfigTemplate(server.command, pluginTemplateContext)),
-      ...(server.args ? { args: server.args.map((arg) => renderPluginConfigTemplate(arg, pluginTemplateContext)) } : {}),
-      ...(server.inheritEnv
-        ? { inheritEnv: server.inheritEnv.map((entry) => renderPluginConfigTemplate(entry, pluginTemplateContext)) }
-        : {}),
-      ...(server.env ? { env: mapRecordValues(server.env, (value) => renderPluginConfigTemplate(value, pluginTemplateContext)) } : {}),
-      ...(server.cwd ? { cwd: resolvePluginConfigPath(server.cwd, pluginTemplateContext) } : {}),
-    })),
+    mcpServers: (plugin.manifest.mcpServers ?? []).map((server) =>
+      resolvePluginMcpServerContribution(server, pluginTemplateContext),
+    ),
   };
 }
 
@@ -259,6 +252,53 @@ function renderPluginConfigTemplate(value: string, context: PluginConfigTemplate
 
 function resolvePluginMcpCommand(command: string): string {
   return command === "node" ? process.execPath : command;
+}
+
+function resolvePluginMcpServerContribution(
+  server: PluginMcpServerManifest,
+  context: PluginConfigTemplateContext,
+): McpServerConfig {
+  if (server.transport === "http") {
+    const bearerToken = renderPluginSecretValueTemplate(server.bearerToken, context);
+
+    return {
+      id: server.id,
+      transport: "http",
+      url: renderPluginConfigTemplate(server.url, context),
+      ...(server.headers ? { headers: mapRecordValues(server.headers, (value) => renderPluginConfigTemplate(value, context)) } : {}),
+      ...(bearerToken ? { bearerToken } : {}),
+    };
+  }
+
+  return {
+    id: server.id,
+    ...(server.transport ? { transport: server.transport } : {}),
+    command: resolvePluginMcpCommand(renderPluginConfigTemplate(server.command, context)),
+    ...(server.args ? { args: server.args.map((arg) => renderPluginConfigTemplate(arg, context)) } : {}),
+    ...(server.inheritEnv
+      ? { inheritEnv: server.inheritEnv.map((entry) => renderPluginConfigTemplate(entry, context)) }
+      : {}),
+    ...(server.env ? { env: mapRecordValues(server.env, (value) => renderPluginConfigTemplate(value, context)) } : {}),
+    ...(server.cwd ? { cwd: resolvePluginConfigPath(server.cwd, context) } : {}),
+  };
+}
+
+function renderPluginSecretValueTemplate(
+  value: SecretValueConfig | undefined,
+  context: PluginConfigTemplateContext,
+): SecretValueConfig | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    return renderPluginConfigTemplate(value, context);
+  }
+
+  return {
+    ...(value.env ? { env: renderPluginConfigTemplate(value.env, context) } : {}),
+    ...(value.file ? { file: resolvePluginConfigPath(value.file, context) } : {}),
+  };
 }
 
 function mapRecordValues(

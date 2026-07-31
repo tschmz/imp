@@ -1,5 +1,4 @@
 import type {
-  AgentMcpServerConfig,
   AgentPhoneCallConfig,
   AgentWorkspaceConfig,
   ModelRef,
@@ -30,10 +29,30 @@ export interface ModelConfig extends Omit<ModelRef, "apiKey"> {
   apiKey?: SecretValueConfig;
 }
 
+export type McpServerConfig = McpStdioServerConfig | McpHttpServerConfig;
+
+export interface McpStdioServerConfig {
+  id: string;
+  transport?: "stdio";
+  command: string;
+  args?: string[];
+  inheritEnv?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+}
+
+export interface McpHttpServerConfig {
+  id: string;
+  transport: "http";
+  url: string;
+  headers?: Record<string, string>;
+  bearerToken?: SecretValueConfig;
+}
+
 export interface ToolsConfig {
   mcp?: {
     inheritEnv?: string[];
-    servers: AgentMcpServerConfig[];
+    servers: McpServerConfig[];
   };
 }
 

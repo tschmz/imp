@@ -66,6 +66,42 @@ describe("loadRuntimePlugins", () => {
     });
   });
 
+  it("namespaces plugin MCP servers and resolves HTTP token files relative to the plugin root", async () => {
+    const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
+    const dataRoot = join(root, "state");
+    const pluginRoot = join(dataRoot, "plugins", "remote-tools");
+    await writePluginManifest(pluginRoot, {
+      schemaVersion: 1,
+      id: "remote-tools",
+      name: "Remote Tools",
+      version: "0.1.0",
+      mcpServers: [
+        {
+          id: "search",
+          transport: "http",
+          url: "https://mcp.example.test/mcp",
+          bearerToken: {
+            file: "secrets/search.token",
+          },
+        },
+      ],
+    });
+
+    const result = await loadRuntimePlugins(createAppConfig(dataRoot), join(root, "config"));
+
+    expect(result.mcpServers).toEqual([
+      {
+        id: "remote-tools.search",
+        transport: "http",
+        url: "https://mcp.example.test/mcp",
+        bearerToken: {
+          file: join(pluginRoot, "secrets", "search.token"),
+        },
+      },
+    ]);
+  });
+
   it("omits plugin config agents that are shadowed by configured agents", async () => {
     const root = await createTempDir();
     vi.stubEnv("HOME", join(root, "home"));

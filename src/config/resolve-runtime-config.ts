@@ -15,8 +15,8 @@ import { getTransport } from "../transports/registry.js";
 import { DEFAULT_LOG_ROTATION_SIZE } from "../logging/file-logger.js";
 import { filterShadowedPluginAgents, loadRuntimePlugins } from "./plugin-runtime.js";
 import { deriveDelegationToolName } from "./schema.js";
-import { resolveConfigPath, resolveSecretValue } from "./secret-value.js";
-import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig, ModelConfig } from "./types.js";
+import { resolveConfigPath, resolveSecretValue, type SecretValueConfig } from "./secret-value.js";
+import type { AgentMcpToolsConfig, AgentToolsConfig, AppConfig, McpServerConfig, ModelConfig } from "./types.js";
 
 interface ResolveRuntimeConfigOptions {
   env?: NodeJS.ProcessEnv;
@@ -67,7 +67,7 @@ export async function resolveRuntimeConfig(
           ...(agent.skills ? { skills: resolveAgentSkills(agent.skills, configDir) } : {}),
           ...(skillCatalog.skills.length > 0 ? { skillCatalog: skillCatalog.skills } : {}),
           ...(skillCatalog.issues.length > 0 ? { skillIssues: skillCatalog.issues } : {}),
-          ...resolveAgentTools(agent, mcpServers, configDir),
+          ...(await resolveAgentTools(agent, mcpServers, configDir, options)),
         };
       }),
     ),
@@ -233,11 +233,12 @@ function resolveAgentSkills(
   };
 }
 
-function resolveAgentTools(
+async function resolveAgentTools(
   agent: AppConfig["agents"][number],
-  mcpServers: Map<string, AgentMcpServerConfig>,
+  mcpServers: Map<string, McpServerConfig>,
   configDir: string,
-): Pick<DaemonConfig["agents"][number], "tools" | "delegations" | "mcp" | "phone"> {
+  options: ResolveRuntimeConfigOptions,
+): Promise<Pick<DaemonConfig["agents"][number], "tools" | "delegations" | "mcp" | "phone">> {
   const tools = agent.tools;
   if (!tools) {
     return {};
@@ -249,10 +250,14 @@ function resolveAgentTools(
     };
   }
 
+  const mcp = tools.mcp
+    ? await resolveAgentMcpConfig(tools.mcp, mcpServers, agent, configDir, options)
+    : undefined;
+
   return {
     ...(tools.builtIn ? { tools: tools.builtIn } : {}),
     ...(tools.agents ? { delegations: resolveAgentDelegations(tools.agents) } : {}),
-    ...(tools.mcp ? { mcp: resolveAgentMcpConfig(tools.mcp, mcpServers, agent) } : {}),
+    ...(mcp ? { mcp } : {}),
     ...(tools.phone ? { phone: resolveAgentPhoneCallConfig(tools.phone, configDir) } : {}),
   };
 }
@@ -270,45 +275,64 @@ function resolveAgentDelegations(
 function resolveGlobalMcpServers(
   appConfig: AppConfig,
   configDir: string,
-  pluginMcpServers: AgentMcpServerConfig[] = [],
-): Map<string, AgentMcpServerConfig> {
+  pluginMcpServers: McpServerConfig[] = [],
+): Map<string, McpServerConfig> {
   const globalInheritEnv = appConfig.tools?.mcp?.inheritEnv ?? [];
 
   return new Map(
     [...(appConfig.tools?.mcp?.servers ?? []), ...pluginMcpServers].map((server) => [
       server.id,
-      {
-        ...server,
-        ...(globalInheritEnv.length > 0 || server.inheritEnv
-          ? { inheritEnv: [...globalInheritEnv, ...(server.inheritEnv ?? [])] }
-          : {}),
-        ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, configDir) } : {}),
-      },
+      server.transport === "http"
+        ? server
+        : {
+            ...server,
+            ...(globalInheritEnv.length > 0 || server.inheritEnv
+              ? { inheritEnv: [...globalInheritEnv, ...(server.inheritEnv ?? [])] }
+              : {}),
+            ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, configDir) } : {}),
+          },
     ]),
   );
 }
 
-function resolveAgentMcpConfig(
+async function resolveAgentMcpConfig(
   mcp: AgentMcpToolsConfig,
-  mcpServers: Map<string, AgentMcpServerConfig>,
+  mcpServers: Map<string, McpServerConfig>,
   agent: AppConfig["agents"][number],
-): AgentMcpConfig {
+  configDir: string,
+  options: ResolveRuntimeConfigOptions,
+): Promise<AgentMcpConfig> {
   return {
-    servers: mcp.servers.map((serverId) => {
+    servers: await Promise.all(mcp.servers.map(async (serverId) => {
       const server = mcpServers.get(serverId);
       if (!server) {
         throw new Error(`Unknown MCP server id "${serverId}".`);
       }
 
-      return renderAgentMcpServerTemplates(server, agent);
-    }),
+      return resolveAgentMcpServerSecrets(
+        renderAgentMcpServerTemplates(server, agent),
+        configDir,
+        options,
+      );
+    })),
   };
 }
 
 function renderAgentMcpServerTemplates(
-  server: AgentMcpServerConfig,
+  server: McpServerConfig,
   agent: AppConfig["agents"][number],
-): AgentMcpServerConfig {
+): McpServerConfig {
+  if (server.transport === "http") {
+    const bearerToken = renderSecretValueTemplate(server.bearerToken, agent);
+
+    return {
+      ...server,
+      url: renderAgentTemplate(server.url, agent),
+      ...(server.headers ? { headers: mapRecordValues(server.headers, (value) => renderAgentTemplate(value, agent)) } : {}),
+      ...(bearerToken ? { bearerToken } : {}),
+    };
+  }
+
   return {
     ...server,
     command: renderAgentTemplate(server.command, agent),
@@ -316,6 +340,45 @@ function renderAgentMcpServerTemplates(
     ...(server.inheritEnv ? { inheritEnv: server.inheritEnv.map((entry) => renderAgentTemplate(entry, agent)) } : {}),
     ...(server.env ? { env: mapRecordValues(server.env, (value) => renderAgentTemplate(value, agent)) } : {}),
     ...(server.cwd ? { cwd: renderAgentTemplate(server.cwd, agent) } : {}),
+  };
+}
+
+async function resolveAgentMcpServerSecrets(
+  server: McpServerConfig,
+  configDir: string,
+  options: ResolveRuntimeConfigOptions,
+): Promise<AgentMcpServerConfig> {
+  if (server.transport !== "http") {
+    return server;
+  }
+
+  const { bearerToken, ...resolvedServer } = server;
+  return {
+    ...resolvedServer,
+    ...(bearerToken
+      ? {
+          bearerToken: await resolveSecretValue(bearerToken, {
+            configDir,
+            env: options.env,
+            readTextFile: options.readTextFile,
+            fieldLabel: `tools.mcp.servers.${server.id}.bearerToken`,
+          }),
+        }
+      : {}),
+  };
+}
+
+function renderSecretValueTemplate(
+  value: SecretValueConfig | undefined,
+  agent: AppConfig["agents"][number],
+): SecretValueConfig | undefined {
+  if (!value || typeof value === "string") {
+    return value;
+  }
+
+  return {
+    ...(value.env ? { env: renderAgentTemplate(value.env, agent) } : {}),
+    ...(value.file ? { file: renderAgentTemplate(value.file, agent) } : {}),
   };
 }
 

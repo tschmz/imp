@@ -162,13 +162,59 @@ describe("resolveMcpTools", () => {
     );
 
     expect(createTransport).toHaveBeenCalledWith({
-      command: "node",
-      env: {
-        GITHUB_TOKEN: "github-token",
-        OPENAI_API_KEY: "explicit-value",
-        STATIC_VALUE: "configured",
+      transport: "stdio",
+      server: {
+        command: "node",
+        env: {
+          GITHUB_TOKEN: "github-token",
+          OPENAI_API_KEY: "explicit-value",
+          STATIC_VALUE: "configured",
+        },
+        stderr: "pipe",
       },
-      stderr: "pipe",
+    });
+  });
+
+  it("creates HTTP MCP transports with configured headers and bearer tokens", async () => {
+    const createTransport = vi.fn((server) => server);
+    const createClient = vi.fn(() => ({
+      connect: vi.fn(async () => {}),
+      listTools: vi.fn(async () => ({ tools: [] })),
+      callTool: vi.fn(async () => ({ content: [] })),
+      close: vi.fn(async () => {}),
+    }));
+
+    await resolveMcpTools(
+      createAgent({
+        mcp: {
+          servers: [
+            {
+              id: "remote",
+              transport: "http",
+              url: "https://mcp.example.test/mcp",
+              headers: {
+                "X-Tenant": "imp",
+              },
+              bearerToken: "remote-token",
+            },
+          ],
+        },
+      }),
+      {
+        createClient,
+        createTransport,
+      },
+    );
+
+    expect(createTransport).toHaveBeenCalledWith({
+      transport: "http",
+      url: "https://mcp.example.test/mcp",
+      requestInit: {
+        headers: {
+          Authorization: "Bearer remote-token",
+          "X-Tenant": "imp",
+        },
+      },
     });
   });
 });

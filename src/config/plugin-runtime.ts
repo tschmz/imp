@@ -1,17 +1,16 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { AgentMcpServerConfig } from "../domain/agent.js";
 import { discoverPluginManifests, readPluginManifestFromDirectory, type DiscoveredPluginManifest, type PluginManifest } from "../plugins/index.js";
 import { createCommandToolDefinitions, type CommandToolRuntimeConfig } from "../runtime/command-tool.js";
 import { loadJsPluginToolDefinitions, resolvePluginJsRuntime } from "../runtime/js-plugin.js";
 import type { ToolDefinition } from "../tools/types.js";
-import { resolveConfigPath } from "./secret-value.js";
-import type { AgentConfig, AppConfig } from "./types.js";
+import { resolveConfigPath, type SecretValueConfig } from "./secret-value.js";
+import type { AgentConfig, AppConfig, McpServerConfig } from "./types.js";
 
 export interface LoadedRuntimePlugins {
   skillPaths: string[];
   agents: AgentConfig[];
-  mcpServers: AgentMcpServerConfig[];
+  mcpServers: McpServerConfig[];
   commandTools: CommandToolRuntimeConfig[];
   pluginTools: ToolDefinition[];
   toolNameAliases: Record<string, string>;
@@ -206,9 +205,9 @@ function resolvePluginModel(
 }
 
 function resolvePluginSecretValue(
-  value: NonNullable<NonNullable<AgentConfig["model"]>["apiKey"]>,
+  value: SecretValueConfig,
   pluginRoot: string,
-): NonNullable<NonNullable<AgentConfig["model"]>["apiKey"]> {
+): SecretValueConfig {
   if (typeof value === "string" || !("file" in value) || !value.file) {
     return value;
   }
@@ -270,11 +269,17 @@ function resolvePluginAgentTools(
   };
 }
 
-function resolvePluginMcpServers(manifest: PluginManifest, pluginRoot: string): AgentMcpServerConfig[] {
+function resolvePluginMcpServers(manifest: PluginManifest, pluginRoot: string): McpServerConfig[] {
   return (manifest.mcpServers ?? []).map((server) => ({
     ...server,
     id: namespacePluginId(manifest.id, server.id),
-    ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, pluginRoot) } : {}),
+    ...(server.transport === "http"
+      ? {
+          ...(server.bearerToken ? { bearerToken: resolvePluginSecretValue(server.bearerToken, pluginRoot) } : {}),
+        }
+      : {
+          ...(server.cwd ? { cwd: resolveConfigPath(server.cwd, pluginRoot) } : {}),
+        }),
   }));
 }
 

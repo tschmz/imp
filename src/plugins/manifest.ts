@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { AgentConfig, FileIngressConfig, FileResponseRoutingConfig } from "../config/types.js";
-import { secretValueConfigSchema } from "../config/secret-value.js";
+import { secretValueConfigSchema, type SecretValueConfig } from "../config/secret-value.js";
 import { pluginIdentifierSchema, pluginResponseRoutingSchema } from "./protocol.js";
 
 export const PLUGIN_MANIFEST_FILE = "plugin.json";
@@ -48,14 +48,26 @@ export interface PluginServiceManifest {
   env?: Record<string, string>;
 }
 
-export interface PluginMcpServerManifest {
+export type PluginMcpServerManifest = PluginMcpStdioServerManifest | PluginMcpHttpServerManifest;
+
+export interface PluginMcpStdioServerManifest {
   id: string;
   description?: string;
+  transport?: "stdio";
   command: string;
   args?: string[];
   inheritEnv?: string[];
   cwd?: string;
   env?: Record<string, string>;
+}
+
+export interface PluginMcpHttpServerManifest {
+  id: string;
+  description?: string;
+  transport: "http";
+  url: string;
+  headers?: Record<string, string>;
+  bearerToken?: SecretValueConfig;
 }
 
 export interface PluginSkillManifest {
@@ -99,6 +111,32 @@ export interface PluginPythonSetupManifest {
   venv?: string;
 }
 
+const mcpHttpReservedHeaderNames = new Set([
+  "authorization",
+  "content-type",
+  "mcp-method",
+  "mcp-name",
+  "mcp-protocol-version",
+  "mcp-session-id",
+]);
+
+const mcpHttpHeadersSchema = z.record(z.string().min(1), z.string()).superRefine((headers, ctx) => {
+  for (const name of Object.keys(headers)) {
+    if (mcpHttpReservedHeaderNames.has(name.toLowerCase())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [name],
+        message: getMcpHttpReservedHeaderMessage(name),
+      });
+    }
+  }
+});
+
+function getMcpHttpReservedHeaderMessage(name: string): string {
+  return name.toLowerCase() === "authorization"
+    ? `HTTP MCP header "${name}" is managed by the MCP transport. Use bearerToken instead.`
+    : `HTTP MCP header "${name}" is managed by the MCP transport and cannot be configured manually.`;
+}
 
 const promptSourceSchema = z
   .object({
@@ -227,15 +265,26 @@ export const pluginManifestSchema: z.ZodType<PluginManifest> = z.object({
     .array()
     .optional(),
   mcpServers: z
-    .object({
-      id: pluginIdentifierSchema,
-      description: z.string().min(1).optional(),
-      command: z.string().min(1),
-      args: z.string().min(1).array().optional(),
-      inheritEnv: z.string().min(1).array().optional(),
-      cwd: z.string().min(1).optional(),
-      env: z.record(z.string(), z.string()).optional(),
-    })
+    .union([
+      z.object({
+        id: pluginIdentifierSchema,
+        description: z.string().min(1).optional(),
+        transport: z.literal("http"),
+        url: z.string().url(),
+        headers: mcpHttpHeadersSchema.optional(),
+        bearerToken: secretValueConfigSchema.optional(),
+      }),
+      z.object({
+        id: pluginIdentifierSchema,
+        description: z.string().min(1).optional(),
+        transport: z.literal("stdio").optional(),
+        command: z.string().min(1),
+        args: z.string().min(1).array().optional(),
+        inheritEnv: z.string().min(1).array().optional(),
+        cwd: z.string().min(1).optional(),
+        env: z.record(z.string(), z.string()).optional(),
+      }),
+    ])
     .array()
     .optional(),
   skills: z.object({ path: z.string().min(1) }).array().optional(),

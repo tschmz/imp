@@ -74,7 +74,11 @@ export function renderPluginDetails(plugin: DiscoveredPluginManifest): string {
     lines.push("");
     lines.push("MCP servers:");
     for (const server of plugin.manifest.mcpServers) {
-      lines.push(`- ${server.id}: ${server.command}${server.args?.length ? ` ${server.args.join(" ")}` : ""}`);
+      lines.push(
+        server.transport === "http"
+          ? `- ${server.id}: ${server.url}`
+          : `- ${server.id}: ${server.command}${server.args?.length ? ` ${server.args.join(" ")}` : ""}`,
+      );
     }
   }
 

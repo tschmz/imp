@@ -54,12 +54,18 @@ This affects the agent shell tool only. Provider credentials and service-wide va
 
 ## MCP Servers
 
-MCP servers are defined once at the top level and enabled per agent.
+MCP servers are defined once at the top level and enabled per agent. Imp supports local `stdio` MCP servers and remote Streamable HTTP MCP servers.
 
-Define a server:
+Define a local `stdio` server:
 
 ```sh
 imp config set tools.mcp '{"inheritEnv":["GITHUB_TOKEN"],"servers":[{"id":"github","command":"github-mcp-server","args":["stdio"]}]}'
+```
+
+Define a remote HTTP server with a Bearer token:
+
+```sh
+imp config set tools.mcp '{"servers":[{"id":"remote","transport":"http","url":"https://mcp.example.com/mcp","headers":{"X-Workspace":"home"},"bearerToken":{"env":"REMOTE_MCP_TOKEN"}}]}'
 ```
 
 Enable it for an agent while keeping selected built-in tools:
@@ -68,7 +74,7 @@ Enable it for an agent while keeping selected built-in tools:
 imp config set agents.default.tools '{"builtIn":["read","bash"],"mcp":{"servers":["github"]}}'
 ```
 
-Imp prefixes MCP tool names with the server ID to avoid collisions.
+Imp prefixes MCP tool names with the server ID to avoid collisions. For HTTP servers, use `bearerToken` instead of setting an `Authorization` header manually.
 
 ## Delegated Agents
 

@@ -27,13 +27,24 @@ export interface AgentSkillsConfig {
   paths: string[];
 }
 
-export interface AgentMcpServerConfig {
+export type AgentMcpServerConfig = AgentMcpStdioServerConfig | AgentMcpHttpServerConfig;
+
+export interface AgentMcpStdioServerConfig {
   id: string;
+  transport?: "stdio";
   command: string;
   args?: string[];
   inheritEnv?: string[];
   env?: Record<string, string>;
   cwd?: string;
+}
+
+export interface AgentMcpHttpServerConfig {
+  id: string;
+  transport: "http";
+  url: string;
+  headers?: Record<string, string>;
+  bearerToken?: string;
 }
 
 export interface AgentMcpConfig {
