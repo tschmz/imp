@@ -1,10 +1,11 @@
-import { getModel, type Api as AiApi, type Model } from "@earendil-works/pi-ai";
+import type { Api as AiApi, Model } from "@earendil-works/pi-ai";
 import type { AgentDefinition, ModelRef } from "../domain/agent.js";
+import { resolveBuiltinModel } from "./pi-ai-runtime.js";
 
 export type ModelResolver = (provider: string, modelId: string) => Model<AiApi> | undefined;
 
 export function defaultResolveModel(provider: string, modelId: string): Model<AiApi> | undefined {
-  return getModel(provider as never, modelId as never);
+  return resolveBuiltinModel(provider, modelId);
 }
 
 export function resolveModelOrThrow(

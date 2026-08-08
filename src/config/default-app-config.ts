@@ -1,6 +1,6 @@
-import { getOAuthProvider } from "@earendil-works/pi-ai/oauth";
 import { join } from "node:path";
 import { DEFAULT_LOG_ROTATION_SIZE } from "../logging/file-logger.js";
+import { isOAuthProvider } from "../runtime/pi-ai-runtime.js";
 import { getDefaultUserDataRoot } from "./discover-config-path.js";
 import type { AppConfig } from "./types.js";
 
@@ -39,7 +39,7 @@ export function buildInitialAppConfig(
 ): AppConfig {
   const prompt = buildAgentPrompt(answers);
   const workspace = buildAgentWorkspace(answers);
-  const usesOAuth = Boolean(getOAuthProvider(answers.provider));
+  const usesOAuth = isOAuthProvider(answers.provider);
 
   return {
     instance: {

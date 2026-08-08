@@ -20,6 +20,7 @@ import {
   toAgentMessages,
   toConversationEvents,
 } from "./message-mapping.js";
+import { defaultStreamFn } from "./pi-ai-runtime.js";
 import type { WorkingDirectoryState } from "./tool-resolution.js";
 
 export type AgentHandle =
@@ -124,6 +125,7 @@ export async function executeAgent(options: ExecuteAgentOptions): Promise<Execut
       tools: options.tools,
       messages: initialMessages,
     },
+    streamFn: defaultStreamFn,
     toolExecution: "parallel",
     ...(options.getApiKey
       ? {

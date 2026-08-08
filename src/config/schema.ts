@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { getOAuthProvider } from "@earendil-works/pi-ai/oauth";
 import type {
   AgentToolsConfig,
   AppConfig,
@@ -8,6 +7,7 @@ import type {
   ModelConfig,
 } from "./types.js";
 import { secretValueConfigSchema } from "./secret-value.js";
+import { isOAuthProvider } from "../runtime/pi-ai-runtime.js";
 import { getTransport, listTransportTypes } from "../transports/registry.js";
 
 type RefinementContext<T> = z.core.$RefinementCtx<T>;
@@ -426,7 +426,7 @@ function validateModelConfig(
     return;
   }
 
-  if (!getOAuthProvider(model.provider)) {
+  if (!isOAuthProvider(model.provider)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: [...path, "authFile"],
