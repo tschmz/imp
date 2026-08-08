@@ -53,14 +53,26 @@ export function createMcpToolCache(options: {
               },
             },
             { logger: options.logger },
-          ).catch((error) => {
-            cache.delete(cacheKey);
-            throw error;
-          });
+          )
+            .then((resolution) => {
+              if (resolution.failedServerIds.includes(server.id)) {
+                cache.delete(cacheKey);
+              }
+
+              return resolution;
+            })
+            .catch((error) => {
+              cache.delete(cacheKey);
+              throw error;
+            });
           cache.set(cacheKey, { promise });
 
           const resolution = await promise;
-          await options.logger?.debug(`cached MCP runtime ready for server "${server.id}"`);
+          if (resolution.failedServerIds.includes(server.id)) {
+            await options.logger?.debug(`not caching failed MCP runtime for server "${server.id}"`);
+          } else {
+            await options.logger?.debug(`cached MCP runtime ready for server "${server.id}"`);
+          }
           return resolution;
         }),
       );
