@@ -16,7 +16,7 @@ export function createCronTool(agent?: AgentDefinition, currentMessage?: Incomin
       action: { type: "string", enum: ["list", "upsert", "delete"] },
       job: {
         type: "object",
-        description: "Required for upsert. Cron job config plus instruction text. job.instruction, job.session.id, and job.session.title support prompt template variables. Use {{runtime.now.date}} in session.id, for example report-{{runtime.now.date}}, to rotate into a new detached session each day.",
+        description: "Required for upsert. Cron job config plus the scheduled user instruction. job.instruction, job.session.id, and job.session.title support prompt template variables. session.mode defaults to attached. Use {{runtime.now.date}} in session.id, for example report-{{runtime.now.date}}, to rotate into a new detached or activated session each day.",
         properties: {
           id: {
             type: "string",
@@ -66,13 +66,13 @@ export function createCronTool(agent?: AgentDefinition, currentMessage?: Incomin
           },
           session: {
             type: "object",
-            description: "Session settings. `detached` keeps the cron session separate; `activate` creates/reuses the named session and makes it the current interactive session for the agent. Use title to set the visible session title. session.id and session.title can include template variables such as {{runtime.now.date}}.",
+            description: "Session settings. `attached` runs the job in the agent's current active session and is the default. `detached` keeps the cron session separate. `activate` creates/reuses the named session and makes it the current interactive session for the agent. Use title to set the visible session title. session.id and session.title can include template variables such as {{runtime.now.date}}.",
             properties: {
-              mode: { type: "string", enum: ["detached", "activate"] },
+              mode: { type: "string", enum: ["attached", "detached", "activate"] },
               id: {
                 type: "string",
                 minLength: 1,
-                description: "Session id. Supports prompt template variables. Use report-{{runtime.now.date}} to rotate sessions daily.",
+                description: "Session id for detached or activated cron sessions. Attached jobs use it only as the cron reference before the active session is resolved. Supports prompt template variables. Use report-{{runtime.now.date}} to rotate sessions daily.",
               },
               title: {
                 type: "string",
@@ -82,13 +82,12 @@ export function createCronTool(agent?: AgentDefinition, currentMessage?: Incomin
               kind: { type: "string", minLength: 1 },
               metadata: { type: "object", additionalProperties: true },
             },
-            required: ["mode", "id"],
             additionalProperties: false,
           },
           instruction: {
             type: "string",
             minLength: 1,
-            description: "Instruction sent to the agent when the schedule fires. Supports prompt template variables such as {{runtime.now.date}}.",
+            description: "Scheduled user instruction sent when the job fires. Write only the task-specific request the future agent should execute, plus any runtime context needed for that run. Do not copy or restate the agent's system prompt, persona, standing operating rules, tool policies, or reply-routing instructions; those are already applied at runtime. Good prompts describe the concrete recurring task, expected output, relevant scope or sources, and any date/time variables such as {{runtime.now.date}}.",
           },
         },
         required: ["id", "schedule", "reply", "instruction"],
@@ -104,7 +103,7 @@ export function createCronTool(agent?: AgentDefinition, currentMessage?: Incomin
     name: "cron",
     label: "cron",
     description:
-      "List, create, update, or delete scheduled Imp jobs for this agent. Jobs are stored in agent-home/cron.md and hot-reloaded by the daemon.",
+      "List, create, update, or delete scheduled Imp jobs for this agent. Jobs are stored in agent-home/cron.md and hot-reloaded by the daemon. A cron instruction is the future scheduled user message, not a replacement system prompt, so keep it task-specific and do not duplicate the agent's permanent instructions. Cron sessions default to attached, which runs in the agent's current active session.",
     parameters,
     executionMode: "sequential",
     async execute(_toolCallId, params) {
@@ -223,14 +222,18 @@ function parseReply(value: unknown, currentMessage?: IncomingMessage): CronJobDe
 
 function parseSession(value: unknown, fallbackId: string): CronJobDefinition["session"] {
   if (value === undefined) {
-    return { mode: "detached", id: fallbackId };
+    return { mode: "attached", id: fallbackId };
   }
-  if (!isRecord(value) || (value.mode !== "detached" && value.mode !== "activate")) {
-    throw createUserVisibleToolError("tool_command_execution", "job.session.mode must be detached or activate.");
+  if (!isRecord(value)) {
+    throw createUserVisibleToolError("tool_command_execution", "job.session must be an object.");
+  }
+  const mode = value.mode ?? "attached";
+  if (mode !== "attached" && mode !== "detached" && mode !== "activate") {
+    throw createUserVisibleToolError("tool_command_execution", "job.session.mode must be attached, detached, or activate.");
   }
   return {
-    mode: value.mode,
-    id: requireString(value.id, "job.session.id"),
+    mode,
+    id: value.id === undefined ? fallbackId : requireString(value.id, "job.session.id"),
     ...(typeof value.title === "string" && value.title.trim() ? { title: value.title.trim() } : {}),
     ...(typeof value.kind === "string" && value.kind.trim() ? { kind: value.kind.trim() } : {}),
     ...(isRecord(value.metadata) ? { metadata: value.metadata } : {}),

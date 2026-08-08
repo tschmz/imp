@@ -1518,6 +1518,142 @@ describe("createRuntimeEntries", () => {
     }
   });
 
+  it("attaches cron runs to the active agent session when requested", async () => {
+    const root = await mkdtemp(join(tmpdir(), "imp-cron-attached-"));
+    const agentHome = join(root, "agents", "default");
+    await mkdir(agentHome, { recursive: true });
+    await writeFile(
+      join(agentHome, "cron.md"),
+      [
+        "# Imp Cron",
+        "",
+        "## report",
+        "",
+        "```json imp-cron",
+        JSON.stringify({
+          id: "report",
+          enabled: true,
+          schedule: "* * * * *",
+          timezone: "UTC",
+          reply: { type: "none" },
+          session: {
+            mode: "attached",
+            id: "report-session",
+            title: "Report",
+          },
+        }, null, 2),
+        "```",
+        "",
+        "Create report.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const activeConversation = {
+      state: {
+        conversation: {
+          transport: "telegram",
+          externalId: "42",
+          sessionId: "active-session",
+          agentId: "default",
+        },
+        agentId: "default",
+        createdAt: "2026-04-07T11:00:00.000Z",
+        updatedAt: "2026-04-07T11:00:00.000Z",
+        version: 1,
+      },
+      messages: [],
+    };
+    const conversationStore = {
+      get: vi.fn(async () => activeConversation),
+      put: vi.fn(async () => undefined),
+      listBackups: vi.fn(async () => []),
+      restore: vi.fn(async () => false),
+      ensureActive: vi.fn(async () => activeConversation),
+      create: vi.fn(async () => activeConversation),
+      ensureActiveForAgent: vi.fn(async () => activeConversation),
+      ensureDetachedForAgent: vi.fn(async () => {
+        throw new Error("unexpected detached session");
+      }),
+      updateState: vi.fn(async (context, patch) => ({
+        ...context,
+        state: {
+          ...context.state,
+          ...patch,
+        },
+      })),
+      appendEvents: vi.fn(async (context, events) => ({
+        ...context,
+        messages: [...context.messages, ...events],
+      })),
+    };
+    const engine = {
+      run: vi.fn(async ({ message }: { message: IncomingMessage }) => ({
+        message: {
+          conversation: message.conversation,
+          text: "done",
+        },
+        conversationEvents: [],
+      })),
+      close: vi.fn(async () => undefined),
+    };
+    const runtime = createRuntime({ conversationStore, engine });
+    let nowCallCount = 0;
+    const entry = createCronSchedulerEntry({
+      agentRegistry: createAgentRegistry([{ ...createTestAgent("default"), home: agentHome }]),
+      runtimes: [runtime],
+      deliveryRouter: createDeliveryRouter(),
+      logger: runtime.logger,
+      now: () => {
+        nowCallCount += 1;
+        return nowCallCount <= 2 ? new Date("2026-04-07T12:00:00.000Z") : new Date();
+      },
+    });
+
+    try {
+      await entry.start();
+      await vi.waitFor(() => {
+        expect(engine.run).toHaveBeenCalled();
+      });
+
+      expect(conversationStore.ensureActiveForAgent).toHaveBeenCalledWith(
+        {
+          transport: "cron",
+          externalId: "cron:default:report",
+          sessionId: "report-session",
+          agentId: "default",
+        },
+        {
+          agentId: "default",
+          now: "2026-04-07T12:00:00.000Z",
+          title: "Report",
+        },
+      );
+      expect(conversationStore.ensureDetachedForAgent).not.toHaveBeenCalled();
+      expect(engine.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversation: expect.objectContaining({
+            state: expect.objectContaining({
+              conversation: activeConversation.state.conversation,
+            }),
+          }),
+          message: expect.objectContaining({
+            conversation: {
+              transport: "cron",
+              externalId: "cron:default:report",
+              sessionId: "active-session",
+              agentId: "default",
+            },
+          }),
+        }),
+      );
+    } finally {
+      await entry.stop();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("renders cron templates for session id, session title, and instruction", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-cron-template-"));
     const agentHome = join(root, "agents", "default");

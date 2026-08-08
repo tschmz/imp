@@ -247,7 +247,7 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
       receivedAt,
       replyChannel,
     });
-    const message = createCronIncomingMessage(renderedJob, receivedAt);
+    let message = createCronIncomingMessage(renderedJob, receivedAt);
     const sessionOptions = {
       agentId: agent.id,
       now: receivedAt,
@@ -258,8 +258,15 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
         cronJobId: renderedJob.id,
       },
     };
+    const activeSessionOptions = {
+      agentId: agent.id,
+      now: receivedAt,
+      title: renderedJob.session.title ?? renderedJob.id,
+    };
     let conversation: ConversationContext | undefined;
-    if (renderedJob.session.mode === "activate") {
+    if (renderedJob.session.mode === "attached") {
+      conversation = await runtime.conversationStore.ensureActiveForAgent?.(message.conversation, activeSessionOptions);
+    } else if (renderedJob.session.mode === "activate") {
       if (!runtime.conversationStore.ensureActivatedForAgent) {
         throw new Error("Cron session mode activate requires an activatable conversation store.");
       }
@@ -267,19 +274,12 @@ export function createCronSchedulerEntry(dependencies: CronSchedulerDependencies
     } else {
       conversation = await runtime.conversationStore.ensureDetachedForAgent?.(message.conversation, sessionOptions);
     }
-    conversation ??= await runtime.conversationStore.ensureActiveForAgent?.(message.conversation, {
-      agentId: agent.id,
-      now: receivedAt,
-      title: renderedJob.session.title ?? renderedJob.id,
-    });
-    conversation ??= await runtime.conversationStore.ensureActive(message.conversation, {
-      agentId: agent.id,
-      now: receivedAt,
-      title: renderedJob.session.title ?? renderedJob.id,
-    });
+    conversation ??= await runtime.conversationStore.ensureActiveForAgent?.(message.conversation, activeSessionOptions);
+    conversation ??= await runtime.conversationStore.ensureActive(message.conversation, activeSessionOptions);
     if (!conversation) {
       throw new Error(`Unable to create cron session for job ${renderedJob.id}.`);
     }
+    message = attachCronMessageToConversation(message, conversation);
     let activeConversation = conversation;
 
     const userEvent = toCronUserEvent(message);
@@ -514,6 +514,17 @@ function createCronIncomingMessage(job: AgentCronJob, receivedAt: string): Incom
         jobId: job.id,
         sourceFile: job.sourceFile,
       },
+    },
+  };
+}
+
+function attachCronMessageToConversation(message: IncomingMessage, conversation: ConversationContext): IncomingMessage {
+  return {
+    ...message,
+    conversation: {
+      ...message.conversation,
+      sessionId: conversation.state.conversation.sessionId,
+      agentId: conversation.state.agentId,
     },
   };
 }

@@ -27,8 +27,8 @@ const cronConfigSchema = z.object({
     }),
   ]),
   session: z.object({
-    mode: z.enum(["detached", "activate"]),
-    id: z.string().min(1),
+    mode: z.enum(["attached", "detached", "activate"]).optional(),
+    id: z.string().min(1).optional(),
     title: z.string().min(1).optional(),
     kind: z.string().min(1).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
@@ -101,7 +101,13 @@ export function parseCronMarkdown(content: string): ParseCronMarkdownResult {
       schedule: block.config.schedule,
       ...(block.config.timezone ? { timezone: block.config.timezone } : {}),
       reply: block.config.reply,
-      session: block.config.session,
+      session: {
+        mode: block.config.session.mode ?? "attached",
+        id: block.config.session.id ?? block.config.id,
+        ...(block.config.session.title ? { title: block.config.session.title } : {}),
+        ...(block.config.session.kind ? { kind: block.config.session.kind } : {}),
+        ...(block.config.session.metadata ? { metadata: block.config.session.metadata } : {}),
+      },
       instruction,
     }];
   });

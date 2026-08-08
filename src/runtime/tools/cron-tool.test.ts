@@ -14,6 +14,44 @@ afterEach(async () => {
 });
 
 describe("cron tool", () => {
+  it("guides agents to keep scheduled instructions task-specific", () => {
+    const [tool] = createCronTool(createAgent({ home: "/tmp/agent" }));
+    const parameters = tool!.parameters as {
+      properties: {
+        job: {
+          properties: {
+            instruction: { description: string };
+          };
+        };
+      };
+    };
+
+    expect(tool!.description).toContain("future scheduled user message");
+    expect(parameters.properties.job.properties.instruction.description).toContain("Do not copy or restate");
+    expect(parameters.properties.job.properties.instruction.description).toContain("system prompt");
+    expect(parameters.properties.job.properties.instruction.description).toContain("concrete recurring task");
+  });
+
+  it("defaults cron session mode to attached when omitted", async () => {
+    const root = await createTempDir();
+    const [tool] = createCronTool(createAgent({ home: root }));
+
+    await tool!.execute("call-1", createUpsertParams({
+      session: {
+        title: "Daily report",
+      },
+    }));
+
+    const parsed = parseCronMarkdown(await readFile(join(root, "cron.md"), "utf8"));
+
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.jobs[0]?.session).toEqual({
+      mode: "attached",
+      id: "daily-report",
+      title: "Daily report",
+    });
+  });
+
   it("resolves current replies to the current endpoint conversation before saving", async () => {
     const root = await createTempDir();
     const [tool] = createCronTool(createAgent({ home: root }), createIncomingMessage());

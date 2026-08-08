@@ -85,6 +85,20 @@ Suche später nochmal.
     expect(result.jobs[0]?.session.mode).toBe("activate");
   });
 
+  it("accepts cron jobs attached to the active agent session", () => {
+    const result = parseCronMarkdown(example.replace('"mode": "detached"', '"mode": "attached"'));
+
+    expect(result.issues).toEqual([]);
+    expect(result.jobs[0]?.session.mode).toBe("attached");
+  });
+
+  it("defaults cron session mode to attached", () => {
+    const result = parseCronMarkdown(example.replace('    "mode": "detached",\n', ""));
+
+    expect(result.issues).toEqual([]);
+    expect(result.jobs[0]?.session.mode).toBe("attached");
+  });
+
   it("renders jobs back as json config in markdown", () => {
     const parsed = parseCronMarkdown(example);
     const rendered = renderCronMarkdown(parsed.jobs);

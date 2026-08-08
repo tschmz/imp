@@ -159,7 +159,9 @@ For the default base prompt, Imp assembles context in this order:
 
 Agents can maintain scheduled jobs in `cron.md` in their agent home. Imp watches this file at runtime and reloads changes without a daemon restart. `cron.md` is intentionally excluded from automatic agent-home Markdown prompt loading, so scheduled instructions are only passed to the agent when the job fires.
 
-Each job is a Markdown section with a JSON fence tagged `json imp-cron`; the Markdown body after the fence is the instruction sent to the agent. The Markdown instruction, `session.id`, and `session.title` support the same Handlebars template variables as prompt files, including `runtime.now.*`, `agent.*`, `conversation.metadata.*`, and `reply.channel.*`.
+Each job is a Markdown section with a JSON fence tagged `json imp-cron`; the Markdown body after the fence is the scheduled user instruction sent to the agent. This instruction is not a replacement system prompt. Write only the recurring task the future run should execute, plus any run-specific context it needs. Do not repeat the agent's persona, standing rules, tool policy, or reply-routing instructions; Imp applies the agent's normal context when the job fires.
+
+The Markdown instruction, `session.id`, and `session.title` support the same Handlebars template variables as prompt files, including `runtime.now.*`, `agent.*`, `conversation.metadata.*`, and `reply.channel.*`.
 
 ````md
 # Imp Cron
@@ -180,9 +182,7 @@ Each job is a Markdown section with a JSON fence tagged `json imp-cron`; the Mar
     }
   },
   "session": {
-    "mode": "detached",
-    "id": "wohnungssuche-{{runtime.now.date}}",
-    "title": "Wohnungssuche {{runtime.now.date}}"
+    "title": "Wohnungssuche"
   }
 }
 ```
@@ -190,9 +190,47 @@ Each job is a Markdown section with a JSON fence tagged `json imp-cron`; the Mar
 Suche nach neuen Wohnungen für {{runtime.now.date}} und fasse relevante Änderungen zusammen.
 ````
 
-Set `reply.type` to `none` to run a scheduled job without response delivery. Schedules use five-field cron syntax: `minute hour day-of-month month day-of-week`.
+Set `reply.type` to `none` to run a scheduled job without response delivery.
 
-Set `session.title` to control the visible title of the session created by the cron job. If omitted, Imp uses the cron job `id` as the session title. Use `session.mode: "detached"` to keep the cron session separate, or `session.mode: "activate"` to create/reuse the named cron session and make it the current interactive session for the agent. The previous active session remains stored; only the active pointer moves. Use a templated `session.id`, for example `report-{{runtime.now.date}}`, when a recurring job should rotate into a fresh session each day.
+### Schedule Syntax
+
+Imp accepts exactly five cron fields:
+
+```text
+minute hour day-of-month month day-of-week
+```
+
+Seconds and predefined aliases such as `@daily` are not supported.
+
+Use the optional `timezone` field with an IANA timezone such as `Europe/Berlin` to control which local time the schedule uses. If omitted, Imp uses the runtime system timezone, falling back to UTC.
+
+| Field | Values |
+| --- | --- |
+| `minute` | `0-59` |
+| `hour` | `0-23` |
+| `day-of-month` | `1-31` |
+| `month` | `1-12` or `JAN-DEC` |
+| `day-of-week` | `0-7` or `SUN-SAT`; `0` and `7` are Sunday, `1` is Monday |
+
+Fields support `*` for any value, comma-separated lists such as `1,3,5`, ranges such as `1-5`, and steps such as `*/15` or `8-18/2`. Named months and weekdays are accepted. `H` can be used for a stable hashed value, for example `H 8 * * *` to spread daily jobs across a stable minute within the 08:00 hour.
+
+When both `day-of-month` and `day-of-week` are restricted, a run matches either field. For example, `0 8 15 * 1` runs at 08:00 on the 15th of the month and on Mondays.
+
+Common examples:
+
+| Schedule | Meaning |
+| --- | --- |
+| `5 0 * * 1` | Every Monday at 00:05 |
+| `0 8 * * *` | Every day at 08:00 |
+| `*/15 8-18 * * 1-5` | Every 15 minutes between 08:00 and 18:59, Monday through Friday |
+| `0 0 1 * *` | At midnight on the first day of every month |
+| `H 8 * * *` | Once per day during the 08:00 hour, with a stable hashed minute |
+
+Set `session.title` to control the visible title used when a cron job creates or activates a session. If omitted, Imp uses the cron job `id` as the title.
+
+`session.mode` defaults to `attached`, which runs the job in the agent's current active session. Use `session.mode: "detached"` to keep the cron session separate, or `session.mode: "activate"` to create/reuse the named cron session and make it the current interactive session for the agent. The previous active session remains stored; only the active pointer moves.
+
+For `detached` and `activate`, set `session.id` to the named cron session. Use a templated `session.id`, for example `report-{{runtime.now.date}}`, when a recurring job should rotate into a fresh session each day. For `attached`, `session.id` is only a cron reference before Imp resolves the active session and can usually be omitted.
 
 ## Complete Example
 

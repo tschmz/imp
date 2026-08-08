@@ -31,8 +31,11 @@ Common built-in tools are:
 | `write` | Create or overwrite files |
 | `update_plan` | Maintain a visible multi-step plan |
 | `attach_file` | Attach a local file to the final response |
+| `cron` | List, create, update, or delete scheduled jobs in the agent home |
 
 `attach_file` accepts a local `path` plus optional `fileName` and `mimeType`. Relative paths are resolved from the agent's current tool working directory. The tool validates that the file is readable and copies it into Imp's export area for the active session before queuing it. Telegram delivers queued files as documents after the text response; CLI chat shows them under `Attachments:`. Agents should not include local paths or `file://` links in the final text because those links are only meaningful on the machine running Imp.
+
+`cron` is available only for agents with an `agent.home` directory. It writes scheduled jobs to `cron.md`; see [Agent Cron Jobs](./agent-context.md#agent-cron-jobs).
 
 A broader coding-agent tool set might look like this:
 
