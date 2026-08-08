@@ -2115,6 +2115,82 @@ describe("createPiAgentEngine", () => {
     expect(close).toHaveBeenCalledTimes(1);
   });
 
+  it("closes uncached HTTP MCP runtimes after each agent run", async () => {
+    const firstClose = vi.fn(async () => {});
+    const secondClose = vi.fn(async () => {});
+    const closeFns = [firstClose, secondClose];
+    let resolveCount = 0;
+    const resolveMcpTools = vi.fn(async () => {
+      const close = closeFns[resolveCount++] ?? vi.fn(async () => {});
+
+      return {
+        tools: [
+          {
+            name: "remote__status",
+            label: "status",
+            description: "check status",
+            parameters: Type.Object({}),
+            async execute() {
+              return {
+                content: [{ type: "text" as const, text: "ok" }],
+                details: {},
+              };
+            },
+          },
+        ],
+        initializedServerIds: ["remote"],
+        failedServerIds: [],
+        close,
+      };
+    });
+    const engine = createPiAgentEngine({
+      resolveModel: () =>
+        ({
+          id: "gpt-5.5",
+          provider: "openai",
+          api: "openai-responses",
+        }) as never,
+      readTextFile: async () => "unused context",
+      resolveMcpTools,
+      createAgent: () => createAgentDouble({ messages: [fauxAssistantMessage("ok")] }),
+    });
+    const mcpAgent = {
+      ...createAgent(),
+      mcp: {
+        servers: [
+          {
+            id: "remote",
+            transport: "http" as const,
+            url: "https://mcp.example.test/mcp",
+          },
+        ],
+      },
+    };
+
+    await engine.run({
+      agent: mcpAgent,
+      conversation: createConversation(),
+      message: createIncomingMessage(),
+    });
+    await engine.run({
+      agent: mcpAgent,
+      conversation: createConversation(),
+      message: {
+        ...createIncomingMessage(),
+        messageId: "3",
+        correlationId: "corr-3",
+      },
+    });
+
+    expect(resolveMcpTools).toHaveBeenCalledTimes(2);
+    expect(firstClose).toHaveBeenCalledTimes(1);
+    expect(secondClose).toHaveBeenCalledTimes(1);
+
+    await engine.close?.();
+    expect(firstClose).toHaveBeenCalledTimes(1);
+    expect(secondClose).toHaveBeenCalledTimes(1);
+  });
+
   it("automatically exposes agent-home plugin tools without restarting the engine", async () => {
     const root = await mkdtemp(join(tmpdir(), "imp-agent-home-plugin-tools-"));
     tempDirs.push(root);

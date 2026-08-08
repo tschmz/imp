@@ -54,9 +54,57 @@ describe("createMcpToolCache", () => {
     await cache.close();
     expect(close).toHaveBeenCalledTimes(1);
   });
+
+  it("does not cache HTTP MCP server runtimes", async () => {
+    const firstClose = vi.fn(async () => {});
+    const secondClose = vi.fn(async () => {});
+    const resolveMcpTools = vi
+      .fn<Parameters<typeof createMcpToolCache>[0]["resolveMcpTools"]>()
+      .mockResolvedValueOnce(createResolution({
+        tools: [createTool("remote__status")],
+        initializedServerIds: ["remote"],
+        close: firstClose,
+      }))
+      .mockResolvedValueOnce(createResolution({
+        tools: [createTool("remote__status")],
+        initializedServerIds: ["remote"],
+        close: secondClose,
+      }));
+    const cache = createMcpToolCache({ resolveMcpTools });
+    const agent = createAgent({
+      id: "remote",
+      transport: "http",
+      url: "https://mcp.example.test/mcp",
+    });
+
+    const first = await cache.resolve(agent);
+    const second = await cache.resolve(agent);
+
+    expect(resolveMcpTools).toHaveBeenCalledTimes(2);
+    expect(first.tools.map((tool) => tool.name)).toEqual(["remote__status"]);
+    expect(second.tools.map((tool) => tool.name)).toEqual(["remote__status"]);
+
+    await first.close();
+    await second.close();
+    expect(firstClose).toHaveBeenCalledTimes(1);
+    expect(secondClose).toHaveBeenCalledTimes(1);
+
+    await cache.close();
+    expect(firstClose).toHaveBeenCalledTimes(1);
+    expect(secondClose).toHaveBeenCalledTimes(1);
+  });
 });
 
-function createAgent(serverId = "flaky"): AgentDefinition {
+function createAgent(
+  server: string | NonNullable<AgentDefinition["mcp"]>["servers"][number] = "flaky",
+): AgentDefinition {
+  const mcpServer = typeof server === "string"
+    ? {
+        id: server,
+        command: "node",
+      }
+    : server;
+
   return {
     id: "default",
     name: "default",
@@ -72,10 +120,7 @@ function createAgent(serverId = "flaky"): AgentDefinition {
     tools: [],
     extensions: [],
     mcp: {
-      servers: [{
-        id: serverId,
-        command: "node",
-      }],
+      servers: [mcpServer],
     },
   };
 }

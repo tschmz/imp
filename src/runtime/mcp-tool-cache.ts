@@ -35,8 +35,30 @@ export function createMcpToolCache(options: {
         };
       }
 
+      const runOwnedResolutions: ResolvedMcpTools[] = [];
       const resolutions = await Promise.all(
         servers.map(async (server) => {
+          if (!isCacheableServer(server)) {
+            await options.logger?.debug(`initializing uncached MCP runtime for server "${server.id}"`);
+            const resolution = await options.resolveMcpTools(
+              {
+                ...agent,
+                mcp: {
+                  servers: [server],
+                },
+              },
+              { logger: options.logger },
+            );
+            runOwnedResolutions.push(resolution);
+            if (resolution.failedServerIds.includes(server.id)) {
+              await options.logger?.debug(`not caching failed MCP runtime for server "${server.id}"`);
+            } else {
+              await options.logger?.debug(`uncached MCP runtime ready for server "${server.id}"`);
+            }
+
+            return resolution;
+          }
+
           const cacheKey = createServerCacheKey(server);
           const cached = cache.get(cacheKey);
           if (cached) {
@@ -82,7 +104,7 @@ export function createMcpToolCache(options: {
         initializedServerIds: resolutions.flatMap((resolution) => resolution.initializedServerIds),
         failedServerIds: resolutions.flatMap((resolution) => resolution.failedServerIds),
         async close() {
-          // Shared server runtimes are owned by the cache and closed by cache.close().
+          await Promise.all(runOwnedResolutions.map(async (resolution) => resolution.close()));
         },
       };
     },
@@ -106,6 +128,10 @@ export function createMcpToolCache(options: {
       await options.logger?.debug("closed cached MCP runtimes");
     },
   };
+}
+
+function isCacheableServer(server: AgentMcpServerConfig): boolean {
+  return server.transport !== "http";
 }
 
 function createServerCacheKey(server: AgentMcpServerConfig): string {

@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport, type StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { CompatibilityCallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type {
   AgentDefinition,
@@ -58,6 +59,13 @@ interface McpClientLike {
     name: string;
     arguments?: Record<string, unknown>;
   }): Promise<McpCallToolSuccess | McpCallToolCompatibilityResult>;
+  request?(request: {
+    method: "tools/call";
+    params: {
+      name: string;
+      arguments?: Record<string, unknown>;
+    };
+  }, resultSchema: typeof CompatibilityCallToolResultSchema): Promise<McpCallToolSuccess | McpCallToolCompatibilityResult>;
   close(): Promise<void>;
 }
 
@@ -253,7 +261,7 @@ function createMcpToolDefinition(
     description: tool.description ?? `Tool imported from MCP server "${serverId}".`,
     parameters: normalizeToolSchema(tool.inputSchema),
     async execute(_toolCallId, params) {
-      const result = await client.callTool({
+      const result = await callMcpTool(client, {
         name: tool.name,
         ...(isRecord(params) ? { arguments: params } : {}),
       });
@@ -291,6 +299,23 @@ function createMcpToolDefinition(
       };
     },
   };
+}
+
+async function callMcpTool(
+  client: McpClientLike,
+  params: {
+    name: string;
+    arguments?: Record<string, unknown>;
+  },
+): Promise<McpCallToolSuccess | McpCallToolCompatibilityResult> {
+  if (client.request) {
+    return client.request({
+      method: "tools/call",
+      params,
+    }, CompatibilityCallToolResultSchema);
+  }
+
+  return client.callTool(params);
 }
 
 function normalizeToolSchema(inputSchema: Record<string, unknown> | undefined): ToolDefinition["parameters"] {

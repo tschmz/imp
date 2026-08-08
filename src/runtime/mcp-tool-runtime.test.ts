@@ -93,6 +93,80 @@ describe("resolveMcpTools", () => {
     }
   });
 
+  it("uses raw MCP requests for tool calls to avoid output schema validation failures", async () => {
+    const request = vi.fn(async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+      structuredContent: {
+        extra: true,
+      },
+    }));
+    const callTool = vi.fn(async () => {
+      throw new Error("callTool should not be used");
+    });
+    const createClient = vi.fn(() => ({
+      connect: vi.fn(async () => {}),
+      listTools: vi.fn(async () => ({
+        tools: [{
+          name: "schema_tool",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+          outputSchema: {
+            type: "object",
+            properties: {},
+            additionalProperties: false,
+          },
+        }],
+      })),
+      request,
+      callTool,
+      close: vi.fn(async () => {}),
+    }));
+
+    const resolution = await resolveMcpTools(
+      createAgent({
+        mcp: {
+          servers: [{
+            id: "echo",
+            command: "node",
+          }],
+        },
+      }),
+      {
+        createClient,
+        createTransport: vi.fn((server) => server),
+      },
+    );
+
+    try {
+      const tool = resolution.tools.find((item) => item.name === "echo__schema_tool");
+      await expect(tool?.execute("2", {})).resolves.toMatchObject({
+        content: [{ type: "text", text: "ok" }],
+        details: {
+          serverId: "echo",
+          toolName: "schema_tool",
+          structuredContent: {
+            extra: true,
+          },
+        },
+      });
+      expect(callTool).not.toHaveBeenCalled();
+      expect(request).toHaveBeenCalledWith(
+        {
+          method: "tools/call",
+          params: {
+            name: "schema_tool",
+            arguments: {},
+          },
+        },
+        expect.any(Object),
+      );
+    } finally {
+      await resolution.close();
+    }
+  });
+
   it("logs MCP startup failures and skips the broken server", async () => {
     const logger = createMockLogger();
 

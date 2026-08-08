@@ -39,6 +39,7 @@ export interface ResolvedRuntimeTools {
   initialWorkingDirectory: string;
   attachmentCollector: AttachmentCollector;
   toolResolution: RuntimeToolResolutionDetails;
+  close(): Promise<void>;
 }
 
 export interface ResolveToolsStageContext extends ResolvePromptStageContext {
@@ -47,6 +48,7 @@ export interface ResolveToolsStageContext extends ResolvePromptStageContext {
   initialWorkingDirectory: string;
   attachmentCollector: AttachmentCollector;
   toolResolution: RuntimeToolResolutionDetails;
+  close(): Promise<void>;
 }
 
 export async function resolveToolsStage(
@@ -157,29 +159,35 @@ export async function resolveRuntimeTools(
   const mcpToolResolution = await dependencies.mcpToolCache.resolve(context.agent);
   const configuredMcpServers = context.agent.mcp?.servers.map((server) => server.id) ?? [];
   const resolvedMcpTools = mcpToolResolution.tools.map((tool) => tool.name);
-  validateResolvedToolNames(context.agent.id, {
-    builtIn: resolvedBuiltInTools,
-    delegation: resolvedDelegationTools,
-    mcp: resolvedMcpTools,
-  });
-  const resolvedTools = [...resolvedBuiltInTools, ...resolvedDelegationTools, ...resolvedMcpTools];
+  try {
+    validateResolvedToolNames(context.agent.id, {
+      builtIn: resolvedBuiltInTools,
+      delegation: resolvedDelegationTools,
+      mcp: resolvedMcpTools,
+    });
+    const resolvedTools = [...resolvedBuiltInTools, ...resolvedDelegationTools, ...resolvedMcpTools];
 
-  return {
-    initialWorkingDirectory,
-    workingDirectoryState,
-    attachmentCollector,
-    toolResolution: {
-      configuredBuiltInTools,
-      resolvedBuiltInTools,
-      missingBuiltInTools,
-      configuredMcpServers,
-      initializedMcpServers: mcpToolResolution.initializedServerIds,
-      failedMcpServers: mcpToolResolution.failedServerIds,
-      resolvedMcpTools,
-      resolvedTools,
-    },
-    tools: [...builtInTools, ...delegationTools, ...mcpToolResolution.tools],
-  };
+    return {
+      initialWorkingDirectory,
+      workingDirectoryState,
+      attachmentCollector,
+      toolResolution: {
+        configuredBuiltInTools,
+        resolvedBuiltInTools,
+        missingBuiltInTools,
+        configuredMcpServers,
+        initializedMcpServers: mcpToolResolution.initializedServerIds,
+        failedMcpServers: mcpToolResolution.failedServerIds,
+        resolvedMcpTools,
+        resolvedTools,
+      },
+      tools: [...builtInTools, ...delegationTools, ...mcpToolResolution.tools],
+      close: mcpToolResolution.close,
+    };
+  } catch (error) {
+    await mcpToolResolution.close();
+    throw error;
+  }
 }
 
 function resolveTurnBuiltInTools(

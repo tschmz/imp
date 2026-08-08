@@ -87,13 +87,17 @@ export function createAgentRuntimeSurfaceResolver(dependencies: {
       runDelegatedAgent: dependencies.agentRegistry ? inspectOnlyDelegatedAgentRun : undefined,
     });
 
-    return {
-      tools: toolResolution.toolResolution.resolvedTools,
-      skills: skillResolution.skills.map((skill) => skill.name),
-      missingBuiltInTools: toolResolution.toolResolution.missingBuiltInTools,
-      failedMcpServers: toolResolution.toolResolution.failedMcpServers,
-      skillIssues: skillResolution.issues,
-    };
+    try {
+      return {
+        tools: toolResolution.toolResolution.resolvedTools,
+        skills: skillResolution.skills.map((skill) => skill.name),
+        missingBuiltInTools: toolResolution.toolResolution.missingBuiltInTools,
+        failedMcpServers: toolResolution.toolResolution.failedMcpServers,
+        skillIssues: skillResolution.issues,
+      };
+    } finally {
+      await toolResolution.close();
+    }
   };
 }
 

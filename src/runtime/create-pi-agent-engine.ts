@@ -211,12 +211,17 @@ export function createPiAgentEngine(
       });
 
       await logPipelineEvent(logger, context, { step: "agent-execution", status: "started" });
-      const executionContext = await executeAgentStage(toolContext, {
-        createAgent: dependencies.createAgent,
-        getApiKey: dependencies.getApiKey,
+      const executionContext = await runWithResolvedToolCleanup(
+        toolContext,
+        () => executeAgentStage(toolContext, {
+          createAgent: dependencies.createAgent,
+          getApiKey: dependencies.getApiKey,
+          logger,
+          logContext: context,
+        }),
         logger,
-        logContext: context,
-      });
+        context,
+      );
       await logPipelineEvent(logger, context, { step: "agent-execution", status: "completed" });
 
       await logPipelineEvent(logger, context, {
@@ -274,6 +279,27 @@ export function createPiAgentEngine(
       await mcpToolCache.close();
     },
   };
+}
+
+async function runWithResolvedToolCleanup<T>(
+  toolContext: { close(): Promise<void> },
+  run: () => Promise<T>,
+  logger: Logger | undefined,
+  context: EngineLogContext,
+): Promise<T> {
+  try {
+    return await run();
+  } finally {
+    try {
+      await toolContext.close();
+    } catch (error) {
+      await logger?.error("failed to close resolved MCP tool runtimes", {
+        event: "agent.tools.mcp.close_failed",
+        component: "agent-engine",
+        ...context,
+      }, error);
+    }
+  }
 }
 
 async function logSystemPromptSources(
