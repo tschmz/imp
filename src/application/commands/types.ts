@@ -8,6 +8,7 @@ import { readRecentLogLines } from "../../logging/view-logs.js";
 import type { HookRegistration, InboundMessageLifecycleHooks } from "../../extensions/types.js";
 import type { ReplyChannelContext } from "../../runtime/context.js";
 import type { AgentEngine } from "../../runtime/types.js";
+import type { ModelProviderLogin } from "./login-command.js";
 import type { ModelResolver } from "../../runtime/model-resolution.js";
 import type { ConversationStore } from "../../storage/types.js";
 
@@ -48,6 +49,7 @@ export interface HandleIncomingMessageDependencies {
   readRecentLogLines?: typeof readRecentLogLines;
   resolveModel?: ModelResolver;
   inboundMessageHooks?: ReadonlyArray<HookRegistration<InboundMessageLifecycleHooks>>;
+  loginModelProvider?: ModelProviderLogin;
   logger?: Logger;
 }
 
@@ -56,6 +58,7 @@ export interface InboundCommandContext {
   dependencies: HandleIncomingMessageDependencies;
   loadAppConfig: typeof loadAppConfig;
   readRecentLogLines: typeof readRecentLogLines;
+  deliverProgress?: (message: OutgoingMessage) => Promise<void> | void;
   logger?: Logger;
 }
 

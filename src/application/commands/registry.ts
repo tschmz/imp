@@ -8,6 +8,7 @@ import { forkCommandHandler } from "./fork-command.js";
 import { helpCommandHandler } from "./help-command.js";
 import { historyCommandHandler } from "./history-command.js";
 import { logsCommandHandler } from "./logs-command.js";
+import { loginCommandHandler } from "./login-command.js";
 import { newCommandHandler } from "./new-command.js";
 import { pingCommandHandler } from "./ping-command.js";
 import { reloadCommandHandler } from "./reload-command.js";
@@ -36,6 +37,7 @@ export const inboundCommandHandlers: InboundCommandHandler[] = [
   configCommandHandler,
   agentCommandHandler,
   logsCommandHandler,
+  loginCommandHandler,
   reloadCommandHandler,
   restartCommandHandler,
 ];

@@ -15,6 +15,7 @@ export type IncomingMessageCommand =
   | "compact"
   | "export"
   | "ping"
+  | "login"
   | "config"
   | "agent"
   | "logs"

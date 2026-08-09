@@ -39,6 +39,7 @@ export async function dispatchCommand(
     logger: commandContext.dependencies.logger,
     loadAppConfig: commandContext.loadAppConfig,
     readRecentLogLines: commandContext.readRecentLogLines,
+    deliverProgress: commandContext.deliverProgress,
   });
 
   return commandResponse

@@ -149,6 +149,7 @@ export function createCommandContext(
       throw new Error("not used");
     }),
     readRecentLogLines: overrides.readRecentLogLines ?? (async () => []),
+    deliverProgress: overrides.deliverProgress,
     logger: overrides.logger,
   };
 }
