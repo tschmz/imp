@@ -77,6 +77,12 @@ Enable it for an agent while keeping selected built-in tools:
 imp config set agents.default.tools '{"builtIn":["read","bash"],"mcp":{"servers":["github"]}}'
 ```
 
+Filter tools from a server for one agent by using an object reference. Without `includeTools` or `excludeTools`, all tools from the server are available. Tool filter names are the raw MCP tool names, not the Imp-prefixed names:
+
+```sh
+imp config set agents.default.tools '{"mcp":{"servers":[{"id":"github","includeTools":["search_issues"],"excludeTools":["delete_issue"]}]}}'
+```
+
 Imp prefixes MCP tool names with the server ID to avoid collisions. For HTTP servers, use `bearerToken` instead of setting an `Authorization` header manually.
 
 ## Delegated Agents

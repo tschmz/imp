@@ -504,6 +504,100 @@ describe("appConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts agent-side MCP tool filters", () => {
+    const result = appConfigSchema.safeParse(
+      {
+        ...createConfig({
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.5",
+          },
+          tools: {
+            mcp: {
+              servers: [
+                {
+                  id: "echo",
+                  includeTools: ["say"],
+                  excludeTools: ["fail"],
+                },
+              ],
+            },
+          },
+        }),
+        tools: {
+          mcp: {
+            servers: [
+              {
+                id: "echo",
+                command: "node",
+              },
+            ],
+          },
+        },
+      },
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects MCP tool filters that include and exclude the same tool", () => {
+    const result = appConfigSchema.safeParse(
+      {
+        ...createConfig({
+          id: "default",
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.5",
+          },
+          tools: {
+            mcp: {
+              servers: [
+                {
+                  id: "echo",
+                  includeTools: ["say"],
+                  excludeTools: ["say"],
+                },
+              ],
+            },
+          },
+        }),
+        tools: {
+          mcp: {
+            servers: [
+              {
+                id: "echo",
+                command: "node",
+              },
+            ],
+          },
+        },
+      },
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected schema validation to fail.");
+    }
+
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["agents", 0, "tools", "mcp", "servers", 0, "excludeTools", 0],
+        message: 'MCP tool "say" cannot be both included and excluded for server "echo".',
+      }),
+    );
+  });
+
   it("rejects HTTP MCP headers managed by the transport", () => {
     const result = appConfigSchema.safeParse(
       {

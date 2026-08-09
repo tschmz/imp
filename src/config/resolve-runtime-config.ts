@@ -3,6 +3,7 @@ import type {
   AgentDelegationConfig,
   AgentMcpConfig,
   AgentMcpServerConfig,
+  AgentMcpToolFilter,
   AgentPhoneCallConfig,
   AgentPromptConfig,
   AgentWorkspaceConfig,
@@ -303,19 +304,51 @@ async function resolveAgentMcpConfig(
   options: ResolveRuntimeConfigOptions,
 ): Promise<AgentMcpConfig> {
   return {
-    servers: await Promise.all(mcp.servers.map(async (serverId) => {
+    servers: await Promise.all(mcp.servers.map(async (serverRef) => {
+      const serverId = getAgentMcpServerReferenceId(serverRef);
       const server = mcpServers.get(serverId);
       if (!server) {
         throw new Error(`Unknown MCP server id "${serverId}".`);
       }
 
-      return resolveAgentMcpServerSecrets(
+      const resolvedServer = await resolveAgentMcpServerSecrets(
         renderAgentMcpServerTemplates(server, agent),
         configDir,
         options,
       );
+
+      return applyAgentMcpToolFilter(
+        resolvedServer,
+        resolveAgentMcpToolFilter(serverRef),
+      );
     })),
   };
+}
+
+function getAgentMcpServerReferenceId(serverRef: AgentMcpToolsConfig["servers"][number]): string {
+  return typeof serverRef === "string" ? serverRef : serverRef.id;
+}
+
+function resolveAgentMcpToolFilter(
+  serverRef: AgentMcpToolsConfig["servers"][number],
+): AgentMcpToolFilter | undefined {
+  if (typeof serverRef === "string") {
+    return undefined;
+  }
+
+  const filter = {
+    ...(serverRef.includeTools ? { include: serverRef.includeTools } : {}),
+    ...(serverRef.excludeTools ? { exclude: serverRef.excludeTools } : {}),
+  };
+
+  return Object.keys(filter).length > 0 ? filter : undefined;
+}
+
+function applyAgentMcpToolFilter(
+  server: AgentMcpServerConfig,
+  toolFilter: AgentMcpToolFilter | undefined,
+): AgentMcpServerConfig {
+  return toolFilter ? { ...server, toolFilter } : server;
 }
 
 function renderAgentMcpServerTemplates(

@@ -142,6 +142,7 @@ function createServerCacheKey(server: AgentMcpServerConfig): string {
       url: server.url,
       headers: fingerprintRecord(server.headers ?? {}),
       bearerToken: fingerprintOptionalString(server.bearerToken),
+      toolFilter: sortToolFilter(server.toolFilter),
     });
   }
 
@@ -153,6 +154,7 @@ function createServerCacheKey(server: AgentMcpServerConfig): string {
     cwd: server.cwd,
     inheritEnv: server.inheritEnv ?? [],
     env: sortRecord(server.env ?? {}),
+    toolFilter: sortToolFilter(server.toolFilter),
   });
 }
 
@@ -174,4 +176,17 @@ function fingerprintOptionalString(value: string | undefined): string | undefine
 
 function fingerprintString(value: string): string {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function sortToolFilter(
+  toolFilter: AgentMcpServerConfig["toolFilter"],
+): AgentMcpServerConfig["toolFilter"] {
+  if (!toolFilter) {
+    return undefined;
+  }
+
+  return {
+    ...(toolFilter.include ? { include: [...toolFilter.include].sort() } : {}),
+    ...(toolFilter.exclude ? { exclude: [...toolFilter.exclude].sort() } : {}),
+  };
 }

@@ -93,6 +93,64 @@ describe("resolveMcpTools", () => {
     }
   });
 
+  it("filters MCP tools per configured server reference", async () => {
+    const createClient = vi.fn(() => ({
+      connect: vi.fn(async () => {}),
+      listTools: vi.fn(async () => ({
+        tools: [
+          {
+            name: "say",
+            inputSchema: {
+              type: "object",
+              properties: {},
+            },
+          },
+          {
+            name: "fail",
+            inputSchema: {
+              type: "object",
+              properties: {},
+            },
+          },
+          {
+            name: "status",
+            inputSchema: {
+              type: "object",
+              properties: {},
+            },
+          },
+        ],
+      })),
+      callTool: vi.fn(async () => ({ content: [] })),
+      close: vi.fn(async () => {}),
+    }));
+
+    const resolution = await resolveMcpTools(
+      createAgent({
+        mcp: {
+          servers: [{
+            id: "echo",
+            command: "node",
+            toolFilter: {
+              include: ["say", "fail"],
+              exclude: ["fail"],
+            },
+          }],
+        },
+      }),
+      {
+        createClient,
+        createTransport: vi.fn((server) => server),
+      },
+    );
+
+    try {
+      expect(resolution.tools.map((tool) => tool.name)).toEqual(["echo__say"]);
+    } finally {
+      await resolution.close();
+    }
+  });
+
   it("uses raw MCP requests for tool calls to avoid output schema validation failures", async () => {
     const request = vi.fn(async () => ({
       content: [{ type: "text" as const, text: "ok" }],

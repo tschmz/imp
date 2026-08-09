@@ -5,7 +5,7 @@ import { createCommandToolDefinitions, type CommandToolRuntimeConfig } from "../
 import { loadJsPluginToolDefinitions, resolvePluginJsRuntime } from "../runtime/js-plugin.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { resolveConfigPath, type SecretValueConfig } from "./secret-value.js";
-import type { AgentConfig, AppConfig, McpServerConfig } from "./types.js";
+import type { AgentConfig, AgentMcpServerReferenceConfig, AppConfig, McpServerConfig } from "./types.js";
 
 export interface LoadedRuntimePlugins {
   skillPaths: string[];
@@ -255,7 +255,7 @@ function resolvePluginAgentTools(
       ? { builtIn: tools.builtIn.map((toolName) => namespacePluginReference(manifest.id, toolName, localToolNames)) }
       : {}),
     ...(tools.mcp
-      ? { mcp: { servers: tools.mcp.servers.map((serverId) => namespacePluginMcpReference(manifest.id, serverId, localMcpServerIds)) } }
+      ? { mcp: { servers: tools.mcp.servers.map((serverRef) => namespacePluginMcpReference(manifest.id, serverRef, localMcpServerIds)) } }
       : {}),
     ...(tools.phone ? { phone: tools.phone } : {}),
     ...(tools.agents
@@ -307,7 +307,23 @@ function namespacePluginToolId(pluginId: string, id: string): string {
   return `${pluginId}__${id}`;
 }
 
-function namespacePluginMcpReference(pluginId: string, id: string, localIds: Set<string>): string {
+function namespacePluginMcpReference(
+  pluginId: string,
+  serverRef: AgentMcpServerReferenceConfig,
+  localIds: Set<string>,
+): AgentMcpServerReferenceConfig {
+  const id = typeof serverRef === "string" ? serverRef : serverRef.id;
+  const namespacedId = namespacePluginMcpReferenceId(pluginId, id, localIds);
+
+  return typeof serverRef === "string"
+    ? namespacedId
+    : {
+        ...serverRef,
+        id: namespacedId,
+      };
+}
+
+function namespacePluginMcpReferenceId(pluginId: string, id: string, localIds: Set<string>): string {
   return !id.includes(".") && localIds.has(id) ? namespacePluginId(pluginId, id) : id;
 }
 

@@ -155,6 +155,15 @@ const promptSourceSchema = z
     }
   });
 
+const pluginAgentMcpServerReferenceSchema = z.union([
+  z.string().min(1),
+  z.object({
+    id: z.string().min(1),
+    includeTools: z.string().min(1).array().min(1).optional(),
+    excludeTools: z.string().min(1).array().min(1).optional(),
+  }).strict(),
+]);
+
 const pluginAgentSchema: z.ZodType<PluginAgentManifest> = z.object({
   id: pluginIdentifierSchema,
   name: z.string().min(1).optional(),
@@ -193,7 +202,7 @@ const pluginAgentSchema: z.ZodType<PluginAgentManifest> = z.object({
     z.string().min(1).array(),
     z.object({
       builtIn: z.string().min(1).array().optional(),
-      mcp: z.object({ servers: z.string().min(1).array().min(1) }).optional(),
+      mcp: z.object({ servers: pluginAgentMcpServerReferenceSchema.array().min(1) }).optional(),
       agents: z
         .object({
           agentId: z.string().min(1),

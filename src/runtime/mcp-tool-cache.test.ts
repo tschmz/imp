@@ -55,6 +55,41 @@ describe("createMcpToolCache", () => {
     expect(close).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps filtered MCP server runtimes separate in the cache", async () => {
+    const resolveMcpTools = vi
+      .fn<Parameters<typeof createMcpToolCache>[0]["resolveMcpTools"]>()
+      .mockResolvedValueOnce(createResolution({
+        tools: [createTool("stable__status")],
+        initializedServerIds: ["stable"],
+      }))
+      .mockResolvedValueOnce(createResolution({
+        tools: [createTool("stable__health")],
+        initializedServerIds: ["stable"],
+      }));
+    const cache = createMcpToolCache({ resolveMcpTools });
+
+    const first = await cache.resolve(createAgent({
+      id: "stable",
+      command: "node",
+      toolFilter: {
+        include: ["status"],
+      },
+    }));
+    const second = await cache.resolve(createAgent({
+      id: "stable",
+      command: "node",
+      toolFilter: {
+        include: ["health"],
+      },
+    }));
+
+    expect(resolveMcpTools).toHaveBeenCalledTimes(2);
+    expect(first.tools.map((tool) => tool.name)).toEqual(["stable__status"]);
+    expect(second.tools.map((tool) => tool.name)).toEqual(["stable__health"]);
+
+    await cache.close();
+  });
+
   it("does not cache HTTP MCP server runtimes", async () => {
     const firstClose = vi.fn(async () => {});
     const secondClose = vi.fn(async () => {});

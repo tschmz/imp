@@ -195,4 +195,39 @@ describe("pluginManifestSchema", () => {
       ],
     });
   });
+
+  it("accepts MCP tool filters for plugin agents", () => {
+    const result = pluginManifestSchema.safeParse({
+      schemaVersion: 1,
+      id: "notes",
+      name: "Notes",
+      version: "0.1.0",
+      mcpServers: [
+        {
+          id: "vault",
+          command: "node",
+          args: ["server.mjs"],
+        },
+      ],
+      agents: [
+        {
+          id: "assistant",
+          prompt: { base: { text: "Notes" } },
+          tools: {
+            mcp: {
+              servers: [
+                {
+                  id: "vault",
+                  includeTools: ["search"],
+                  excludeTools: ["delete_note"],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
 });

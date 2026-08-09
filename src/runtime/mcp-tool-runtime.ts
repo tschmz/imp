@@ -125,8 +125,9 @@ export async function resolveMcpTools(
     try {
       await client.connect(transport);
       const listedTools = await listAllTools(client);
+      const availableTools = filterMcpTools(listedTools, server.toolFilter);
 
-      for (const tool of listedTools) {
+      for (const tool of availableTools) {
         tools.push(createMcpToolDefinition(server.id, tool, client));
       }
 
@@ -246,6 +247,23 @@ async function listAllTools(client: McpClientLike): Promise<McpListedTool[]> {
   } while (cursor);
 
   return tools;
+}
+
+function filterMcpTools(
+  tools: McpListedTool[],
+  toolFilter: NonNullable<AgentDefinition["mcp"]>["servers"][number]["toolFilter"],
+): McpListedTool[] {
+  if (!toolFilter) {
+    return tools;
+  }
+
+  const includedTools = toolFilter.include ? new Set(toolFilter.include) : undefined;
+  const excludedTools = new Set(toolFilter.exclude ?? []);
+
+  return tools.filter((tool) =>
+    (includedTools === undefined || includedTools.has(tool.name)) &&
+    !excludedTools.has(tool.name),
+  );
 }
 
 function createMcpToolDefinition(

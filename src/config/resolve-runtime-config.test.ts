@@ -1176,6 +1176,74 @@ describe("resolveRuntimeConfig", () => {
     });
   });
 
+  it("resolves agent-side MCP tool filters onto the referenced server", async () => {
+    const appConfig = createAppConfig({
+      tools: {
+        mcp: {
+          servers: [
+            {
+              id: "echo",
+              command: "node",
+              args: ["./server.mjs"],
+            },
+          ],
+        },
+      },
+      agents: [
+        {
+          id: "default",
+          model: {
+            provider: "openai",
+            modelId: "gpt-5.5",
+          },
+          prompt: {
+            base: {
+              text: "You are concise.",
+            },
+          },
+          tools: {
+            mcp: {
+              servers: [
+                {
+                  id: "echo",
+                  includeTools: ["say"],
+                  excludeTools: ["fail"],
+                },
+              ],
+            },
+          },
+        },
+      ],
+      endpoints: [
+        {
+          id: "private-telegram",
+          type: "telegram",
+          enabled: true,
+          token: "telegram-token",
+          access: {
+            allowedUserIds: [],
+          },
+        },
+      ],
+    });
+
+    const result = await resolveRuntimeConfig(appConfig, "/etc/imp/config.json");
+
+    expect(result.agents[0]?.mcp).toEqual({
+      servers: [
+        {
+          id: "echo",
+          command: "node",
+          args: ["./server.mjs"],
+          toolFilter: {
+            include: ["say"],
+            exclude: ["fail"],
+          },
+        },
+      ],
+    });
+  });
+
   it("resolves HTTP MCP bearer token references and agent templates", async () => {
     const appConfig = createAppConfig({
       tools: {

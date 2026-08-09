@@ -102,6 +102,57 @@ describe("loadRuntimePlugins", () => {
     ]);
   });
 
+  it("namespaces plugin agent MCP server references while preserving tool filters", async () => {
+    const root = await createTempDir();
+    vi.stubEnv("HOME", join(root, "home"));
+    const dataRoot = join(root, "state");
+    const pluginRoot = join(dataRoot, "plugins", "notes");
+    await writePluginManifest(pluginRoot, {
+      schemaVersion: 1,
+      id: "notes",
+      name: "Notes",
+      version: "0.1.0",
+      mcpServers: [
+        {
+          id: "vault",
+          command: "node",
+          args: ["server.mjs"],
+        },
+      ],
+      agents: [
+        {
+          id: "assistant",
+          prompt: { base: { text: "Notes" } },
+          tools: {
+            mcp: {
+              servers: [
+                {
+                  id: "vault",
+                  includeTools: ["search"],
+                  excludeTools: ["delete_note"],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+
+    const result = await loadRuntimePlugins(createAppConfig(dataRoot), join(root, "config"));
+
+    expect(result.agents[0]?.tools).toEqual({
+      mcp: {
+        servers: [
+          {
+            id: "notes.vault",
+            includeTools: ["search"],
+            excludeTools: ["delete_note"],
+          },
+        ],
+      },
+    });
+  });
+
   it("omits plugin config agents that are shadowed by configured agents", async () => {
     const root = await createTempDir();
     vi.stubEnv("HOME", join(root, "home"));

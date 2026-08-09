@@ -29,6 +29,11 @@ export interface AgentSkillsConfig {
 
 export type AgentMcpServerConfig = AgentMcpStdioServerConfig | AgentMcpHttpServerConfig;
 
+export interface AgentMcpToolFilter {
+  include?: string[];
+  exclude?: string[];
+}
+
 export interface AgentMcpStdioServerConfig {
   id: string;
   transport?: "stdio";
@@ -37,6 +42,7 @@ export interface AgentMcpStdioServerConfig {
   inheritEnv?: string[];
   env?: Record<string, string>;
   cwd?: string;
+  toolFilter?: AgentMcpToolFilter;
 }
 
 export interface AgentMcpHttpServerConfig {
@@ -45,6 +51,7 @@ export interface AgentMcpHttpServerConfig {
   url: string;
   headers?: Record<string, string>;
   bearerToken?: string;
+  toolFilter?: AgentMcpToolFilter;
 }
 
 export interface AgentMcpConfig {

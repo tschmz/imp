@@ -79,13 +79,23 @@ const mcpServerIdSchema = z
     "MCP server ids may only contain letters, numbers, hyphens, and underscores.",
   );
 
-const mcpServerReferenceSchema = z
+const mcpServerReferenceIdSchema = z
   .string()
   .min(1)
   .regex(
     /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?$/,
     "MCP server references may only contain letters, numbers, hyphens, underscores, and one plugin namespace dot.",
   );
+const mcpToolNameSchema = z.string().min(1);
+const mcpServerReferenceObjectSchema = z.object({
+  id: mcpServerReferenceIdSchema,
+  includeTools: mcpToolNameSchema.array().min(1).optional(),
+  excludeTools: mcpToolNameSchema.array().min(1).optional(),
+}).strict().superRefine(validateMcpToolFilter);
+const mcpServerReferenceSchema = z.union([
+  mcpServerReferenceIdSchema,
+  mcpServerReferenceObjectSchema,
+]);
 
 const mcpHttpReservedHeaderNames = new Set([
   "authorization",
@@ -112,6 +122,47 @@ function getMcpHttpReservedHeaderMessage(name: string): string {
   return name.toLowerCase() === "authorization"
     ? `HTTP MCP header "${name}" is managed by the MCP transport. Use bearerToken instead.`
     : `HTTP MCP header "${name}" is managed by the MCP transport and cannot be configured manually.`;
+}
+
+function validateMcpToolFilter(
+  filter: { id: string; includeTools?: string[]; excludeTools?: string[] },
+  ctx: RefinementContext<{ id: string; includeTools?: string[]; excludeTools?: string[] }>,
+): void {
+  addDuplicateMcpToolFilterIssues(filter.includeTools ?? [], "includeTools", ctx);
+  addDuplicateMcpToolFilterIssues(filter.excludeTools ?? [], "excludeTools", ctx);
+
+  const includedTools = new Set(filter.includeTools ?? []);
+  for (const [index, toolName] of (filter.excludeTools ?? []).entries()) {
+    if (!includedTools.has(toolName)) {
+      continue;
+    }
+
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["excludeTools", index],
+      message: `MCP tool "${toolName}" cannot be both included and excluded for server "${filter.id}".`,
+    });
+  }
+}
+
+function addDuplicateMcpToolFilterIssues(
+  toolNames: string[],
+  fieldName: "includeTools" | "excludeTools",
+  ctx: RefinementContext<{ id: string; includeTools?: string[]; excludeTools?: string[] }>,
+): void {
+  const seen = new Set<string>();
+  for (const [index, toolName] of toolNames.entries()) {
+    if (seen.has(toolName)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [fieldName, index],
+        message: `Duplicate MCP tool name "${toolName}" in ${fieldName}. Tool names must be unique per MCP server filter.`,
+      });
+      continue;
+    }
+
+    seen.add(toolName);
+  }
 }
 
 const mcpStdioServerConfigSchema = z.object({
@@ -300,11 +351,12 @@ function validateAgentToolsConfig(
   }
 
   const serverRefs = new Set<string>();
-  for (const [index, serverId] of (tools.mcp?.servers ?? []).entries()) {
+  for (const [index, serverRef] of (tools.mcp?.servers ?? []).entries()) {
+    const serverId = getMcpServerReferenceId(serverRef);
     if (serverRefs.has(serverId)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["mcp", "servers", index],
+        path: ["mcp", "servers", index, ...getMcpServerReferencePath(serverRef)],
         message: `Duplicate MCP server reference "${serverId}". MCP server references must be unique per agent.`,
       });
       continue;
@@ -445,18 +497,27 @@ function validateAgentMcpServerReferences(
       continue;
     }
 
-    for (const [serverIndex, serverId] of (agent.tools?.mcp?.servers ?? []).entries()) {
+    for (const [serverIndex, serverRef] of (agent.tools?.mcp?.servers ?? []).entries()) {
+      const serverId = getMcpServerReferenceId(serverRef);
       if (mcpServerIds.has(serverId) || isNamespacedReference(serverId)) {
         continue;
       }
 
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["agents", agentIndex, "tools", "mcp", "servers", serverIndex],
+        path: ["agents", agentIndex, "tools", "mcp", "servers", serverIndex, ...getMcpServerReferencePath(serverRef)],
         message: `Unknown MCP server id "${serverId}" for agent "${agent.id}".`,
       });
     }
   }
+}
+
+function getMcpServerReferenceId(serverRef: string | { id: string }): string {
+  return typeof serverRef === "string" ? serverRef : serverRef.id;
+}
+
+function getMcpServerReferencePath(serverRef: string | { id: string }): string[] {
+  return typeof serverRef === "string" ? [] : ["id"];
 }
 
 function validateAgentDelegationReferences(

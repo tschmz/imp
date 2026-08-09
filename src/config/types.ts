@@ -57,7 +57,15 @@ export interface ToolsConfig {
 }
 
 export interface AgentMcpToolsConfig {
-  servers: string[];
+  servers: AgentMcpServerReferenceConfig[];
+}
+
+export type AgentMcpServerReferenceConfig = string | AgentMcpServerReferenceObjectConfig;
+
+export interface AgentMcpServerReferenceObjectConfig {
+  id: string;
+  includeTools?: string[];
+  excludeTools?: string[];
 }
 
 export interface AgentDelegationToolConfig {
