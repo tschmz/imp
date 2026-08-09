@@ -71,7 +71,14 @@
         ],
         "agents": [
           {
-            "agentId": "ops"
+            "agentId": "ops",
+            "toolName": "ask_ops",
+            "description": "Delegate operational diagnostics, deployment checks, and remediation planning to the ops specialist."
+          },
+          {
+            "agentId": "researcher",
+            "toolName": "research_docs",
+            "description": "Delegate focused documentation or codebase research to a read-only research specialist."
           }
         ],
         "mcp": {
@@ -160,6 +167,49 @@
           "/usr/bin",
           "/bin"
         ]
+      }
+    },
+    {
+      "id": "researcher",
+      "name": "Research Specialist",
+      "tools": {
+        "builtIn": [
+          "read",
+          "grep",
+          "find",
+          "ls",
+          "attach_file"
+        ],
+        "mcp": {
+          "servers": [
+            {
+              "id": "docs",
+              "includeTools": [
+                "search",
+                "fetch"
+              ]
+            },
+            "remote-docs"
+          ]
+        }
+      },
+      "prompt": {
+        "base": {
+          "text": "You are a focused research specialist. Investigate the requested topic, cite the files or tool results you used, and return concise findings for the parent agent."
+        },
+        "instructions": [
+          {
+            "file": "/var/lib/imp/agents/researcher/AGENTS.md"
+          }
+        ],
+        "references": [
+          {
+            "file": "/var/lib/imp/agents/researcher/NOTES.md"
+          }
+        ]
+      },
+      "workspace": {
+        "cwd": "/var/lib/imp/agents/researcher/workspace"
       }
     }
   ],
